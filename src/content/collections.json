@@ -1,0 +1,6 @@
+[
+  { "handle": "rings", "title": "Rings", "description": "Architectural forms for everyday wear. Grade 23 titanium.", "featured": true, "count": 4 },
+  { "handle": "necklaces", "title": "Necklaces", "description": "Pendants and chains in pure titanium. Lightweight, corrosion-proof.", "featured": true, "count": 4 },
+  { "handle": "earrings", "title": "Earrings", "description": "Studs, hoops and drops. Implant-grade posts. Nickel-free.", "featured": true, "count": 4 },
+  { "handle": "bracelets", "title": "Bracelets", "description": "Cuffs and bangles. No tarnish. Ever.", "featured": true, "count": 3 }
+]

@@ -1,0 +1,191 @@
+import { describe, it, expect, beforeEach } from 'vitest'
+import { useCartStore } from '@/store/cart'
+import type { HJProduct } from '@/lib/shopify/types'
+
+const mockProduct: HJProduct = {
+  id: 'hj-001',
+  handle: 'arc-band',
+  title: 'Arc Band',
+  collection: 'rings',
+  material: 'titanium',
+  tags: ['rings'],
+  price: '89.00',
+  compareAtPrice: null,
+  badge: 'Bestseller',
+  description: 'Test',
+  spec: '2mm',
+  svgType: 'ring-arc',
+}
+
+const mockProduct2: HJProduct = {
+  id: 'hj-002',
+  handle: 'dome-ring',
+  title: 'Dome Ring',
+  collection: 'rings',
+  material: 'titanium',
+  tags: ['rings'],
+  price: '112.00',
+  compareAtPrice: null,
+  badge: 'New',
+  description: 'Dome ring',
+  spec: '4mm',
+  svgType: 'ring-dome',
+}
+
+beforeEach(() => {
+  useCartStore.setState({ items: [], isOpen: false })
+})
+
+describe('cart store — initial state', () => {
+  it('has an empty items array', () => {
+    const { items } = useCartStore.getState()
+    expect(items).toEqual([])
+  })
+
+  it('has isOpen as false', () => {
+    const { isOpen } = useCartStore.getState()
+    expect(isOpen).toBe(false)
+  })
+})
+
+describe('addItem', () => {
+  it('adds a product and totalItems becomes 1', () => {
+    const { addItem, totalItems } = useCartStore.getState()
+    addItem(mockProduct)
+    expect(totalItems()).toBe(1)
+  })
+
+  it('adding the same product twice results in quantity 2', () => {
+    const { addItem, totalItems } = useCartStore.getState()
+    addItem(mockProduct)
+    addItem(mockProduct)
+    expect(totalItems()).toBe(2)
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(1)
+    expect(items[0].quantity).toBe(2)
+  })
+
+  it('adding two different products results in two items', () => {
+    const { addItem } = useCartStore.getState()
+    addItem(mockProduct)
+    addItem(mockProduct2)
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(2)
+  })
+
+  it('respects explicit quantity when adding', () => {
+    const { addItem, totalItems } = useCartStore.getState()
+    addItem(mockProduct, 3)
+    expect(totalItems()).toBe(3)
+  })
+})
+
+describe('removeItem', () => {
+  it('removes the correct product by id', () => {
+    const { addItem, removeItem } = useCartStore.getState()
+    addItem(mockProduct)
+    addItem(mockProduct2)
+    removeItem('hj-001')
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(1)
+    expect(items[0].product.id).toBe('hj-002')
+  })
+
+  it('removing a non-existent id leaves cart unchanged', () => {
+    const { addItem, removeItem } = useCartStore.getState()
+    addItem(mockProduct)
+    removeItem('does-not-exist')
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(1)
+  })
+})
+
+describe('updateQuantity', () => {
+  it('updates quantity for an existing item', () => {
+    const { addItem, updateQuantity } = useCartStore.getState()
+    addItem(mockProduct)
+    updateQuantity('hj-001', 5)
+    const { items } = useCartStore.getState()
+    expect(items[0].quantity).toBe(5)
+  })
+
+  it('removes the item when quantity is set to 0', () => {
+    const { addItem, updateQuantity } = useCartStore.getState()
+    addItem(mockProduct)
+    updateQuantity('hj-001', 0)
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(0)
+  })
+
+  it('removes the item when quantity is negative', () => {
+    const { addItem, updateQuantity } = useCartStore.getState()
+    addItem(mockProduct)
+    updateQuantity('hj-001', -1)
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(0)
+  })
+})
+
+describe('clearCart', () => {
+  it('empties the items array', () => {
+    const { addItem, clearCart } = useCartStore.getState()
+    addItem(mockProduct)
+    addItem(mockProduct2)
+    clearCart()
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(0)
+  })
+})
+
+describe('drawer controls', () => {
+  it('openCart sets isOpen to true', () => {
+    useCartStore.getState().openCart()
+    expect(useCartStore.getState().isOpen).toBe(true)
+  })
+
+  it('closeCart sets isOpen to false', () => {
+    useCartStore.setState({ isOpen: true })
+    useCartStore.getState().closeCart()
+    expect(useCartStore.getState().isOpen).toBe(false)
+  })
+
+  it('toggleCart flips isOpen from false to true', () => {
+    useCartStore.getState().toggleCart()
+    expect(useCartStore.getState().isOpen).toBe(true)
+  })
+
+  it('toggleCart flips isOpen from true to false', () => {
+    useCartStore.setState({ isOpen: true })
+    useCartStore.getState().toggleCart()
+    expect(useCartStore.getState().isOpen).toBe(false)
+  })
+})
+
+describe('totalPrice', () => {
+  it('returns 0 for an empty cart', () => {
+    const { totalPrice } = useCartStore.getState()
+    expect(totalPrice()).toBe(0)
+  })
+
+  it('returns price * quantity for a single item', () => {
+    const { addItem, totalPrice } = useCartStore.getState()
+    addItem(mockProduct, 2) // 89.00 * 2 = 178.00
+    expect(totalPrice()).toBeCloseTo(178.0, 2)
+  })
+
+  it('sums price * quantity across multiple items', () => {
+    const { addItem, totalPrice } = useCartStore.getState()
+    addItem(mockProduct, 1)   // 89.00
+    addItem(mockProduct2, 2)  // 112.00 * 2 = 224.00 → total 313.00
+    expect(totalPrice()).toBeCloseTo(313.0, 2)
+  })
+})
+
+describe('totalItems', () => {
+  it('sums quantities across all items', () => {
+    const { addItem, totalItems } = useCartStore.getState()
+    addItem(mockProduct, 3)
+    addItem(mockProduct2, 2)
+    expect(totalItems()).toBe(5)
+  })
+})

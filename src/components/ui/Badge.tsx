@@ -1,0 +1,52 @@
+import { cn } from '@/lib/utils/cn'
+
+type BadgeVariant = 'bestseller' | 'new' | 'sale'
+
+interface BadgeProps {
+  variant: BadgeVariant
+  className?: string
+}
+
+const variantStyles: Record<BadgeVariant, React.CSSProperties> = {
+  bestseller: {
+    color: 'var(--titanium)',
+    backgroundColor: 'rgba(157,167,175,0.12)',
+    border: '1px solid rgba(157,167,175,0.3)',
+  },
+  new: {
+    color: 'var(--sage)',
+    backgroundColor: 'rgba(140,168,154,0.12)',
+    border: '1px solid rgba(140,168,154,0.3)',
+  },
+  sale: {
+    color: 'var(--ink)',
+    backgroundColor: 'var(--ash)',
+    border: '1px solid var(--ash)',
+  },
+}
+
+const variantLabels: Record<BadgeVariant, string> = {
+  bestseller: 'Bestseller',
+  new: 'New',
+  sale: 'Sale',
+}
+
+export function Badge({ variant, className }: BadgeProps) {
+  return (
+    <span
+      className={cn('inline-block', className)}
+      style={{
+        fontFamily: 'var(--font-ui)',
+        fontSize: '9px',
+        letterSpacing: '0.15em',
+        textTransform: 'uppercase',
+        padding: '3px 7px',
+        ...variantStyles[variant],
+      }}
+    >
+      {variantLabels[variant]}
+    </span>
+  )
+}
+
+export default Badge
