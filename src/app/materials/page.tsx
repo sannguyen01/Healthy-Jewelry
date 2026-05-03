@@ -171,43 +171,23 @@ export default function MaterialsPage() {
                   {material.body}
                 </p>
 
-                <ul
-                  style={{
-                    listStyle: 'none',
-                    padding: 0,
-                    margin: '0 0 32px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                  }}
-                >
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '0 0 32px' }}>
                   {material.properties.map((prop) => (
-                    <li
+                    <span
                       key={prop}
+                      className="material-tag"
                       style={{
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '10px',
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 'var(--text-sm)',
-                        color: 'var(--ink)',
-                        fontWeight: 300,
+                        padding: '6px 14px',
+                        border: '1px solid var(--ash)',
+                        backgroundColor: 'var(--bg)',
                       }}
                     >
-                      <span
-                        style={{
-                          color: 'var(--sage)',
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '0.9rem',
-                          flexShrink: 0,
-                        }}
-                      >
-                        ✓
-                      </span>
                       {prop}
-                    </li>
+                    </span>
                   ))}
-                </ul>
+                </div>
 
                 <Link
                   href={`/shop?material=${material.handle}`}

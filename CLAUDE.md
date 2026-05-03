@@ -10,34 +10,37 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 
 ## Tech Stack
 - Framework: Next.js 15, App Router, TypeScript (strict mode)
-- Styling: Tailwind CSS v4 + CSS custom properties (T3 tokens in `src/app/globals.css`)
-- Fonts: Bebas Neue (display) + Cormorant Garamond (serif) + Barlow Condensed (UI) + Barlow (body)
+- Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`)
+- Fonts: Barlow Condensed (display) + DM Sans (UI + body)
 - State: Zustand (cart store)
 - Package manager: pnpm
 - Deployment: Vercel (auto-deploy on push to `main`)
 - Testing: Vitest + Testing Library (80%+ coverage required)
 
-## Design System — T3 (Void-White Dominant)
+## Design System — T4 (Void-White Dominant)
 
 | Token | Hex | Use |
 |-------|-----|-----|
 | `--bg` | #F7F5F1 | Void-white — dominant background |
-| `--nacre` | #EDE9E2 | Card tile background |
-| `--ash` | #D5D0C8 | Borders, dividers |
+| `--nacre` | #EDEAE4 | Card tile background |
+| `--ash` | #D8D3CB | Borders, dividers |
 | `--graphite` | #6B6762 | Secondary text |
 | `--ink` | #1A1714 | Primary text, logo |
 | `--titanium` | #9DA7AF | Accent color |
 | `--sage` | #8CA89A | Green accent |
+| `--mist` | #A8A49E | Muted text |
+| `--on-dark` | #F0EDE8 | Text on dark backgrounds |
 | `--black` | #0A0A0A | Campaign band dark |
 | `--mid` | #2C2926 | Dark hover states |
 
-**Ease token**: `--ease: cubic-bezier(0.00, 0.00, 0.30, 1.00)`
+**Ease tokens**:
+- `--ease: cubic-bezier(0.16, 1, 0.3, 1)` (smooth spring)
+- `--ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00)` (sharp snap)
 
 ### Typography
-- `--font-display` → Bebas Neue (section labels, CTAs, product names, nav logo)
-- `--font-serif` → Cormorant Garamond (hero headline, editorial text)
-- `--font-ui` → Barlow Condensed (nav links, metadata, labels, eyebrows)
-- `--font-body` → Barlow (body text, prices, descriptions)
+- `--font-display` → Barlow Condensed (section labels, CTAs, product names, collection numbers, nav)
+- `--font-ui` → DM Sans (nav links, metadata, labels, eyebrows, utility)
+- `--font-body` → DM Sans (body text, prices, descriptions)
 
 ### Architecture (Gentle Monster style)
 - Horizontal scroll strips on homepage (no product grids)
@@ -62,6 +65,16 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Data: `src/lib/data/hj-data.ts` — typed product catalog (static, Shopify-ready)
 - Shopify: `src/lib/shopify/` — client, queries, mutations, types
 - Store: `src/store/cart.ts` — Zustand cart with persist
+- Hooks: `src/lib/hooks/useReveal.ts` — IntersectionObserver scroll-reveal hook, returns `[ref, visible]` tuple, triggers once then disconnects
+
+### Animations
+Keyframes defined in `globals.css`:
+- `hjSlideUp` — fade + translate up (Hero stagger, section entrances)
+- `hjFadeDown` — subtle fade + translate down
+- `hjSlideIn` — fade + translate right
+- `hjFadeIn` — simple opacity fade
+
+CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 
 ## Content Data (NO STONES/GEMS)
 - `src/lib/data/hj-data.ts` — 15 products, 4 collections, 3 materials
@@ -77,6 +90,7 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - `/about` → Brand story
 - `/materials` → Materials science page
 - `/search` → Search results
+- `/contact` → Contact page (form + email info)
 
 ## Coding Standards
 - Strict TypeScript, no `any`

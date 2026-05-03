@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath, revalidateTag } from 'next/cache'
+import { timingSafeEqual } from 'crypto'
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Validate secret — check query param first, then header
-  const secretParam = request.nextUrl.searchParams.get('secret')
-  const secretHeader = request.headers.get('x-shopify-hmac-sha256')
   const expectedSecret = process.env.SHOPIFY_REVALIDATION_SECRET
 
   if (!expectedSecret) {
@@ -12,13 +10,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Revalidation not configured' }, { status: 503 })
   }
 
-  const providedSecret = secretParam ?? secretHeader
+  // Accept secret only via header — never via query param (query params appear in logs)
+  const providedSecret = request.headers.get('x-revalidate-secret')
 
-  if (!providedSecret || providedSecret !== expectedSecret) {
+  // Timing-safe comparison prevents byte-by-byte secret recovery via timing attacks
+  const secretsMatch =
+    providedSecret !== null &&
+    providedSecret.length === expectedSecret.length &&
+    timingSafeEqual(Buffer.from(providedSecret), Buffer.from(expectedSecret))
+
+  if (!secretsMatch) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Revalidate all relevant paths and tags
   try {
     revalidatePath('/', 'page')
     revalidatePath('/shop', 'page')
@@ -28,7 +32,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     revalidatePath('/shop/bracelets', 'page')
     revalidatePath('/products/[handle]', 'page')
 
-    // Tag-based revalidation for fine-grained control
     revalidateTag('products')
     revalidateTag('collections')
 

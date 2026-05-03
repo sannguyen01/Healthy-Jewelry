@@ -35,11 +35,12 @@ export default function AboutPage() {
 
           <h1
             style={{
-              fontFamily: 'var(--font-serif)',
-              fontStyle: 'italic',
+              fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
               fontSize: 'var(--text-display)',
-              fontWeight: 400,
-              lineHeight: 1.08,
+              fontWeight: 700,
+              lineHeight: 1.05,
               color: 'var(--ink)',
               margin: '0 0 32px',
             }}
