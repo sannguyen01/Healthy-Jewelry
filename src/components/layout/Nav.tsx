@@ -41,11 +41,11 @@ export function Nav({ cartCount }: NavProps) {
             'background-color 0.4s cubic-bezier(0.00,0.00,0.30,1.00), border-color 0.4s cubic-bezier(0.00,0.00,0.30,1.00)',
         }}
       >
-        {/* Logo — left */}
+        {/* Logo + wordmark — left */}
         <Link
           href="/"
           aria-label="Healthy Jewelry — home"
-          style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}
         >
           <Image
             src="/logo.png"
@@ -55,6 +55,19 @@ export function Nav({ cartCount }: NavProps) {
             style={{ objectFit: 'contain', height: '28px', width: 'auto' }}
             priority
           />
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 500,
+              fontSize: 'clamp(1rem, 1.4vw, 1.25rem)',
+              letterSpacing: '0.10em',
+              lineHeight: 1.1,
+              color: menuOpen ? 'var(--on-dark)' : 'var(--ink)',
+              transition: 'color 400ms cubic-bezier(0.00, 0.00, 0.30, 1.00)',
+            }}
+          >
+            HEALTHY JEWELLREY
+          </span>
         </Link>
 
         {/* Desktop center nav */}
