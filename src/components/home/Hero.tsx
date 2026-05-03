@@ -14,13 +14,11 @@ export function Hero() {
     children.forEach((child, i) => {
       child.style.opacity = '0'
       child.style.transform = 'translateY(32px)'
-      child.style.transition = `opacity 0.7s var(--ease, cubic-bezier(0.00,0.00,0.30,1.00)), transform 0.7s var(--ease, cubic-bezier(0.00,0.00,0.30,1.00))`
-      child.style.animationDelay = `${i * 0.12}s`
-      const delay = i * 120
+      child.style.transition = `opacity 0.7s var(--ease), transform 0.7s var(--ease)`
       setTimeout(() => {
         child.style.opacity = '1'
         child.style.transform = 'translateY(0)'
-      }, delay + 80)
+      }, i * 120 + 80)
     })
   }, [])
 
@@ -32,102 +30,90 @@ export function Hero() {
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
         overflow: 'hidden',
       }}
     >
-      {/* Background ring SVG — decorative, top-right */}
+      {/* Background ring — large, right side, very faint */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
-          top: '-60px',
-          right: '-60px',
-          width: '420px',
-          height: '420px',
-          opacity: 0.1,
+          right: '-120px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 'min(60vw, 640px)',
+          height: 'min(60vw, 640px)',
+          opacity: 0.06,
           pointerEvents: 'none',
         }}
       >
         <JewelrySVG type="ring-arc" className="w-full h-full" />
       </div>
 
-      {/* Center content */}
+      {/* Left-aligned content */}
       <div
         ref={contentRef}
         style={{
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
+          alignItems: 'flex-start',
           padding: '0 clamp(20px, 4vw, 64px)',
-          maxWidth: '760px',
-          gap: '0',
+          maxWidth: '720px',
           zIndex: 1,
         }}
       >
-        {/* Eyebrow */}
-        <span
-          className="label-eyebrow"
-          style={{ marginBottom: '28px' }}
-        >
+        <span className="label-eyebrow" style={{ marginBottom: '24px' }}>
           Implant-Grade Titanium · Niobium · 316L Steel
         </span>
 
-        {/* Headline */}
         <h1
           style={{
-            fontFamily: 'var(--font-serif)',
-            fontStyle: 'italic',
-            fontSize: 'var(--text-hero, clamp(3.2rem, 8vw, 6.5rem))',
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--text-hero)',
+            fontWeight: 500,
             color: 'var(--ink)',
-            lineHeight: 0.95,
+            lineHeight: 0.9,
             letterSpacing: '-0.01em',
+            textTransform: 'uppercase',
             margin: '0 0 28px',
-            whiteSpace: 'pre-line',
           }}
         >
-          {`Metal that works\nwith your body.`}
+          Metal that
+          <br />
+          works with
+          <br />
+          your body.
         </h1>
 
-        {/* Subline */}
         <p
           style={{
             fontFamily: 'var(--font-body)',
             fontWeight: 300,
-            fontSize: 'var(--text-lg, 1.15rem)',
+            fontSize: 'var(--text-lg)',
             color: 'var(--graphite)',
             margin: '0 0 44px',
             lineHeight: 1.6,
+            maxWidth: '400px',
           }}
         >
           No stones. No fillers. Pure material integrity.
         </p>
 
-        {/* CTA buttons */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '16px',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-          }}
-        >
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           <Link
             href="/shop"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
               padding: '14px 32px',
               backgroundColor: 'var(--ink)',
               color: 'var(--bg)',
               fontFamily: 'var(--font-ui)',
-              fontSize: '0.72rem',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 500,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
-              textDecoration: 'none',
-              transition: 'background-color 0.25s var(--ease, cubic-bezier(0.00,0.00,0.30,1.00))',
+              transition: 'background-color 0.25s var(--ease)',
             }}
             onMouseEnter={(e) => {
               ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--mid)'
@@ -138,21 +124,7 @@ export function Hero() {
           >
             Shop Collection
           </Link>
-          <Link
-            href="/about"
-            className="btn-ghost"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '14px 32px',
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.72rem',
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-            }}
-          >
+          <Link href="/about" className="btn-ghost">
             Our Story
           </Link>
         </div>
@@ -183,13 +155,7 @@ export function Hero() {
         >
           Scroll
         </span>
-        <div
-          style={{
-            width: '1px',
-            height: '32px',
-            backgroundColor: 'var(--ash)',
-          }}
-        />
+        <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--ash)' }} />
       </div>
     </section>
   )

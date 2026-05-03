@@ -10,13 +10,7 @@ export function MaterialsSection() {
         padding: 'clamp(64px, 8vw, 96px) var(--space-gutter, clamp(20px,4vw,64px))',
       }}
     >
-      {/* Section eyebrow + headline */}
-      <div
-        style={{
-          maxWidth: '1200px',
-          margin: '0 auto 48px',
-        }}
-      >
+      <div style={{ maxWidth: '1200px', margin: '0 auto 48px' }}>
         <div
           style={{
             display: 'flex',
@@ -26,29 +20,24 @@ export function MaterialsSection() {
           }}
         >
           <span className="label-eyebrow">Materials</span>
-          <div
-            style={{
-              flex: 1,
-              height: '1px',
-              backgroundColor: 'var(--ash)',
-            }}
-          />
+          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
         </div>
         <h2
           style={{
-            fontFamily: 'var(--font-serif)',
-            fontStyle: 'italic',
-            fontSize: 'var(--text-2xl, clamp(1.8rem, 3.5vw, 2.8rem))',
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--text-2xl)',
+            fontWeight: 500,
+            textTransform: 'uppercase',
             color: 'var(--ink)',
             margin: 0,
-            lineHeight: 1.15,
+            lineHeight: 1.1,
+            letterSpacing: '0.02em',
           }}
         >
           Built from the inside out.
         </h2>
       </div>
 
-      {/* Material cards */}
       <div
         className="hj-materials-row"
         style={{
@@ -69,11 +58,11 @@ export function MaterialsSection() {
               borderTop: '1px solid var(--ash)',
             }}
           >
-            {/* Ordinal */}
             <p
               style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: '3rem',
+                fontWeight: 400,
                 color: 'var(--ash)',
                 lineHeight: 1,
                 margin: '0 0 16px',
@@ -84,11 +73,11 @@ export function MaterialsSection() {
               {ordinals[i]}
             </p>
 
-            {/* Material title */}
             <h3
               style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: '1.2rem',
+                fontWeight: 500,
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 color: 'var(--ink)',
@@ -98,11 +87,10 @@ export function MaterialsSection() {
               {material.title}
             </h3>
 
-            {/* Subtitle */}
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
-                fontSize: 'var(--text-xs, 0.7rem)',
+                fontSize: 'var(--text-xs)',
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
                 color: 'var(--titanium)',
@@ -112,12 +100,11 @@ export function MaterialsSection() {
               {material.subtitle}
             </p>
 
-            {/* Body */}
             <p
               style={{
                 fontFamily: 'var(--font-body)',
                 fontWeight: 300,
-                fontSize: 'var(--text-sm, 0.85rem)',
+                fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
                 lineHeight: 1.7,
                 margin: '0 0 20px',
@@ -126,35 +113,26 @@ export function MaterialsSection() {
               {material.body}
             </p>
 
-            {/* Properties list */}
-            <ul
-              style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
-              }}
-            >
+            {/* Pill badges for properties */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {material.properties.map((prop) => (
-                <li
+                <span
                   key={prop}
                   style={{
+                    display: 'inline-block',
+                    padding: '4px 12px',
+                    border: '1px solid var(--ash)',
                     fontFamily: 'var(--font-ui)',
-                    fontSize: 'var(--text-xs, 0.7rem)',
-                    letterSpacing: '0.1em',
+                    fontSize: 'var(--text-xs)',
+                    letterSpacing: '0.08em',
                     color: 'var(--graphite)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <span style={{ color: 'var(--titanium)' }}>·</span>
                   {prop}
-                </li>
+                </span>
               ))}
-            </ul>
+            </div>
           </div>
         ))}
       </div>

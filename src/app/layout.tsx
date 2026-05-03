@@ -1,35 +1,20 @@
 import type { Metadata, Viewport } from 'next'
-import { Bebas_Neue, Cormorant_Garamond, Barlow_Condensed, Barlow } from 'next/font/google'
+import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
 import { CartProvider } from '@/store/cart'
 
-const bebasNeue = Bebas_Neue({
-  weight: '400',
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-display-next',
-})
-
-const cormorantGaramond = Cormorant_Garamond({
-  weight: ['300'],
-  style: ['normal', 'italic'],
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-serif-next',
-})
-
 const barlowCondensed = Barlow_Condensed({
+  weight: ['400', '500'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-bc',
+})
+
+const dmSans = DM_Sans({
   weight: ['300', '400', '500'],
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-ui-next',
-})
-
-const barlow = Barlow({
-  weight: ['300', '400'],
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-body-next',
+  variable: '--font-dm',
 })
 
 export const metadata: Metadata = {
@@ -98,26 +83,18 @@ export const viewport: Viewport = {
   themeColor: '#F7F5F1',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      className={[
-        bebasNeue.variable,
-        cormorantGaramond.variable,
-        barlowCondensed.variable,
-        barlow.variable,
-      ].join(' ')}
-      style={{
-        '--font-display': 'var(--font-display-next, "Bebas Neue", sans-serif)',
-        '--font-serif': 'var(--font-serif-next, "Cormorant Garamond", Georgia, serif)',
-        '--font-ui': 'var(--font-ui-next, "Barlow Condensed", sans-serif)',
-        '--font-body': 'var(--font-body-next, "Barlow", sans-serif)',
-      } as React.CSSProperties}
+      className={`${barlowCondensed.variable} ${dmSans.variable}`}
+      style={
+        {
+          '--font-display': 'var(--font-bc, "Barlow Condensed", sans-serif)',
+          '--font-ui': 'var(--font-bc, "Barlow Condensed", sans-serif)',
+          '--font-body': 'var(--font-dm, "DM Sans", sans-serif)',
+        } as React.CSSProperties
+      }
     >
       <body>
         <CartProvider>{children}</CartProvider>

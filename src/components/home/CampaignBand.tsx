@@ -1,35 +1,32 @@
+import Link from 'next/link'
+
 interface CampaignBandProps {
   headline?: string
-  subline?: string
+  body?: string
 }
 
 export function CampaignBand({
   headline = 'SCIENCE BEFORE AESTHETICS.',
-  subline = 'GRADE 23 TITANIUM · NIOBIUM · 316L SURGICAL STEEL',
+  body = 'Every piece engineered for biocompatibility. Grade 23 titanium passes through the body without reaction. That’s not a feature — it’s the foundation.',
 }: CampaignBandProps) {
   return (
     <section
       className="campaign-band"
       style={{
         backgroundColor: 'var(--black)',
-        padding: `clamp(56px, 8vw, 96px) var(--space-gutter, clamp(20px,4vw,64px))`,
+        padding: `clamp(64px, 9vw, 112px) var(--space-gutter, clamp(20px,4vw,64px))`,
       }}
     >
-      <div
-        style={{
-          maxWidth: '960px',
-          margin: '0 auto',
-          textAlign: 'center',
-        }}
-      >
+      <div style={{ maxWidth: '800px' }}>
         <h2
           style={{
             fontFamily: 'var(--font-display)',
-            fontSize: 'var(--text-display, clamp(2.4rem, 6vw, 4.5rem))',
+            fontSize: 'var(--text-display)',
+            fontWeight: 500,
             color: 'var(--bg)',
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
-            margin: '0 0 20px',
+            margin: '0 0 28px',
             lineHeight: 1,
           }}
         >
@@ -37,16 +34,20 @@ export function CampaignBand({
         </h2>
         <p
           style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-sm, 0.8rem)',
-            color: 'rgba(247,245,241,0.5)',
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            margin: 0,
+            fontFamily: 'var(--font-body)',
+            fontWeight: 300,
+            fontSize: 'var(--text-lg)',
+            color: 'rgba(247,245,241,0.6)',
+            lineHeight: 1.65,
+            margin: '0 0 36px',
+            maxWidth: '520px',
           }}
         >
-          {subline}
+          {body}
         </p>
+        <Link href="/materials" className="btn-ghost-dark">
+          Read the science
+        </Link>
       </div>
     </section>
   )

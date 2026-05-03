@@ -12,7 +12,6 @@ export function CollectionGrid() {
         padding: 'clamp(48px, 6vw, 80px) var(--space-gutter, clamp(20px,4vw,64px))',
       }}
     >
-      {/* Section eyebrow */}
       <div
         style={{
           marginBottom: '28px',
@@ -22,26 +21,11 @@ export function CollectionGrid() {
         }}
       >
         <span className="label-eyebrow">Collections</span>
-        <div
-          style={{
-            flex: 1,
-            height: '1px',
-            backgroundColor: 'var(--ash)',
-          }}
-        />
+        <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
       </div>
 
-      {/* 2×2 grid */}
-      <div
-        className="hj-collection-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 'var(--space-gutter, clamp(16px,2vw,32px))',
-          maxWidth: '1200px',
-          margin: '0 auto',
-        }}
-      >
+      {/* 4-column horizontal bar */}
+      <div className="hj-coll-grid" style={{ gap: '2px' }}>
         {hjCollections.map((collection) => {
           const firstProduct = getProductsByCollection(collection.handle)[0]
           return (
@@ -54,14 +38,14 @@ export function CollectionGrid() {
                 aspectRatio: '3 / 4',
                 overflow: 'hidden',
                 textDecoration: 'none',
-                transition: 'transform 0.4s var(--ease, cubic-bezier(0.00,0.00,0.30,1.00))',
+                transition: 'opacity 0.3s var(--ease)',
               }}
-              className="card-tile hj-collection-tile"
+              className="card-tile hj-coll-tile"
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.02)'
+                ;(e.currentTarget as HTMLAnchorElement).style.opacity = '0.88'
               }}
               onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.transform = 'scale(1.00)'
+                ;(e.currentTarget as HTMLAnchorElement).style.opacity = '1'
               }}
             >
               {/* Background SVG illustration */}
@@ -74,7 +58,7 @@ export function CollectionGrid() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    opacity: 0.15,
+                    opacity: 0.12,
                     pointerEvents: 'none',
                   }}
                 >
@@ -82,54 +66,37 @@ export function CollectionGrid() {
                 </div>
               )}
 
-              {/* Bottom overlay */}
+              {/* Bottom label */}
               <div
                 style={{
                   position: 'absolute',
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  padding: '24px',
-                  background: 'linear-gradient(to top, rgba(26,23,20,0.08) 0%, transparent 100%)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
+                  padding: '20px 16px',
                 }}
               >
                 <h3
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontSize: '1.4rem',
-                    letterSpacing: '0.06em',
+                    fontSize: '1.1rem',
+                    fontWeight: 500,
+                    letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     color: 'var(--ink)',
-                    margin: 0,
+                    margin: '0 0 4px',
                   }}
                 >
                   {collection.title}
                 </h3>
-                <p
-                  style={{
-                    fontFamily: 'var(--font-body)',
-                    fontWeight: 300,
-                    fontSize: '0.82rem',
-                    color: 'var(--graphite)',
-                    margin: 0,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {collection.description}
-                </p>
                 <span
                   style={{
                     display: 'block',
                     fontFamily: 'var(--font-ui)',
-                    fontSize: '0.62rem',
-                    letterSpacing: '0.18em',
+                    fontSize: 'var(--text-xs)',
+                    letterSpacing: '0.14em',
                     textTransform: 'uppercase',
-                    color: 'var(--ink)',
-                    marginTop: '8px',
-                    alignSelf: 'flex-end',
+                    color: 'var(--graphite)',
                   }}
                 >
                   Shop →
@@ -139,14 +106,6 @@ export function CollectionGrid() {
           )
         })}
       </div>
-
-      <style>{`
-        @media (max-width: 600px) {
-          .hj-collection-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </section>
   )
 }

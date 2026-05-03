@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 import { useCartStore } from '@/store/cart'
 import { useScrolled } from '@/lib/hooks/useScrolled'
@@ -40,21 +41,20 @@ export function Nav({ cartCount }: NavProps) {
             'background-color 0.4s cubic-bezier(0.00,0.00,0.30,1.00), border-color 0.4s cubic-bezier(0.00,0.00,0.30,1.00)',
         }}
       >
-        {/* Wordmark — left */}
+        {/* Logo — left */}
         <Link
           href="/"
           aria-label="Healthy Jewelry — home"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.2rem',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--ink)',
-            textDecoration: 'none',
-            flexShrink: 0,
-          }}
+          style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
         >
-          Healthy Jewelry
+          <Image
+            src="/logo.png"
+            alt="Healthy Jewelry"
+            width={120}
+            height={32}
+            style={{ objectFit: 'contain', height: '28px', width: 'auto' }}
+            priority
+          />
         </Link>
 
         {/* Desktop center nav */}
