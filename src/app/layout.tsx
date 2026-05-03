@@ -91,7 +91,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       style={
         {
           '--font-display': 'var(--font-bc, "Barlow Condensed", sans-serif)',
-          '--font-ui': 'var(--font-bc, "Barlow Condensed", sans-serif)',
+          '--font-ui': 'var(--font-dm, "DM Sans", sans-serif)',
           '--font-body': 'var(--font-dm, "DM Sans", sans-serif)',
         } as React.CSSProperties
       }
