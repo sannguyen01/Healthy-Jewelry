@@ -10,12 +10,28 @@ const NAV_LINKS = [
   { label: 'Journal', href: '/journal' },
 ]
 
+// Minimal titanium ring mark — two concentric circles echoing the jewelry motif
+function BrandMark() {
+  return (
+    <svg
+      viewBox="0 0 28 28"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      style={{ width: 22, height: 22, flexShrink: 0 }}
+    >
+      <circle cx="14" cy="14" r="11" stroke="var(--titanium)" strokeWidth="3" fill="none" />
+      <circle cx="14" cy="14" r="6" stroke="var(--ash)" strokeWidth="1.5" fill="none" />
+    </svg>
+  )
+}
+
 export function Header() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 80)
+    const onScroll = () => setScrolled(window.scrollY > 60)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
@@ -33,48 +49,56 @@ export function Header() {
         display: 'flex',
         alignItems: 'center',
         padding: '0 var(--space-gutter)',
-        backgroundColor: scrolled ? 'var(--color-dark)' : 'transparent',
-        transition: 'background-color var(--duration-base) var(--ease-bio)',
-        borderBottom: scrolled ? '1px solid rgba(248, 245, 240, 0.06)' : 'none',
+        backgroundColor: scrolled ? 'rgba(247, 245, 241, 0.94)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(12px)' : 'none',
+        WebkitBackdropFilter: scrolled ? 'blur(12px)' : 'none',
+        transition: `background-color var(--duration-base) var(--ease)`,
+        borderBottom: scrolled ? '1px solid var(--ash)' : '1px solid transparent',
       }}
     >
-      {/* Wordmark */}
+      {/* Logo mark + brand name — same font as footer brand column */}
       <Link
         href="/"
         aria-label="Healthy Jewelry — home"
         style={{
-          fontSize: 'var(--text-xs)',
-          letterSpacing: '0.20em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text)',
-          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
           flexShrink: 0,
         }}
       >
-        Healthy Jewelry
+        <BrandMark />
+        <span
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '1.1rem',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ink)',
+            lineHeight: 1,
+          }}
+        >
+          Healthy Jewelry
+        </span>
       </Link>
 
-      {/* Desktop Nav */}
+      {/* Desktop nav — hj-desk-nav handles show/hide at 768px breakpoint */}
       <nav
         aria-label="Primary navigation"
-        style={{
-          display: 'flex',
-          gap: '32px',
-          marginLeft: 'auto',
-          marginRight: '32px',
-        }}
-        className="desktop-nav"
+        style={{ gap: '32px', marginLeft: 'auto', marginRight: '32px' }}
+        className="hj-desk-nav"
       >
         {NAV_LINKS.map((link) => (
           <Link
             key={link.href}
             href={link.href}
             style={{
+              fontFamily: 'var(--font-ui)',
               fontSize: 'var(--text-xs)',
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
-              color: 'var(--color-text-muted)',
-              transition: `color var(--duration-fast) var(--ease-bio)`,
+              color: 'var(--graphite)',
+              transition: `color var(--duration-fast) var(--ease)`,
             }}
           >
             {link.label}
@@ -82,29 +106,29 @@ export function Header() {
         ))}
       </nav>
 
-      {/* Atelier CTA */}
+      {/* Atelier CTA — desktop only; hj-desk-nav (utilities layer) overrides btn-ghost display */}
       <Link
         href="/atelier"
-        className="btn-ghost"
-        style={{ display: 'none' }}
+        className="btn-ghost hj-desk-nav"
         aria-label="Book a consultation"
       >
         Atelier
       </Link>
 
-      {/* Mobile menu toggle */}
+      {/* Mobile menu toggle — hj-mob-menu: hidden on desktop, flex on ≤768px */}
       <button
         aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={menuOpen}
         onClick={() => setMenuOpen((v) => !v)}
         style={{
           marginLeft: 'auto',
-          color: 'var(--color-text)',
+          color: 'var(--ink)',
+          fontFamily: 'var(--font-ui)',
           fontSize: 'var(--text-xs)',
           letterSpacing: '0.15em',
           textTransform: 'uppercase',
         }}
-        className="mobile-menu-toggle"
+        className="hj-mob-menu"
       >
         {menuOpen ? 'Close' : 'Menu'}
       </button>
@@ -116,7 +140,7 @@ export function Header() {
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'var(--color-dark)',
+            backgroundColor: 'var(--bg)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -131,9 +155,11 @@ export function Header() {
               href={link.href}
               onClick={() => setMenuOpen(false)}
               style={{
+                fontFamily: 'var(--font-display)',
                 fontSize: 'var(--text-2xl)',
-                color: 'var(--color-text)',
-                letterSpacing: '0.05em',
+                color: 'var(--ink)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
               }}
             >
               {link.label}
