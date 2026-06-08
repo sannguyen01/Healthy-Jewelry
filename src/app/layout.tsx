@@ -48,21 +48,12 @@ export const metadata: Metadata = {
     title: 'Healthy Jewelry — Implant-Grade Titanium',
     description:
       'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic. Corrosion-proof. Built to last.',
-    images: [
-      {
-        url: '/og-default.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Healthy Jewelry — Implant-Grade Titanium',
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Healthy Jewelry — Implant-Grade Titanium',
     description:
       'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic. Corrosion-proof.',
-    images: ['/og-default.jpg'],
   },
   robots: {
     index: true,

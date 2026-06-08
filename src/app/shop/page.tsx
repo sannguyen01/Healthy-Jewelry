@@ -3,7 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductGrid } from '@/components/product/ProductGrid'
-import { getAllProducts } from '@/lib/data/hj-data'
+import { getProducts } from '@/lib/shopify'
 
 export const metadata: Metadata = {
   title: 'Shop All',
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
     'Browse the full Healthy Jewelry collection. Implant-grade titanium, niobium, and 316L surgical steel rings, necklaces, earrings, and bracelets.',
 }
 
-export default function ShopPage() {
-  const products = getAllProducts()
+export default async function ShopPage() {
+  const products = await getProducts()
 
   return (
     <>

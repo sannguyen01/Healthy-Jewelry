@@ -33,3 +33,17 @@ export function useCartItemQuantity(productId: string): number {
     return item?.quantity ?? 0
   })
 }
+
+/**
+ * Returns the Shopify checkoutUrl from the cart store, or null if not yet synced.
+ */
+export function useCheckoutUrl(): string | null {
+  return useCartStore((state) => state.checkoutUrl)
+}
+
+/**
+ * Returns whether the cart is currently syncing with Shopify.
+ */
+export function useCartIsLoading(): boolean {
+  return useCartStore((state) => state.isLoading)
+}

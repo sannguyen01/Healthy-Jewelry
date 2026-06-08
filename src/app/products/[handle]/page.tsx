@@ -6,7 +6,10 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { HorizontalScroll } from '@/components/home/HorizontalScroll'
-import { getAllProducts, getProductByHandle, getProductsByCollection } from '@/lib/data/hj-data'
+import { getAllProducts, getProductByHandle } from '@/lib/data/hj-data'
+import { getProduct, getProductsByCollection } from '@/lib/shopify'
+import { JsonLd, productJsonLd } from '@/components/seo/JsonLd'
+import { SITE_URL } from '@/config/site'
 
 interface ProductPageProps {
   params: Promise<{ handle: string }>
@@ -30,16 +33,42 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { handle } = await params
-  const product = getProductByHandle(handle)
+  const product = await getProduct(handle)
 
   if (!product) {
     notFound()
   }
 
-  const related = getProductsByCollection(product.collection).filter((p) => p.id !== product.id)
+  const related = (await getProductsByCollection(product.collection)).filter(
+    (p) => p.id !== product.id
+  )
 
   return (
     <>
+      <JsonLd type="Product" data={productJsonLd(product)} />
+      <JsonLd
+        type="Organization"
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+            { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE_URL}/shop` },
+            {
+              '@type': 'ListItem',
+              position: 3,
+              name: product.collection,
+              item: `${SITE_URL}/shop/${product.collection}`,
+            },
+            {
+              '@type': 'ListItem',
+              position: 4,
+              name: product.title,
+              item: `${SITE_URL}/products/${product.handle}`,
+            },
+          ],
+        }}
+      />
       <Nav />
       <main style={{ paddingTop: '64px' }}>
         {/* Breadcrumbs */}

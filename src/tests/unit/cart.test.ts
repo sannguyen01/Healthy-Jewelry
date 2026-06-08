@@ -33,7 +33,13 @@ const mockProduct2: HJProduct = {
 }
 
 beforeEach(() => {
-  useCartStore.setState({ items: [], isOpen: false })
+  useCartStore.setState({
+    items: [],
+    isOpen: false,
+    shopifyCartId: null,
+    checkoutUrl: null,
+    isLoading: false,
+  })
 })
 
 describe('cart store — initial state', () => {
@@ -45,6 +51,21 @@ describe('cart store — initial state', () => {
   it('has isOpen as false', () => {
     const { isOpen } = useCartStore.getState()
     expect(isOpen).toBe(false)
+  })
+
+  it('has shopifyCartId as null', () => {
+    const { shopifyCartId } = useCartStore.getState()
+    expect(shopifyCartId).toBeNull()
+  })
+
+  it('has checkoutUrl as null', () => {
+    const { checkoutUrl } = useCartStore.getState()
+    expect(checkoutUrl).toBeNull()
+  })
+
+  it('has isLoading as false', () => {
+    const { isLoading } = useCartStore.getState()
+    expect(isLoading).toBe(false)
   })
 })
 
@@ -134,6 +155,14 @@ describe('clearCart', () => {
     clearCart()
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(0)
+  })
+
+  it('clears shopifyCartId and checkoutUrl', () => {
+    useCartStore.setState({ shopifyCartId: 'gid://shopify/Cart/123', checkoutUrl: 'https://checkout.shopify.com/x' })
+    useCartStore.getState().clearCart()
+    const { shopifyCartId, checkoutUrl } = useCartStore.getState()
+    expect(shopifyCartId).toBeNull()
+    expect(checkoutUrl).toBeNull()
   })
 })
 

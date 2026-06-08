@@ -3,12 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-
-const NAV_LINKS = [
-  { label: 'Collection', href: '/collections' },
-  { label: 'Our Story', href: '/about' },
-  { label: 'Contact', href: '/contact' },
-]
+import { mainNav } from '@/config/navigation'
 
 const EASE_SHARP = 'cubic-bezier(0.00, 0.00, 0.30, 1.00)'
 const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
@@ -99,7 +94,7 @@ export function Header() {
         className="hj-desk-nav"
         style={{ gap: 40, alignItems: 'center' }}
       >
-        {NAV_LINKS.map(({ label, href }) => (
+        {mainNav.map(({ label, href }) => (
           <Link
             key={href}
             href={href}
@@ -212,7 +207,7 @@ export function Header() {
             zIndex: 89,
           }}
         >
-          {NAV_LINKS.map(({ label, href }) => (
+          {mainNav.map(({ label, href }) => (
             <div
               key={href}
               style={{
