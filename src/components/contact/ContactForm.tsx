@@ -11,12 +11,7 @@ interface FormFields {
   message: string
 }
 
-const SUBJECTS = [
-  'General inquiry',
-  'Product question',
-  'Order support',
-  'Custom order',
-] as const
+const SUBJECTS = ['General inquiry', 'Product question', 'Order support', 'Custom order'] as const
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -56,9 +51,15 @@ export function ContactForm() {
     e.preventDefault()
     setStatus('sending')
     try {
-      // Simulate send — replace with POST /api/contact when Resend is wired
-      await new Promise((resolve) => setTimeout(resolve, 800))
-      console.log('Contact form submission:', fields)
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error ?? 'Failed to send')
+      }
       setStatus('sent')
     } catch {
       setStatus('error')

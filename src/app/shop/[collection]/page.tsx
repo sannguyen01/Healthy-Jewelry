@@ -4,7 +4,8 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductGrid } from '@/components/product/ProductGrid'
-import { getProductsByCollection, hjCollections } from '@/lib/data/hj-data'
+import { hjCollections } from '@/lib/data/hj-data'
+import { getProductsByCollection } from '@/lib/shopify'
 import type { HJCollectionHandle } from '@/lib/shopify/types'
 
 const VALID_COLLECTIONS: HJCollectionHandle[] = [
@@ -29,9 +30,9 @@ interface CollectionPageProps {
   params: Promise<{ collection: string }>
 }
 
-export async function generateMetadata(
-  { params }: CollectionPageProps
-): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: CollectionPageProps): Promise<Metadata> {
   const { collection } = await params
   const col = hjCollections.find((c) => c.handle === collection)
   if (!col) {
@@ -52,7 +53,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
 
   const handle = collection as HJCollectionHandle
   const col = hjCollections.find((c) => c.handle === handle)
-  const products = getProductsByCollection(handle)
+  const products = await getProductsByCollection(handle)
 
   return (
     <>

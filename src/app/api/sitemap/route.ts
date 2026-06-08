@@ -6,15 +6,21 @@ export async function GET(): Promise<NextResponse> {
   const products = getAllProducts()
 
   const staticPages = [
-    { loc: '/',                    changefreq: 'weekly',  priority: '1.0' },
-    { loc: '/shop',                changefreq: 'daily',   priority: '0.9' },
-    { loc: '/shop/rings',          changefreq: 'daily',   priority: '0.8' },
-    { loc: '/shop/necklaces',      changefreq: 'daily',   priority: '0.8' },
-    { loc: '/shop/earrings',       changefreq: 'daily',   priority: '0.8' },
-    { loc: '/shop/bracelets',      changefreq: 'daily',   priority: '0.8' },
-    { loc: '/about',               changefreq: 'monthly', priority: '0.6' },
-    { loc: '/materials',           changefreq: 'monthly', priority: '0.7' },
-    { loc: '/search',              changefreq: 'monthly', priority: '0.5' },
+    { loc: '/', changefreq: 'weekly', priority: '1.0' },
+    { loc: '/shop', changefreq: 'daily', priority: '0.9' },
+    { loc: '/shop/rings', changefreq: 'daily', priority: '0.8' },
+    { loc: '/shop/necklaces', changefreq: 'daily', priority: '0.8' },
+    { loc: '/shop/earrings', changefreq: 'daily', priority: '0.8' },
+    { loc: '/shop/bracelets', changefreq: 'daily', priority: '0.8' },
+    { loc: '/about', changefreq: 'monthly', priority: '0.6' },
+    { loc: '/materials', changefreq: 'monthly', priority: '0.7' },
+    { loc: '/search', changefreq: 'monthly', priority: '0.5' },
+    { loc: '/privacy', changefreq: 'yearly', priority: '0.3' },
+    { loc: '/terms', changefreq: 'yearly', priority: '0.3' },
+    { loc: '/shipping', changefreq: 'monthly', priority: '0.4' },
+    { loc: '/faq', changefreq: 'monthly', priority: '0.5' },
+    { loc: '/stores', changefreq: 'monthly', priority: '0.3' },
+    { loc: '/legal', changefreq: 'yearly', priority: '0.2' },
   ] as const
 
   const productPages = products.map((p) => ({
