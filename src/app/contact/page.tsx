@@ -13,7 +13,6 @@ export const metadata: Metadata = {
 const INFO_ITEMS = [
   { label: 'Email', value: 'hello@healthyjewelry.com' },
   { label: 'Response time', value: 'Within 24 hours' },
-  { label: 'Location', value: 'Hà Nội, Việt Nam' },
 ] as const
 
 export default function ContactPage() {
@@ -23,7 +22,6 @@ export default function ContactPage() {
       <CartDrawer />
 
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
-
         {/* ── Page header ───────────────────────────────────────────── */}
         <section
           style={{
@@ -64,8 +62,7 @@ export default function ContactPage() {
               margin: 0,
             }}
           >
-            Material questions, sizing advice, custom orders. We&apos;re based in
-            Hà Nội — reach us any time.
+            Material questions, sizing advice, custom orders. Reach us any time.
           </p>
         </section>
 
@@ -163,15 +160,13 @@ export default function ContactPage() {
               margin: 0,
             }}
           >
-            Read our complete guide to Grade 23 titanium, niobium, and 316L
-            surgical steel.
+            Read our complete guide to Grade 23 titanium, niobium, and 316L surgical steel.
           </p>
 
           <a href="/materials" className="btn-ghost-dark" style={{ marginTop: '8px' }}>
             View Materials Guide
           </a>
         </section>
-
       </main>
 
       <Footer />

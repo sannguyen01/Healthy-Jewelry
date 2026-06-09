@@ -6,7 +6,7 @@ import { CartDrawer } from '@/components/layout/CartDrawer'
 export const metadata: Metadata = {
   title: 'Locations — Healthy Jewelry',
   description:
-    'Healthy Jewelry is available exclusively online. Our flagship store in Hà Nội is coming in 2026. Ships worldwide.',
+    'Healthy Jewelry is available exclusively online. Ships worldwide with free delivery on every order.',
 }
 
 export default function StoresPage() {
@@ -15,7 +15,6 @@ export default function StoresPage() {
       <Nav />
       <CartDrawer />
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
-
         {/* Hero */}
         <section
           style={{
@@ -63,12 +62,19 @@ export default function StoresPage() {
               margin: 0,
             }}
           >
-            Currently available exclusively online — we ship worldwide with free delivery on every order.
+            Currently available exclusively online — we ship worldwide with free delivery on every
+            order.
           </p>
         </section>
 
         {/* Divider */}
-        <div style={{ height: '1px', backgroundColor: 'var(--ash)', margin: '0 clamp(24px, 6vw, 120px)' }} />
+        <div
+          style={{
+            height: '1px',
+            backgroundColor: 'var(--ash)',
+            margin: '0 clamp(24px, 6vw, 120px)',
+          }}
+        />
 
         {/* Online Store */}
         <section
@@ -117,7 +123,8 @@ export default function StoresPage() {
                 margin: '0 0 16px',
               }}
             >
-              Our full collection is available at healthyjewelry.com. Free shipping to every country, no minimum order. Orders from Hà Nội can arrive the same day.
+              Our full collection is available at healthyjewelry.com. Free shipping to every
+              country, no minimum order.
             </p>
             <p
               style={{
@@ -129,9 +136,7 @@ export default function StoresPage() {
                 margin: 0,
               }}
             >
-              Vietnam-wide delivery: 2–4 business days.
-              <br />
-              International: 7–14 business days.
+              International delivery: 7–14 business days.
             </p>
           </div>
 
@@ -158,9 +163,9 @@ export default function StoresPage() {
                 margin: '0 0 20px',
               }}
             >
-              Hà Nội,
+              Flagship Store
               <br />
-              Việt Nam.
+              Coming 2026.
             </h2>
             <p
               style={{
@@ -172,7 +177,8 @@ export default function StoresPage() {
                 margin: '0 0 16px',
               }}
             >
-              Our flagship physical store in Hà Nội is coming in 2026. It will be a space dedicated to material transparency — where you can see, handle, and compare our metals in person.
+              Our flagship physical store is coming in 2026. It will be a space dedicated to
+              material transparency — where you can see, handle, and compare our metals in person.
             </p>
             <p
               style={{
@@ -184,7 +190,8 @@ export default function StoresPage() {
                 margin: 0,
               }}
             >
-              Until then, we offer in-person consultations and showroom appointments in Hà Nội. Email us to arrange a visit.
+              Until then, we offer in-person consultations and showroom appointments by appointment.
+              Email us to arrange a visit.
             </p>
           </div>
         </section>
@@ -214,7 +221,7 @@ export default function StoresPage() {
                 margin: 0,
               }}
             >
-              In Hà Nội?
+              Showroom
             </p>
             <h2
               style={{
@@ -238,7 +245,7 @@ export default function StoresPage() {
                 margin: 0,
               }}
             >
-              For showroom appointments or in-person consultations in Hà Nội, email us at{' '}
+              For showroom appointments or in-person consultations, email us at{' '}
               <a
                 href="mailto:hello@healthyjewelry.com"
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
@@ -258,7 +265,6 @@ export default function StoresPage() {
             </div>
           </div>
         </section>
-
       </main>
       <Footer />
     </>

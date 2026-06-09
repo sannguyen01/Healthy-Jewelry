@@ -6,7 +6,7 @@ import { CartDrawer } from '@/components/layout/CartDrawer'
 export const metadata: Metadata = {
   title: 'Terms of Service — Healthy Jewelry',
   description:
-    'Terms of Service for Healthy Jewelry. Govening law: Vietnamese law, Hà Nội courts. Lifetime warranty against corrosion.',
+    'Terms of Service for Healthy Jewelry. Lifetime warranty against corrosion. Free returns within 30 days.',
 }
 
 const sectionHeadStyle: React.CSSProperties = {
@@ -125,10 +125,9 @@ export default function TermsPage() {
               best of our knowledge.
             </p>
             <p style={bodyStyle}>
-              Prices are displayed in Vietnamese Dong (VND) for domestic customers and in US Dollars
-              (USD) for international customers. We reserve the right to change prices at any time
-              without notice. The price shown at the time of your order confirmation is the price
-              you will pay.
+              Prices are displayed in US Dollars (USD). We reserve the right to change prices at any
+              time without notice. The price shown at the time of your order confirmation is the
+              price you will pay.
             </p>
             <p style={bodyStyle}>
               We make every effort to display product colors accurately, but actual colors may vary
@@ -162,9 +161,8 @@ export default function TermsPage() {
             <p style={bodyStyle}>We accept the following payment methods:</p>
             <ul style={listStyle}>
               <li>Credit and debit cards (Visa, Mastercard)</li>
-              <li>Bank transfer (Vietnam domestic)</li>
-              <li>Digital wallets (MoMo, ZaloPay) for Vietnamese customers</li>
-              <li>PayPal for international orders</li>
+              <li>PayPal</li>
+              <li>Bank transfer</li>
             </ul>
             <p style={bodyStyle}>
               All transactions are processed securely. We do not store your full card details on our
@@ -227,20 +225,18 @@ export default function TermsPage() {
           <div>
             <h2 style={sectionHeadStyle}>Governing Law</h2>
             <p style={bodyStyle}>
-              These Terms are governed by the laws of the Socialist Republic of Vietnam. Any
-              disputes arising from these Terms or your use of our services shall be subject to the
-              exclusive jurisdiction of the courts of Hà Nội, Vietnam.
+              These Terms are governed by applicable law. We aim to resolve any disputes arising
+              from these Terms or your use of our services amicably before any formal proceedings.
             </p>
             <p style={bodyStyle}>
-              For international customers, we aim to resolve disputes amicably before any formal
-              proceedings. Contact us first at{' '}
+              Contact us at{' '}
               <a
                 href="mailto:hello@healthyjewelry.com"
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
                 hello@healthyjewelry.com
-              </a>
-              .
+              </a>{' '}
+              before any formal proceedings.
             </p>
           </div>
 
@@ -257,7 +253,7 @@ export default function TermsPage() {
                 hello@healthyjewelry.com
               </a>
               <br />
-              <strong>Address:</strong> Healthy Jewelry, Hà Nội, Việt Nam
+              <strong>Address:</strong> Healthy Jewelry
             </p>
           </div>
         </section>

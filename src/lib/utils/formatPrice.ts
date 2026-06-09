@@ -6,10 +6,7 @@ export type CurrencyCode = 'USD' | 'VND' | 'EUR' | 'GBP'
  * Format a price amount into a localised currency string.
  * Accepts both string and numeric amounts.
  */
-export function formatPrice(
-  amount: string | number,
-  currencyCode: CurrencyCode = 'USD'
-): string {
+export function formatPrice(amount: string | number, currencyCode: CurrencyCode = 'USD'): string {
   const numeric = typeof amount === 'string' ? parseFloat(amount) : amount
 
   return new Intl.NumberFormat('en-US', {
@@ -21,7 +18,7 @@ export function formatPrice(
 }
 
 /**
- * Format a price in Vietnamese Dong (VND).
+ * Format a price in VND.
  */
 export function formatPriceVND(amount: number): string {
   return new Intl.NumberFormat('vi-VN', {

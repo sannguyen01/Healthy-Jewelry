@@ -144,7 +144,7 @@ export function Footer() {
               color: 'var(--titanium)',
             }}
           >
-            © 2026 Healthy Jewelry · Hà Nội, Việt Nam
+            © 2026 Healthy Jewelry
           </span>
           <span
             style={{

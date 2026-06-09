@@ -6,7 +6,7 @@ import { CartDrawer } from '@/components/layout/CartDrawer'
 export const metadata: Metadata = {
   title: 'Shipping & Returns — Healthy Jewelry',
   description:
-    'Free shipping on all Healthy Jewelry orders. Same-day Hà Nội delivery, 2-4 day Vietnam-wide, 7-14 day international. 30-day returns.',
+    'Free shipping on all Healthy Jewelry orders worldwide. 7–14 day international delivery. 30-day returns.',
 }
 
 const sectionHeadStyle: React.CSSProperties = {
@@ -70,7 +70,6 @@ export default function ShippingPage() {
       <Nav />
       <CartDrawer />
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
-
         {/* Hero */}
         <section
           style={{
@@ -122,7 +121,13 @@ export default function ShippingPage() {
         </section>
 
         {/* Divider */}
-        <div style={{ height: '1px', backgroundColor: 'var(--ash)', margin: '0 clamp(24px, 6vw, 120px)' }} />
+        <div
+          style={{
+            height: '1px',
+            backgroundColor: 'var(--ash)',
+            margin: '0 clamp(24px, 6vw, 120px)',
+          }}
+        />
 
         {/* Content */}
         <section
@@ -134,13 +139,10 @@ export default function ShippingPage() {
             gap: '56px',
           }}
         >
-
           {/* Shipping */}
           <div>
             <h2 style={sectionHeadStyle}>Shipping</h2>
-            <p style={bodyStyle}>
-              All orders ship free. No minimum order value, no handling fees. We ship from Hà Nội.
-            </p>
+            <p style={bodyStyle}>All orders ship free. No minimum order value, no handling fees.</p>
 
             <table style={tableStyle}>
               <thead>
@@ -152,16 +154,6 @@ export default function ShippingPage() {
               </thead>
               <tbody>
                 <tr>
-                  <td style={tdStyle}>Hà Nội (same-day)</td>
-                  <td style={tdStyle}>Same day (orders placed before 2pm on weekdays)</td>
-                  <td style={tdStyle}>Free</td>
-                </tr>
-                <tr>
-                  <td style={tdStyle}>Vietnam — nationwide</td>
-                  <td style={tdStyle}>2–4 business days</td>
-                  <td style={tdStyle}>Free</td>
-                </tr>
-                <tr>
                   <td style={tdStyle}>International</td>
                   <td style={tdStyle}>7–14 business days</td>
                   <td style={tdStyle}>Free</td>
@@ -170,10 +162,13 @@ export default function ShippingPage() {
             </table>
 
             <p style={bodyStyle}>
-              Orders are processed within 1 business day. You will receive a shipping confirmation email with a tracking number once your order ships. Same-day delivery in Hà Nội is available Monday through Friday for orders placed before 2:00pm local time.
+              Orders are processed within 1 business day. You will receive a shipping confirmation
+              email with a tracking number once your order ships.{' '}
             </p>
             <p style={bodyStyle}>
-              International orders may be subject to customs duties and import taxes levied by the destination country. These charges are the responsibility of the recipient and are not included in our free shipping offer.
+              International orders may be subject to customs duties and import taxes levied by the
+              destination country. These charges are the responsibility of the recipient and are not
+              included in our free shipping offer.
             </p>
           </div>
 
@@ -181,16 +176,25 @@ export default function ShippingPage() {
           <div>
             <h2 style={sectionHeadStyle}>Returns</h2>
             <p style={bodyStyle}>
-              We accept returns within <strong>30 days</strong> of delivery. Items must be unworn, in original condition, and in original packaging.
+              We accept returns within <strong>30 days</strong> of delivery. Items must be unworn,
+              in original condition, and in original packaging.
             </p>
             <ul style={listStyle}>
-              <li>Initiate a return by emailing{' '}
-                <a href="mailto:support@healthyjewelry.com" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
+              <li>
+                Initiate a return by emailing{' '}
+                <a
+                  href="mailto:support@healthyjewelry.com"
+                  style={{ color: 'var(--ink)', textDecoration: 'underline' }}
+                >
                   support@healthyjewelry.com
                 </a>{' '}
-                with your order number.</li>
-              <li>We will provide a prepaid return label for Vietnam-domestic returns.</li>
-              <li>Once we receive and inspect the returned item, your refund will be processed to your original payment method within 5–7 business days.</li>
+                with your order number.
+              </li>
+              <li>We will provide a prepaid return label for all returns.</li>
+              <li>
+                Once we receive and inspect the returned item, your refund will be processed to your
+                original payment method within 5–7 business days.
+              </li>
               <li>Piercing jewelry that has been worn cannot be returned for hygiene reasons.</li>
             </ul>
           </div>
@@ -199,17 +203,24 @@ export default function ShippingPage() {
           <div>
             <h2 style={sectionHeadStyle}>Exchanges</h2>
             <p style={bodyStyle}>
-              Need a different size or material? We offer free exchanges within <strong>30 days</strong> of delivery.
+              Need a different size or material? We offer free exchanges within{' '}
+              <strong>30 days</strong> of delivery.
             </p>
             <ul style={listStyle}>
               <li>Size swaps: we will send the correct size once we receive your return.</li>
-              <li>Material swaps: exchanges between Grade 23 Titanium, Niobium, and 316L Surgical Steel variants of the same style.</li>
-              <li>A prepaid return label is provided for all exchange requests within Vietnam.</li>
+              <li>
+                Material swaps: exchanges between Grade 23 Titanium, Niobium, and 316L Surgical
+                Steel variants of the same style.
+              </li>
+              <li>A prepaid return label is provided for all exchange requests.</li>
               <li>International exchange shipping costs may apply.</li>
             </ul>
             <p style={bodyStyle}>
               To start an exchange, email{' '}
-              <a href="mailto:support@healthyjewelry.com" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
+              <a
+                href="mailto:support@healthyjewelry.com"
+                style={{ color: 'var(--ink)', textDecoration: 'underline' }}
+              >
                 support@healthyjewelry.com
               </a>{' '}
               with your order number and the item you would like instead.
@@ -221,13 +232,15 @@ export default function ShippingPage() {
             <h2 style={sectionHeadStyle}>Questions?</h2>
             <p style={bodyStyle}>
               Contact our support team at{' '}
-              <a href="mailto:support@healthyjewelry.com" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
+              <a
+                href="mailto:support@healthyjewelry.com"
+                style={{ color: 'var(--ink)', textDecoration: 'underline' }}
+              >
                 support@healthyjewelry.com
               </a>
               . We respond within 24 hours on business days.
             </p>
           </div>
-
         </section>
       </main>
       <Footer />

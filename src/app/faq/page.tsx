@@ -76,11 +76,11 @@ const sections: Section[] = [
     items: [
       {
         q: 'How long does shipping take?',
-        a: 'Hà Nội same-day delivery is available for orders placed before 2pm on weekdays. Vietnam-wide delivery takes 2–4 business days. International orders arrive in 7–14 business days. All orders ship free with no minimum order value.',
+        a: 'International orders arrive in 7–14 business days. All orders ship free with no minimum order value.',
       },
       {
         q: 'Can I return or exchange?',
-        a: 'Yes. We accept returns and exchanges within 30 days of delivery. Items must be unworn and in original condition. Email support@healthyjewelry.com with your order number to initiate a return or exchange. We provide a prepaid return label for Vietnam-domestic orders.',
+        a: 'Yes. We accept returns and exchanges within 30 days of delivery. Items must be unworn and in original condition. Email support@healthyjewelry.com with your order number to initiate a return or exchange. We provide a prepaid return label for all eligible orders.',
       },
     ],
   },
@@ -92,7 +92,6 @@ export default function FAQPage() {
       <Nav />
       <CartDrawer />
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
-
         {/* Hero */}
         <section
           style={{
@@ -132,7 +131,13 @@ export default function FAQPage() {
         </section>
 
         {/* Divider */}
-        <div style={{ height: '1px', backgroundColor: 'var(--ash)', margin: '0 clamp(24px, 6vw, 120px)' }} />
+        <div
+          style={{
+            height: '1px',
+            backgroundColor: 'var(--ash)',
+            margin: '0 clamp(24px, 6vw, 120px)',
+          }}
+        />
 
         {/* Sections */}
         <section
@@ -234,13 +239,9 @@ export default function FAQPage() {
                 margin: '0 0 20px',
               }}
             >
-              Our team is based in Hà Nội and responds within 24 hours on business days.
+              Our team responds within 24 hours on business days.
             </p>
-            <a
-              href="/contact"
-              className="btn-ghost"
-              style={{ display: 'inline-block' }}
-            >
+            <a href="/contact" className="btn-ghost" style={{ display: 'inline-block' }}>
               Contact Us
             </a>
           </div>

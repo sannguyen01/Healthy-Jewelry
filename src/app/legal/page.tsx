@@ -97,10 +97,6 @@ export default function LegalPage() {
             <p style={bodyStyle}>
               <strong>Company name:</strong> Healthy Jewelry
               <br />
-              <strong>Country of operation:</strong> Socialist Republic of Vietnam
-              <br />
-              <strong>City:</strong> Hà Nội, Việt Nam
-              <br />
               <strong>Website:</strong> healthyjewelry.com
               <br />
               <strong>Contact:</strong>{' '}
@@ -112,8 +108,8 @@ export default function LegalPage() {
               </a>
             </p>
             <p style={bodyStyle}>
-              Healthy Jewelry is a Vietnamese jewelry brand specializing in implant-grade metals:
-              Grade 23 Titanium, Niobium, and 316L Surgical Steel.
+              Healthy Jewelry is a premium jewelry brand specializing in implant-grade metals: Grade
+              23 Titanium, Niobium, and 316L Surgical Steel.
             </p>
           </div>
 
@@ -123,7 +119,7 @@ export default function LegalPage() {
             <p style={bodyStyle}>
               All content on healthyjewelry.com — including but not limited to text, photography,
               graphics, product designs, logos, page layouts, and source code — is the exclusive
-              property of Healthy Jewelry and is protected under Vietnamese copyright law and
+              property of Healthy Jewelry and is protected under applicable copyright law and
               applicable international treaties.
             </p>
             <p style={bodyStyle}>© 2026 Healthy Jewelry. All rights reserved.</p>
@@ -147,9 +143,9 @@ export default function LegalPage() {
             <h2 style={sectionHeadStyle}>Trademark Notice</h2>
             <p style={bodyStyle}>
               &ldquo;Healthy Jewelry&rdquo; and the Healthy Jewelry logotype are trademarks of
-              Healthy Jewelry in Vietnam. The tagline &ldquo;Metal that works with your body&rdquo;
-              is the proprietary brand copy of Healthy Jewelry. Use of these marks without explicit
-              written authorization is prohibited.
+              Healthy Jewelry. The tagline &ldquo;Metal that works with your body&rdquo; is the
+              proprietary brand copy of Healthy Jewelry. Use of these marks without explicit written
+              authorization is prohibited.
             </p>
             <p style={bodyStyle}>
               All other trademarks, product names, and company names mentioned on this site are the
@@ -178,8 +174,8 @@ export default function LegalPage() {
               <a href="/terms" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
                 Terms of Service
               </a>
-              . Nothing in this Legal Notice limits rights you may have under applicable Vietnamese
-              consumer protection law.
+              . Nothing in this Legal Notice limits rights you may have under applicable consumer
+              protection law.
             </p>
           </div>
 
@@ -198,7 +194,7 @@ export default function LegalPage() {
                 legal@healthyjewelry.com
               </a>
               <br />
-              <strong>Address:</strong> Healthy Jewelry, Hà Nội, Việt Nam
+              <strong>Address:</strong> Healthy Jewelry
             </p>
           </div>
         </section>
