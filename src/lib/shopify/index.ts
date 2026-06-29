@@ -22,8 +22,7 @@ import {
 
 function isShopifyConfigured(): boolean {
   return !!(
-    process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN &&
-    process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
+    process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN && process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
   )
 }
 
@@ -33,38 +32,41 @@ function mapShopifyProduct(node: Product): HJProduct {
 
   const material: HJMaterialHandle =
     (tags.find((t) =>
-      (['titanium', 'niobium', 'surgical-steel'] as const).includes(
-        t as HJMaterialHandle
-      )
+      (['titanium', 'niobium', 'surgical-steel'] as const).includes(t as HJMaterialHandle)
     ) as HJMaterialHandle | undefined) ?? 'titanium'
 
   const priceAmount = node.priceRange?.minVariantPrice?.amount ?? '0'
   const price = parseFloat(priceAmount).toFixed(2)
 
-  const compareAtAmount =
-    node.compareAtPriceRange?.minVariantPrice?.amount ?? null
-  const compareAtPrice: string | null = compareAtAmount
-    ? parseFloat(compareAtAmount).toFixed(2)
-    : null
+  const compareAtAmount = node.compareAtPriceRange?.minVariantPrice?.amount ?? null
+  // Shopify returns "0.0" (not null) when no compare-at price is set — guard against it
+  const compareAtPrice: string | null =
+    compareAtAmount && parseFloat(compareAtAmount) > 0
+      ? parseFloat(compareAtAmount).toFixed(2)
+      : null
 
   const collectionsEdges = node.collections?.edges ?? []
   const collection: HJCollectionHandle =
-    (collectionsEdges[0]?.node?.handle as HJCollectionHandle | undefined) ??
-    'rings'
+    (collectionsEdges[0]?.node?.handle as HJCollectionHandle | undefined) ?? 'rings'
 
   const handle = node.handle ?? ''
 
-  let svgType: HJSvgType = 'ring-arc'
-  if (handle.includes('necklace') || handle.includes('pendant')) {
-    svgType = 'necklace-drop'
-  } else if (handle.includes('earring') || handle.includes('stud')) {
-    svgType = 'earring-hoop'
-  } else if (handle.includes('bracelet') || handle.includes('cuff')) {
-    svgType = 'bracelet-cuff'
+  // Tag-based svgType: Shopify admin adds e.g. "svg:ring-dome" to override the fallback
+  const svgTag = tags.find((t) => t.startsWith('svg:'))
+  let svgType: HJSvgType = svgTag ? (svgTag.replace('svg:', '') as HJSvgType) : 'ring-arc'
+  if (!svgTag) {
+    if (handle.includes('necklace') || handle.includes('pendant')) {
+      svgType = 'necklace-drop'
+    } else if (handle.includes('earring') || handle.includes('stud')) {
+      svgType = 'earring-hoop'
+    } else if (handle.includes('bracelet') || handle.includes('cuff')) {
+      svgType = 'bracelet-cuff'
+    }
   }
 
   return {
     id: node.id,
+    defaultVariantId: node.variants.edges[0]?.node.id ?? node.id,
     handle,
     title: node.title,
     description: node.description,
@@ -101,19 +103,37 @@ export async function getProduct(handle: string): Promise<HJProduct | null> {
   }
 }
 
-export async function getProducts(first = 20): Promise<HJProduct[]> {
+type ProductsPage = {
+  products: {
+    pageInfo: { hasNextPage: boolean; endCursor: string }
+    edges: { node: Product }[]
+  }
+}
+
+export async function getProducts(maxItems = 250): Promise<HJProduct[]> {
   if (!isShopifyConfigured()) {
     return staticGetAllProducts()
   }
   try {
-    const response = await shopifyFetch<{
-      products: { edges: { node: Product }[] }
-    }>(GET_PRODUCTS, { first }, { revalidate: 3600 })
-    const edges = response.data?.products?.edges ?? []
-    if (edges.length === 0) {
-      return staticGetAllProducts()
+    const all: HJProduct[] = []
+    let cursor: string | null = null
+    let hasMore = true
+
+    while (hasMore && all.length < maxItems) {
+      const page: ProductsPage = (
+        await shopifyFetch<ProductsPage>(
+          GET_PRODUCTS,
+          { first: 50, after: cursor },
+          { revalidate: 3600 }
+        )
+      ).data
+      const { edges, pageInfo } = page.products
+      all.push(...edges.map((e) => mapShopifyProduct(e.node)))
+      hasMore = pageInfo.hasNextPage
+      cursor = pageInfo.endCursor
     }
-    return edges.map((e) => mapShopifyProduct(e.node))
+
+    return all.length > 0 ? all : staticGetAllProducts()
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
       console.warn('[shopify] getProducts fallback to static:', e.message)
@@ -132,33 +152,21 @@ export async function getProductsByCollection(
   try {
     const response = await shopifyFetch<{
       collection: { products: { edges: { node: Product }[] } } | null
-    }>(
-      GET_PRODUCTS_BY_COLLECTION,
-      { handle: collectionHandle, first },
-      { revalidate: 3600 }
-    )
+    }>(GET_PRODUCTS_BY_COLLECTION, { handle: collectionHandle, first }, { revalidate: 3600 })
     const edges = response.data?.collection?.products?.edges ?? []
     if (edges.length === 0) {
-      return staticGetProductsByCollection(
-        collectionHandle as HJCollectionHandle
-      )
+      return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
     }
     return edges.map((e) => mapShopifyProduct(e.node))
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
-      console.warn(
-        '[shopify] getProductsByCollection fallback:',
-        e.message
-      )
+      console.warn('[shopify] getProductsByCollection fallback:', e.message)
     }
     return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
   }
 }
 
-export async function searchProducts(
-  query: string,
-  first = 20
-): Promise<HJProduct[]> {
+export async function searchProducts(query: string, first = 20): Promise<HJProduct[]> {
   const q = query.toLowerCase().trim()
   if (!isShopifyConfigured() || !q) {
     return staticGetAllProducts().filter(
@@ -173,9 +181,7 @@ export async function searchProducts(
     const response = await shopifyFetch<{
       search: { edges: { node: Product }[] }
     }>(SEARCH_PRODUCTS, { query, first }, { revalidate: 0 })
-    return (response.data?.search?.edges ?? []).map((e) =>
-      mapShopifyProduct(e.node)
-    )
+    return (response.data?.search?.edges ?? []).map((e) => mapShopifyProduct(e.node))
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
       console.warn('[shopify] searchProducts fallback:', e.message)

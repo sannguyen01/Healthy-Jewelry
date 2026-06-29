@@ -4,11 +4,11 @@ on:
   pull_request:
     branches: [main, develop]
   push:
-    branches: [develop]
+    branches: [main, develop]
 
 jobs:
   quality:
-    name: Lint · Type-check · Test
+    name: Lint · Type-check · Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,3 +39,44 @@ jobs:
           SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
           NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: mock.myshopify.com
           NEXT_PUBLIC_SITE_URL: https://healthyjewelry.com
+          SHOPIFY_WEBHOOK_SECRET: mock_webhook_secret
+
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: pnpm e2e
+        env:
+          CI: true
+          NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: placeholder.myshopify.com
+          SHOPIFY_STOREFRONT_ACCESS_TOKEN: placeholder_token
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          SHOPIFY_WEBHOOK_SECRET: placeholder_secret
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

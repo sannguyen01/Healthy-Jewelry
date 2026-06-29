@@ -104,7 +104,7 @@ export const useCartStore = create<CartState>()(
 
         try {
           const lines = items.map((item) => ({
-            merchandiseId: item.product.id,
+            merchandiseId: item.product.defaultVariantId,
             quantity: item.quantity,
           }))
 
@@ -148,7 +148,16 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'hj-cart',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        try {
+          localStorage.setItem('__hj_test__', '1')
+          localStorage.removeItem('__hj_test__')
+          return localStorage
+        } catch {
+          // Safari private browsing throws on localStorage access
+          return { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+        }
+      }),
       // Persist cart items, Shopify cart ID, and checkoutUrl; do not persist transient UI state
       partialize: (state) => ({
         items: state.items,

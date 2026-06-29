@@ -115,6 +115,7 @@ export type HJCollectionHandle = 'rings' | 'necklaces' | 'earrings' | 'bracelets
 
 export interface HJProduct {
   id: string
+  defaultVariantId: string
   handle: string
   title: string
   collection: HJCollectionHandle
