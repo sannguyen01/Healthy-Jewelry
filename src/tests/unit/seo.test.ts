@@ -8,6 +8,7 @@ import type { HJProduct, HJCollection } from '@/lib/shopify/types'
 
 const mockProduct: HJProduct = {
   id: 'gid://shopify/Product/hj-001',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
   handle: 'arc-band-titanium',
   title: 'Arc Band',
   collection: 'rings',

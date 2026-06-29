@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getAllProducts } from '@/lib/data/hj-data'
+import { getProducts } from '@/lib/shopify'
 import { SITE_URL } from '@/config/site'
 
 export async function GET(): Promise<NextResponse> {
-  const products = getAllProducts()
+  const products = await getProducts()
 
   const staticPages = [
     { loc: '/', changefreq: 'weekly', priority: '1.0' },

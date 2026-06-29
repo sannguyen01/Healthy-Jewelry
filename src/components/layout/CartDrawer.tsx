@@ -12,6 +12,8 @@ export function CartDrawer() {
   const removeItem = useCartStore((s) => s.removeItem)
   const updateQuantity = useCartStore((s) => s.updateQuantity)
   const total = useCartStore((s) => s.totalPrice())
+  const syncWithShopify = useCartStore((s) => s.syncWithShopify)
+  const isLoading = useCartStore((s) => s.isLoading)
 
   // Lock body scroll when open
   useEffect(() => {
@@ -347,31 +349,39 @@ export function CartDrawer() {
                 ${total.toFixed(2)}
               </span>
             </div>
-            <a
-              href="/checkout"
+            <button
+              onClick={async () => {
+                await syncWithShopify()
+                const url = useCartStore.getState().checkoutUrl
+                window.location.href = url ?? '/checkout'
+              }}
+              disabled={isLoading}
               style={{
                 display: 'block',
                 width: '100%',
                 padding: '16px',
-                backgroundColor: 'var(--ink)',
+                backgroundColor: isLoading ? 'var(--graphite)' : 'var(--ink)',
                 color: 'var(--bg)',
                 fontFamily: 'var(--font-display)',
                 fontSize: '0.9rem',
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
                 textAlign: 'center',
-                textDecoration: 'none',
+                border: 'none',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.2s ease',
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--mid)'
+                if (!isLoading)
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--mid)'
               }}
               onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--ink)'
+                if (!isLoading)
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--ink)'
               }}
             >
-              Checkout
-            </a>
+              {isLoading ? 'Preparing…' : 'Checkout'}
+            </button>
           </div>
         )}
       </aside>

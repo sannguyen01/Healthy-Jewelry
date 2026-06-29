@@ -4,16 +4,19 @@ import { shopifyConfig } from '@/config/shopify'
 // Allowlist of permitted Storefront GraphQL operation names.
 // Reject any request whose operation is not in this set.
 const ALLOWED_OPERATIONS = new Set([
-  'GetProduct',
+  // Queries — names match src/lib/shopify/queries/products.ts
+  'GetProductByHandle',
   'GetProducts',
-  'GetCollection',
+  'GetProductsByCollection',
+  'SearchProducts',
   'GetCollections',
+  // Cart queries — src/lib/shopify/queries/cart.ts
   'GetCart',
+  // Cart mutations — names match src/lib/shopify/mutations/cart.ts
   'CreateCart',
-  'AddCartLines',
+  'AddToCart',
   'UpdateCartLines',
-  'RemoveCartLines',
-  'GetProductRecommendations',
+  'RemoveFromCart',
 ])
 
 // 16 KB covers all legitimate Storefront queries

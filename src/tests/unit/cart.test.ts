@@ -4,6 +4,7 @@ import type { HJProduct } from '@/lib/shopify/types'
 
 const mockProduct: HJProduct = {
   id: 'hj-001',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
   handle: 'arc-band',
   title: 'Arc Band',
   collection: 'rings',
@@ -19,6 +20,7 @@ const mockProduct: HJProduct = {
 
 const mockProduct2: HJProduct = {
   id: 'hj-002',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-002-default',
   handle: 'dome-ring',
   title: 'Dome Ring',
   collection: 'rings',
@@ -158,7 +160,10 @@ describe('clearCart', () => {
   })
 
   it('clears shopifyCartId and checkoutUrl', () => {
-    useCartStore.setState({ shopifyCartId: 'gid://shopify/Cart/123', checkoutUrl: 'https://checkout.shopify.com/x' })
+    useCartStore.setState({
+      shopifyCartId: 'gid://shopify/Cart/123',
+      checkoutUrl: 'https://checkout.shopify.com/x',
+    })
     useCartStore.getState().clearCart()
     const { shopifyCartId, checkoutUrl } = useCartStore.getState()
     expect(shopifyCartId).toBeNull()
@@ -204,8 +209,8 @@ describe('totalPrice', () => {
 
   it('sums price * quantity across multiple items', () => {
     const { addItem, totalPrice } = useCartStore.getState()
-    addItem(mockProduct, 1)   // 89.00
-    addItem(mockProduct2, 2)  // 112.00 * 2 = 224.00 → total 313.00
+    addItem(mockProduct, 1) // 89.00
+    addItem(mockProduct2, 2) // 112.00 * 2 = 224.00 → total 313.00
     expect(totalPrice()).toBeCloseTo(313.0, 2)
   })
 })

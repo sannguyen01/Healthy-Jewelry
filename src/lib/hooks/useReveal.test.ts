@@ -16,7 +16,7 @@ beforeEach(() => {
 
   vi.stubGlobal(
     'IntersectionObserver',
-    vi.fn((cb: IOCallback, _options?: IntersectionObserverInit) => {
+    vi.fn((cb: IOCallback) => {
       observerCallback = cb
       return {
         observe: mockObserve,
@@ -27,7 +27,7 @@ beforeEach(() => {
         rootMargin: '',
         thresholds: [],
       } satisfies IntersectionObserver
-    }),
+    })
   )
 })
 
@@ -45,7 +45,7 @@ afterEach(() => {
 function attachRefAndTriggerEffect(
   ref: React.RefObject<HTMLElement | null>,
   rerender: (props: { threshold: number }) => void,
-  threshold: number,
+  threshold: number
 ): void {
   const div = document.createElement('div')
   ;(ref as { current: HTMLElement }).current = div
@@ -78,7 +78,7 @@ describe('useReveal', () => {
     it('sets visible to true when the observer fires with isIntersecting: true', () => {
       const { result, rerender } = renderHook(
         ({ threshold }: { threshold: number }) => useReveal(threshold),
-        { initialProps: { threshold: 0.12 } },
+        { initialProps: { threshold: 0.12 } }
       )
 
       attachRefAndTriggerEffect(result.current[0], rerender, 0.13)
@@ -93,7 +93,7 @@ describe('useReveal', () => {
     it('does NOT set visible to true when isIntersecting is false', () => {
       const { result, rerender } = renderHook(
         ({ threshold }: { threshold: number }) => useReveal(threshold),
-        { initialProps: { threshold: 0.12 } },
+        { initialProps: { threshold: 0.12 } }
       )
 
       attachRefAndTriggerEffect(result.current[0], rerender, 0.13)
@@ -108,7 +108,7 @@ describe('useReveal', () => {
     it('calls disconnect after the first intersection', () => {
       const { result, rerender } = renderHook(
         ({ threshold }: { threshold: number }) => useReveal(threshold),
-        { initialProps: { threshold: 0.12 } },
+        { initialProps: { threshold: 0.12 } }
       )
 
       attachRefAndTriggerEffect(result.current[0], rerender, 0.13)
@@ -125,7 +125,7 @@ describe('useReveal', () => {
     it('disconnects the observer on unmount', () => {
       const { result, rerender, unmount } = renderHook(
         ({ threshold }: { threshold: number }) => useReveal(threshold),
-        { initialProps: { threshold: 0.12 } },
+        { initialProps: { threshold: 0.12 } }
       )
 
       attachRefAndTriggerEffect(result.current[0], rerender, 0.13)
@@ -140,7 +140,7 @@ describe('useReveal', () => {
     it('passes the default threshold of 0.12 to IntersectionObserver', () => {
       const { result, rerender } = renderHook(
         ({ threshold }: { threshold: number }) => useReveal(threshold),
-        { initialProps: { threshold: 0.11 } },
+        { initialProps: { threshold: 0.11 } }
       )
 
       // Attach ref then rerender with 0.12 so the effect fires with that threshold
@@ -150,16 +150,13 @@ describe('useReveal', () => {
         rerender({ threshold: 0.12 })
       })
 
-      expect(IntersectionObserver).toHaveBeenCalledWith(
-        expect.any(Function),
-        { threshold: 0.12 },
-      )
+      expect(IntersectionObserver).toHaveBeenCalledWith(expect.any(Function), { threshold: 0.12 })
     })
 
     it('passes a custom threshold to IntersectionObserver', () => {
       const { result, rerender } = renderHook(
         ({ threshold }: { threshold: number }) => useReveal(threshold),
-        { initialProps: { threshold: 0.12 } },
+        { initialProps: { threshold: 0.12 } }
       )
 
       const div = document.createElement('div')
@@ -168,10 +165,7 @@ describe('useReveal', () => {
         rerender({ threshold: 0.5 })
       })
 
-      expect(IntersectionObserver).toHaveBeenCalledWith(
-        expect.any(Function),
-        { threshold: 0.5 },
-      )
+      expect(IntersectionObserver).toHaveBeenCalledWith(expect.any(Function), { threshold: 0.5 })
     })
   })
 })

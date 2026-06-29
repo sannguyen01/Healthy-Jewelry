@@ -81,6 +81,7 @@ export const hjProducts: HJProduct[] = [
   // ── Rings ────────────────────────────────────────────────────────────────
   {
     id: 'gid://shopify/Product/hj-001',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
     handle: 'arc-band-titanium',
     title: 'Arc Band',
     collection: 'rings',
@@ -95,6 +96,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-002',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-002-default',
     handle: 'dome-ring-titanium',
     title: 'Dome Ring',
     collection: 'rings',
@@ -109,6 +111,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-003',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-003-default',
     handle: 'flat-band-niobium',
     title: 'Flat Band',
     collection: 'rings',
@@ -123,6 +126,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-004',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-004-default',
     handle: 'split-ring-titanium',
     title: 'Split Ring',
     collection: 'rings',
@@ -139,6 +143,7 @@ export const hjProducts: HJProduct[] = [
   // ── Necklaces ────────────────────────────────────────────────────────────
   {
     id: 'gid://shopify/Product/hj-005',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-005-default',
     handle: 'orbit-pendant-titanium',
     title: 'Orbit Pendant',
     collection: 'necklaces',
@@ -153,6 +158,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-006',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-006-default',
     handle: 'bar-necklace-titanium',
     title: 'Linear Bar',
     collection: 'necklaces',
@@ -167,6 +173,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-007',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-007-default',
     handle: 'drop-pendant-surgical-steel',
     title: 'Teardrop Pendant',
     collection: 'necklaces',
@@ -181,6 +188,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-008',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-008-default',
     handle: 'link-chain-niobium',
     title: 'Fine Link Chain',
     collection: 'necklaces',
@@ -197,6 +205,7 @@ export const hjProducts: HJProduct[] = [
   // ── Earrings ─────────────────────────────────────────────────────────────
   {
     id: 'gid://shopify/Product/hj-009',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-009-default',
     handle: 'disc-studs-titanium',
     title: 'Disc Studs',
     collection: 'earrings',
@@ -211,6 +220,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-010',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-010-default',
     handle: 'arc-hoops-titanium',
     title: 'Arc Hoops',
     collection: 'earrings',
@@ -225,6 +235,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-011',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-011-default',
     handle: 'tube-drops-surgical-steel',
     title: 'Tube Drops',
     collection: 'earrings',
@@ -239,6 +250,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-012',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-012-default',
     handle: 'cone-studs-niobium',
     title: 'Cone Studs',
     collection: 'earrings',
@@ -255,6 +267,7 @@ export const hjProducts: HJProduct[] = [
   // ── Bracelets ────────────────────────────────────────────────────────────
   {
     id: 'gid://shopify/Product/hj-013',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-013-default',
     handle: 'cable-cuff-titanium',
     title: 'Cable Cuff',
     collection: 'bracelets',
@@ -269,6 +282,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-014',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-014-default',
     handle: 'flat-bangle-titanium',
     title: 'Flat Bangle',
     collection: 'bracelets',
@@ -283,6 +297,7 @@ export const hjProducts: HJProduct[] = [
   },
   {
     id: 'gid://shopify/Product/hj-015',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-015-default',
     handle: 'link-bracelet-surgical-steel',
     title: 'Link Bracelet',
     collection: 'bracelets',

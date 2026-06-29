@@ -1,0 +1,198 @@
+import { describe, it, expect, beforeEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { ProductDetail } from '@/components/product/ProductDetail'
+import { useCartStore } from '@/store/cart'
+import type { HJProduct } from '@/lib/shopify/types'
+
+const ringProduct: HJProduct = {
+  id: 'hj-001',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
+  handle: 'arc-band-titanium',
+  title: 'Arc Band',
+  collection: 'rings',
+  material: 'titanium',
+  tags: ['rings', 'titanium', 'bestseller'],
+  price: '89.00',
+  compareAtPrice: null,
+  badge: 'Bestseller',
+  description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
+  spec: '2 mm · 1.8 g',
+  svgType: 'ring-arc',
+}
+
+const earringProduct: HJProduct = {
+  id: 'hj-009',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-009-default',
+  handle: 'disc-studs-titanium',
+  title: 'Disc Studs',
+  collection: 'earrings',
+  material: 'titanium',
+  tags: ['earrings', 'titanium'],
+  price: '68.00',
+  compareAtPrice: null,
+  badge: null,
+  description: 'Flat disc studs on implant-grade titanium posts.',
+  spec: 'Disc 8 mm · post 6 mm',
+  svgType: 'earring-stud',
+}
+
+const braceletProduct: HJProduct = {
+  id: 'hj-013',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-013-default',
+  handle: 'cable-cuff-titanium',
+  title: 'Cable Cuff',
+  collection: 'bracelets',
+  material: 'titanium',
+  tags: ['bracelets'],
+  price: '168.00',
+  compareAtPrice: null,
+  badge: null,
+  description: 'Twisted titanium cable cuff.',
+  spec: '2.5 mm cable · 160 mm',
+  svgType: 'bracelet-cuff',
+}
+
+beforeEach(() => {
+  useCartStore.setState({
+    items: [],
+    isOpen: false,
+    shopifyCartId: null,
+    checkoutUrl: null,
+    isLoading: false,
+  })
+})
+
+describe('ProductDetail', () => {
+  describe('product info', () => {
+    it('renders product title as h1', () => {
+      render(<ProductDetail product={ringProduct} />)
+      const h1 = screen.getByRole('heading', { level: 1 })
+      expect(h1.textContent).toBe('Arc Band')
+    })
+
+    it('renders formatted price', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('$89.00')).toBeTruthy()
+    })
+
+    it('renders product description', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText(/mirror-polished arc profile/i)).toBeTruthy()
+    })
+
+    it('renders product spec', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('2 mm · 1.8 g')).toBeTruthy()
+    })
+
+    it('renders full material name for titanium', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('Grade 23 Titanium')).toBeTruthy()
+    })
+
+    it('renders full material name for niobium', () => {
+      render(<ProductDetail product={{ ...ringProduct, material: 'niobium' }} />)
+      expect(screen.getByText('Niobium')).toBeTruthy()
+    })
+
+    it('renders full material name for surgical-steel', () => {
+      render(<ProductDetail product={{ ...ringProduct, material: 'surgical-steel' }} />)
+      expect(screen.getByText('316L Surgical Steel')).toBeTruthy()
+    })
+
+    it('renders separator element', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(document.querySelector('[role="separator"]')).toBeTruthy()
+    })
+  })
+
+  describe('badge', () => {
+    it('renders badge when product has one', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('Bestseller')).toBeTruthy()
+    })
+
+    it('does not render badge when null', () => {
+      render(<ProductDetail product={earringProduct} />)
+      expect(screen.queryByText('Bestseller')).toBeNull()
+    })
+  })
+
+  describe('compare at price', () => {
+    it('renders compareAtPrice when present', () => {
+      render(
+        <ProductDetail product={{ ...ringProduct, compareAtPrice: '130.00', badge: 'Sale' }} />,
+      )
+      expect(screen.getByText('$130.00')).toBeTruthy()
+    })
+
+    it('does not render compareAtPrice when null', () => {
+      render(<ProductDetail product={ringProduct} />)
+      const prices = screen.getAllByText(/\$89\.00/)
+      expect(prices.length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByText('$130.00')).toBeNull()
+    })
+  })
+
+  describe('size picker', () => {
+    it('shows size picker for rings', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('US Ring Size')).toBeTruthy()
+    })
+
+    it('shows size picker for bracelets', () => {
+      render(<ProductDetail product={braceletProduct} />)
+      expect(screen.getByText('Bracelet Size')).toBeTruthy()
+    })
+
+    it('does not show size picker for earrings', () => {
+      render(<ProductDetail product={earringProduct} />)
+      expect(screen.queryByText('US Ring Size')).toBeNull()
+      expect(screen.queryByText('Bracelet Size')).toBeNull()
+    })
+
+    it('does not show size picker for necklaces', () => {
+      const necklaceProduct = { ...earringProduct, collection: 'necklaces' as const }
+      render(<ProductDetail product={necklaceProduct} />)
+      expect(screen.queryByText('US Ring Size')).toBeNull()
+    })
+  })
+
+  describe('add to bag', () => {
+    it('renders "Add to Bag" button', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByRole('button', { name: /add arc band to bag/i })).toBeTruthy()
+    })
+
+    it('clicking Add to Bag adds product to cart', () => {
+      render(<ProductDetail product={ringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
+      const items = useCartStore.getState().items
+      expect(items).toHaveLength(1)
+      expect(items[0].product.id).toBe('hj-001')
+    })
+
+    it('clicking Add to Bag opens the cart drawer', () => {
+      render(<ProductDetail product={ringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
+      expect(useCartStore.getState().isOpen).toBe(true)
+    })
+  })
+
+  describe('trust signals', () => {
+    it('shows IMPLANT GRADE trust signal', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('·IMPLANT GRADE·')).toBeTruthy()
+    })
+
+    it('shows HYPOALLERGENIC trust signal', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('·HYPOALLERGENIC·')).toBeTruthy()
+    })
+
+    it('shows MRI SAFE trust signal', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByText('·MRI SAFE·')).toBeTruthy()
+    })
+  })
+})

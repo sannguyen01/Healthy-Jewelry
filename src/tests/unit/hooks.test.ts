@@ -165,6 +165,7 @@ describe('useIsTablet', () => {
 
 const testProduct: HJProduct = {
   id: 'gid://shopify/Product/hj-test-001',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-test-001-default',
   handle: 'test-ring-titanium',
   title: 'Test Ring',
   collection: 'rings',
