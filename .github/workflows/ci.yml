@@ -33,7 +33,7 @@ jobs:
         run: pnpm type-check
 
       - name: Unit tests
-        run: pnpm test --run
+        run: pnpm exec vitest run
         env:
           SHOPIFY_STORE_DOMAIN: mock.myshopify.com
           SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
