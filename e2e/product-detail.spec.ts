@@ -20,7 +20,10 @@ test.describe('Product detail — ring', () => {
   })
 
   test('shows product description', async ({ page }) => {
-    const desc = page.locator('p').filter({ hasText: /titanium/i }).first()
+    const desc = page
+      .locator('p')
+      .filter({ hasText: /titanium/i })
+      .first()
     await expect(desc).toBeVisible()
   })
 
@@ -98,5 +101,57 @@ test.describe('Product detail — bracelet', () => {
 
   test('shows Bracelet Size picker for bracelets', async ({ page }) => {
     await expect(page.getByText('Bracelet Size')).toBeVisible()
+  })
+})
+
+test.describe('Product detail — size selection', () => {
+  test('clicking a ring size marks it as selected (aria-pressed="true")', async ({ page }) => {
+    await page.goto(`/products/${RING_HANDLE}`)
+    const size7 = page.getByRole('button', { name: 'Ring size 7' })
+    await size7.click()
+    await expect(size7).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('clicking a different ring size deselects the previous one', async ({ page }) => {
+    await page.goto(`/products/${RING_HANDLE}`)
+    const size7 = page.getByRole('button', { name: 'Ring size 7' })
+    const size9 = page.getByRole('button', { name: 'Ring size 9' })
+    await size7.click()
+    await expect(size7).toHaveAttribute('aria-pressed', 'true')
+    await size9.click()
+    await expect(size9).toHaveAttribute('aria-pressed', 'true')
+    await expect(size7).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('clicking a bracelet size marks it as selected', async ({ page }) => {
+    await page.goto(`/products/${BRACELET_HANDLE}`)
+    const sizeM = page.getByRole('button', { name: 'Bracelet size M' })
+    await sizeM.click()
+    await expect(sizeM).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+test.describe('Product detail — breadcrumb navigation', () => {
+  test('breadcrumb nav is present with aria-label', async ({ page }) => {
+    await page.goto(`/products/${RING_HANDLE}`)
+    await expect(page.getByRole('navigation', { name: /breadcrumb/i })).toBeVisible()
+  })
+
+  test('breadcrumb Shop link navigates to /shop', async ({ page }) => {
+    await page.goto(`/products/${RING_HANDLE}`)
+    const shopLink = page
+      .getByRole('navigation', { name: /breadcrumb/i })
+      .getByRole('link', { name: /^shop$/i })
+    await shopLink.click()
+    await expect(page).toHaveURL('/shop')
+  })
+
+  test('breadcrumb collection link navigates to collection page', async ({ page }) => {
+    await page.goto(`/products/${RING_HANDLE}`)
+    const collectionLink = page
+      .getByRole('navigation', { name: /breadcrumb/i })
+      .getByRole('link', { name: /rings/i })
+    await collectionLink.click()
+    await expect(page).toHaveURL('/shop/rings')
   })
 })
