@@ -16,6 +16,8 @@
     "e2e:debug": "playwright test --debug"
   },
   "dependencies": {
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.0",
     "next": "^15.3.1",

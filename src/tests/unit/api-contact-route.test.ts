@@ -10,6 +10,18 @@ vi.mock('resend', () => ({
   })),
 }))
 
+// Mock @upstash/ratelimit and @upstash/redis so tests run without real Redis.
+// In test env UPSTASH_REDIS_REST_URL is unset → upstashRl stays null → in-memory
+// fallback is used. These mocks just prevent import errors when packages are installed.
+vi.mock('@upstash/ratelimit', () => ({
+  Ratelimit: vi.fn().mockImplementation(() => ({
+    limit: vi.fn().mockResolvedValue({ success: true }),
+  })),
+}))
+vi.mock('@upstash/redis', () => ({
+  Redis: { fromEnv: vi.fn().mockReturnValue({}) },
+}))
+
 const { POST } = await import('@/app/api/contact/route')
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -114,6 +126,15 @@ describe('POST /api/contact', () => {
       const json = (await res.json()) as { success: boolean }
       expect(json.success).toBe(true)
     })
+
+    it('does NOT include customer email in console output (GDPR data minimisation)', async () => {
+      vi.stubEnv('RESEND_API_KEY', '')
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+      await POST(makeReq(VALID_BODY))
+      const logged = infoSpy.mock.calls.flat().join(' ')
+      expect(logged).not.toContain(VALID_BODY.email)
+      infoSpy.mockRestore()
+    })
   })
 
   describe('success path — RESEND_API_KEY present', () => {
@@ -139,7 +160,7 @@ describe('POST /api/contact', () => {
             emails: {
               send: vi.fn().mockRejectedValueOnce(new Error('Resend API down')),
             },
-          }) as unknown as InstanceType<typeof Resend>,
+          }) as unknown as InstanceType<typeof Resend>
       )
       const req = new NextRequest('http://localhost/api/contact', {
         method: 'POST',
