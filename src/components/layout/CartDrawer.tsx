@@ -255,6 +255,7 @@ export function CartDrawer() {
                         −
                       </button>
                       <span
+                        data-testid="qty-display"
                         style={{
                           fontFamily: 'var(--font-ui)',
                           fontSize: '0.72rem',

@@ -47,7 +47,7 @@ describe('Nav', () => {
 
     it('renders the brand wordmark', () => {
       render(<Nav />)
-      expect(screen.getByText('HEALTHY JEWELLREY')).toBeTruthy()
+      expect(screen.getByText('HEALTHY JEWELLERY')).toBeTruthy()
     })
 
     it('renders logo image with alt text', () => {

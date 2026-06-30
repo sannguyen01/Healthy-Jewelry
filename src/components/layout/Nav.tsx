@@ -66,7 +66,7 @@ export function Nav({ cartCount }: NavProps) {
               transition: 'color 400ms cubic-bezier(0.00, 0.00, 0.30, 1.00)',
             }}
           >
-            HEALTHY JEWELLREY
+            HEALTHY JEWELLERY
           </span>
         </Link>
 

@@ -68,21 +68,30 @@ test.describe('Cart — with items', () => {
 
   test('cart shows quantity 1 initially', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    await expect(dialog.getByText('1')).toBeVisible()
+    await expect(dialog.locator('[data-testid="qty-display"]').first()).toHaveText('1')
   })
 
   test('increase quantity button increments count', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    await dialog.getByRole('button', { name: /increase quantity/i }).first().click()
-    await expect(dialog.getByText('2')).toBeVisible()
+    await dialog
+      .getByRole('button', { name: /increase quantity/i })
+      .first()
+      .click()
+    await expect(dialog.locator('[data-testid="qty-display"]').first()).toHaveText('2')
   })
 
   test('decrease quantity from 2 to 1', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    await dialog.getByRole('button', { name: /increase quantity/i }).first().click()
-    await expect(dialog.getByText('2')).toBeVisible()
-    await dialog.getByRole('button', { name: /decrease quantity/i }).first().click()
-    await expect(dialog.getByText('1')).toBeVisible()
+    await dialog
+      .getByRole('button', { name: /increase quantity/i })
+      .first()
+      .click()
+    await expect(dialog.locator('[data-testid="qty-display"]').first()).toHaveText('2')
+    await dialog
+      .getByRole('button', { name: /decrease quantity/i })
+      .first()
+      .click()
+    await expect(dialog.locator('[data-testid="qty-display"]').first()).toHaveText('1')
   })
 
   test('remove button removes item', async ({ page }) => {
