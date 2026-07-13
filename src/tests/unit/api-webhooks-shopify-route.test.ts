@@ -95,7 +95,9 @@ describe('POST /api/webhooks/shopify', () => {
 
     it('returns 401 when secret is wrong even with correct format', async () => {
       const body = JSON.stringify({ id: 1 })
-      const wrongSig = createHmac('sha256', 'wrong-secret').update(Buffer.from(body)).digest('base64')
+      const wrongSig = createHmac('sha256', 'wrong-secret')
+        .update(Buffer.from(body))
+        .digest('base64')
       const req = makeReqWithSig(body, wrongSig)
       const res = await POST(req)
       expect(res.status).toBe(401)
@@ -114,13 +116,39 @@ describe('POST /api/webhooks/shopify', () => {
       vi.stubEnv('SHOPIFY_WEBHOOK_SECRET', TEST_SECRET)
     })
 
-    it('revalidates product paths on products/update topic', async () => {
+    it('revalidates the broad product listing paths on products/update topic', async () => {
       const body = JSON.stringify({ id: 1 })
       const req = makeSignedReq(body, TEST_SECRET, 'products/update')
       await POST(req)
       expect(revalidatePath).toHaveBeenCalledWith('/', 'page')
       expect(revalidatePath).toHaveBeenCalledWith('/shop', 'page')
-      expect(revalidatePath).toHaveBeenCalledWith('/products/[handle]', 'page')
+      expect(revalidateTag).toHaveBeenCalledWith('products')
+    })
+
+    it('scopes revalidation to the specific product when the payload includes a handle', async () => {
+      const body = JSON.stringify({ id: 1, handle: 'arc-band-titanium' })
+      const req = makeSignedReq(body, TEST_SECRET, 'products/update')
+      await POST(req)
+      expect(revalidateTag).toHaveBeenCalledWith('product:arc-band-titanium')
+      // No longer invalidates every generated product detail page —
+      // the scoped tag replaces the old blanket path revalidation.
+      expect(revalidatePath).not.toHaveBeenCalledWith('/products/[handle]', 'page')
+    })
+
+    it('does not crash and still revalidates the broad tag when the payload has no handle', async () => {
+      const body = JSON.stringify({ id: 1 })
+      const req = makeSignedReq(body, TEST_SECRET, 'products/update')
+      const res = await POST(req)
+      expect(res.status).toBe(200)
+      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidateTag).not.toHaveBeenCalledWith(expect.stringMatching(/^product:/))
+    })
+
+    it('does not crash on an unparseable webhook body', async () => {
+      const body = 'not-json'
+      const req = makeSignedReq(body, TEST_SECRET, 'products/update')
+      const res = await POST(req)
+      expect(res.status).toBe(200)
       expect(revalidateTag).toHaveBeenCalledWith('products')
     })
 

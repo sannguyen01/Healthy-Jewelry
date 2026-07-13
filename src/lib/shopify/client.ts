@@ -1,13 +1,12 @@
+import { shopifyConfig } from '@/config/shopify'
 import type { ShopifyResponse } from './types'
 
 // ── Environment validation ─────────────────────────────────────────────────
 
-function getEnv(key: string): string {
-  const value = process.env[key]
+function requireEnv(value: string, key: string): string {
   if (!value) {
     throw new Error(
-      `Missing required environment variable: ${key}. ` +
-        `Add it to your .env.local file.`
+      `Missing required environment variable: ${key}. ` + `Add it to your .env.local file.`
     )
   }
   return value
@@ -31,11 +30,14 @@ export class ShopifyFetchError extends Error {
 export async function shopifyFetch<T>(
   query: string,
   variables?: Record<string, unknown>,
-  options?: { cache?: RequestCache; revalidate?: number }
+  options?: { cache?: RequestCache; revalidate?: number; tags?: string[] }
 ): Promise<ShopifyResponse<T>> {
-  const storeDomain = getEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN')
-  const accessToken = getEnv('SHOPIFY_STOREFRONT_ACCESS_TOKEN')
-  const apiVersion = process.env.SHOPIFY_API_VERSION ?? '2025-01'
+  const storeDomain = requireEnv(shopifyConfig.storeDomain, 'NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN')
+  const accessToken = requireEnv(
+    shopifyConfig.storefrontAccessToken,
+    'SHOPIFY_STOREFRONT_ACCESS_TOKEN'
+  )
+  const apiVersion = shopifyConfig.apiVersion
 
   const endpoint = `https://${storeDomain}/api/${apiVersion}/graphql.json`
 
@@ -52,8 +54,11 @@ export async function shopifyFetch<T>(
     }),
   }
 
-  if (options?.revalidate !== undefined) {
-    fetchOptions.next = { revalidate: options.revalidate }
+  if (options?.revalidate !== undefined || options?.tags) {
+    fetchOptions.next = {
+      ...(options?.revalidate !== undefined ? { revalidate: options.revalidate } : {}),
+      ...(options?.tags ? { tags: options.tags } : {}),
+    }
   } else if (options?.cache) {
     fetchOptions.cache = options.cache
   }
@@ -82,21 +87,14 @@ export async function shopifyFetch<T>(
   try {
     json = await response.json()
   } catch {
-    throw new ShopifyFetchError(
-      'Shopify API returned non-JSON response',
-      response.status
-    )
+    throw new ShopifyFetchError('Shopify API returned non-JSON response', response.status)
   }
 
   const body = json as ShopifyResponse<T>
 
   if (body.errors && body.errors.length > 0) {
     const messages = body.errors.map((e) => e.message).join('; ')
-    throw new ShopifyFetchError(
-      `Shopify GraphQL errors: ${messages}`,
-      response.status,
-      body.errors
-    )
+    throw new ShopifyFetchError(`Shopify GraphQL errors: ${messages}`, response.status, body.errors)
   }
 
   return body

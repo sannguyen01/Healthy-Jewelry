@@ -33,16 +33,12 @@ export interface Product {
   handle: string
   title: string
   description: string
-  descriptionHtml: string
   tags: string[]
   priceRange: {
     minVariantPrice: Money
   }
   compareAtPriceRange: {
     minVariantPrice: Money | null
-  }
-  images: {
-    edges: { node: Image }[]
   }
   variants: {
     edges: { node: ProductVariant }[]
@@ -127,6 +123,10 @@ export interface HJProduct {
   description: string
   spec: string
   svgType: HJSvgType
+  // Full variant list (sizes etc.) — the detail-page fetch requests every
+  // variant; listing/card fetches request just the first so size selection
+  // is only ever offered from the product detail page.
+  variants: ProductVariant[]
 }
 
 export interface HJCollection {

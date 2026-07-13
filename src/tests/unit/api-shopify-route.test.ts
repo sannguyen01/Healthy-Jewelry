@@ -8,12 +8,15 @@ vi.mock('next/cache', () => ({
 }))
 
 const { POST } = await import('@/app/api/shopify/route')
+const { CREATE_CART, ADD_TO_CART, UPDATE_CART_LINES, REMOVE_FROM_CART } =
+  await import('@/lib/shopify/mutations/cart')
+const { GET_CART } = await import('@/lib/shopify/queries/cart')
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeReq(
   body: unknown,
-  opts: { contentLength?: number; contentType?: string } = {},
+  opts: { contentLength?: number; contentType?: string } = {}
 ): NextRequest {
   const headers: Record<string, string> = {
     'Content-Type': opts.contentType ?? 'application/json',
@@ -102,7 +105,8 @@ describe('POST /api/shopify', () => {
 
     it('returns 403 for a mutation not in the allowlist', async () => {
       const req = makeReq({
-        query: 'mutation DeleteProduct($id: ID!) { productDelete(input: { id: $id }) { deletedProductId } }',
+        query:
+          'mutation DeleteProduct($id: ID!) { productDelete(input: { id: $id }) { deletedProductId } }',
         variables: { id: '1' },
       })
       const res = await POST(req)
@@ -118,10 +122,28 @@ describe('POST /api/shopify', () => {
 
   describe('allowed operations reach Shopify', () => {
     const allowedOps = [
-      { name: 'GetProductByHandle', query: 'query GetProductByHandle($handle: String!) { productByHandle(handle: $handle) { id } }', variables: { handle: 'test' } },
-      { name: 'GetProducts', query: 'query GetProducts { products(first: 10) { edges { node { id } } } }', variables: {} },
-      { name: 'GetCollections', query: 'query GetCollections { collections(first: 4) { edges { node { id } } } }', variables: {} },
-      { name: 'CreateCart', query: 'mutation CreateCart($lines: [CartLineInput!]!) { cartCreate(input: { lines: $lines }) { cart { id checkoutUrl } } }', variables: { lines: [] } },
+      {
+        name: 'GetProductByHandle',
+        query:
+          'query GetProductByHandle($handle: String!) { productByHandle(handle: $handle) { id } }',
+        variables: { handle: 'test' },
+      },
+      {
+        name: 'GetProducts',
+        query: 'query GetProducts { products(first: 10) { edges { node { id } } } }',
+        variables: {},
+      },
+      {
+        name: 'GetCollections',
+        query: 'query GetCollections { collections(first: 4) { edges { node { id } } } }',
+        variables: {},
+      },
+      {
+        name: 'CreateCart',
+        query:
+          'mutation CreateCart($lines: [CartLineInput!]!) { cartCreate(input: { lines: $lines }) { cart { id checkoutUrl } } }',
+        variables: { lines: [] },
+      },
     ]
 
     beforeEach(() => {
@@ -131,12 +153,45 @@ describe('POST /api/shopify', () => {
         new Response(JSON.stringify(SHOPIFY_SUCCESS), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        }),
+        })
       )
     })
 
     for (const op of allowedOps) {
       it(`allows operation: ${op.name}`, async () => {
+        const req = makeReq({ query: op.query, variables: op.variables })
+        const res = await POST(req)
+        expect(res.status).toBe(200)
+      })
+    }
+
+    // Regression test: the hand-written query strings above start directly
+    // with "query"/"mutation" and would pass even a start-anchored regex.
+    // The REAL exported constants interpolate their GraphQL fragment before
+    // the operation keyword (e.g. `${CART_FRAGMENT}\n mutation CreateCart...`)
+    // — this caught a bug where every real cart request was rejected 403.
+    const realCartOps = [
+      { name: 'CreateCart', query: CREATE_CART, variables: { lines: [] } },
+      {
+        name: 'AddToCart',
+        query: ADD_TO_CART,
+        variables: { cartId: 'gid://shopify/Cart/1', lines: [] },
+      },
+      {
+        name: 'UpdateCartLines',
+        query: UPDATE_CART_LINES,
+        variables: { cartId: 'gid://shopify/Cart/1', lines: [] },
+      },
+      {
+        name: 'RemoveFromCart',
+        query: REMOVE_FROM_CART,
+        variables: { cartId: 'gid://shopify/Cart/1', lineIds: [] },
+      },
+      { name: 'GetCart', query: GET_CART, variables: { cartId: 'gid://shopify/Cart/1' } },
+    ]
+
+    for (const op of realCartOps) {
+      it(`allows the real exported ${op.name} query/mutation constant (with its fragment prefix)`, async () => {
         const req = makeReq({ query: op.query, variables: op.variables })
         const res = await POST(req)
         expect(res.status).toBe(200)
@@ -182,9 +237,7 @@ describe('POST /api/shopify', () => {
     it('propagates non-OK Shopify status code', async () => {
       vi.stubEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', 'test.myshopify.com')
       vi.stubEnv('SHOPIFY_STOREFRONT_ACCESS_TOKEN', 'token')
-      vi.mocked(fetch).mockResolvedValue(
-        new Response('Unauthorized', { status: 401 }),
-      )
+      vi.mocked(fetch).mockResolvedValue(new Response('Unauthorized', { status: 401 }))
       const req = makeReq({
         query: 'query GetProducts { products(first: 1) { edges { node { id } } } }',
         variables: {},
@@ -200,7 +253,7 @@ describe('POST /api/shopify', () => {
         new Response('not-json', {
           status: 200,
           headers: { 'Content-Type': 'text/plain' },
-        }),
+        })
       )
       const req = makeReq({
         query: 'query GetProducts { products(first: 1) { edges { node { id } } } }',
@@ -217,7 +270,7 @@ describe('POST /api/shopify', () => {
         new Response(JSON.stringify(SHOPIFY_SUCCESS), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        }),
+        })
       )
       const req = makeReq({
         query: 'query GetProducts { products(first: 1) { edges { node { id } } } }',
@@ -236,7 +289,7 @@ describe('POST /api/shopify', () => {
         new Response(JSON.stringify(SHOPIFY_SUCCESS), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        }),
+        })
       )
       const req = makeReq({
         query: 'query GetProducts { products(first: 1) { edges { node { id } } } }',
@@ -250,7 +303,7 @@ describe('POST /api/shopify', () => {
           headers: expect.objectContaining({
             'X-Shopify-Storefront-Access-Token': 'secret-token',
           }),
-        }),
+        })
       )
     })
   })

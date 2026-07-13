@@ -36,6 +36,7 @@ const mockProduct: HJProduct = {
   description: 'Grade 23 titanium.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  variants: [],
 }
 
 const mockProduct2: HJProduct = {
@@ -52,6 +53,7 @@ const mockProduct2: HJProduct = {
   description: 'Dome profile.',
   spec: '4 mm · 2.4 g',
   svgType: 'ring-dome',
+  variants: [],
 }
 
 function openDrawer() {
@@ -149,8 +151,8 @@ describe('CartDrawer — with items', () => {
   beforeEach(() => {
     useCartStore.setState({
       items: [
-        { product: mockProduct, quantity: 2 },
-        { product: mockProduct2, quantity: 1 },
+        { product: mockProduct, quantity: 2, variantId: mockProduct.defaultVariantId },
+        { product: mockProduct2, quantity: 1, variantId: mockProduct2.defaultVariantId },
       ],
       isOpen: true,
       shopifyCartId: null,

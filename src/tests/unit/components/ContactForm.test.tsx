@@ -90,7 +90,7 @@ describe('ContactForm', () => {
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /sending/i })).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: /sending/i })).toBeInTheDocument()
     )
   })
 
@@ -105,9 +105,7 @@ describe('ContactForm', () => {
 
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled(),
-    )
+    await waitFor(() => expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled())
   })
 
   it('shows success state after 200 response', async () => {
@@ -125,9 +123,7 @@ describe('ContactForm', () => {
 
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
-    await waitFor(() =>
-      expect(screen.getByText(/message sent/i)).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText(/message sent/i)).toBeInTheDocument())
   })
 
   it('success state hides the submit form', async () => {
@@ -145,7 +141,9 @@ describe('ContactForm', () => {
 
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
-    await waitFor(() => expect(screen.queryByRole('button', { name: /send message/i })).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /send message/i })).not.toBeInTheDocument()
+    )
   })
 
   it('success state mentions 24 hour reply time', async () => {
@@ -163,15 +161,13 @@ describe('ContactForm', () => {
 
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
-    await waitFor(() =>
-      expect(screen.getByText(/24 hours/i)).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText(/24 hours/i)).toBeInTheDocument())
   })
 
-  it('shows error state on non-ok response', async () => {
+  it('shows the server-provided error message on a non-ok response, not a generic fallback', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
-      json: async () => ({ error: 'Failed to send' }),
+      json: async () => ({ error: 'Name must be 2-100 characters' }),
     } as Response)
 
     const user = userEvent.setup()
@@ -184,8 +180,27 @@ describe('ContactForm', () => {
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
     await waitFor(() =>
-      expect(screen.getByText(/something went wrong/i)).toBeInTheDocument(),
+      expect(screen.getByText(/name must be 2-100 characters/i)).toBeInTheDocument()
     )
+    expect(screen.queryByText(/^something went wrong/i)).not.toBeInTheDocument()
+  })
+
+  it('falls back to a generic message when the server response has no error field', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      json: async () => ({}),
+    } as Response)
+
+    const user = userEvent.setup()
+    render(<ContactForm />)
+
+    await user.type(screen.getByLabelText(/^name$/i), 'San')
+    await user.type(screen.getByLabelText(/^email$/i), 'san@example.com')
+    await user.type(screen.getByLabelText(/^message$/i), 'Hello, a question.')
+
+    await user.click(screen.getByRole('button', { name: /send message/i }))
+
+    await waitFor(() => expect(screen.getByText(/something went wrong/i)).toBeInTheDocument())
   })
 
   it('shows error state on network failure', async () => {
@@ -200,9 +215,7 @@ describe('ContactForm', () => {
 
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
-    await waitFor(() =>
-      expect(screen.getByText(/something went wrong/i)).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText(/something went wrong/i)).toBeInTheDocument())
   })
 
   it('error state shows direct email link', async () => {
@@ -237,7 +250,61 @@ describe('ContactForm', () => {
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /send message/i })).not.toBeDisabled(),
+      expect(screen.getByRole('button', { name: /send message/i })).not.toBeDisabled()
     )
+  })
+
+  // ── Field validation ───────────────────────────────────────────────────────
+
+  it('shows an inline error when a too-short name is blurred', async () => {
+    const user = userEvent.setup()
+    render(<ContactForm />)
+
+    const input = screen.getByLabelText(/^name$/i)
+    await user.type(input, 'A')
+    await user.tab()
+
+    expect(await screen.findByText(/name must be 2-100 characters/i)).toBeInTheDocument()
+  })
+
+  it('shows an inline error when an invalid email is blurred', async () => {
+    const user = userEvent.setup()
+    render(<ContactForm />)
+
+    const input = screen.getByLabelText(/^email$/i)
+    await user.type(input, 'not-an-email')
+    await user.tab()
+
+    expect(await screen.findByText(/valid email required/i)).toBeInTheDocument()
+  })
+
+  it('clears the inline error once the field becomes valid', async () => {
+    const user = userEvent.setup()
+    render(<ContactForm />)
+
+    const input = screen.getByLabelText(/^email$/i)
+    await user.type(input, 'not-an-email')
+    await user.tab()
+    expect(await screen.findByText(/valid email required/i)).toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, 'san@example.com')
+    await user.tab()
+
+    await waitFor(() => expect(screen.queryByText(/valid email required/i)).not.toBeInTheDocument())
+  })
+
+  it('prevents submission and does not call fetch when a field is invalid', async () => {
+    const user = userEvent.setup()
+    render(<ContactForm />)
+
+    await user.type(screen.getByLabelText(/^name$/i), 'A')
+    await user.type(screen.getByLabelText(/^email$/i), 'san@example.com')
+    await user.type(screen.getByLabelText(/^message$/i), 'Hello, a question.')
+
+    await user.click(screen.getByRole('button', { name: /send message/i }))
+
+    expect(await screen.findByText(/name must be 2-100 characters/i)).toBeInTheDocument()
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 })

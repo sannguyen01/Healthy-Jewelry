@@ -1,6 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import {
+  validateName,
+  validateEmail,
+  validateSubject,
+  validateMessage,
+} from '@/lib/utils/contactValidation'
 
 type FormStatus = 'idle' | 'sending' | 'sent' | 'error'
 
@@ -11,7 +17,16 @@ interface FormFields {
   message: string
 }
 
+type FieldErrors = Partial<Record<keyof FormFields, string>>
+
 const SUBJECTS = ['General inquiry', 'Product question', 'Order support', 'Custom order'] as const
+
+const FIELD_VALIDATORS: Record<keyof FormFields, (value: string) => string | null> = {
+  name: validateName,
+  email: validateEmail,
+  subject: validateSubject,
+  message: validateMessage,
+}
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -27,6 +42,25 @@ const inputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontFamily: 'var(--font-ui)',
+  fontSize: 'var(--text-xs)',
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'var(--graphite)',
+  marginBottom: '8px',
+}
+
+const fieldErrorStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)',
+  fontSize: 'var(--text-xs)',
+  color: '#B3261E',
+  marginTop: '6px',
+}
+
+const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.'
+
 export function ContactForm() {
   const [fields, setFields] = useState<FormFields>({
     name: '',
@@ -36,11 +70,19 @@ export function ContactForm() {
   })
   const [status, setStatus] = useState<FormStatus>('idle')
   const [focusedField, setFocusedField] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [errorMessage, setErrorMessage] = useState<string>(DEFAULT_ERROR_MESSAGE)
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) {
     setFields((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  function handleBlur(name: keyof FormFields) {
+    setFocusedField(null)
+    const error = FIELD_VALIDATORS[name](fields[name])
+    setFieldErrors((prev) => ({ ...prev, [name]: error ?? undefined }))
   }
 
   function getFocusStyle(name: string): React.CSSProperties {
@@ -49,6 +91,17 @@ export function ContactForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
+    const nextErrors: FieldErrors = {}
+    for (const key of Object.keys(FIELD_VALIDATORS) as (keyof FormFields)[]) {
+      const error = FIELD_VALIDATORS[key](fields[key])
+      if (error) nextErrors[key] = error
+    }
+    setFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      return
+    }
+
     setStatus('sending')
     try {
       const res = await fetch('/api/contact', {
@@ -57,11 +110,17 @@ export function ContactForm() {
         body: JSON.stringify(fields),
       })
       if (!res.ok) {
+        // Surface the server's specific reason (validation, rate limit, etc.)
         const data = await res.json().catch(() => ({}))
-        throw new Error((data as { error?: string }).error ?? 'Failed to send')
+        setErrorMessage((data as { error?: string }).error ?? DEFAULT_ERROR_MESSAGE)
+        setStatus('error')
+        return
       }
       setStatus('sent')
     } catch {
+      // A true network/exception failure has no server-authored message to
+      // show — a generic fallback is more useful than a raw fetch error.
+      setErrorMessage(DEFAULT_ERROR_MESSAGE)
       setStatus('error')
     }
   }
@@ -108,18 +167,7 @@ export function ContactForm() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Name */}
         <div>
-          <label
-            htmlFor="cf-name"
-            style={{
-              display: 'block',
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-xs)',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--graphite)',
-              marginBottom: '8px',
-            }}
-          >
+          <label htmlFor="cf-name" style={labelStyle}>
             Name
           </label>
           <input
@@ -130,26 +178,22 @@ export function ContactForm() {
             value={fields.name}
             onChange={handleChange}
             onFocus={() => setFocusedField('name')}
-            onBlur={() => setFocusedField(null)}
+            onBlur={() => handleBlur('name')}
             style={{ ...inputStyle, ...getFocusStyle('name') }}
             placeholder="Your name"
+            aria-invalid={Boolean(fieldErrors.name)}
+            aria-describedby={fieldErrors.name ? 'cf-name-error' : undefined}
           />
+          {fieldErrors.name && (
+            <p id="cf-name-error" style={fieldErrorStyle}>
+              {fieldErrors.name}
+            </p>
+          )}
         </div>
 
         {/* Email */}
         <div>
-          <label
-            htmlFor="cf-email"
-            style={{
-              display: 'block',
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-xs)',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--graphite)',
-              marginBottom: '8px',
-            }}
-          >
+          <label htmlFor="cf-email" style={labelStyle}>
             Email
           </label>
           <input
@@ -160,26 +204,22 @@ export function ContactForm() {
             value={fields.email}
             onChange={handleChange}
             onFocus={() => setFocusedField('email')}
-            onBlur={() => setFocusedField(null)}
+            onBlur={() => handleBlur('email')}
             style={{ ...inputStyle, ...getFocusStyle('email') }}
             placeholder="your@email.com"
+            aria-invalid={Boolean(fieldErrors.email)}
+            aria-describedby={fieldErrors.email ? 'cf-email-error' : undefined}
           />
+          {fieldErrors.email && (
+            <p id="cf-email-error" style={fieldErrorStyle}>
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
 
         {/* Subject */}
         <div>
-          <label
-            htmlFor="cf-subject"
-            style={{
-              display: 'block',
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-xs)',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--graphite)',
-              marginBottom: '8px',
-            }}
-          >
+          <label htmlFor="cf-subject" style={labelStyle}>
             Subject
           </label>
           <select
@@ -188,7 +228,7 @@ export function ContactForm() {
             value={fields.subject}
             onChange={handleChange}
             onFocus={() => setFocusedField('subject')}
-            onBlur={() => setFocusedField(null)}
+            onBlur={() => handleBlur('subject')}
             style={{ ...inputStyle, ...getFocusStyle('subject'), cursor: 'pointer' }}
           >
             {SUBJECTS.map((s) => (
@@ -197,22 +237,12 @@ export function ContactForm() {
               </option>
             ))}
           </select>
+          {fieldErrors.subject && <p style={fieldErrorStyle}>{fieldErrors.subject}</p>}
         </div>
 
         {/* Message */}
         <div>
-          <label
-            htmlFor="cf-message"
-            style={{
-              display: 'block',
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-xs)',
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--graphite)',
-              marginBottom: '8px',
-            }}
-          >
+          <label htmlFor="cf-message" style={labelStyle}>
             Message
           </label>
           <textarea
@@ -222,7 +252,7 @@ export function ContactForm() {
             value={fields.message}
             onChange={handleChange}
             onFocus={() => setFocusedField('message')}
-            onBlur={() => setFocusedField(null)}
+            onBlur={() => handleBlur('message')}
             style={{
               ...inputStyle,
               ...getFocusStyle('message'),
@@ -230,7 +260,14 @@ export function ContactForm() {
               resize: 'vertical',
             }}
             placeholder="Tell us how we can help…"
+            aria-invalid={Boolean(fieldErrors.message)}
+            aria-describedby={fieldErrors.message ? 'cf-message-error' : undefined}
           />
+          {fieldErrors.message && (
+            <p id="cf-message-error" style={fieldErrorStyle}>
+              {fieldErrors.message}
+            </p>
+          )}
         </div>
 
         {/* Error state */}
@@ -244,7 +281,7 @@ export function ContactForm() {
               margin: 0,
             }}
           >
-            Something went wrong. Try emailing us directly at{' '}
+            {errorMessage} Try emailing us directly at{' '}
             <a
               href="mailto:hello@healthyjewelry.com"
               style={{ color: 'var(--ink)', textDecoration: 'underline' }}

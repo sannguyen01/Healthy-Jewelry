@@ -2,8 +2,14 @@ import type { Metadata } from 'next'
 import Nav from '@/components/layout/Nav'
 import CartDrawer from '@/components/layout/CartDrawer'
 import Footer from '@/components/layout/Footer'
-import { Hero, HorizontalScroll, CampaignBand, CollectionGrid, MaterialsSection } from '@/components/home'
-import { getBestsellers, getNewArrivals, getProductsByCollection } from '@/lib/data/hj-data'
+import {
+  Hero,
+  HorizontalScroll,
+  CampaignBand,
+  CollectionGrid,
+  MaterialsSection,
+} from '@/components/home'
+import { getBestsellers, getNewArrivals, getProductsByCollection } from '@/lib/shopify'
 
 export const metadata: Metadata = {
   title: 'Healthy Jewelry — Implant-Grade Titanium',
@@ -18,10 +24,12 @@ export const metadata: Metadata = {
   },
 }
 
-export default function HomePage() {
-  const bestsellers = getBestsellers()
-  const newArrivals = getNewArrivals()
-  const titaniumNecklaces = getProductsByCollection('necklaces')
+export default async function HomePage() {
+  const [bestsellers, newArrivals, titaniumNecklaces] = await Promise.all([
+    getBestsellers(),
+    getNewArrivals(),
+    getProductsByCollection('necklaces'),
+  ])
 
   return (
     <>

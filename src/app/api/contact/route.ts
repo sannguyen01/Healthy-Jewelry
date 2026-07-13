@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import {
+  validateName,
+  validateEmail,
+  validateSubject,
+  validateMessage,
+} from '@/lib/utils/contactValidation'
 
 // Serverless-safe rate limiting.
 // Production: set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN in Vercel env vars
@@ -20,8 +26,12 @@ const upstashRl =
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 function isRateLimitedLocal(ip: string): boolean {
   const now = Date.now()
+  // Prune expired entries on each call to prevent unbounded map growth.
+  for (const [key, val] of rateLimitMap) {
+    if (now > val.resetAt) rateLimitMap.delete(key)
+  }
   const entry = rateLimitMap.get(ip)
-  if (!entry || now > entry.resetAt) {
+  if (!entry) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + 3600_000 })
     return false
   }
@@ -59,44 +69,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { name, email, subject, message } = body as Record<string, unknown>
 
-  if (
-    !name ||
-    typeof name !== 'string' ||
-    name.trim().length < 2 ||
-    name.trim().length > 100
-  ) {
-    return NextResponse.json(
-      { error: 'Name must be 2-100 characters' },
-      { status: 400 },
-    )
+  if (typeof name !== 'string') {
+    return NextResponse.json({ error: 'Name must be 2-100 characters' }, { status: 400 })
   }
+  const nameError = validateName(name)
+  if (nameError) return NextResponse.json({ error: nameError }, { status: 400 })
 
-  if (
-    !email ||
-    typeof email !== 'string' ||
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  ) {
-    return NextResponse.json(
-      { error: 'Valid email required' },
-      { status: 400 },
-    )
+  if (typeof email !== 'string') {
+    return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
   }
+  const emailError = validateEmail(email)
+  if (emailError) return NextResponse.json({ error: emailError }, { status: 400 })
 
-  if (!subject || typeof subject !== 'string' || !subject.trim()) {
+  if (typeof subject !== 'string') {
     return NextResponse.json({ error: 'Subject required' }, { status: 400 })
   }
+  const subjectError = validateSubject(subject)
+  if (subjectError) return NextResponse.json({ error: subjectError }, { status: 400 })
 
-  if (
-    !message ||
-    typeof message !== 'string' ||
-    message.trim().length < 10 ||
-    message.trim().length > 2000
-  ) {
-    return NextResponse.json(
-      { error: 'Message must be 10-2000 characters' },
-      { status: 400 },
-    )
+  if (typeof message !== 'string') {
+    return NextResponse.json({ error: 'Message must be 10-2000 characters' }, { status: 400 })
   }
+  const messageError = validateMessage(message)
+  if (messageError) return NextResponse.json({ error: messageError }, { status: 400 })
 
   // 3. Send via Resend (graceful degradation if API key absent)
   const apiKey = process.env.RESEND_API_KEY

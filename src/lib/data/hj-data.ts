@@ -3,6 +3,8 @@ import type {
   HJCollection,
   HJMaterial,
   HJCollectionHandle,
+  ProductVariant,
+  Money,
 } from '@/lib/shopify/types'
 
 // ── Collections ────────────────────────────────────────────────────────────
@@ -42,42 +44,30 @@ export const hjMaterials: HJMaterial[] = [
     title: 'Grade 23 Titanium',
     subtitle: 'Implant-grade',
     body: 'The same alloy used in surgical implants and aerospace structures. Hypoallergenic, 45% lighter than steel, corrosion-proof in saltwater.',
-    properties: [
-      'Hypoallergenic',
-      'Saltwater-resistant',
-      'Lifetime color stability',
-      'MRI-safe',
-    ],
+    properties: ['Hypoallergenic', 'Saltwater-resistant', 'Lifetime color stability', 'MRI-safe'],
   },
   {
     handle: 'niobium',
     title: 'Niobium',
     subtitle: 'Anodized',
     body: 'A rare refractory metal, naturally biocompatible. Anodized in oxygen-free environments to achieve stable, pigment-free color.',
-    properties: [
-      'Pigment-free color',
-      'Zero nickel',
-      'Biocompatible',
-      'Anodized permanently',
-    ],
+    properties: ['Pigment-free color', 'Zero nickel', 'Biocompatible', 'Anodized permanently'],
   },
   {
     handle: 'surgical-steel',
     title: '316L Surgical Steel',
     subtitle: 'Medical grade',
     body: '316L is the same steel specification used in medical instruments. Low carbon content prevents sensitization over extended wear.',
-    properties: [
-      'Low-carbon spec',
-      'High corrosion resistance',
-      'Polishable',
-      'FDA-recognized',
-    ],
+    properties: ['Low-carbon spec', 'High corrosion resistance', 'Polishable', 'FDA-recognized'],
   },
 ]
 
 // ── Products ───────────────────────────────────────────────────────────────
+// Base product data is defined without `variants` (below) so size variants
+// can be synthesized once, by collection, instead of hand-writing 8 ring
+// sizes / 5 bracelet sizes into every product literal.
 
-export const hjProducts: HJProduct[] = [
+const hjProductsRaw: Omit<HJProduct, 'variants'>[] = [
   // ── Rings ────────────────────────────────────────────────────────────────
   {
     id: 'gid://shopify/Product/hj-001',
@@ -311,6 +301,59 @@ export const hjProducts: HJProduct[] = [
     svgType: 'bracelet-link',
   },
 ]
+
+// ── Variant synthesis ──────────────────────────────────────────────────────
+
+const RING_SIZES = ['5', '6', '7', '8', '9', '10', '11', '12']
+// Values match SizePicker.tsx's BRACELET_SIZES exactly, so a size chosen in
+// the UI resolves to the matching variant here.
+const BRACELET_SIZES = ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)']
+
+function money(amount: string): Money {
+  return { amount, currencyCode: 'USD' }
+}
+
+function buildVariants(product: Omit<HJProduct, 'variants'>): ProductVariant[] {
+  const compareAtPrice = product.compareAtPrice ? money(product.compareAtPrice) : null
+
+  if (product.collection === 'rings') {
+    return RING_SIZES.map((size) => ({
+      id: `${product.id}-size-${size}`,
+      title: size,
+      price: money(product.price),
+      compareAtPrice,
+      availableForSale: true,
+      selectedOptions: [{ name: 'Size', value: size }],
+    }))
+  }
+
+  if (product.collection === 'bracelets') {
+    return BRACELET_SIZES.map((size) => ({
+      id: `${product.id}-size-${size.slice(0, size.indexOf(' '))}`,
+      title: size,
+      price: money(product.price),
+      compareAtPrice,
+      availableForSale: true,
+      selectedOptions: [{ name: 'Size', value: size }],
+    }))
+  }
+
+  return [
+    {
+      id: product.defaultVariantId,
+      title: 'Default',
+      price: money(product.price),
+      compareAtPrice,
+      availableForSale: true,
+      selectedOptions: [],
+    },
+  ]
+}
+
+export const hjProducts: HJProduct[] = hjProductsRaw.map((product) => ({
+  ...product,
+  variants: buildVariants(product),
+}))
 
 // ── Helper functions ───────────────────────────────────────────────────────
 

@@ -33,6 +33,7 @@ const baseProduct: HJProduct = {
   description: 'Grade 23 titanium. Mirror-polished arc profile.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  variants: [],
 }
 
 describe('ProductCard', () => {
@@ -119,7 +120,7 @@ describe('ProductCard', () => {
   describe('className prop', () => {
     it('appends custom className to the article', () => {
       const { container } = render(
-        <ProductCard product={baseProduct} className="my-custom-class" />,
+        <ProductCard product={baseProduct} className="my-custom-class" />
       )
       expect(container.querySelector('.my-custom-class')).toBeTruthy()
     })

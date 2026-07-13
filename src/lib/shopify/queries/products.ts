@@ -1,4 +1,9 @@
 // Healthy Jewelry — Shopify product GraphQL queries
+//
+// PRODUCT_FRAGMENT's variant count is parameterized via $variantsFirst so the
+// same fragment serves both the full product-detail fetch (needs every size
+// variant) and lightweight listing fetches (only need the first variant to
+// resolve a default id) without duplicating the field list.
 
 export const PRODUCT_FRAGMENT = /* GraphQL */ `
   fragment ProductFragment on Product {
@@ -6,7 +11,6 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
     handle
     title
     description
-    descriptionHtml
     tags
     priceRange {
       minVariantPrice {
@@ -20,17 +24,7 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
         currencyCode
       }
     }
-    images(first: 10) {
-      edges {
-        node {
-          url
-          altText
-          width
-          height
-        }
-      }
-    }
-    variants(first: 20) {
+    variants(first: $variantsFirst) {
       edges {
         node {
           id
@@ -64,7 +58,7 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
 
 export const GET_PRODUCT_BY_HANDLE = /* GraphQL */ `
   ${PRODUCT_FRAGMENT}
-  query GetProductByHandle($handle: String!) {
+  query GetProductByHandle($handle: String!, $variantsFirst: Int = 20) {
     product(handle: $handle) {
       ...ProductFragment
     }
@@ -73,7 +67,7 @@ export const GET_PRODUCT_BY_HANDLE = /* GraphQL */ `
 
 export const GET_PRODUCTS = /* GraphQL */ `
   ${PRODUCT_FRAGMENT}
-  query GetProducts($first: Int!, $after: String) {
+  query GetProducts($first: Int!, $after: String, $variantsFirst: Int = 1) {
     products(first: $first, after: $after) {
       pageInfo {
         hasNextPage
@@ -90,7 +84,12 @@ export const GET_PRODUCTS = /* GraphQL */ `
 
 export const GET_PRODUCTS_BY_COLLECTION = /* GraphQL */ `
   ${PRODUCT_FRAGMENT}
-  query GetProductsByCollection($handle: String!, $first: Int!, $after: String) {
+  query GetProductsByCollection(
+    $handle: String!
+    $first: Int!
+    $after: String
+    $variantsFirst: Int = 1
+  ) {
     collection(handle: $handle) {
       id
       handle
@@ -119,7 +118,7 @@ export const GET_PRODUCTS_BY_COLLECTION = /* GraphQL */ `
 
 export const SEARCH_PRODUCTS = /* GraphQL */ `
   ${PRODUCT_FRAGMENT}
-  query SearchProducts($query: String!, $first: Int!, $after: String) {
+  query SearchProducts($query: String!, $first: Int!, $after: String, $variantsFirst: Int = 1) {
     search(query: $query, first: $first, after: $after, types: PRODUCT) {
       pageInfo {
         hasNextPage
@@ -130,6 +129,34 @@ export const SEARCH_PRODUCTS = /* GraphQL */ `
           ... on Product {
             ...ProductFragment
           }
+        }
+      }
+    }
+  }
+`
+
+// Bestsellers / new arrivals — tag-filtered server-side rather than fetching
+// the whole catalog and filtering client-side.
+export const GET_BESTSELLERS = /* GraphQL */ `
+  ${PRODUCT_FRAGMENT}
+  query GetBestsellers($first: Int!, $variantsFirst: Int = 1) {
+    products(first: $first, query: "tag:bestseller") {
+      edges {
+        node {
+          ...ProductFragment
+        }
+      }
+    }
+  }
+`
+
+export const GET_NEW_ARRIVALS = /* GraphQL */ `
+  ${PRODUCT_FRAGMENT}
+  query GetNewArrivals($first: Int!, $variantsFirst: Int = 1) {
+    products(first: $first, query: "tag:new") {
+      edges {
+        node {
+          ...ProductFragment
         }
       }
     }

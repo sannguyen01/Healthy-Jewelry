@@ -1,8 +1,11 @@
+import { shopifyConfig } from '@/config/shopify'
 import { shopifyFetch, ShopifyFetchError } from './client'
 import {
   GET_PRODUCT_BY_HANDLE,
   GET_PRODUCTS,
   GET_PRODUCTS_BY_COLLECTION,
+  GET_BESTSELLERS,
+  GET_NEW_ARRIVALS,
   SEARCH_PRODUCTS,
 } from './queries/products'
 import type {
@@ -17,13 +20,13 @@ import {
   getAllProducts as staticGetAllProducts,
   getProductByHandle as staticGetProductByHandle,
   getProductsByCollection as staticGetProductsByCollection,
+  getBestsellers as staticGetBestsellers,
+  getNewArrivals as staticGetNewArrivals,
   hjCollections,
 } from '@/lib/data/hj-data'
 
 function isShopifyConfigured(): boolean {
-  return !!(
-    process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN && process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
-  )
+  return !!(shopifyConfig.storefrontAccessToken && shopifyConfig.storeDomain)
 }
 
 // Map Shopify GraphQL Product node → HJProduct
@@ -45,11 +48,18 @@ function mapShopifyProduct(node: Product): HJProduct {
       ? parseFloat(compareAtAmount).toFixed(2)
       : null
 
+  const handle = node.handle ?? ''
+
   const collectionsEdges = node.collections?.edges ?? []
+  const hasCollectionTag = collectionsEdges.length > 0
   const collection: HJCollectionHandle =
     (collectionsEdges[0]?.node?.handle as HJCollectionHandle | undefined) ?? 'rings'
-
-  const handle = node.handle ?? ''
+  if (!hasCollectionTag) {
+    console.warn('[shopify] product missing collection, defaulting to "rings":', {
+      handle,
+      id: node.id,
+    })
+  }
 
   // Tag-based svgType: Shopify admin adds e.g. "svg:ring-dome" to override the fallback
   const svgTag = tags.find((t) => t.startsWith('svg:'))
@@ -61,12 +71,29 @@ function mapShopifyProduct(node: Product): HJProduct {
       svgType = 'earring-hoop'
     } else if (handle.includes('bracelet') || handle.includes('cuff')) {
       svgType = 'bracelet-cuff'
+    } else {
+      console.warn('[shopify] product missing svg: tag, defaulting to "ring-arc":', {
+        handle,
+        id: node.id,
+      })
     }
   }
 
+  // Badge priority: explicit bestseller/new tags win, then an active
+  // compare-at price implies a Sale badge, otherwise no badge.
+  const badge: HJProduct['badge'] = tags.includes('bestseller')
+    ? 'Bestseller'
+    : tags.includes('new')
+      ? 'New'
+      : compareAtPrice !== null
+        ? 'Sale'
+        : null
+
+  const variants = node.variants.edges.map((e) => e.node)
+
   return {
     id: node.id,
-    defaultVariantId: node.variants.edges[0]?.node.id ?? node.id,
+    defaultVariantId: variants[0]?.id ?? node.id,
     handle,
     title: node.title,
     description: node.description,
@@ -76,8 +103,9 @@ function mapShopifyProduct(node: Product): HJProduct {
     material,
     tags,
     svgType,
-    badge: null,
+    badge,
     spec: '',
+    variants,
   }
 }
 
@@ -89,7 +117,7 @@ export async function getProduct(handle: string): Promise<HJProduct | null> {
     const response = await shopifyFetch<{ product: Product | null }>(
       GET_PRODUCT_BY_HANDLE,
       { handle },
-      { revalidate: 3600 }
+      { revalidate: 3600, tags: ['products', `product:${handle}`] }
     )
     if (!response.data?.product) {
       return staticGetProductByHandle(handle) ?? null
@@ -124,7 +152,7 @@ export async function getProducts(maxItems = 250): Promise<HJProduct[]> {
         await shopifyFetch<ProductsPage>(
           GET_PRODUCTS,
           { first: 50, after: cursor },
-          { revalidate: 3600 }
+          { revalidate: 3600, tags: ['products'] }
         )
       ).data
       const { edges, pageInfo } = page.products
@@ -152,7 +180,11 @@ export async function getProductsByCollection(
   try {
     const response = await shopifyFetch<{
       collection: { products: { edges: { node: Product }[] } } | null
-    }>(GET_PRODUCTS_BY_COLLECTION, { handle: collectionHandle, first }, { revalidate: 3600 })
+    }>(
+      GET_PRODUCTS_BY_COLLECTION,
+      { handle: collectionHandle, first },
+      { revalidate: 3600, tags: ['products', `collection:${collectionHandle}`] }
+    )
     const edges = response.data?.collection?.products?.edges ?? []
     if (edges.length === 0) {
       return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
@@ -187,6 +219,46 @@ export async function searchProducts(query: string, first = 20): Promise<HJProdu
       console.warn('[shopify] searchProducts fallback:', e.message)
     }
     return []
+  }
+}
+
+export async function getBestsellers(first = 8): Promise<HJProduct[]> {
+  if (!isShopifyConfigured()) {
+    return staticGetBestsellers()
+  }
+  try {
+    const response = await shopifyFetch<{ products: { edges: { node: Product }[] } }>(
+      GET_BESTSELLERS,
+      { first },
+      { revalidate: 3600, tags: ['products'] }
+    )
+    const edges = response.data?.products?.edges ?? []
+    return edges.length > 0 ? edges.map((e) => mapShopifyProduct(e.node)) : staticGetBestsellers()
+  } catch (e) {
+    if (e instanceof ShopifyFetchError) {
+      console.warn('[shopify] getBestsellers fallback to static:', e.message)
+    }
+    return staticGetBestsellers()
+  }
+}
+
+export async function getNewArrivals(first = 8): Promise<HJProduct[]> {
+  if (!isShopifyConfigured()) {
+    return staticGetNewArrivals()
+  }
+  try {
+    const response = await shopifyFetch<{ products: { edges: { node: Product }[] } }>(
+      GET_NEW_ARRIVALS,
+      { first },
+      { revalidate: 3600, tags: ['products'] }
+    )
+    const edges = response.data?.products?.edges ?? []
+    return edges.length > 0 ? edges.map((e) => mapShopifyProduct(e.node)) : staticGetNewArrivals()
+  } catch (e) {
+    if (e instanceof ShopifyFetchError) {
+      console.warn('[shopify] getNewArrivals fallback to static:', e.message)
+    }
+    return staticGetNewArrivals()
   }
 }
 

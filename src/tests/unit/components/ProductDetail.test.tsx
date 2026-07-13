@@ -4,9 +4,11 @@ import { ProductDetail } from '@/components/product/ProductDetail'
 import { useCartStore } from '@/store/cart'
 import type { HJProduct } from '@/lib/shopify/types'
 
+const money = (amount: string) => ({ amount, currencyCode: 'USD' })
+
 const ringProduct: HJProduct = {
   id: 'hj-001',
-  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-size-5',
   handle: 'arc-band-titanium',
   title: 'Arc Band',
   collection: 'rings',
@@ -18,6 +20,14 @@ const ringProduct: HJProduct = {
   description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  variants: ['5', '6', '7', '8', '9', '10', '11', '12'].map((size) => ({
+    id: `gid://shopify/ProductVariant/hj-001-size-${size}`,
+    title: size,
+    price: money('89.00'),
+    compareAtPrice: null,
+    availableForSale: true,
+    selectedOptions: [{ name: 'Size', value: size }],
+  })),
 }
 
 const earringProduct: HJProduct = {
@@ -34,11 +44,21 @@ const earringProduct: HJProduct = {
   description: 'Flat disc studs on implant-grade titanium posts.',
   spec: 'Disc 8 mm · post 6 mm',
   svgType: 'earring-stud',
+  variants: [
+    {
+      id: 'gid://shopify/ProductVariant/hj-009-default',
+      title: 'Default',
+      price: money('68.00'),
+      compareAtPrice: null,
+      availableForSale: true,
+      selectedOptions: [],
+    },
+  ],
 }
 
 const braceletProduct: HJProduct = {
   id: 'hj-013',
-  defaultVariantId: 'gid://shopify/ProductVariant/hj-013-default',
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-013-size-XS',
   handle: 'cable-cuff-titanium',
   title: 'Cable Cuff',
   collection: 'bracelets',
@@ -50,6 +70,14 @@ const braceletProduct: HJProduct = {
   description: 'Twisted titanium cable cuff.',
   spec: '2.5 mm cable · 160 mm',
   svgType: 'bracelet-cuff',
+  variants: ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)'].map((size) => ({
+    id: `gid://shopify/ProductVariant/hj-013-size-${size.slice(0, size.indexOf(' '))}`,
+    title: size,
+    price: money('168.00'),
+    compareAtPrice: null,
+    availableForSale: true,
+    selectedOptions: [{ name: 'Size', value: size }],
+  })),
 }
 
 beforeEach(() => {
@@ -121,7 +149,7 @@ describe('ProductDetail', () => {
   describe('compare at price', () => {
     it('renders compareAtPrice when present', () => {
       render(
-        <ProductDetail product={{ ...ringProduct, compareAtPrice: '130.00', badge: 'Sale' }} />,
+        <ProductDetail product={{ ...ringProduct, compareAtPrice: '130.00', badge: 'Sale' }} />
       )
       expect(screen.getByText('$130.00')).toBeTruthy()
     })
@@ -158,24 +186,82 @@ describe('ProductDetail', () => {
     })
   })
 
-  describe('add to bag', () => {
-    it('renders "Add to Bag" button', () => {
-      render(<ProductDetail product={ringProduct} />)
-      expect(screen.getByRole('button', { name: /add arc band to bag/i })).toBeTruthy()
+  describe('add to bag — unsized product (earrings)', () => {
+    it('renders "Add to Bag" button, enabled, with no size selection', () => {
+      render(<ProductDetail product={earringProduct} />)
+      const button = screen.getByRole('button', { name: /add disc studs to bag/i })
+      expect(button).toBeTruthy()
+      expect(button).not.toBeDisabled()
     })
 
-    it('clicking Add to Bag adds product to cart', () => {
-      render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
+    it('clicking Add to Bag adds the default variant to the cart', () => {
+      render(<ProductDetail product={earringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /add disc studs to bag/i }))
       const items = useCartStore.getState().items
       expect(items).toHaveLength(1)
-      expect(items[0].product.id).toBe('hj-001')
+      expect(items[0].product.id).toBe('hj-009')
+      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-009-default')
     })
 
     it('clicking Add to Bag opens the cart drawer', () => {
-      render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
+      render(<ProductDetail product={earringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /add disc studs to bag/i }))
       expect(useCartStore.getState().isOpen).toBe(true)
+    })
+  })
+
+  describe('add to bag — sized product (rings)', () => {
+    it('shows "Select a Size" and disables the button before a size is chosen', () => {
+      render(<ProductDetail product={ringProduct} />)
+      const button = screen.getByRole('button', { name: /select a size/i })
+      expect(button).toBeDisabled()
+    })
+
+    it('clicking the disabled button does not add anything to the cart', () => {
+      render(<ProductDetail product={ringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /select a size/i }))
+      expect(useCartStore.getState().items).toHaveLength(0)
+    })
+
+    it('enables "Add to Bag" once a size is selected', () => {
+      render(<ProductDetail product={ringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
+      const button = screen.getByRole('button', { name: /add arc band to bag/i })
+      expect(button).not.toBeDisabled()
+    })
+
+    it('adds the variant matching the selected size, not the first variant', () => {
+      render(<ProductDetail product={ringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
+      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
+
+      const items = useCartStore.getState().items
+      expect(items).toHaveLength(1)
+      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-001-size-9')
+      // Guards against the regression this test exists to prevent: silently
+      // defaulting to the first variant (size 5) regardless of selection.
+      expect(items[0].variantId).not.toBe('gid://shopify/ProductVariant/hj-001-size-5')
+    })
+
+    it('picking a different size before adding resolves the newly selected variant', () => {
+      render(<ProductDetail product={ringProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /ring size 7/i }))
+      fireEvent.click(screen.getByRole('button', { name: /ring size 11/i }))
+      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
+
+      const items = useCartStore.getState().items
+      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-001-size-11')
+    })
+  })
+
+  describe('add to bag — sized product (bracelets)', () => {
+    it('resolves the correct variant for the selected bracelet size', () => {
+      render(<ProductDetail product={braceletProduct} />)
+      fireEvent.click(screen.getByRole('button', { name: /bracelet size m/i }))
+      fireEvent.click(screen.getByRole('button', { name: /add cable cuff to bag/i }))
+
+      const items = useCartStore.getState().items
+      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-013-size-M')
     })
   })
 

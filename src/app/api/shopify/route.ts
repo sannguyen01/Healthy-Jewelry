@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { shopifyConfig } from '@/config/shopify'
-
 // Allowlist of permitted Storefront GraphQL operation names.
 // Reject any request whose operation is not in this set.
 const ALLOWED_OPERATIONS = new Set([
@@ -53,16 +52,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Missing required field: variables' }, { status: 400 })
   }
 
-  // Enforce operation allowlist — reject unknown or anonymous operations
-  const opMatch = query.match(/^\s*(?:query|mutation)\s+(\w+)/)
-  const operationName = opMatch?.[1] ?? null
+  // Enforce operation allowlist — reject unknown or anonymous operations.
+  // Not anchored to the start of the string: every query/mutation constant in
+  // this codebase interpolates its GraphQL fragment(s) before the operation
+  // keyword (see lib/shopify/queries|mutations/*.ts), so an anchored match
+  // would never find the operation name. Requiring exactly one match still
+  // rejects documents that smuggle a second, unlisted operation alongside an
+  // allowed one.
+  const operationMatches = [...query.matchAll(/\b(?:query|mutation)\s+(\w+)\s*[({]/g)]
+  const operationName = operationMatches.length === 1 ? operationMatches[0][1] : null
   if (!operationName || !ALLOWED_OPERATIONS.has(operationName)) {
     return NextResponse.json({ error: 'Operation not permitted' }, { status: 403 })
   }
 
-  // Read env vars server-side — never exposed in response
-  const storeDomain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
-  const accessToken = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN
+  // Read env vars server-side via the shared config — never exposed in response
+  const storeDomain = shopifyConfig.storeDomain
+  const accessToken = shopifyConfig.storefrontAccessToken
 
   if (!storeDomain || !accessToken) {
     console.error('[shopify/route] Missing Shopify environment variables')

@@ -25,8 +25,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const addItem = useCartStore((s) => s.addItem)
   const openCart = useCartStore((s) => s.openCart)
 
+  // Rings and bracelets are sized — a size must resolve to a real Shopify
+  // variant before the correct item can be added to the cart.
+  const requiresSize = product.collection === 'rings' || product.collection === 'bracelets'
+  const selectedVariant = selectedSize
+    ? product.variants.find((v) =>
+        v.selectedOptions.some((o) => o.name === 'Size' && o.value === selectedSize)
+      )
+    : undefined
+  const canAddToBag = !requiresSize || selectedVariant !== undefined
+
   function handleAddToBag() {
-    addItem(product, 1)
+    if (!canAddToBag) return
+    addItem(product, 1, selectedVariant?.id)
     openCart()
   }
 
@@ -67,11 +78,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
             aspectRatio: '1 / 1',
           }}
         >
-          <JewelrySVG
-            type={product.svgType}
-            className=""
-            style={{ width: '70%', height: '70%' }}
-          />
+          <JewelrySVG type={product.svgType} className="" style={{ width: '70%', height: '70%' }} />
         </div>
 
         {/* Right — Info panel */}
@@ -182,29 +189,38 @@ export function ProductDetail({ product }: ProductDetailProps) {
           {/* Add to Bag */}
           <button
             onClick={handleAddToBag}
+            disabled={!canAddToBag}
             style={{
               width: '100%',
               padding: '18px',
-              backgroundColor: 'var(--ink)',
+              backgroundColor: canAddToBag ? 'var(--ink)' : 'var(--ash)',
               color: 'var(--bg)',
               fontFamily: 'var(--font-display)',
               fontSize: '1rem',
               textTransform: 'uppercase',
               letterSpacing: '0.14em',
               border: 'none',
-              cursor: 'pointer',
+              cursor: canAddToBag ? 'pointer' : 'not-allowed',
               transition: `background-color var(--duration-fast) var(--ease)`,
               marginTop: '8px',
             }}
             onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--mid)'
+              if (canAddToBag) {
+                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--mid)'
+              }
             }}
             onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--ink)'
+              if (canAddToBag) {
+                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--ink)'
+              }
             }}
-            aria-label={`Add ${product.title} to bag`}
+            aria-label={
+              requiresSize && !selectedVariant
+                ? `Select a size before adding ${product.title} to bag`
+                : `Add ${product.title} to bag`
+            }
           >
-            Add to Bag
+            {requiresSize && !selectedVariant ? 'Select a Size' : 'Add to Bag'}
           </button>
 
           {/* Trust signals */}

@@ -1,13 +1,24 @@
 // Healthy Jewelry — Shopify configuration
 
+// Single source of truth for Shopify env/config. Values that vary at runtime are
+// exposed as getters so they read process.env at access time (never frozen at
+// module-eval), which keeps server-side reads and test env stubbing accurate.
 export const shopifyConfig = {
-  storeDomain: process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ?? '',
-  storefrontAccessToken: process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? '',
+  get storeDomain(): string {
+    return process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ?? ''
+  },
+  get storefrontAccessToken(): string {
+    return process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? ''
+  },
   // Admin API token — reserved for future Order Management / inventory features.
   // undefined when SHOPIFY_ADMIN_ACCESS_TOKEN is not set (which is the normal case).
-  adminAccessToken: process.env.SHOPIFY_ADMIN_ACCESS_TOKEN,
+  get adminAccessToken(): string | undefined {
+    return process.env.SHOPIFY_ADMIN_ACCESS_TOKEN
+  },
   apiVersion: '2025-01' as const,
-  revalidationSecret: process.env.SHOPIFY_REVALIDATION_SECRET ?? '',
+  get revalidationSecret(): string {
+    return process.env.SHOPIFY_REVALIDATION_SECRET ?? ''
+  },
 } as const
 
 export type ShopifyConfig = typeof shopifyConfig

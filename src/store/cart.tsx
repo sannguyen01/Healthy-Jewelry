@@ -2,14 +2,95 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { shopifyConfig } from '@/config/shopify'
 import type { HJProduct } from '@/lib/shopify/types'
-import { CREATE_CART } from '@/lib/shopify/mutations/cart'
+import { CREATE_CART, ADD_TO_CART, REMOVE_FROM_CART } from '@/lib/shopify/mutations/cart'
+import { GET_CART } from '@/lib/shopify/queries/cart'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface CartItem {
   product: HJProduct
   quantity: number
+  // The specific Shopify variant (e.g. a size) this line represents.
+  // Falls back to the product's default variant for unsized products.
+  variantId: string
+}
+
+interface ShopifyCartPayload {
+  id: string
+  checkoutUrl: string
+  lines: { edges: { node: { id: string } }[] }
+}
+
+interface ShopifyMutationResult {
+  cart?: ShopifyCartPayload
+  userErrors?: { field: string[]; message: string }[]
+}
+
+async function postShopify<T>(
+  query: string,
+  variables: Record<string, unknown>
+): Promise<{ data?: T }> {
+  const res = await fetch('/api/shopify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  })
+  return (await res.json()) as { data?: T }
+}
+
+type SyncLine = { merchandiseId: string; quantity: number }
+
+// Reconciles an existing Shopify cart to match the current local lines by
+// removing everything then re-adding the fresh set. Returns null when the
+// cart is gone/expired or a mutation reports a userError, in which case the
+// caller falls back to creating a brand new cart.
+async function syncExistingCart(
+  cartId: string,
+  lines: SyncLine[]
+): Promise<ShopifyCartPayload | null> {
+  const cartResult = await postShopify<{ cart: ShopifyCartPayload | null }>(GET_CART, { cartId })
+  const existingCart = cartResult.data?.cart
+  if (!existingCart) {
+    return null
+  }
+
+  const existingLineIds = existingCart.lines.edges.map((e) => e.node.id)
+  if (existingLineIds.length > 0) {
+    const removeResult = await postShopify<{ cartLinesRemove: ShopifyMutationResult }>(
+      REMOVE_FROM_CART,
+      { cartId, lineIds: existingLineIds }
+    )
+    const removeErrors = removeResult.data?.cartLinesRemove?.userErrors
+    if (removeErrors && removeErrors.length > 0) {
+      console.warn('[HJ] cartLinesRemove returned userErrors:', removeErrors)
+      return null
+    }
+  }
+
+  const addResult = await postShopify<{ cartLinesAdd: ShopifyMutationResult }>(ADD_TO_CART, {
+    cartId,
+    lines,
+  })
+  const added = addResult.data?.cartLinesAdd
+  if (added?.userErrors && added.userErrors.length > 0) {
+    console.warn('[HJ] cartLinesAdd returned userErrors:', added.userErrors)
+    return null
+  }
+  return added?.cart ?? null
+}
+
+async function createShopifyCart(lines: SyncLine[]): Promise<ShopifyCartPayload | null> {
+  const createResult = await postShopify<{ cartCreate: ShopifyMutationResult }>(CREATE_CART, {
+    lines,
+  })
+  const created = createResult.data?.cartCreate
+  if (created?.userErrors && created.userErrors.length > 0) {
+    console.warn('[HJ] cartCreate returned userErrors:', created.userErrors)
+    return null
+  }
+  return created?.cart ?? null
 }
 
 export interface CartState {
@@ -20,7 +101,7 @@ export interface CartState {
   isLoading: boolean
 
   // Mutations
-  addItem: (product: HJProduct, quantity?: number) => void
+  addItem: (product: HJProduct, quantity?: number, variantId?: string) => void
   removeItem: (productId: string) => void
   updateQuantity: (productId: string, quantity: number) => void
   clearCart: () => void
@@ -49,25 +130,35 @@ export const useCartStore = create<CartState>()(
       checkoutUrl: null,
       isLoading: false,
 
-      addItem: (product, quantity = 1) => {
+      addItem: (product, quantity = 1, variantId) => {
+        const resolvedVariantId = variantId ?? product.defaultVariantId
         set((state) => {
           const existing = state.items.find((item) => item.product.id === product.id)
           if (existing) {
+            // Same product already in the bag — merge quantity, keep the size
+            // originally selected rather than silently swapping it.
             return {
               items: state.items.map((item) =>
                 item.product.id === product.id
                   ? { ...item, quantity: item.quantity + quantity }
                   : item
               ),
+              // A cart-content change invalidates any previously-synced
+              // checkout URL so the checkout page never redirects to a stale cart.
+              checkoutUrl: null,
             }
           }
-          return { items: [...state.items, { product, quantity }] }
+          return {
+            items: [...state.items, { product, quantity, variantId: resolvedVariantId }],
+            checkoutUrl: null,
+          }
         })
       },
 
       removeItem: (productId) => {
         set((state) => ({
           items: state.items.filter((item) => item.product.id !== productId),
+          checkoutUrl: null,
         }))
       },
 
@@ -80,6 +171,7 @@ export const useCartStore = create<CartState>()(
           items: state.items.map((item) =>
             item.product.id === productId ? { ...item, quantity } : item
           ),
+          checkoutUrl: null,
         }))
       },
 
@@ -90,12 +182,11 @@ export const useCartStore = create<CartState>()(
       toggleCart: () => set((state) => ({ isOpen: !state.isOpen })),
 
       syncWithShopify: async () => {
-        const domain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
-        if (!domain) {
+        if (!shopifyConfig.storeDomain) {
           return
         }
 
-        const { items } = get()
+        const { items, shopifyCartId } = get()
         if (items.length === 0) {
           return
         }
@@ -103,30 +194,21 @@ export const useCartStore = create<CartState>()(
         set({ isLoading: true })
 
         try {
-          const lines = items.map((item) => ({
-            merchandiseId: item.product.defaultVariantId,
+          const lines: SyncLine[] = items.map((item) => ({
+            merchandiseId: item.variantId,
             quantity: item.quantity,
           }))
 
-          const res = await fetch('/api/shopify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: CREATE_CART,
-              variables: { lines },
-            }),
-          })
+          // Reuse the existing Shopify cart (same id, so abandoned-checkout
+          // tracking stays coherent) when one exists; only create a new cart
+          // when there isn't one yet, or the existing one turned out to be
+          // gone/expired on Shopify's side.
+          const cart = shopifyCartId
+            ? ((await syncExistingCart(shopifyCartId, lines)) ?? (await createShopifyCart(lines)))
+            : await createShopifyCart(lines)
 
-          const data = (await res.json()) as {
-            data?: { cartCreate?: { cart?: { id: string; checkoutUrl: string } } }
-          }
-
-          const cart = data?.data?.cartCreate?.cart
           if (cart) {
-            set({
-              shopifyCartId: cart.id,
-              checkoutUrl: cart.checkoutUrl,
-            })
+            set({ shopifyCartId: cart.id, checkoutUrl: cart.checkoutUrl })
           }
         } catch (err) {
           console.warn('[HJ] Shopify cart sync failed — local cart still active', err)

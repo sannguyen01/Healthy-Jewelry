@@ -68,7 +68,8 @@ describe('POST /api/contact', () => {
     })
 
     it('returns 400 when name is missing', async () => {
-      const { name: _n, ...body } = VALID_BODY
+      const { name, ...body } = VALID_BODY
+      void name
       const res = await POST(makeReq(body))
       expect(res.status).toBe(400)
       const json = (await res.json()) as { error: string }
@@ -93,7 +94,8 @@ describe('POST /api/contact', () => {
     })
 
     it('returns 400 when subject is missing', async () => {
-      const { subject: _s, ...body } = VALID_BODY
+      const { subject, ...body } = VALID_BODY
+      void subject
       const res = await POST(makeReq(body))
       expect(res.status).toBe(400)
       const json = (await res.json()) as { error: string }
@@ -110,6 +112,51 @@ describe('POST /api/contact', () => {
     it('returns 400 when message exceeds 2000 chars', async () => {
       const res = await POST(makeReq({ ...VALID_BODY, message: 'A'.repeat(2001) }))
       expect(res.status).toBe(400)
+    })
+  })
+
+  describe('in-memory rate limit (no Upstash configured)', () => {
+    it('rate-limits the 6th request from the same IP within the window', async () => {
+      const ip = '198.51.100.10'
+      const reqFor = () =>
+        new NextRequest('http://localhost/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip },
+          body: JSON.stringify(VALID_BODY),
+        })
+
+      for (let i = 0; i < 5; i++) {
+        const res = await POST(reqFor())
+        expect(res.status).not.toBe(429)
+      }
+      const sixth = await POST(reqFor())
+      expect(sixth.status).toBe(429)
+    })
+
+    it('prunes an expired entry so the same IP is allowed again after the window passes', async () => {
+      vi.useFakeTimers()
+      try {
+        const ip = '198.51.100.20'
+        const reqFor = () =>
+          new NextRequest('http://localhost/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip },
+            body: JSON.stringify(VALID_BODY),
+          })
+
+        for (let i = 0; i < 5; i++) {
+          await POST(reqFor())
+        }
+        expect((await POST(reqFor())).status).toBe(429)
+
+        // Advance past the 1-hour rate-limit window.
+        vi.advanceTimersByTime(3_600_000 + 1000)
+
+        const afterWindow = await POST(reqFor())
+        expect(afterWindow.status).not.toBe(429)
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 
