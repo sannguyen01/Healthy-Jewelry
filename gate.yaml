@@ -1,0 +1,21 @@
+# Machine-readable safety policy for this repo's loops. Mirrors loop-constraints.md
+# and the four hard gates in ~/.claude/loop/README.md.
+version: 1
+
+denylist:
+  - ".env"
+  - ".env.*"
+  - "**/secrets/**"
+  - "**/credentials/**"
+  - "**/*_key*"
+  - "**/*_secret*"
+  - ".vercel/**"
+  - "**/migrations/**"
+  - ".github/workflows/**"
+  - "src/lib/shopify/**"
+  - "next.config.ts"
+
+maxFiles: 10
+
+# At L1 nothing is auto-merged (no fix phase runs), so this is empty on purpose.
+autoMergeAllowlist: []
