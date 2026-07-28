@@ -1,8 +1,28 @@
 # Loop State — Healthy-Jewelry
 
-Last run: never
+Last run: 2026-07-28T00:00:00Z — euro-summer-visual-assets branch, draft PR opened
 
 ## High Priority (loop is acting or waiting on human)
+
+- [ ] SOCIAL-PROOF-DESIGN — `public/images/lifestyle/social-proof-ugc.jpg` and
+  `logo-candidate.png` copied into the repo but intentionally left unwired.
+  No existing UGC/social-proof section or logo-swap stub exists anywhere in
+  the codebase to hang them on.
+  Loop action: report only, did not invent a section design
+  Human decision: pending — needs a design decision on placement/composition
+  before implementation
+- [ ] COLLECTIONS-JSON-DRIFT — `src/content/collections.json` (consumed only
+  by `src/lib/content.ts`'s `getAllCollections`/`getFeaturedCollections`/
+  `getCollectionBySlug`) was NOT updated with the new Charms collection.
+  Confirmed via grep this data path is dead/unused by any live route,
+  component, or nav — only self-referencing in `content.test.ts` — so this
+  is a pre-existing, harmless data-duplication issue (two parallel
+  collection lists: this JSON file vs. `hj-data.ts`'s `hjCollections`), not
+  something this run introduced. Skipped to stay within the repo's
+  `gate.yaml` `maxFiles: 10` limit, which the 3 requested places
+  (navigation.ts, hj-data.ts, and full routing support) already reached.
+  Loop action: report only
+  Human decision: pending — trivial 1-file follow-up if desired
 
 - [ ] VERCEL-ENV — 8 Vercel env vars not yet set (Shopify tokens, site URL,
   webhook/revalidation secrets, Resend key, Upstash Redis URL+token)
@@ -32,10 +52,16 @@ CLAUDE.md's content.
 <!-- Loop appends "already reported on <date>: <finding>" here so the same
      finding is not re-surfaced every run. -->
 
+already reported on 2026-07-28: SOCIAL-PROOF-DESIGN, COLLECTIONS-JSON-DRIFT
+(see High Priority above)
+
 ## Run history / token spend
 
 <!-- Loop appends a one-line summary per run: date, tokens, outcome. Full
      detail lives in loop-run-log.md; this is the human-readable index. -->
+
+2026-07-28: euro-summer-visual-assets branch, 3 commits, draft PR opened —
+fix-proposed (see loop-run-log.md for detail)
 
 ---
 Run log: see loop-run-log.md
