@@ -57,13 +57,23 @@ export function Hero() {
         <div
           style={{
             position: 'absolute',
-            inset: 0,
-            // Pixel-based stops (not %) so the fully-opaque zone always covers the
-            // 720px content column + padding regardless of viewport width — a
-            // percentage-based gradient shrinks its opaque zone on wider screens
-            // and can leave the tail of the copy sitting over the raw photo.
+            top: 0,
+            bottom: 0,
+            left: 0,
+            // Sized to the actual content column (720px + its clamp() padding)
+            // plus a breathing-room buffer — NOT inset:0 across the full section.
+            // A previous version used fixed pixel gradient stops across the whole
+            // section width, which crushed the photo to a thin sliver (or nothing)
+            // on common 1280-1440px viewports: the fade-to-transparent point sat
+            // at or past the edge of the viewport itself. Scoping the overlay's
+            // own width to the content box means the gradient's percentages are
+            // relative to THAT width, so it always fades to fully transparent
+            // right at the text's edge — full photo visible beyond it, on any
+            // viewport wider than the content column.
+            width: 'calc(720px + clamp(20px, 4vw, 64px) + 100px)',
+            maxWidth: '100%',
             background:
-              'linear-gradient(90deg, var(--bg) 0px, var(--bg) 820px, rgba(247,245,241,0.55) 1040px, rgba(247,245,241,0) 1320px)',
+              'linear-gradient(90deg, var(--bg) 0%, var(--bg) 55%, rgba(247,245,241,0) 100%)',
           }}
         />
       </div>

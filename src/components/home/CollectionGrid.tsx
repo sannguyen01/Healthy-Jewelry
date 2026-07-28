@@ -90,9 +90,9 @@ export function CollectionGrid() {
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  height: '58%',
+                  height: '42%',
                   background:
-                    'linear-gradient(180deg, rgba(247,245,241,0) 0%, rgba(247,245,241,0.85) 72%, var(--bg) 100%)',
+                    'linear-gradient(180deg, rgba(247,245,241,0) 0%, rgba(247,245,241,0.85) 68%, var(--bg) 100%)',
                   pointerEvents: 'none',
                 }}
               />
