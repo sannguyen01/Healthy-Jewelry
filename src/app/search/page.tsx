@@ -189,7 +189,7 @@ function SearchResults() {
                 marginTop: '28px',
               }}
             >
-              {(['rings', 'necklaces', 'earrings', 'bracelets'] as const).map((cat) => (
+              {(['rings', 'necklaces', 'earrings', 'bracelets', 'charms'] as const).map((cat) => (
                 <Link
                   key={cat}
                   href={`/shop/${cat}`}

@@ -8,7 +8,7 @@ import { getProducts } from '@/lib/shopify'
 export const metadata: Metadata = {
   title: 'Shop All',
   description:
-    'Browse the full Healthy Jewelry collection. Implant-grade titanium, niobium, and 316L surgical steel rings, necklaces, earrings, and bracelets.',
+    'Browse the full Healthy Jewelry collection. Implant-grade titanium, niobium, and 316L surgical steel rings, necklaces, earrings, bracelets, and charms.',
 }
 
 export default async function ShopPage() {
@@ -21,8 +21,7 @@ export default async function ShopPage() {
         {/* Section header */}
         <section
           style={{
-            padding:
-              'var(--space-section) var(--space-gutter) calc(var(--space-section) / 2)',
+            padding: 'var(--space-section) var(--space-gutter) calc(var(--space-section) / 2)',
           }}
         >
           <span className="label-eyebrow" style={{ marginBottom: '12px' }}>

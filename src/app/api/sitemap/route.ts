@@ -12,6 +12,7 @@ export async function GET(): Promise<NextResponse> {
     { loc: '/shop/necklaces', changefreq: 'daily', priority: '0.8' },
     { loc: '/shop/earrings', changefreq: 'daily', priority: '0.8' },
     { loc: '/shop/bracelets', changefreq: 'daily', priority: '0.8' },
+    { loc: '/shop/charms', changefreq: 'daily', priority: '0.8' },
     { loc: '/about', changefreq: 'monthly', priority: '0.6' },
     { loc: '/materials', changefreq: 'monthly', priority: '0.7' },
     { loc: '/search', changefreq: 'monthly', priority: '0.5' },

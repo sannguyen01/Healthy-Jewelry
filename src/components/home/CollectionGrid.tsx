@@ -1,8 +1,14 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { hjCollections, getProductsByCollection } from '@/lib/data/hj-data'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
+
+const COLLECTION_PHOTOS: Partial<Record<string, string>> = {
+  charms: '/images/collections/charms.jpg',
+  earrings: '/images/collections/earrings.jpg',
+}
 
 export function CollectionGrid() {
   return (
@@ -48,23 +54,48 @@ export function CollectionGrid() {
                 ;(e.currentTarget as HTMLAnchorElement).style.opacity = '1'
               }}
             >
-              {/* Background SVG illustration */}
-              {firstProduct && (
-                <div
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: 0.12,
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <JewelrySVG type={firstProduct.svgType} className="w-2/3 h-2/3" />
-                </div>
+              {/* Background photo or SVG illustration */}
+              {COLLECTION_PHOTOS[collection.handle] ? (
+                <Image
+                  src={COLLECTION_PHOTOS[collection.handle] as string}
+                  alt=""
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  style={{ objectFit: 'cover' }}
+                />
+              ) : (
+                firstProduct && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: 0.12,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <JewelrySVG type={firstProduct.svgType} className="w-2/3 h-2/3" />
+                  </div>
+                )
               )}
+
+              {/* Bottom scrim — ensures label stays legible over photo backgrounds */}
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '58%',
+                  background:
+                    'linear-gradient(180deg, rgba(247,245,241,0) 0%, rgba(247,245,241,0.85) 72%, var(--bg) 100%)',
+                  pointerEvents: 'none',
+                }}
+              />
 
               {/* Bottom label */}
               <div

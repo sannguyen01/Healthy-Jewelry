@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { hjMaterials } from '@/lib/data/hj-data'
 
 const ordinals = ['01', '02', '03']
@@ -10,32 +11,62 @@ export function MaterialsSection() {
         padding: 'clamp(64px, 8vw, 96px) var(--space-gutter, clamp(20px,4vw,64px))',
       }}
     >
-      <div style={{ maxWidth: '1200px', margin: '0 auto 48px' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '20px',
-            marginBottom: '24px',
-          }}
-        >
-          <span className="label-eyebrow">Materials</span>
-          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
+      <div
+        className="hj-materials-intro"
+        style={{
+          maxWidth: '1200px',
+          margin: '0 auto 48px',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 'clamp(24px, 4vw, 48px)',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '20px',
+              marginBottom: '24px',
+            }}
+          >
+            <span className="label-eyebrow">Materials</span>
+            <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
+          </div>
+          <h2
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'var(--text-2xl)',
+              fontWeight: 500,
+              textTransform: 'uppercase',
+              color: 'var(--ink)',
+              margin: 0,
+              lineHeight: 1.1,
+              letterSpacing: '0.02em',
+            }}
+          >
+            Built from the inside out.
+          </h2>
         </div>
-        <h2
+
+        <div
+          className="hj-materials-photo"
           style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'var(--text-2xl)',
-            fontWeight: 500,
-            textTransform: 'uppercase',
-            color: 'var(--ink)',
-            margin: 0,
-            lineHeight: 1.1,
-            letterSpacing: '0.02em',
+            position: 'relative',
+            width: '200px',
+            aspectRatio: '3 / 4',
+            flexShrink: 0,
+            overflow: 'hidden',
           }}
         >
-          Built from the inside out.
-        </h2>
+          <Image
+            src="/images/lifestyle/philosophy-waterproof.jpg"
+            alt="Titanium jewelry worn in water, showing waterproof, non-corrosion material integrity"
+            fill
+            sizes="200px"
+            style={{ objectFit: 'cover' }}
+          />
+        </div>
       </div>
 
       <div
@@ -141,6 +172,13 @@ export function MaterialsSection() {
         @media (max-width: 768px) {
           .hj-materials-row {
             flex-direction: column !important;
+          }
+          .hj-materials-intro {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+          .hj-materials-photo {
+            width: 100% !important;
           }
         }
       `}</style>
