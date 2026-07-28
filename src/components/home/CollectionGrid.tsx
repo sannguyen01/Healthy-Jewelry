@@ -82,6 +82,21 @@ export function CollectionGrid() {
                 )
               )}
 
+              {/* Bottom scrim — ensures label stays legible over photo backgrounds */}
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '58%',
+                  background:
+                    'linear-gradient(180deg, rgba(247,245,241,0) 0%, rgba(247,245,241,0.85) 72%, var(--bg) 100%)',
+                  pointerEvents: 'none',
+                }}
+              />
+
               {/* Bottom label */}
               <div
                 style={{

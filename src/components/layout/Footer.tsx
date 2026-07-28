@@ -6,6 +6,7 @@ const shopLinks = [
   { label: 'Necklaces', href: '/shop/necklaces' },
   { label: 'Earrings', href: '/shop/earrings' },
   { label: 'Bracelets', href: '/shop/bracelets' },
+  { label: 'Charms', href: '/shop/charms' },
 ]
 
 const infoLinks = [

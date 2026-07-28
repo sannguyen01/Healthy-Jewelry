@@ -30,6 +30,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     revalidatePath('/shop/necklaces', 'page')
     revalidatePath('/shop/earrings', 'page')
     revalidatePath('/shop/bracelets', 'page')
+    revalidatePath('/shop/charms', 'page')
     revalidatePath('/products/[handle]', 'page')
 
     revalidateTag('products')

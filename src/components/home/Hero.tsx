@@ -16,10 +16,13 @@ export function Hero() {
       child.style.opacity = '0'
       child.style.transform = 'translateY(32px)'
       child.style.transition = `opacity 0.7s var(--ease), transform 0.7s var(--ease)`
-      setTimeout(() => {
-        child.style.opacity = '1'
-        child.style.transform = 'translateY(0)'
-      }, i * 120 + 80)
+      setTimeout(
+        () => {
+          child.style.opacity = '1'
+          child.style.transform = 'translateY(0)'
+        },
+        i * 120 + 80
+      )
     })
   }, [])
 
@@ -55,8 +58,12 @@ export function Hero() {
           style={{
             position: 'absolute',
             inset: 0,
+            // Pixel-based stops (not %) so the fully-opaque zone always covers the
+            // 720px content column + padding regardless of viewport width — a
+            // percentage-based gradient shrinks its opaque zone on wider screens
+            // and can leave the tail of the copy sitting over the raw photo.
             background:
-              'linear-gradient(90deg, var(--bg) 0%, var(--bg) 28%, rgba(247,245,241,0.55) 55%, rgba(247,245,241,0) 75%)',
+              'linear-gradient(90deg, var(--bg) 0px, var(--bg) 820px, rgba(247,245,241,0.55) 1040px, rgba(247,245,241,0) 1320px)',
           }}
         />
       </div>
