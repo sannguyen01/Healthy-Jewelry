@@ -12,8 +12,8 @@ import {
 } from '@/lib/data/hj-data'
 
 describe('getAllProducts', () => {
-  it('returns exactly 15 products', () => {
-    expect(getAllProducts()).toHaveLength(15)
+  it('returns exactly 17 products', () => {
+    expect(getAllProducts()).toHaveLength(17)
   })
 
   it('returns the same reference as hjProducts', () => {
@@ -45,6 +45,16 @@ describe('getProductsByCollection', () => {
   it('returns 3 products for bracelets', () => {
     const bracelets = getProductsByCollection('bracelets')
     expect(bracelets).toHaveLength(3)
+  })
+
+  it('returns 2 products for charms', () => {
+    const charms = getProductsByCollection('charms')
+    expect(charms).toHaveLength(2)
+  })
+
+  it('all returned charm products have collection === "charms"', () => {
+    const charms = getProductsByCollection('charms')
+    charms.forEach((p) => expect(p.collection).toBe('charms'))
   })
 })
 
@@ -116,19 +126,25 @@ describe('getCollectionByHandle', () => {
     const collection = getCollectionByHandle('bracelets')
     expect(collection?.handle).toBe('bracelets')
   })
+
+  it('returns the charms collection', () => {
+    const collection = getCollectionByHandle('charms')
+    expect(collection?.handle).toBe('charms')
+  })
 })
 
 describe('hjCollections', () => {
-  it('has exactly 4 entries', () => {
-    expect(hjCollections).toHaveLength(4)
+  it('has exactly 5 entries', () => {
+    expect(hjCollections).toHaveLength(5)
   })
 
-  it('contains rings, necklaces, earrings, bracelets', () => {
+  it('contains rings, necklaces, earrings, bracelets, charms', () => {
     const handles = hjCollections.map((c) => c.handle)
     expect(handles).toContain('rings')
     expect(handles).toContain('necklaces')
     expect(handles).toContain('earrings')
     expect(handles).toContain('bracelets')
+    expect(handles).toContain('charms')
   })
 })
 

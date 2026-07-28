@@ -13,6 +13,7 @@ const VALID_COLLECTIONS: HJCollectionHandle[] = [
   'necklaces',
   'earrings',
   'bracelets',
+  'charms',
 ]
 
 const COLLECTION_NUMBERS: Record<string, string> = {
@@ -20,6 +21,7 @@ const COLLECTION_NUMBERS: Record<string, string> = {
   necklaces: '02',
   earrings: '03',
   bracelets: '04',
+  charms: '05',
 }
 
 export function generateStaticParams() {

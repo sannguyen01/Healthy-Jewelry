@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 
 export function Hero() {
@@ -33,6 +34,33 @@ export function Hero() {
         overflow: 'hidden',
       }}
     >
+      {/* Hero photo — right side, behind content on mobile via overlay gradient */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+        }}
+      >
+        <Image
+          src="/images/lifestyle/hero-banner.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: 'cover', objectPosition: 'right center' }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(90deg, var(--bg) 0%, var(--bg) 28%, rgba(247,245,241,0.55) 55%, rgba(247,245,241,0) 75%)',
+          }}
+        />
+      </div>
+
       {/* Background ring — large, right side, very faint */}
       <div
         aria-hidden="true"
@@ -45,6 +73,7 @@ export function Hero() {
           height: 'min(60vw, 640px)',
           opacity: 0.06,
           pointerEvents: 'none',
+          zIndex: 0,
         }}
       >
         <JewelrySVG type="ring-arc" className="w-full h-full" />
@@ -60,6 +89,7 @@ export function Hero() {
           padding: '0 clamp(20px, 4vw, 64px)',
           maxWidth: '720px',
           zIndex: 1,
+          position: 'relative',
         }}
       >
         <span className="label-eyebrow" style={{ marginBottom: '24px' }}>
