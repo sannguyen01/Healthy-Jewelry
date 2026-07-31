@@ -28,8 +28,16 @@ export function productJsonLd(product: HJProduct): Record<string, unknown> {
     offers: {
       '@type': 'Offer',
       price: product.price,
-      priceCurrency: 'USD',
-      availability: 'https://schema.org/InStock',
+      // Structured data is what Google prints beside the listing and what
+      // Merchant Center validates against the landing page. A hardcoded USD
+      // over a store that charges VND advertises the wrong price publicly and
+      // gets the feed disapproved for price mismatch.
+      priceCurrency: product.currencyCode,
+      // Advertising InStock for a sold-out product is the other half of the
+      // same problem: Merchant Center checks availability against the page.
+      availability: product.availableForSale
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
       url: `${SITE_URL}/products/${product.handle}`,
     },
   }

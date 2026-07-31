@@ -4,7 +4,9 @@ import {
   generateCollectionMetadata,
   generatePageMetadata,
 } from '@/lib/utils/seo'
+import { productJsonLd } from '@/components/seo/JsonLd'
 import type { HJProduct, HJCollection } from '@/lib/shopify/types'
+import { makeProduct } from '@/test/factories'
 
 const mockProduct: HJProduct = {
   id: 'gid://shopify/Product/hj-001',
@@ -169,5 +171,33 @@ describe('generatePageMetadata', () => {
     const meta = generatePageMetadata('About Us')
     const tw = meta.twitter as { card?: string }
     expect(tw.card).toBe('summary_large_image')
+  })
+})
+
+// ── Structured data reflects the real offer ────────────────────────────────
+//
+// Google prints priceCurrency beside the listing and Merchant Center validates
+// both currency and availability against the landing page. Hardcoding USD over
+// a VND store advertises the wrong price publicly and gets the feed
+// disapproved for price mismatch.
+
+describe('productJsonLd — offer accuracy', () => {
+  it('uses the product currency, not a hardcoded USD', () => {
+    const jsonLd = productJsonLd(makeProduct({ currencyCode: 'VND', price: '2450000' }))
+    const offers = jsonLd.offers as Record<string, unknown>
+    expect(offers.priceCurrency).toBe('VND')
+    expect(offers.price).toBe('2450000')
+  })
+
+  it('advertises OutOfStock for a sold-out product', () => {
+    const jsonLd = productJsonLd(makeProduct({ availableForSale: false }))
+    const offers = jsonLd.offers as Record<string, unknown>
+    expect(offers.availability).toBe('https://schema.org/OutOfStock')
+  })
+
+  it('advertises InStock for an available product', () => {
+    const jsonLd = productJsonLd(makeProduct({ availableForSale: true }))
+    const offers = jsonLd.offers as Record<string, unknown>
+    expect(offers.availability).toBe('https://schema.org/InStock')
   })
 })

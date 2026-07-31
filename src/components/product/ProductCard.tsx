@@ -76,12 +76,30 @@ export function ProductCard({ product, className }: ProductCardProps) {
           </p>
         </div>
 
-        {/* Badge — absolute top-left */}
-        {product.badge !== null && (
-          <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
-            <ProductBadge badge={product.badge} />
-          </div>
-        )}
+        {/* Badge — absolute top-left. Sold out outranks any promotional badge:
+            a "Bestseller" flash on something nobody can buy sends the customer
+            to a dead product page. */}
+        <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
+          {!product.availableForSale ? (
+            <span
+              data-testid="card-sold-out"
+              style={{
+                display: 'inline-block',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-xs)',
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--bg)',
+                backgroundColor: 'var(--ink)',
+                padding: '5px 9px',
+              }}
+            >
+              Sold Out
+            </span>
+          ) : (
+            product.badge !== null && <ProductBadge badge={product.badge} />
+          )}
+        </div>
 
         {/* Info bar */}
         <div style={{ padding: '16px' }}>
@@ -119,7 +137,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                 color: 'var(--ink)',
               }}
             >
-              {formatPrice(product.price, 'USD')}
+              {formatPrice(product.price, product.currencyCode)}
             </span>
 
             {product.compareAtPrice !== null && (
@@ -132,7 +150,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                   textDecoration: 'line-through',
                 }}
               >
-                {formatPrice(product.compareAtPrice, 'USD')}
+                {formatPrice(product.compareAtPrice, product.currencyCode)}
               </span>
             )}
           </div>

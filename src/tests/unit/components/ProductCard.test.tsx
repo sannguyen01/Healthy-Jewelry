@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductCard } from '@/components/product/ProductCard'
 import type { HJProduct } from '@/lib/shopify/types'
+import { makeProduct } from '@/test/factories'
 
 vi.mock('next/link', () => ({
   default: ({
@@ -127,5 +128,64 @@ describe('ProductCard', () => {
       )
       expect(container.querySelector('.my-custom-class')).toBeTruthy()
     })
+  })
+})
+
+// ── Currency and availability ──────────────────────────────────────────────
+//
+// The card hardcoded 'USD' regardless of what the store charges, so a
+// Vietnamese customer browsing a VND store saw dollar signs over VND amounts.
+
+describe('ProductCard — currency', () => {
+  it('renders the price in the product currency', () => {
+    render(<ProductCard product={makeProduct({ currencyCode: 'VND', price: '2450000' })} />)
+    const text = document.body.textContent ?? ''
+    expect(text).not.toContain('$')
+    expect(text).toMatch(/2[.,\s]?450[.,\s]?000/)
+  })
+
+  it('renders the compare-at price in the same currency', () => {
+    render(
+      <ProductCard
+        product={makeProduct({
+          currencyCode: 'VND',
+          price: '2450000',
+          compareAtPrice: '2900000',
+        })}
+      />
+    )
+    expect(document.body.textContent ?? '').not.toContain('$')
+  })
+
+  it('still renders USD stores in USD', () => {
+    render(<ProductCard product={makeProduct({ currencyCode: 'USD', price: '89.00' })} />)
+    expect(screen.getByText('$89.00')).toBeTruthy()
+  })
+})
+
+describe('ProductCard — availability', () => {
+  it('marks a sold-out product on the card', () => {
+    render(<ProductCard product={makeProduct({ availableForSale: false })} />)
+    expect(screen.getByTestId('card-sold-out')).toBeTruthy()
+  })
+
+  it('shows no sold-out marker for an available product', () => {
+    render(<ProductCard product={makeProduct({ availableForSale: true })} />)
+    expect(screen.queryByTestId('card-sold-out')).toBeNull()
+  })
+
+  // A "Bestseller" flash on something nobody can buy sends the customer to a
+  // dead product page.
+  it('shows sold out instead of a promotional badge', () => {
+    render(
+      <ProductCard product={makeProduct({ availableForSale: false, badge: 'Bestseller' })} />
+    )
+    expect(screen.getByTestId('card-sold-out')).toBeTruthy()
+    expect(screen.queryByText('Bestseller')).toBeNull()
+  })
+
+  it('still shows the promotional badge when available', () => {
+    render(<ProductCard product={makeProduct({ availableForSale: true, badge: 'Bestseller' })} />)
+    expect(screen.getByText('Bestseller')).toBeTruthy()
   })
 })
