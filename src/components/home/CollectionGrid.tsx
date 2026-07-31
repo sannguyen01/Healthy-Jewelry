@@ -73,11 +73,15 @@ export function CollectionGrid() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      opacity: 0.12,
+                      backgroundColor: 'var(--nacre)',
                       pointerEvents: 'none',
                     }}
                   >
-                    <JewelrySVG type={firstProduct.svgType} className="w-2/3 h-2/3" />
+                    <JewelrySVG
+                      type={firstProduct.svgType}
+                      className="w-2/3 h-2/3"
+                      style={{ opacity: 0.45 }}
+                    />
                   </div>
                 )
               )}
