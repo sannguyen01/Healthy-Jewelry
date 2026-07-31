@@ -439,3 +439,169 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     expect(results.every((p) => p.badge === 'New')).toBe(true)
   })
 })
+
+// ── Currency, availability and options mapping ─────────────────────────────
+//
+// HJProduct used to drop Shopify's currencyCode entirely, so every price was
+// rendered as USD regardless of what the store actually charges. It also had
+// no availability or option data, so sold-out products were addable to the bag
+// and the size picker was driven by a hardcoded list.
+
+describe('lib/shopify/index — currency mapping', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', VALID_DOMAIN)
+    vi.stubEnv('SHOPIFY_STOREFRONT_ACCESS_TOKEN', VALID_TOKEN)
+  })
+
+  async function mapNode(overrides: Record<string, unknown>) {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(mockJsonResponse({ data: { product: shopifyProductNode(overrides) } }))
+    )
+    const { getProduct } = await import('@/lib/shopify')
+    return getProduct('arc-band-titanium')
+  }
+
+  it('carries the currency code through from Shopify', async () => {
+    const product = await mapNode({
+      priceRange: { minVariantPrice: { amount: '2450000', currencyCode: 'VND' } },
+    })
+    expect(product?.currencyCode).toBe('VND')
+  })
+
+  it('stores a zero-decimal price without spurious minor units', async () => {
+    const product = await mapNode({
+      priceRange: { minVariantPrice: { amount: '2450000.0', currencyCode: 'VND' } },
+    })
+    expect(product?.price).toBe('2450000')
+  })
+
+  it('keeps two decimals for a minor-unit currency', async () => {
+    const product = await mapNode({})
+    expect(product?.price).toBe('89.00')
+  })
+
+  it('formats compareAtPrice with the same precision as the price', async () => {
+    const product = await mapNode({
+      priceRange: { minVariantPrice: { amount: '2450000', currencyCode: 'VND' } },
+      compareAtPriceRange: { minVariantPrice: { amount: '2900000', currencyCode: 'VND' } },
+    })
+    expect(product?.compareAtPrice).toBe('2900000')
+  })
+
+  it('falls back to the first variant currency when the price range has none', async () => {
+    const product = await mapNode({
+      priceRange: { minVariantPrice: { amount: '89.00' } },
+    })
+    expect(product?.currencyCode).toBe('USD')
+  })
+})
+
+describe('lib/shopify/index — availability and options mapping', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', VALID_DOMAIN)
+    vi.stubEnv('SHOPIFY_STOREFRONT_ACCESS_TOKEN', VALID_TOKEN)
+  })
+
+  async function mapNode(overrides: Record<string, unknown>) {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(mockJsonResponse({ data: { product: shopifyProductNode(overrides) } }))
+    )
+    const { getProduct } = await import('@/lib/shopify')
+    return getProduct('arc-band-titanium')
+  }
+
+  it('carries the product-level availableForSale flag', async () => {
+    expect((await mapNode({ availableForSale: false }))?.availableForSale).toBe(false)
+    expect((await mapNode({ availableForSale: true }))?.availableForSale).toBe(true)
+  })
+
+  it('derives availability from the variants when Shopify omits the flag', async () => {
+    const soldOutVariants = {
+      edges: [
+        {
+          node: {
+            id: 'v1',
+            title: '5',
+            availableForSale: false,
+            price: { amount: '89.00', currencyCode: 'USD' },
+            compareAtPrice: null,
+            selectedOptions: [{ name: 'Size', value: '5' }],
+          },
+        },
+      ],
+    }
+    const product = await mapNode({ availableForSale: undefined, variants: soldOutVariants })
+    expect(product?.availableForSale).toBe(false)
+  })
+
+  it('carries Shopify option definitions through to the product', async () => {
+    const product = await mapNode({
+      options: [{ id: 'o1', name: 'Size', values: ['5', '6'] }],
+    })
+    expect(product?.options).toEqual([{ id: 'o1', name: 'Size', values: ['5', '6'] }])
+  })
+
+  it('defaults options to an empty array when Shopify sends none', async () => {
+    expect((await mapNode({ options: undefined }))?.options).toEqual([])
+  })
+
+  // Defaulting to variants[0] regardless put an unbuyable merchandiseId in the
+  // cart whenever the first size was sold out, and the customer only found out
+  // when Shopify refused the checkout.
+  it('defaults to the first purchasable variant, skipping a sold-out first size', async () => {
+    const product = await mapNode({
+      variants: {
+        edges: [
+          {
+            node: {
+              id: 'v-sold-out',
+              title: '5',
+              availableForSale: false,
+              price: { amount: '89.00', currencyCode: 'USD' },
+              compareAtPrice: null,
+              selectedOptions: [{ name: 'Size', value: '5' }],
+            },
+          },
+          {
+            node: {
+              id: 'v-in-stock',
+              title: '6',
+              availableForSale: true,
+              price: { amount: '89.00', currencyCode: 'USD' },
+              compareAtPrice: null,
+              selectedOptions: [{ name: 'Size', value: '6' }],
+            },
+          },
+        ],
+      },
+    })
+    expect(product?.defaultVariantId).toBe('v-in-stock')
+  })
+
+  it('falls back to the first variant when every variant is sold out', async () => {
+    const product = await mapNode({
+      availableForSale: false,
+      variants: {
+        edges: [
+          {
+            node: {
+              id: 'v-a',
+              title: '5',
+              availableForSale: false,
+              price: { amount: '89.00', currencyCode: 'USD' },
+              compareAtPrice: null,
+              selectedOptions: [],
+            },
+          },
+        ],
+      },
+    })
+    expect(product?.defaultVariantId).toBe('v-a')
+  })
+})

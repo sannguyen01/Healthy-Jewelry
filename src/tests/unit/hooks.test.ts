@@ -2,7 +2,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useScrolled } from '@/lib/hooks/useScrolled'
 import { useMedia, useIsMobile, useIsTablet } from '@/lib/hooks/useMedia'
-import { useCartItem, useIsInCart, useCartItemQuantity } from '@/lib/hooks/useCart'
+import {
+  useCartItem,
+  useIsInCart,
+  useCartItemQuantity,
+  useProductQuantityInCart,
+  useCartError,
+  useCartTotals,
+  useCartCurrency,
+  useCartDiscountCodes,
+  useCartAdjustments,
+  useCheckoutUrl,
+  useCartIsLoading,
+} from '@/lib/hooks/useCart'
 import { useCartStore } from '@/store/cart'
 import type { HJProduct } from '@/lib/shopify/types'
 
@@ -270,5 +282,114 @@ describe('useCartItemQuantity', () => {
     })
     const { result } = renderHook(() => useCartItemQuantity('other-id'))
     expect(result.current).toBe(0)
+  })
+})
+
+// ── Cart state hooks added with the transaction-path rework ────────────────
+
+describe('useProductQuantityInCart', () => {
+  beforeEach(() => {
+    useCartStore.setState({ items: [], isOpen: false })
+  })
+
+  it('returns 0 when the product is not in the bag', () => {
+    const { result } = renderHook(() => useProductQuantityInCart(testProduct.id))
+    expect(result.current).toBe(0)
+  })
+
+  // A product card has no size context, so it reports the total across sizes.
+  it('sums quantities across every variant of the product', () => {
+    act(() => {
+      useCartStore.getState().addItem(testProduct, 2, 'v-size-7')
+      useCartStore.getState().addItem(testProduct, 3, 'v-size-9')
+    })
+    const { result } = renderHook(() => useProductQuantityInCart(testProduct.id))
+    expect(result.current).toBe(5)
+  })
+})
+
+describe('useCartError', () => {
+  beforeEach(() => {
+    useCartStore.setState({ error: null })
+  })
+
+  it('returns null when the cart is healthy', () => {
+    const { result } = renderHook(() => useCartError())
+    expect(result.current).toBeNull()
+  })
+
+  it('returns the surfaced error', () => {
+    act(() => {
+      useCartStore.setState({ error: { code: 'network', message: 'offline' } })
+    })
+    const { result } = renderHook(() => useCartError())
+    expect(result.current?.code).toBe('network')
+  })
+})
+
+describe('useCartTotals and useCartCurrency', () => {
+  beforeEach(() => {
+    useCartStore.setState({ items: [], totals: null })
+  })
+
+  it('returns null totals before the first sync', () => {
+    const { result } = renderHook(() => useCartTotals())
+    expect(result.current).toBeNull()
+  })
+
+  it('returns Shopify totals once synced', () => {
+    act(() => {
+      useCartStore.setState({
+        totals: {
+          subtotal: { amount: '2450000', currencyCode: 'VND' },
+          total: { amount: '2450000', currencyCode: 'VND' },
+          tax: null,
+          duty: null,
+        },
+      })
+    })
+    expect(renderHook(() => useCartTotals()).result.current?.total.amount).toBe('2450000')
+    expect(renderHook(() => useCartCurrency()).result.current).toBe('VND')
+  })
+})
+
+describe('useCartDiscountCodes and useCartAdjustments', () => {
+  beforeEach(() => {
+    useCartStore.setState({ discountCodes: [], adjustments: [] })
+  })
+
+  it('returns applied discount codes', () => {
+    act(() => {
+      useCartStore.setState({ discountCodes: [{ code: 'TITANIUM10', applicable: true }] })
+    })
+    expect(renderHook(() => useCartDiscountCodes()).result.current).toEqual([
+      { code: 'TITANIUM10', applicable: true },
+    ])
+  })
+
+  it('returns pending adjustment notices', () => {
+    act(() => {
+      useCartStore.setState({ adjustments: ['Arc Band is limited to 2 — your bag was updated.'] })
+    })
+    expect(renderHook(() => useCartAdjustments()).result.current).toHaveLength(1)
+  })
+})
+
+describe('useCheckoutUrl and useCartIsLoading', () => {
+  it('reflects the synced checkout URL', () => {
+    act(() => {
+      useCartStore.setState({ checkoutUrl: 'https://checkout/x' })
+    })
+    expect(renderHook(() => useCheckoutUrl()).result.current).toBe('https://checkout/x')
+  })
+
+  it('reflects the loading flag', () => {
+    act(() => {
+      useCartStore.setState({ isLoading: true })
+    })
+    expect(renderHook(() => useCartIsLoading()).result.current).toBe(true)
+    act(() => {
+      useCartStore.setState({ isLoading: false })
+    })
   })
 })
