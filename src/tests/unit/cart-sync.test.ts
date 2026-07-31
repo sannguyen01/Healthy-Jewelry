@@ -628,3 +628,99 @@ describe('checkoutUrl is never persisted', () => {
     expect(partial).toHaveProperty('shopifyCartId')
   })
 })
+
+// ── Concurrency ────────────────────────────────────────────────────────────
+
+describe('syncWithShopify — bag edited mid-flight', () => {
+  // Shopify's answer only speaks to the lines we asked about. A line added
+  // while the request was in flight is not in that answer, and treating its
+  // absence as "sold out" would delete a just-added item and say so.
+  it('leaves an item added during the sync untouched', async () => {
+    let resolveCreate: ((value: Response) => void) | undefined
+    mockFetch.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveCreate = resolve
+        })
+    )
+
+    useCartStore.getState().addItem(mockProduct)
+    const syncing = useCartStore.getState().syncWithShopify()
+
+    // The customer adds a second size while the first request is open.
+    useCartStore.getState().addItem(mockProduct, 1, 'v-added-late')
+
+    resolveCreate?.(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: cartPayload('gid://shopify/Cart/c1', 'https://checkout/c1', [
+              { merchandiseId: VARIANT, quantity: 1 },
+            ]),
+            userErrors: [],
+          },
+        },
+      })
+    )
+    await syncing
+
+    const { items, adjustments } = useCartStore.getState()
+    expect(items.map((i) => i.variantId)).toContain('v-added-late')
+    expect(items).toHaveLength(2)
+    expect(adjustments).toEqual([])
+  })
+
+  it('withholds the checkout URL until the newer bag has been synced', async () => {
+    let resolveCreate: ((value: Response) => void) | undefined
+    mockFetch.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveCreate = resolve
+        })
+    )
+
+    useCartStore.getState().addItem(mockProduct)
+    const syncing = useCartStore.getState().syncWithShopify()
+    useCartStore.getState().addItem(mockProduct, 1, 'v-added-late')
+
+    resolveCreate?.(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: cartPayload('gid://shopify/Cart/c1', 'https://checkout/c1', [
+              { merchandiseId: VARIANT, quantity: 1 },
+            ]),
+            userErrors: [],
+          },
+        },
+      })
+    )
+    await syncing
+
+    // That URL prices a cart missing the line the customer just added.
+    expect(useCartStore.getState().checkoutUrl).toBeNull()
+    expect(useCartStore.getState().totals).toBeNull()
+  })
+})
+
+describe('reconcileCart — cart lookup failures', () => {
+  // Swallowing the failure and creating a replacement would orphan a cart the
+  // customer still holds, losing its contents and any applied discount.
+  it('does not replace the existing cart when the lookup errors', async () => {
+    useCartStore.setState({ shopifyCartId: 'gid://shopify/Cart/existing-1' })
+
+    const ops: string[] = []
+    mockFetch.mockImplementation(async (_url, init: RequestInit) => {
+      ops.push(operationName(JSON.parse(init.body as string)))
+      return jsonResponse({ errors: [{ message: 'Throttled' }] })
+    })
+
+    useCartStore.getState().addItem(mockProduct)
+    await useCartStore.getState().syncWithShopify()
+
+    expect(ops).toEqual(['GetCart'])
+    expect(ops).not.toContain('CreateCart')
+    expect(useCartStore.getState().shopifyCartId).toBe('gid://shopify/Cart/existing-1')
+    expect(useCartStore.getState().error).not.toBeNull()
+  })
+})

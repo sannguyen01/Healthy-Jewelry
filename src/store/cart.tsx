@@ -476,7 +476,22 @@ export const useCartStore = create<CartState>()(
           const adjustments: string[] = []
           const reconciledItems: CartItem[] = []
 
+          // Shopify's answer only speaks to the lines we asked about. A line
+          // the customer added while this request was in flight is not in
+          // `desired`, so its absence from the response means nothing — judging
+          // it here would delete a just-added item and tell the customer it had
+          // sold out. Those lines pass through untouched and the next sync
+          // reconciles them.
+          const requested = new Set(desired.map((l) => l.merchandiseId))
+          let addedDuringSync = false
+
           for (const item of get().items) {
+            if (!requested.has(item.variantId)) {
+              reconciledItems.push(item)
+              addedDuringSync = true
+              continue
+            }
+
             const remote = remoteByMerch.get(item.variantId)
             if (!remote) {
               adjustments.push(`${item.product.title} sold out and was removed from your bag.`)
@@ -495,8 +510,12 @@ export const useCartStore = create<CartState>()(
           set({
             items: reconciledItems,
             shopifyCartId: cart.id,
-            checkoutUrl: reconciledItems.length > 0 ? cart.checkoutUrl : null,
-            totals: toTotals(cart.cost),
+            // A cart that changed mid-flight has not been priced or reserved by
+            // Shopify yet, so neither its checkout URL nor its totals describe
+            // what the customer is now holding.
+            checkoutUrl:
+              reconciledItems.length > 0 && !addedDuringSync ? cart.checkoutUrl : null,
+            totals: addedDuringSync ? null : toTotals(cart.cost),
             discountCodes: cart.discountCodes ?? [],
             adjustments,
             isLoading: false,
@@ -667,17 +686,13 @@ async function reconcileCart(
     return createCart(desired)
   }
 
-  let existing: ShopifyCartPayload | null = null
-  try {
-    const data = await postShopify<{ cart: ShopifyCartPayload | null }>(GET_CART, { cartId })
-    existing = data?.cart ?? null
-  } catch (err) {
-    // A cart that can't be read is treated as gone only for "not found"-shaped
-    // failures; a network error must surface rather than silently orphan the
-    // customer's existing cart by creating a second one.
-    if (err instanceof CartSyncError && err.code === 'network') throw err
-    existing = null
-  }
+  // Only a successful query that comes back with `cart: null` means the cart is
+  // gone — that is how Shopify reports an expired or completed one. Any thrown
+  // error is a failure to find out, which is a different thing: swallowing it
+  // and creating a replacement would orphan a cart the customer still has,
+  // losing whatever is in it along with any discount already applied.
+  const data = await postShopify<{ cart: ShopifyCartPayload | null }>(GET_CART, { cartId })
+  const existing = data?.cart ?? null
 
   if (!existing) {
     if (desired.length === 0) return null

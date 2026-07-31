@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useCartStore } from '@/store/cart'
+import { useCartStore, MAX_LINE_QUANTITY } from '@/store/cart'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { QuantityStepper } from '@/components/product/QuantityStepper'
 import { CartNotices } from '@/components/product/CartNotices'
 import { formatPrice } from '@/lib/utils/formatPrice'
 import { describeVariant, cartLineLabel } from '@/lib/utils/cartLine'
-import { MAX_LINE_QUANTITY } from '@/store/cart'
 
 export function CartDrawer() {
   const isOpen = useCartStore((s) => s.isOpen)
