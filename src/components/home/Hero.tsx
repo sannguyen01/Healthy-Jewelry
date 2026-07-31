@@ -61,19 +61,19 @@ export function Hero() {
             bottom: 0,
             left: 0,
             // Sized to the actual content column (720px + its clamp() padding)
-            // plus a fixed 48px fade strip — NOT inset:0 across the full section.
-            // The gradient below is solid for this entire width minus that 48px
-            // strip (a calc() offset, not a percentage stop), so the opaque zone
-            // always reaches the text column's real right edge regardless of the
-            // clamp()'d padding at a given viewport width — a percentage split
-            // (e.g. 55%/100%) drifts with this div's own width and was cutting
-            // the solid backing short of the text at 1280-1440px viewports while
-            // also stretching the haze/fade zone across ~400px before the photo
-            // ever became fully visible.
-            width: 'calc(720px + clamp(20px, 4vw, 64px) + 48px)',
+            // plus a fixed 180px fade strip — NOT inset:0 across the full section.
+            // The strip's offset is a calc() length, not a percentage stop, so the
+            // solid zone always reaches the text column's real right edge at any
+            // viewport width. Within that fixed strip, an eased 5-stop falloff
+            // (quadratic-ish: 100/56/25/6/0% alpha) blends into the photo instead
+            // of a flat linear ramp — a linear cut over a photo this detailed reads
+            // as an abrupt seam; easing it out gives a soft, photographic vignette
+            // instead. Still far narrower than the ~400px haze an earlier version
+            // of this gradient stretched across.
+            width: 'calc(720px + clamp(20px, 4vw, 64px) + 180px)',
             maxWidth: '100%',
             background:
-              'linear-gradient(90deg, var(--bg) 0, var(--bg) calc(100% - 48px), rgba(247,245,241,0) 100%)',
+              'linear-gradient(90deg, var(--bg) 0, var(--bg) calc(100% - 180px), rgba(247,245,241,0.56) calc(100% - 135px), rgba(247,245,241,0.25) calc(100% - 90px), rgba(247,245,241,0.06) calc(100% - 45px), rgba(247,245,241,0) 100%)',
           }}
         />
       </div>
