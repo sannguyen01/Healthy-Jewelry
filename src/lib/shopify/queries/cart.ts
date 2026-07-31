@@ -4,6 +4,7 @@ export const CART_FRAGMENT = /* GraphQL */ `
   fragment CartFragment on Cart {
     id
     checkoutUrl
+    totalQuantity
     cost {
       totalAmount {
         amount
@@ -13,12 +14,38 @@ export const CART_FRAGMENT = /* GraphQL */ `
         amount
         currencyCode
       }
+      totalTaxAmount {
+        amount
+        currencyCode
+      }
+      totalDutyAmount {
+        amount
+        currencyCode
+      }
+    }
+    discountCodes {
+      code
+      applicable
     }
     lines(first: 100) {
       edges {
         node {
           id
           quantity
+          cost {
+            totalAmount {
+              amount
+              currencyCode
+            }
+            amountPerQuantity {
+              amount
+              currencyCode
+            }
+            compareAtAmountPerQuantity {
+              amount
+              currencyCode
+            }
+          }
           merchandise {
             ... on ProductVariant {
               id
@@ -43,6 +70,12 @@ export const CART_FRAGMENT = /* GraphQL */ `
                 description
                 descriptionHtml
                 tags
+                availableForSale
+                options {
+                  id
+                  name
+                  values
+                }
                 priceRange {
                   minVariantPrice {
                     amount

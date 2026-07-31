@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { useCartStore } from '@/store/cart'
 import type { HJProduct } from '@/lib/shopify/types'
+import { makeCartItem } from '@/test/factories'
 
 vi.mock('next/link', () => ({
   default: ({
@@ -35,6 +36,9 @@ const mockProduct: HJProduct = {
   badge: null,
   description: 'Grade 23 titanium.',
   spec: '2 mm · 1.8 g',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [],
   svgType: 'ring-arc',
   variants: [],
 }
@@ -52,6 +56,9 @@ const mockProduct2: HJProduct = {
   badge: null,
   description: 'Dome profile.',
   spec: '4 mm · 2.4 g',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [],
   svgType: 'ring-dome',
   variants: [],
 }
@@ -151,8 +158,8 @@ describe('CartDrawer — with items', () => {
   beforeEach(() => {
     useCartStore.setState({
       items: [
-        { product: mockProduct, quantity: 2, variantId: mockProduct.defaultVariantId },
-        { product: mockProduct2, quantity: 1, variantId: mockProduct2.defaultVariantId },
+        makeCartItem({ product: mockProduct, quantity: 2 }),
+        makeCartItem({ product: mockProduct2, quantity: 1 }),
       ],
       isOpen: true,
       shopifyCartId: null,

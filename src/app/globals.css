@@ -402,4 +402,19 @@
     text-transform: uppercase;
     color: var(--graphite);
   }
+
+  /* ── Visually hidden ──
+     Keeps a label in the accessibility tree while removing it from the visual
+     layout. Used for form labels the design shows only as placeholders. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
 }

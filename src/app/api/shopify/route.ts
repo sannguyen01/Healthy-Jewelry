@@ -16,6 +16,8 @@ const ALLOWED_OPERATIONS = new Set([
   'AddToCart',
   'UpdateCartLines',
   'RemoveFromCart',
+  'UpdateCartDiscountCodes',
+  'UpdateCartBuyerIdentity',
 ])
 
 // 16 KB covers all legitimate Storefront queries

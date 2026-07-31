@@ -32,6 +32,9 @@ const baseProduct: HJProduct = {
   badge: null,
   description: 'Grade 23 titanium. Mirror-polished arc profile.',
   spec: '2 mm · 1.8 g',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [],
   svgType: 'ring-arc',
   variants: [],
 }

@@ -4,6 +4,7 @@ import type {
   HJMaterial,
   HJCollectionHandle,
   ProductVariant,
+  ProductOption,
   Money,
 } from '@/lib/shopify/types'
 
@@ -73,7 +74,19 @@ export const hjMaterials: HJMaterial[] = [
 // can be synthesized once, by collection, instead of hand-writing 8 ring
 // sizes / 5 bracelet sizes into every product literal.
 
-const hjProductsRaw: Omit<HJProduct, 'variants'>[] = [
+// Currency for the static fallback catalog. These prices only ever render when
+// Shopify is unreachable or unconfigured; the live store's real currency always
+// comes from Shopify's Money objects. Kept overridable so a redeploy can align
+// the fallback with the store's presentment currency without a code change.
+export const STATIC_CATALOG_CURRENCY: string =
+  process.env.NEXT_PUBLIC_FALLBACK_CURRENCY?.toUpperCase() || 'USD'
+
+// `currencyCode`, `availableForSale` and `options` are derived below rather
+// than repeated on all 17 literals — they're uniform across the static catalog.
+const hjProductsRaw: Omit<
+  HJProduct,
+  'variants' | 'currencyCode' | 'availableForSale' | 'options'
+>[] = [
   // ── Rings ────────────────────────────────────────────────────────────────
   {
     id: 'gid://shopify/Product/hj-001',
@@ -348,10 +361,24 @@ const RING_SIZES = ['5', '6', '7', '8', '9', '10', '11', '12']
 const BRACELET_SIZES = ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)']
 
 function money(amount: string): Money {
-  return { amount, currencyCode: 'USD' }
+  return { amount, currencyCode: STATIC_CATALOG_CURRENCY }
 }
 
-function buildVariants(product: Omit<HJProduct, 'variants'>): ProductVariant[] {
+type RawProduct = Omit<HJProduct, 'variants' | 'currencyCode' | 'availableForSale' | 'options'>
+
+// Mirrors Shopify's `Product.options` for the static catalog, so SizePicker can
+// render from one shape whether the data came from Shopify or from here.
+function buildOptions(product: RawProduct): ProductOption[] {
+  if (product.collection === 'rings') {
+    return [{ id: `${product.id}-opt-size`, name: 'Size', values: [...RING_SIZES] }]
+  }
+  if (product.collection === 'bracelets') {
+    return [{ id: `${product.id}-opt-size`, name: 'Size', values: [...BRACELET_SIZES] }]
+  }
+  return []
+}
+
+function buildVariants(product: RawProduct): ProductVariant[] {
   const compareAtPrice = product.compareAtPrice ? money(product.compareAtPrice) : null
 
   if (product.collection === 'rings') {
@@ -390,6 +417,9 @@ function buildVariants(product: Omit<HJProduct, 'variants'>): ProductVariant[] {
 
 export const hjProducts: HJProduct[] = hjProductsRaw.map((product) => ({
   ...product,
+  currencyCode: STATIC_CATALOG_CURRENCY,
+  availableForSale: true,
+  options: buildOptions(product),
   variants: buildVariants(product),
 }))
 

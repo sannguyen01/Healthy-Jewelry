@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { HJProduct } from '@/lib/shopify/types'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { ProductBadge } from '@/components/product/ProductBadge'
-import { SizePicker } from '@/components/product/SizePicker'
+import { SizePicker, buildSizeOptions } from '@/components/product/SizePicker'
+import { QuantityStepper } from '@/components/product/QuantityStepper'
 import { formatPrice } from '@/lib/utils/formatPrice'
-import { useCartStore } from '@/store/cart'
+import { useCartStore, MAX_LINE_QUANTITY } from '@/store/cart'
 
 interface ProductDetailProps {
   product: HJProduct
@@ -22,24 +23,63 @@ const TRUST_SIGNALS = ['·IMPLANT GRADE·', '·HYPOALLERGENIC·', '·MRI SAFE·'
 
 export function ProductDetail({ product }: ProductDetailProps) {
   const [selectedSize, setSelectedSize] = useState<string | undefined>(undefined)
+  const [quantity, setQuantity] = useState(1)
   const addItem = useCartStore((s) => s.addItem)
   const openCart = useCartStore((s) => s.openCart)
 
-  // Rings and bracelets are sized — a size must resolve to a real Shopify
-  // variant before the correct item can be added to the cart.
-  const requiresSize = product.collection === 'rings' || product.collection === 'bracelets'
-  const selectedVariant = selectedSize
-    ? product.variants.find((v) =>
-        v.selectedOptions.some((o) => o.name === 'Size' && o.value === selectedSize)
+  // Whether this product is sized is a fact about its Shopify options, not
+  // about its collection. Keying off the collection — as this did — meant a
+  // ring published without size variants could never be added to the bag, and
+  // a sized product in any other collection never got a picker.
+  const sizeInfo = useMemo(
+    () => buildSizeOptions(product.options, product.variants),
+    [product.options, product.variants]
+  )
+  const requiresSize = sizeInfo !== null
+
+  const selectedVariant = useMemo(() => {
+    if (!requiresSize) {
+      return product.variants.find((v) => v.id === product.defaultVariantId) ?? product.variants[0]
+    }
+    if (!selectedSize || !sizeInfo) return undefined
+    return product.variants.find((v) =>
+      v.selectedOptions.some(
+        (o) =>
+          o.name.trim().toLowerCase() === sizeInfo.name.trim().toLowerCase() &&
+          o.value === selectedSize
       )
-    : undefined
-  const canAddToBag = !requiresSize || selectedVariant !== undefined
+    )
+  }, [requiresSize, selectedSize, sizeInfo, product.variants, product.defaultVariantId])
+
+  // Price follows the chosen variant. A size 12 band can legitimately cost more
+  // than the "from" price shown before a size is picked, and charging a
+  // different number at checkout than the one on the page earns a chargeback.
+  const displayPrice = selectedVariant?.price?.amount ?? product.price
+  const displayCurrency = selectedVariant?.price?.currencyCode ?? product.currencyCode ?? 'USD'
+  const displayCompareAt =
+    selectedVariant?.compareAtPrice?.amount ?? (selectedVariant ? null : product.compareAtPrice)
+  const isOnSale =
+    displayCompareAt !== null &&
+    displayCompareAt !== undefined &&
+    parseFloat(displayCompareAt) > parseFloat(displayPrice)
+
+  const soldOut = !product.availableForSale
+  const variantSoldOut = selectedVariant !== undefined && !selectedVariant.availableForSale
+  const canAddToBag = !soldOut && selectedVariant !== undefined && selectedVariant.availableForSale
 
   function handleAddToBag() {
-    if (!canAddToBag) return
-    addItem(product, 1, selectedVariant?.id)
+    if (!canAddToBag || !selectedVariant) return
+    addItem(product, quantity, selectedVariant.id)
     openCart()
   }
+
+  const buttonLabel = soldOut
+    ? 'Sold Out'
+    : requiresSize && !selectedSize
+      ? `Select a ${sizeInfo?.name ?? 'Size'}`
+      : variantSoldOut
+        ? 'Sold Out'
+        : 'Add to Bag'
 
   const materialName = MATERIAL_FULL_NAMES[product.material] ?? product.material
 
@@ -76,9 +116,28 @@ export function ProductDetail({ product }: ProductDetailProps) {
             justifyContent: 'center',
             minHeight: '480px',
             aspectRatio: '1 / 1',
+            position: 'relative',
           }}
         >
           <JewelrySVG type={product.svgType} className="" style={{ width: '70%', height: '70%' }} />
+          {soldOut && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '16px',
+                left: '16px',
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-xs)',
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--bg)',
+                backgroundColor: 'var(--ink)',
+                padding: '6px 10px',
+              }}
+            >
+              Sold Out
+            </span>
+          )}
         </div>
 
         {/* Right — Info panel */}
@@ -116,17 +175,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
           </div>
 
           {/* Spec */}
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-xs)',
-              color: 'var(--graphite)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {product.spec}
-          </p>
+          {product.spec && (
+            <p
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--graphite)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {product.spec}
+            </p>
+          )}
 
           {/* Description */}
           <p
@@ -155,16 +216,17 @@ export function ProductDetail({ product }: ProductDetailProps) {
           {/* Price */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
             <span
+              data-testid="product-price"
               style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 'var(--text-xl)',
                 color: 'var(--ink)',
               }}
             >
-              {formatPrice(product.price, 'USD')}
+              {formatPrice(displayPrice, displayCurrency)}
             </span>
 
-            {product.compareAtPrice !== null && (
+            {isOnSale && displayCompareAt && (
               <span
                 style={{
                   fontFamily: 'var(--font-body)',
@@ -174,27 +236,45 @@ export function ProductDetail({ product }: ProductDetailProps) {
                   textDecoration: 'line-through',
                 }}
               >
-                {formatPrice(product.compareAtPrice, 'USD')}
+                {formatPrice(displayCompareAt, displayCurrency)}
               </span>
             )}
           </div>
 
-          {/* Size picker — only for rings and bracelets */}
-          <SizePicker
-            collection={product.collection}
-            onSelect={setSelectedSize}
-            selected={selectedSize}
-          />
+          {/* Size picker — rendered from Shopify's own option values */}
+          {sizeInfo && (
+            <SizePicker
+              options={product.options}
+              variants={product.variants}
+              onSelect={setSelectedSize}
+              selected={selectedSize}
+            />
+          )}
+
+          {/* Quantity */}
+          {!soldOut && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span className="label-eyebrow">Quantity</span>
+              <QuantityStepper
+                value={quantity}
+                min={1}
+                max={MAX_LINE_QUANTITY}
+                onChange={setQuantity}
+                label={product.title}
+              />
+            </div>
+          )}
 
           {/* Add to Bag */}
           <button
             onClick={handleAddToBag}
             disabled={!canAddToBag}
+            data-testid="add-to-bag"
             style={{
               width: '100%',
               padding: '18px',
               backgroundColor: canAddToBag ? 'var(--ink)' : 'var(--ash)',
-              color: 'var(--bg)',
+              color: canAddToBag ? 'var(--bg)' : 'var(--graphite)',
               fontFamily: 'var(--font-display)',
               fontSize: '1rem',
               textTransform: 'uppercase',
@@ -215,12 +295,14 @@ export function ProductDetail({ product }: ProductDetailProps) {
               }
             }}
             aria-label={
-              requiresSize && !selectedVariant
-                ? `Select a size before adding ${product.title} to bag`
-                : `Add ${product.title} to bag`
+              soldOut
+                ? `${product.title} is sold out`
+                : requiresSize && !selectedSize
+                  ? `Select a size before adding ${product.title} to bag`
+                  : `Add ${product.title} to bag`
             }
           >
-            {requiresSize && !selectedVariant ? 'Select a Size' : 'Add to Bag'}
+            {buttonLabel}
           </button>
 
           {/* Trust signals */}

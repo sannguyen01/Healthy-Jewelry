@@ -28,12 +28,20 @@ export interface ProductVariant {
   selectedOptions: SelectedOption[]
 }
 
+export interface ProductOption {
+  id: string
+  name: string
+  values: string[]
+}
+
 export interface Product {
   id: string
   handle: string
   title: string
   description: string
   tags: string[]
+  availableForSale: boolean
+  options: ProductOption[]
   priceRange: {
     minVariantPrice: Money
   }
@@ -63,18 +71,37 @@ export interface CartLine {
   id: string
   quantity: number
   merchandise: { product: Product } & ProductVariant
+  cost: {
+    totalAmount: Money
+    amountPerQuantity: Money
+    compareAtAmountPerQuantity: Money | null
+  }
+}
+
+export interface CartCost {
+  totalAmount: Money
+  subtotalAmount: Money
+  // Shopify only populates tax/duty once a delivery address is known, so both
+  // are null for an anonymous cart. The UI must say "calculated at checkout"
+  // rather than render a confident 0.
+  totalTaxAmount: Money | null
+  totalDutyAmount: Money | null
+}
+
+export interface CartDiscountCode {
+  code: string
+  applicable: boolean
 }
 
 export interface Cart {
   id: string
   checkoutUrl: string
+  totalQuantity: number
   lines: {
     edges: { node: CartLine }[]
   }
-  cost: {
-    totalAmount: Money
-    subtotalAmount: Money
-  }
+  cost: CartCost
+  discountCodes: CartDiscountCode[]
 }
 
 // ── Generic Shopify response envelope ─────────────────────────────────────
@@ -121,6 +148,18 @@ export interface HJProduct {
   tags: string[]
   price: string
   compareAtPrice: string | null
+  // ISO-4217 code from Shopify's Money object. Carried on the product (rather
+  // than assumed at render time) because the store's presentment currency is a
+  // merchant setting — a Vietnam-based store charges VND, and showing "$" over
+  // a VND amount misstates the price by ~25,000x.
+  currencyCode: string
+  // False when every variant is out of stock. Drives the sold-out treatment on
+  // cards and disables Add to Bag before Shopify has to reject the checkout.
+  availableForSale: boolean
+  // Shopify's option definitions (e.g. { name: 'Size', values: ['7','8'] }).
+  // The size picker renders from these rather than a hardcoded list, so the
+  // UI can never offer a size that has no matching variant.
+  options: ProductOption[]
   badge: HJBadge
   description: string
   spec: string

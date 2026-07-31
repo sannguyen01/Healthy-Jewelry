@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Nav } from '@/components/layout/Nav'
 import { useCartStore } from '@/store/cart'
+import { makeCartItem, makeProduct } from '@/test/factories'
 
 vi.mock('next/image', () => ({
   // eslint-disable-next-line @next/next/no-img-element
@@ -82,28 +83,7 @@ describe('Nav', () => {
 
     it('shows count badge when cart has items', () => {
       useCartStore.setState({
-        items: [
-          {
-            product: {
-              id: 'hj-001',
-              defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
-              handle: 'arc-band',
-              title: 'Arc Band',
-              collection: 'rings',
-              material: 'titanium',
-              tags: [],
-              price: '89.00',
-              compareAtPrice: null,
-              badge: null,
-              description: 'Test',
-              spec: '2mm',
-              svgType: 'ring-arc',
-              variants: [],
-            },
-            quantity: 3,
-            variantId: 'gid://shopify/ProductVariant/hj-001-default',
-          },
-        ],
+        items: [makeCartItem({ product: makeProduct({ id: 'hj-001' }), quantity: 3 })],
         isOpen: false,
         shopifyCartId: null,
         checkoutUrl: null,

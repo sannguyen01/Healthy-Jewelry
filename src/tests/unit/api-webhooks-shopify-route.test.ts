@@ -191,12 +191,66 @@ describe('POST /api/webhooks/shopify', () => {
 
     it('returns 200 for an unrecognised topic (no revalidation needed)', async () => {
       const body = JSON.stringify({ id: 1 })
-      const req = makeSignedReq(body, TEST_SECRET, 'orders/paid')
+      const req = makeSignedReq(body, TEST_SECRET, 'customers/create')
       const res = await POST(req)
       expect(res.status).toBe(200)
       // No product/collection revalidation expected
       expect(revalidateTag).not.toHaveBeenCalled()
       expect(revalidatePath).not.toHaveBeenCalled()
+    })
+
+    it('reports handled: false for a topic it does not act on', async () => {
+      const req = makeSignedReq(JSON.stringify({ id: 1 }), TEST_SECRET, 'customers/create')
+      const json = (await (await POST(req)).json()) as { ok: boolean; handled: boolean }
+      expect(json.ok).toBe(true)
+      expect(json.handled).toBe(false)
+    })
+
+    // Inventory movement flips availableForSale, which drives sold-out badges
+    // and whether Add to Bag works. Stale catalog cache here means overselling.
+    it('revalidates the catalog on inventory_levels/update', async () => {
+      const body = JSON.stringify({ inventory_item_id: 42, available: 0 })
+      const req = makeSignedReq(body, TEST_SECRET, 'inventory_levels/update')
+      const res = await POST(req)
+      expect(res.status).toBe(200)
+      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidatePath).toHaveBeenCalledWith('/shop', 'page')
+    })
+
+    it('revalidates the catalog on orders/create', async () => {
+      const body = JSON.stringify({ id: 9, line_items: [] })
+      const req = makeSignedReq(body, TEST_SECRET, 'orders/create')
+      await POST(req)
+      expect(revalidateTag).toHaveBeenCalledWith('products')
+    })
+
+    it('revalidates each purchased product handle from an order payload', async () => {
+      const body = JSON.stringify({
+        id: 9,
+        line_items: [{ product_handle: 'arc-band' }, { product_handle: 'dome-ring' }],
+      })
+      const req = makeSignedReq(body, TEST_SECRET, 'orders/paid')
+      await POST(req)
+      expect(revalidateTag).toHaveBeenCalledWith('product:arc-band')
+      expect(revalidateTag).toHaveBeenCalledWith('product:dome-ring')
+    })
+
+    it('deduplicates repeated product handles in one order', async () => {
+      const body = JSON.stringify({
+        id: 9,
+        line_items: [{ product_handle: 'arc-band' }, { product_handle: 'arc-band' }],
+      })
+      const req = makeSignedReq(body, TEST_SECRET, 'orders/paid')
+      await POST(req)
+      const calls = vi.mocked(revalidateTag).mock.calls.filter((c) => c[0] === 'product:arc-band')
+      expect(calls).toHaveLength(1)
+    })
+
+    it('still returns 200 when an order payload has a malformed line_items field', async () => {
+      const body = JSON.stringify({ id: 9, line_items: 'not-an-array' })
+      const req = makeSignedReq(body, TEST_SECRET, 'orders/paid')
+      const res = await POST(req)
+      expect(res.status).toBe(200)
     })
 
     it('returns { ok: true } in response body', async () => {

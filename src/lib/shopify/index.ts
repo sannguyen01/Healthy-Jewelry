@@ -1,4 +1,5 @@
 import { shopifyConfig } from '@/config/shopify'
+import { currencyFractionDigits } from '@/lib/utils/formatPrice'
 import { shopifyFetch, ShopifyFetchError } from './client'
 import {
   GET_PRODUCT_BY_HANDLE,
@@ -39,13 +40,26 @@ function mapShopifyProduct(node: Product): HJProduct {
     ) as HJMaterialHandle | undefined) ?? 'titanium'
 
   const priceAmount = node.priceRange?.minVariantPrice?.amount ?? '0'
-  const price = parseFloat(priceAmount).toFixed(2)
+
+  // Currency comes from Shopify's Money object. Prefer the price we're actually
+  // showing (minVariantPrice), fall back to the first variant, then USD — the
+  // last of which only happens if Shopify returned a price with no currency,
+  // which it never does.
+  const currencyCode =
+    node.priceRange?.minVariantPrice?.currencyCode ??
+    node.variants?.edges?.[0]?.node?.price?.currencyCode ??
+    'USD'
+
+  // Zero-decimal currencies (VND, JPY, …) must not be stored as "450000.00" —
+  // the stored string is what every downstream formatter and total parses.
+  const digits = currencyFractionDigits(currencyCode)
+  const price = parseFloat(priceAmount).toFixed(digits)
 
   const compareAtAmount = node.compareAtPriceRange?.minVariantPrice?.amount ?? null
   // Shopify returns "0.0" (not null) when no compare-at price is set — guard against it
   const compareAtPrice: string | null =
     compareAtAmount && parseFloat(compareAtAmount) > 0
-      ? parseFloat(compareAtAmount).toFixed(2)
+      ? parseFloat(compareAtAmount).toFixed(digits)
       : null
 
   const handle = node.handle ?? ''
@@ -91,14 +105,31 @@ function mapShopifyProduct(node: Product): HJProduct {
 
   const variants = node.variants.edges.map((e) => e.node)
 
+  // Default to the first variant that can actually be bought. Defaulting to
+  // variants[0] regardless — as this did before — means a product whose first
+  // size is sold out puts an unpurchasable merchandiseId into the cart, and the
+  // customer only discovers it when Shopify rejects the checkout.
+  const defaultVariant = variants.find((v) => v.availableForSale) ?? variants[0]
+
+  // Shopify's product-level availableForSale is authoritative when present;
+  // deriving it from the variant list is only correct for the detail fetch,
+  // where every variant is requested (listing fetches ask for just one).
+  const availableForSale =
+    typeof node.availableForSale === 'boolean'
+      ? node.availableForSale
+      : variants.some((v) => v.availableForSale)
+
   return {
     id: node.id,
-    defaultVariantId: variants[0]?.id ?? node.id,
+    defaultVariantId: defaultVariant?.id ?? node.id,
     handle,
     title: node.title,
     description: node.description,
     price,
     compareAtPrice,
+    currencyCode,
+    availableForSale,
+    options: node.options ?? [],
     collection,
     material,
     tags,

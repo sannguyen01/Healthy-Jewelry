@@ -1,29 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { useCartStore } from '@/store/cart'
-import type { HJProduct } from '@/lib/shopify/types'
+import { useCartStore, diffCartLines } from '@/store/cart'
+import { makeProduct, makeSizedProduct } from '@/test/factories'
 
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-const mockProduct: HJProduct = {
+const mockProduct = makeProduct({
   id: 'hj-001',
-  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
   handle: 'arc-band',
   title: 'Arc Band',
-  collection: 'rings',
-  material: 'titanium',
-  tags: ['rings'],
-  price: '89.00',
-  compareAtPrice: null,
-  badge: null,
-  description: 'Test',
-  spec: '2mm',
-  svgType: 'ring-arc',
-  variants: [],
-}
+  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
+})
 
-function jsonResponse(body: unknown) {
-  return { ok: true, json: async () => body } as Response
+const VARIANT = mockProduct.defaultVariantId
+
+function jsonResponse(body: unknown, ok = true, status = 200) {
+  return { ok, status, json: async () => body } as Response
 }
 
 function operationName(body: unknown): string {
@@ -34,14 +26,51 @@ function operationName(body: unknown): string {
   return match?.[1] ?? ''
 }
 
-beforeEach(() => {
+/** Builds a Shopify cart payload with lines for the given merchandise ids. */
+function cartPayload(
+  id: string,
+  checkoutUrl: string,
+  lines: { merchandiseId: string; quantity: number; lineId?: string }[]
+) {
+  return {
+    id,
+    checkoutUrl,
+    totalQuantity: lines.reduce((s, l) => s + l.quantity, 0),
+    cost: {
+      subtotalAmount: { amount: '89.00', currencyCode: 'USD' },
+      totalAmount: { amount: '89.00', currencyCode: 'USD' },
+      totalTaxAmount: null,
+      totalDutyAmount: null,
+    },
+    discountCodes: [],
+    lines: {
+      edges: lines.map((l, i) => ({
+        node: {
+          id: l.lineId ?? `gid://shopify/CartLine/${i + 1}`,
+          quantity: l.quantity,
+          merchandise: { id: l.merchandiseId, availableForSale: true },
+        },
+      })),
+    },
+  }
+}
+
+function resetStore() {
   useCartStore.setState({
     items: [],
     isOpen: false,
     shopifyCartId: null,
     checkoutUrl: null,
     isLoading: false,
+    error: null,
+    totals: null,
+    discountCodes: [],
+    adjustments: [],
   })
+}
+
+beforeEach(() => {
+  resetStore()
   mockFetch.mockReset()
   vi.stubEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', 'test-shop.myshopify.com')
 })
@@ -49,6 +78,91 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs()
 })
+
+// ── diffCartLines ──────────────────────────────────────────────────────────
+
+describe('diffCartLines', () => {
+  const line = (id: string, merchandiseId: string, quantity: number) => ({
+    id,
+    quantity,
+    merchandise: { id: merchandiseId, availableForSale: true },
+  })
+
+  it('issues no mutations when the remote cart already matches', () => {
+    const diff = diffCartLines(
+      [line('l1', 'v1', 2)],
+      [{ merchandiseId: 'v1', quantity: 2 }]
+    )
+    expect(diff).toEqual({ toAdd: [], toUpdate: [], toRemove: [] })
+  })
+
+  it('updates a line in place when only the quantity changed', () => {
+    const diff = diffCartLines(
+      [line('l1', 'v1', 2)],
+      [{ merchandiseId: 'v1', quantity: 5 }]
+    )
+    expect(diff.toUpdate).toEqual([{ id: 'l1', quantity: 5 }])
+    expect(diff.toAdd).toEqual([])
+    expect(diff.toRemove).toEqual([])
+  })
+
+  it('adds lines that are not in the remote cart yet', () => {
+    const diff = diffCartLines(
+      [line('l1', 'v1', 1)],
+      [
+        { merchandiseId: 'v1', quantity: 1 },
+        { merchandiseId: 'v2', quantity: 3 },
+      ]
+    )
+    expect(diff.toAdd).toEqual([{ merchandiseId: 'v2', quantity: 3 }])
+  })
+
+  it('removes remote lines the customer no longer wants', () => {
+    const diff = diffCartLines(
+      [line('l1', 'v1', 1), line('l2', 'v2', 1)],
+      [{ merchandiseId: 'v1', quantity: 1 }]
+    )
+    expect(diff.toRemove).toEqual(['l2'])
+  })
+
+  it('empties the remote cart when the local bag is empty', () => {
+    const diff = diffCartLines([line('l1', 'v1', 1), line('l2', 'v2', 1)], [])
+    expect(diff.toRemove).toEqual(['l1', 'l2'])
+    expect(diff.toAdd).toEqual([])
+  })
+
+  it('collapses duplicate remote lines for the same merchandise', () => {
+    const diff = diffCartLines(
+      [line('l1', 'v1', 1), line('l2', 'v1', 1)],
+      [{ merchandiseId: 'v1', quantity: 4 }]
+    )
+    expect(diff.toRemove).toEqual(['l2'])
+    expect(diff.toUpdate).toEqual([{ id: 'l1', quantity: 4 }])
+  })
+
+  it('drops a remote line whose merchandise cannot be identified', () => {
+    const diff = diffCartLines(
+      [{ id: 'l1', quantity: 1, merchandise: undefined }],
+      [{ merchandiseId: 'v1', quantity: 1 }]
+    )
+    expect(diff.toRemove).toEqual(['l1'])
+    expect(diff.toAdd).toEqual([{ merchandiseId: 'v1', quantity: 1 }])
+  })
+
+  it('keeps the two sizes of one product as two independent lines', () => {
+    const diff = diffCartLines(
+      [line('l1', 'ring-size-7', 1)],
+      [
+        { merchandiseId: 'ring-size-7', quantity: 1 },
+        { merchandiseId: 'ring-size-9', quantity: 1 },
+      ]
+    )
+    expect(diff.toRemove).toEqual([])
+    expect(diff.toAdd).toEqual([{ merchandiseId: 'ring-size-9', quantity: 1 }])
+  })
+})
+
+// ── First sync ─────────────────────────────────────────────────────────────
 
 describe('syncWithShopify — first sync (no shopifyCartId)', () => {
   it('calls CreateCart and stores the returned id/checkoutUrl', async () => {
@@ -58,11 +172,9 @@ describe('syncWithShopify — first sync (no shopifyCartId)', () => {
       return jsonResponse({
         data: {
           cartCreate: {
-            cart: {
-              id: 'gid://shopify/Cart/new-1',
-              checkoutUrl: 'https://checkout.shopify.com/new-1',
-              lines: { edges: [] },
-            },
+            cart: cartPayload('gid://shopify/Cart/new-1', 'https://checkout.shopify.com/new-1', [
+              { merchandiseId: VARIANT, quantity: 1 },
+            ]),
             userErrors: [],
           },
         },
@@ -76,6 +188,38 @@ describe('syncWithShopify — first sync (no shopifyCartId)', () => {
     expect(shopifyCartId).toBe('gid://shopify/Cart/new-1')
     expect(checkoutUrl).toBe('https://checkout.shopify.com/new-1')
     expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores Shopify totals so the UI stops guessing the subtotal', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: {
+              ...cartPayload('gid://shopify/Cart/new-1', 'https://checkout/x', [
+                { merchandiseId: VARIANT, quantity: 1 },
+              ]),
+              cost: {
+                subtotalAmount: { amount: '2450000', currencyCode: 'VND' },
+                totalAmount: { amount: '2450000', currencyCode: 'VND' },
+                totalTaxAmount: null,
+                totalDutyAmount: null,
+              },
+            },
+            userErrors: [],
+          },
+        },
+      })
+    )
+
+    useCartStore.getState().addItem(mockProduct)
+    await useCartStore.getState().syncWithShopify()
+
+    expect(useCartStore.getState().totals?.subtotal).toEqual({
+      amount: '2450000',
+      currencyCode: 'VND',
+    })
+    expect(useCartStore.getState().currencyCode()).toBe('VND')
   })
 
   it('a userErrors response leaves the cart id/checkoutUrl unset and does not throw', async () => {
@@ -93,10 +237,13 @@ describe('syncWithShopify — first sync (no shopifyCartId)', () => {
     useCartStore.getState().addItem(mockProduct)
     await expect(useCartStore.getState().syncWithShopify()).resolves.toBeUndefined()
 
-    const { shopifyCartId, checkoutUrl, items } = useCartStore.getState()
+    const { shopifyCartId, checkoutUrl, items, error } = useCartStore.getState()
     expect(shopifyCartId).toBeNull()
     expect(checkoutUrl).toBeNull()
     expect(items).toHaveLength(1)
+    // The failure has to be visible to the customer, not just to the console.
+    expect(error?.code).toBe('rejected')
+    expect(error?.message).toBeTruthy()
   })
 
   it('a network failure is caught, isLoading returns to false, local items stay intact', async () => {
@@ -105,19 +252,36 @@ describe('syncWithShopify — first sync (no shopifyCartId)', () => {
     useCartStore.getState().addItem(mockProduct)
     await useCartStore.getState().syncWithShopify()
 
-    const { isLoading, items, checkoutUrl } = useCartStore.getState()
+    const { isLoading, items, checkoutUrl, error } = useCartStore.getState()
     expect(isLoading).toBe(false)
     expect(items).toHaveLength(1)
     expect(checkoutUrl).toBeNull()
+    expect(error?.code).toBe('network')
+  })
+
+  it('reports not_configured when the proxy says Shopify env vars are missing', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'not configured' }, false, 503))
+
+    useCartStore.getState().addItem(mockProduct)
+    await useCartStore.getState().syncWithShopify()
+
+    expect(useCartStore.getState().error?.code).toBe('not_configured')
+  })
+
+  it('does not call Shopify at all when the bag is empty and no cart exists', async () => {
+    await useCartStore.getState().syncWithShopify()
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 })
+
+// ── Resync ─────────────────────────────────────────────────────────────────
 
 describe('syncWithShopify — resync with an existing shopifyCartId', () => {
   beforeEach(() => {
     useCartStore.setState({ shopifyCartId: 'gid://shopify/Cart/existing-1' })
   })
 
-  it('uses GetCart + CartLinesRemove + CartLinesAdd, not CreateCart again', async () => {
+  it('adds only the new line, leaving the untouched one alone', async () => {
     const calledOps: string[] = []
 
     mockFetch.mockImplementation(async (_url, init) => {
@@ -128,28 +292,20 @@ describe('syncWithShopify — resync with an existing shopifyCartId', () => {
       if (op === 'GetCart') {
         return jsonResponse({
           data: {
-            cart: {
-              id: 'gid://shopify/Cart/existing-1',
-              checkoutUrl: 'https://checkout.shopify.com/existing-1-stale',
-              lines: { edges: [{ node: { id: 'gid://shopify/CartLine/old-1' } }] },
-            },
+            cart: cartPayload('gid://shopify/Cart/existing-1', 'https://checkout/stale', [
+              { merchandiseId: VARIANT, quantity: 1, lineId: 'line-a' },
+            ]),
           },
-        })
-      }
-      if (op === 'RemoveFromCart') {
-        return jsonResponse({
-          data: { cartLinesRemove: { cart: null, userErrors: [] } },
         })
       }
       if (op === 'AddToCart') {
         return jsonResponse({
           data: {
             cartLinesAdd: {
-              cart: {
-                id: 'gid://shopify/Cart/existing-1',
-                checkoutUrl: 'https://checkout.shopify.com/existing-1-fresh',
-                lines: { edges: [] },
-              },
+              cart: cartPayload('gid://shopify/Cart/existing-1', 'https://checkout/fresh', [
+                { merchandiseId: VARIANT, quantity: 1, lineId: 'line-a' },
+                { merchandiseId: 'v-size-9', quantity: 1, lineId: 'line-b' },
+              ]),
               userErrors: [],
             },
           },
@@ -159,36 +315,131 @@ describe('syncWithShopify — resync with an existing shopifyCartId', () => {
     })
 
     useCartStore.getState().addItem(mockProduct)
+    useCartStore.getState().addItem(mockProduct, 1, 'v-size-9')
     await useCartStore.getState().syncWithShopify()
 
-    expect(calledOps).toEqual(['GetCart', 'RemoveFromCart', 'AddToCart'])
+    // The previous implementation removed every line and re-added the whole
+    // set on every sync. Diffing means an added size costs one mutation.
+    expect(calledOps).toEqual(['GetCart', 'AddToCart'])
+    expect(calledOps).not.toContain('RemoveFromCart')
     expect(calledOps).not.toContain('CreateCart')
+    expect(useCartStore.getState().checkoutUrl).toBe('https://checkout/fresh')
+  })
 
-    const { shopifyCartId, checkoutUrl } = useCartStore.getState()
-    expect(shopifyCartId).toBe('gid://shopify/Cart/existing-1')
-    expect(checkoutUrl).toBe('https://checkout.shopify.com/existing-1-fresh')
+  it('issues no mutations at all when the remote cart already matches', async () => {
+    const calledOps: string[] = []
+
+    mockFetch.mockImplementation(async (_url, init) => {
+      const op = operationName(JSON.parse((init as RequestInit).body as string))
+      calledOps.push(op)
+      if (op === 'GetCart') {
+        return jsonResponse({
+          data: {
+            cart: cartPayload('gid://shopify/Cart/existing-1', 'https://checkout/same', [
+              { merchandiseId: VARIANT, quantity: 1, lineId: 'line-a' },
+            ]),
+          },
+        })
+      }
+      throw new Error(`Unexpected operation in test: ${op}`)
+    })
+
+    useCartStore.getState().addItem(mockProduct)
+    await useCartStore.getState().syncWithShopify()
+
+    expect(calledOps).toEqual(['GetCart'])
+    expect(useCartStore.getState().checkoutUrl).toBe('https://checkout/same')
+  })
+
+  it('updates a quantity in place rather than removing and re-adding', async () => {
+    const calledOps: string[] = []
+
+    mockFetch.mockImplementation(async (_url, init) => {
+      const op = operationName(JSON.parse((init as RequestInit).body as string))
+      calledOps.push(op)
+      if (op === 'GetCart') {
+        return jsonResponse({
+          data: {
+            cart: cartPayload('gid://shopify/Cart/existing-1', 'https://checkout/stale', [
+              { merchandiseId: VARIANT, quantity: 1, lineId: 'line-a' },
+            ]),
+          },
+        })
+      }
+      if (op === 'UpdateCartLines') {
+        return jsonResponse({
+          data: {
+            cartLinesUpdate: {
+              cart: cartPayload('gid://shopify/Cart/existing-1', 'https://checkout/fresh', [
+                { merchandiseId: VARIANT, quantity: 4, lineId: 'line-a' },
+              ]),
+              userErrors: [],
+            },
+          },
+        })
+      }
+      throw new Error(`Unexpected operation in test: ${op}`)
+    })
+
+    useCartStore.getState().addItem(mockProduct, 4)
+    await useCartStore.getState().syncWithShopify()
+
+    expect(calledOps).toEqual(['GetCart', 'UpdateCartLines'])
+  })
+
+  // The old sync returned early on an empty bag, so removed items stayed in the
+  // Shopify cart and any surviving checkout URL still charged for them.
+  it('pushes an emptied bag to Shopify instead of leaving stale lines', async () => {
+    const calledOps: string[] = []
+
+    mockFetch.mockImplementation(async (_url, init) => {
+      const op = operationName(JSON.parse((init as RequestInit).body as string))
+      calledOps.push(op)
+      if (op === 'GetCart') {
+        return jsonResponse({
+          data: {
+            cart: cartPayload('gid://shopify/Cart/existing-1', 'https://checkout/stale', [
+              { merchandiseId: VARIANT, quantity: 1, lineId: 'line-a' },
+            ]),
+          },
+        })
+      }
+      if (op === 'RemoveFromCart') {
+        return jsonResponse({
+          data: {
+            cartLinesRemove: {
+              cart: cartPayload('gid://shopify/Cart/existing-1', 'https://checkout/empty', []),
+              userErrors: [],
+            },
+          },
+        })
+      }
+      throw new Error(`Unexpected operation in test: ${op}`)
+    })
+
+    await useCartStore.getState().syncWithShopify()
+
+    expect(calledOps).toEqual(['GetCart', 'RemoveFromCart'])
+    expect(useCartStore.getState().checkoutUrl).toBeNull()
   })
 
   it('falls back to CreateCart when the existing cart is not found/expired', async () => {
     const calledOps: string[] = []
 
     mockFetch.mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string) as unknown
-      const op = operationName(body)
+      const op = operationName(JSON.parse((init as RequestInit).body as string))
       calledOps.push(op)
 
-      if (op === 'GetCart') {
-        return jsonResponse({ data: { cart: null } })
-      }
+      if (op === 'GetCart') return jsonResponse({ data: { cart: null } })
       if (op === 'CreateCart') {
         return jsonResponse({
           data: {
             cartCreate: {
-              cart: {
-                id: 'gid://shopify/Cart/replacement-1',
-                checkoutUrl: 'https://checkout.shopify.com/replacement-1',
-                lines: { edges: [] },
-              },
+              cart: cartPayload(
+                'gid://shopify/Cart/replacement-1',
+                'https://checkout.shopify.com/replacement-1',
+                [{ merchandiseId: VARIANT, quantity: 1 }]
+              ),
               userErrors: [],
             },
           },
@@ -201,9 +452,179 @@ describe('syncWithShopify — resync with an existing shopifyCartId', () => {
     await useCartStore.getState().syncWithShopify()
 
     expect(calledOps).toEqual(['GetCart', 'CreateCart'])
+    expect(useCartStore.getState().shopifyCartId).toBe('gid://shopify/Cart/replacement-1')
+  })
 
-    const { shopifyCartId, checkoutUrl } = useCartStore.getState()
-    expect(shopifyCartId).toBe('gid://shopify/Cart/replacement-1')
-    expect(checkoutUrl).toBe('https://checkout.shopify.com/replacement-1')
+  it('does not orphan the existing cart by creating a second one on a network blip', async () => {
+    mockFetch.mockRejectedValue(new Error('network down'))
+
+    useCartStore.getState().addItem(mockProduct)
+    await useCartStore.getState().syncWithShopify()
+
+    expect(useCartStore.getState().shopifyCartId).toBe('gid://shopify/Cart/existing-1')
+    expect(useCartStore.getState().error?.code).toBe('network')
+  })
+})
+
+// ── Reconciliation of Shopify's own adjustments ────────────────────────────
+
+describe('syncWithShopify — reconciling Shopify adjustments', () => {
+  it('reduces a line when Shopify caps it to available stock', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: cartPayload('gid://shopify/Cart/c1', 'https://checkout/c1', [
+              { merchandiseId: VARIANT, quantity: 2 },
+            ]),
+            userErrors: [],
+          },
+        },
+      })
+    )
+
+    useCartStore.getState().addItem(mockProduct, 5)
+    await useCartStore.getState().syncWithShopify()
+
+    const { items, adjustments } = useCartStore.getState()
+    expect(items[0].quantity).toBe(2)
+    expect(adjustments.join(' ')).toMatch(/limited to 2/i)
+  })
+
+  it('drops a line Shopify refused and says so, keeping the rest of the bag', async () => {
+    const sized = makeSizedProduct(['7', '9'], { id: 'p-sized' })
+    const seven = sized.variants[0]
+    const nine = sized.variants[1]
+
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: cartPayload('gid://shopify/Cart/c1', 'https://checkout/c1', [
+              { merchandiseId: seven.id, quantity: 1 },
+            ]),
+            userErrors: [],
+          },
+        },
+      })
+    )
+
+    useCartStore.getState().addItem(sized, 1, seven.id)
+    useCartStore.getState().addItem(sized, 1, nine.id)
+    await useCartStore.getState().syncWithShopify()
+
+    const { items, adjustments } = useCartStore.getState()
+    expect(items).toHaveLength(1)
+    expect(items[0].variantId).toBe(seven.id)
+    expect(adjustments.join(' ')).toMatch(/sold out/i)
+  })
+
+  // Emptying a real bag is unrecoverable, so a zero-line response for a
+  // non-empty bag is treated as a bad payload, not as "everything sold out".
+  it('refuses to empty the bag when Shopify returns a cart with no lines at all', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: cartPayload('gid://shopify/Cart/c1', 'https://checkout/c1', []),
+            userErrors: [],
+          },
+        },
+      })
+    )
+
+    useCartStore.getState().addItem(mockProduct, 2)
+    await useCartStore.getState().syncWithShopify()
+
+    const { items, checkoutUrl, error } = useCartStore.getState()
+    expect(items).toHaveLength(1)
+    expect(checkoutUrl).toBeNull()
+    expect(error).not.toBeNull()
+  })
+})
+
+// ── prepareCheckout ────────────────────────────────────────────────────────
+
+describe('prepareCheckout', () => {
+  it('returns null without calling Shopify for an empty bag', async () => {
+    const url = await useCartStore.getState().prepareCheckout()
+    expect(url).toBeNull()
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns a freshly synced checkout URL', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: cartPayload('gid://shopify/Cart/c1', 'https://checkout/fresh', [
+              { merchandiseId: VARIANT, quantity: 1 },
+            ]),
+            userErrors: [],
+          },
+        },
+      })
+    )
+
+    useCartStore.getState().addItem(mockProduct)
+    await expect(useCartStore.getState().prepareCheckout()).resolves.toBe(
+      'https://checkout/fresh'
+    )
+  })
+
+  it('returns null rather than a URL when the sync failed', async () => {
+    mockFetch.mockRejectedValue(new Error('network down'))
+    useCartStore.getState().addItem(mockProduct)
+    await expect(useCartStore.getState().prepareCheckout()).resolves.toBeNull()
+  })
+
+  it('does not send the customer to checkout when every line sold out', async () => {
+    const sized = makeSizedProduct(['7', '9'], { id: 'p-gone' })
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          cartCreate: {
+            cart: cartPayload('gid://shopify/Cart/c1', 'https://checkout/c1', [
+              { merchandiseId: sized.variants[0].id, quantity: 1 },
+            ]),
+            userErrors: [],
+          },
+        },
+      })
+    )
+
+    useCartStore.getState().addItem(sized, 1, sized.variants[0].id)
+    await useCartStore.getState().syncWithShopify()
+
+    // Now everything is gone from the remote cart but one line survives
+    // locally; emptying it must block the hand-off rather than open an
+    // empty Shopify checkout.
+    useCartStore.setState({ items: [], checkoutUrl: 'https://checkout/c1' })
+    await expect(useCartStore.getState().prepareCheckout()).resolves.toBeNull()
+  })
+})
+
+// ── checkoutUrl persistence ────────────────────────────────────────────────
+
+describe('checkoutUrl is never persisted', () => {
+  it('is excluded from the persisted partial state', () => {
+    const persistOptions = (
+      useCartStore as unknown as {
+        persist: { getOptions: () => { partialize?: (s: unknown) => object } }
+      }
+    ).persist.getOptions()
+
+    const partial = persistOptions.partialize?.({
+      items: [],
+      shopifyCartId: 'gid://shopify/Cart/1',
+      checkoutUrl: 'https://checkout/expired',
+      totals: { subtotal: { amount: '1', currencyCode: 'USD' } },
+    })
+
+    // A checkout URL from a previous visit can point at an expired Shopify
+    // cart, which drops the customer out of the funnel with a 404.
+    expect(partial).not.toHaveProperty('checkoutUrl')
+    expect(partial).not.toHaveProperty('totals')
+    expect(partial).toHaveProperty('shopifyCartId')
   })
 })

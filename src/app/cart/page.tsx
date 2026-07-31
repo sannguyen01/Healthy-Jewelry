@@ -1,11 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import { useCartStore } from '@/store/cart'
+import { QuantityStepper } from '@/components/product/QuantityStepper'
+import { CartNotices } from '@/components/product/CartNotices'
+import { DiscountCodeField } from '@/components/product/DiscountCodeField'
+import { formatPrice } from '@/lib/utils/formatPrice'
+import { describeVariant, cartLineLabel } from '@/lib/utils/cartLine'
+import { useCartStore, MAX_LINE_QUANTITY } from '@/store/cart'
 
 export default function CartPage() {
   const items = useCartStore((s) => s.items)
@@ -13,6 +19,30 @@ export default function CartPage() {
   const updateQuantity = useCartStore((s) => s.updateQuantity)
   const total = useCartStore((s) => s.totalPrice())
   const totalItems = useCartStore((s) => s.totalItems())
+  const currency = useCartStore((s) => s.currencyCode())
+  const totals = useCartStore((s) => s.totals)
+  const prepareCheckout = useCartStore((s) => s.prepareCheckout)
+  const isLoading = useCartStore((s) => s.isLoading)
+
+  const [checkoutFailed, setCheckoutFailed] = useState(false)
+
+  async function handleCheckout() {
+    setCheckoutFailed(false)
+    const url = await prepareCheckout()
+    if (url) {
+      window.location.href = url
+      return
+    }
+    setCheckoutFailed(true)
+  }
+
+  // Shopify's numbers win once the cart has synced. Before that we show the
+  // locally computed subtotal and say plainly that it is not the final figure.
+  const subtotalAmount = totals?.subtotal?.amount ?? String(total)
+  const totalAmount = totals?.total?.amount ?? String(total)
+  const displayCurrency = totals?.subtotal?.currencyCode ?? currency
+  const hasShopifyTotals = totals !== null
+  const taxAmount = totals?.tax?.amount ?? null
 
   return (
     <>
@@ -41,10 +71,7 @@ export default function CartPage() {
               textAlign: 'center',
             }}
           >
-            <JewelrySVG
-              type="ring-arc"
-              style={{ width: '80px', height: '80px', opacity: 0.18 }}
-            />
+            <JewelrySVG type="ring-arc" style={{ width: '80px', height: '80px', opacity: 0.18 }} />
 
             <h1
               style={{
@@ -70,8 +97,8 @@ export default function CartPage() {
                 lineHeight: 1.6,
               }}
             >
-              You have not added any pieces yet. Browse the collection to find
-              something made for your body.
+              You have not added any pieces yet. Browse the collection to find something made for
+              your body.
             </p>
 
             <Link href="/shop" className="btn-ghost" style={{ marginTop: '8px' }}>
@@ -127,174 +154,150 @@ export default function CartPage() {
                 </span>
               </div>
 
+              <CartNotices showCheckoutFailure={checkoutFailed} />
+
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {items.map(({ product, quantity }) => (
-                  <li
-                    key={product.id}
-                    style={{
-                      display: 'flex',
-                      gap: '20px',
-                      padding: '20px 0',
-                      borderBottom: '1px solid var(--nacre)',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {/* SVG thumbnail */}
-                    <div
+                {items.map((item) => {
+                  const { product, quantity, variantId } = item
+                  const variantLabel = describeVariant(item)
+                  const lineLabel = cartLineLabel(product.title, item)
+                  const unitPrice = item.unitPrice ?? product.price
+                  const unitCurrency = product.currencyCode ?? currency
+                  const lineTotal = parseFloat(unitPrice) * quantity
+
+                  return (
+                    <li
+                      key={variantId}
+                      data-testid="cart-line"
                       style={{
-                        width: '80px',
-                        height: '80px',
-                        flexShrink: 0,
-                        backgroundColor: 'var(--nacre)',
                         display: 'flex',
+                        gap: '20px',
+                        padding: '20px 0',
+                        borderBottom: '1px solid var(--nacre)',
                         alignItems: 'center',
-                        justifyContent: 'center',
                       }}
                     >
-                      <JewelrySVG
-                        type={product.svgType}
-                        style={{ width: '60%', height: '60%' }}
-                      />
-                    </div>
-
-                    {/* Details */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: '0.95rem',
-                          letterSpacing: '0.08em',
-                          textTransform: 'uppercase',
-                          color: 'var(--ink)',
-                          margin: '0 0 4px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {product.title}
-                      </p>
-
-                      <p
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: 'var(--text-xs)',
-                          letterSpacing: '0.12em',
-                          textTransform: 'uppercase',
-                          color: 'var(--titanium)',
-                          margin: '0 0 12px',
-                        }}
-                      >
-                        {product.material.replace('-', ' ')}
-                      </p>
-
-                      {/* Qty controls */}
+                      {/* SVG thumbnail */}
                       <div
-                        style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+                        style={{
+                          width: '80px',
+                          height: '80px',
+                          flexShrink: 0,
+                          backgroundColor: 'var(--nacre)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
                       >
-                        <button
-                          onClick={() => updateQuantity(product.id, quantity - 1)}
-                          aria-label="Decrease quantity"
+                        <JewelrySVG
+                          type={product.svgType}
+                          style={{ width: '60%', height: '60%' }}
+                        />
+                      </div>
+
+                      {/* Details */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Link
+                          href={`/products/${product.handle}`}
                           style={{
-                            width: '28px',
-                            height: '28px',
-                            border: '1px solid var(--ash)',
-                            background: 'none',
-                            cursor: 'pointer',
+                            fontFamily: 'var(--font-display)',
+                            fontSize: '0.95rem',
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
                             color: 'var(--ink)',
-                            fontSize: '1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            textDecoration: 'none',
+                            display: 'block',
+                            margin: '0 0 4px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          −
-                        </button>
+                          {product.title}
+                        </Link>
 
-                        <span
+                        <p
                           style={{
-                            fontFamily: 'var(--font-ui)',
-                            fontSize: 'var(--text-xs)',
-                            letterSpacing: '0.1em',
-                            color: 'var(--ink)',
-                            minWidth: '20px',
-                            textAlign: 'center',
-                          }}
-                        >
-                          {quantity}
-                        </span>
-
-                        <button
-                          onClick={() => updateQuantity(product.id, quantity + 1)}
-                          aria-label="Increase quantity"
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            border: '1px solid var(--ash)',
-                            background: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--ink)',
-                            fontSize: '1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          +
-                        </button>
-
-                        <button
-                          onClick={() => removeItem(product.id)}
-                          aria-label={`Remove ${product.title}`}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
                             fontFamily: 'var(--font-ui)',
                             fontSize: 'var(--text-xs)',
                             letterSpacing: '0.12em',
                             textTransform: 'uppercase',
-                            color: 'var(--graphite)',
-                            marginLeft: 'auto',
-                            padding: '2px 0',
-                            textDecoration: 'underline',
-                            textUnderlineOffset: '3px',
+                            color: 'var(--titanium)',
+                            margin: '0 0 12px',
                           }}
                         >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
+                          {product.material.replace('-', ' ')}
+                          {variantLabel && (
+                            <>
+                              {' · '}
+                              <span data-testid="cart-line-variant">{variantLabel}</span>
+                            </>
+                          )}
+                        </p>
 
-                    {/* Line price */}
-                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                      <p
-                        style={{
-                          fontFamily: 'var(--font-body)',
-                          fontSize: 'var(--text-base)',
-                          color: 'var(--ink)',
-                          fontWeight: 300,
-                          margin: 0,
-                        }}
-                      >
-                        ${(parseFloat(product.price) * quantity).toFixed(2)}
-                      </p>
-                      {quantity > 1 && (
+                        {/* Qty controls */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <QuantityStepper
+                            value={quantity}
+                            min={1}
+                            max={MAX_LINE_QUANTITY}
+                            label={lineLabel}
+                            onChange={(next) => updateQuantity(variantId, next)}
+                          />
+
+                          <button
+                            onClick={() => removeItem(variantId)}
+                            aria-label={`Remove ${lineLabel}`}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 'var(--text-xs)',
+                              letterSpacing: '0.12em',
+                              textTransform: 'uppercase',
+                              color: 'var(--graphite)',
+                              marginLeft: 'auto',
+                              padding: '2px 0',
+                              textDecoration: 'underline',
+                              textUnderlineOffset: '3px',
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Line price */}
+                      <div style={{ flexShrink: 0, textAlign: 'right' }}>
                         <p
                           style={{
                             fontFamily: 'var(--font-body)',
-                            fontSize: 'var(--text-xs)',
-                            color: 'var(--graphite)',
+                            fontSize: 'var(--text-base)',
+                            color: 'var(--ink)',
                             fontWeight: 300,
-                            margin: '4px 0 0',
+                            margin: 0,
                           }}
                         >
-                          ${product.price} each
+                          {formatPrice(lineTotal, unitCurrency)}
                         </p>
-                      )}
-                    </div>
-                  </li>
-                ))}
+                        {quantity > 1 && (
+                          <p
+                            style={{
+                              fontFamily: 'var(--font-body)',
+                              fontSize: 'var(--text-xs)',
+                              color: 'var(--graphite)',
+                              fontWeight: 300,
+                              margin: '4px 0 0',
+                            }}
+                          >
+                            {formatPrice(unitPrice, unitCurrency)} each
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
 
               <div style={{ marginTop: '24px' }}>
@@ -338,9 +341,20 @@ export default function CartPage() {
               </h2>
 
               <div
-                style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '28px' }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  marginBottom: '28px',
+                }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
                   <span
                     style={{
                       fontFamily: 'var(--font-ui)',
@@ -353,6 +367,7 @@ export default function CartPage() {
                     Subtotal
                   </span>
                   <span
+                    data-testid="cart-subtotal"
                     style={{
                       fontFamily: 'var(--font-body)',
                       fontSize: 'var(--text-base)',
@@ -360,11 +375,51 @@ export default function CartPage() {
                       fontWeight: 300,
                     }}
                   >
-                    ${total.toFixed(2)}
+                    {formatPrice(subtotalAmount, displayCurrency)}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {/* Only shown once Shopify has computed it — an anonymous cart
+                    has no address, so there is no honest tax figure to give. */}
+                {taxAmount !== null && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-ui)',
+                        fontSize: 'var(--text-xs)',
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                        color: 'var(--graphite)',
+                      }}
+                    >
+                      Tax
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 'var(--text-base)',
+                        color: 'var(--ink)',
+                        fontWeight: 300,
+                      }}
+                    >
+                      {formatPrice(taxAmount, displayCurrency)}
+                    </span>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
                   <span
                     style={{
                       fontFamily: 'var(--font-ui)',
@@ -374,23 +429,31 @@ export default function CartPage() {
                       color: 'var(--graphite)',
                     }}
                   >
-                    Estimated Shipping
+                    Shipping
                   </span>
                   <span
                     style={{
                       fontFamily: 'var(--font-body)',
                       fontSize: 'var(--text-sm)',
-                      color: 'var(--sage)',
+                      color: 'var(--graphite)',
                       fontWeight: 300,
                     }}
                   >
-                    Free
+                    Calculated at checkout
                   </span>
                 </div>
 
+                <DiscountCodeField />
+
                 <div style={{ height: '1px', backgroundColor: 'var(--ash)', margin: '4px 0' }} />
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
                   <span
                     style={{
                       fontFamily: 'var(--font-display)',
@@ -400,9 +463,10 @@ export default function CartPage() {
                       color: 'var(--ink)',
                     }}
                   >
-                    Total
+                    {hasShopifyTotals ? 'Total' : 'Estimated Total'}
                   </span>
                   <span
+                    data-testid="cart-total"
                     style={{
                       fontFamily: 'var(--font-display)',
                       fontSize: 'var(--text-xl)',
@@ -410,30 +474,33 @@ export default function CartPage() {
                       color: 'var(--ink)',
                     }}
                   >
-                    ${total.toFixed(2)}
+                    {formatPrice(totalAmount, displayCurrency)}
                   </span>
                 </div>
               </div>
 
-              <a
-                href="/checkout"
+              <button
+                onClick={handleCheckout}
+                disabled={isLoading}
+                data-testid="checkout-button"
                 style={{
                   display: 'block',
                   width: '100%',
                   padding: '18px',
-                  backgroundColor: 'var(--ink)',
+                  backgroundColor: isLoading ? 'var(--graphite)' : 'var(--ink)',
                   color: 'var(--bg)',
                   fontFamily: 'var(--font-display)',
                   fontSize: '0.9rem',
                   letterSpacing: '0.16em',
                   textTransform: 'uppercase',
                   textAlign: 'center',
-                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
                   boxSizing: 'border-box',
                 }}
               >
-                Proceed to Checkout
-              </a>
+                {isLoading ? 'Preparing…' : 'Proceed to Checkout'}
+              </button>
 
               <p
                 style={{
@@ -446,7 +513,8 @@ export default function CartPage() {
                   lineHeight: 1.5,
                 }}
               >
-                Taxes calculated at checkout. Free shipping on all orders.
+                Shipping and taxes are calculated at checkout. You will be taken to our secure
+                Shopify checkout to complete your order.
               </p>
             </div>
           </div>

@@ -12,6 +12,12 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
     title
     description
     tags
+    availableForSale
+    options {
+      id
+      name
+      values
+    }
     priceRange {
       minVariantPrice {
         amount

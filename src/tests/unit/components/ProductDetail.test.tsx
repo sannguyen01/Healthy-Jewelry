@@ -19,6 +19,11 @@ const ringProduct: HJProduct = {
   badge: 'Bestseller',
   description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
   spec: '2 mm · 1.8 g',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [
+    { id: 'hj-001-opt-size', name: 'Size', values: ['5', '6', '7', '8', '9', '10', '11', '12'] },
+  ],
   svgType: 'ring-arc',
   variants: ['5', '6', '7', '8', '9', '10', '11', '12'].map((size) => ({
     id: `gid://shopify/ProductVariant/hj-001-size-${size}`,
@@ -43,6 +48,9 @@ const earringProduct: HJProduct = {
   badge: null,
   description: 'Flat disc studs on implant-grade titanium posts.',
   spec: 'Disc 8 mm · post 6 mm',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [],
   svgType: 'earring-stud',
   variants: [
     {
@@ -69,6 +77,15 @@ const braceletProduct: HJProduct = {
   badge: null,
   description: 'Twisted titanium cable cuff.',
   spec: '2.5 mm cable · 160 mm',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [
+    {
+      id: 'hj-013-opt-size',
+      name: 'Size',
+      values: ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)'],
+    },
+  ],
   svgType: 'bracelet-cuff',
   variants: ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)'].map((size) => ({
     id: `gid://shopify/ProductVariant/hj-013-size-${size.slice(0, size.indexOf(' '))}`,
@@ -165,24 +182,24 @@ describe('ProductDetail', () => {
   describe('size picker', () => {
     it('shows size picker for rings', () => {
       render(<ProductDetail product={ringProduct} />)
-      expect(screen.getByText('US Ring Size')).toBeTruthy()
+      expect(screen.getByRole('radiogroup', { name: 'Size' })).toBeTruthy()
     })
 
     it('shows size picker for bracelets', () => {
       render(<ProductDetail product={braceletProduct} />)
-      expect(screen.getByText('Bracelet Size')).toBeTruthy()
+      expect(screen.getByRole('radiogroup', { name: 'Size' })).toBeTruthy()
     })
 
     it('does not show size picker for earrings', () => {
       render(<ProductDetail product={earringProduct} />)
-      expect(screen.queryByText('US Ring Size')).toBeNull()
-      expect(screen.queryByText('Bracelet Size')).toBeNull()
+      expect(screen.queryByRole('radiogroup', { name: 'Size' })).toBeNull()
+      expect(screen.queryByRole('radiogroup', { name: 'Size' })).toBeNull()
     })
 
     it('does not show size picker for necklaces', () => {
       const necklaceProduct = { ...earringProduct, collection: 'necklaces' as const }
       render(<ProductDetail product={necklaceProduct} />)
-      expect(screen.queryByText('US Ring Size')).toBeNull()
+      expect(screen.queryByRole('radiogroup', { name: 'Size' })).toBeNull()
     })
   })
 
@@ -225,14 +242,14 @@ describe('ProductDetail', () => {
 
     it('enables "Add to Bag" once a size is selected', () => {
       render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
+      fireEvent.click(screen.getByRole('radio', { name: `Size 9` }))
       const button = screen.getByRole('button', { name: /add arc band to bag/i })
       expect(button).not.toBeDisabled()
     })
 
     it('adds the variant matching the selected size, not the first variant', () => {
       render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
+      fireEvent.click(screen.getByRole('radio', { name: `Size 9` }))
       fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
 
       const items = useCartStore.getState().items
@@ -245,8 +262,8 @@ describe('ProductDetail', () => {
 
     it('picking a different size before adding resolves the newly selected variant', () => {
       render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /ring size 7/i }))
-      fireEvent.click(screen.getByRole('button', { name: /ring size 11/i }))
+      fireEvent.click(screen.getByRole('radio', { name: `Size 7` }))
+      fireEvent.click(screen.getByRole('radio', { name: `Size 11` }))
       fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
 
       const items = useCartStore.getState().items
@@ -257,7 +274,7 @@ describe('ProductDetail', () => {
   describe('add to bag — sized product (bracelets)', () => {
     it('resolves the correct variant for the selected bracelet size', () => {
       render(<ProductDetail product={braceletProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /bracelet size m/i }))
+      fireEvent.click(screen.getByRole('radio', { name: /^Size m/i }))
       fireEvent.click(screen.getByRole('button', { name: /add cable cuff to bag/i }))
 
       const items = useCartStore.getState().items

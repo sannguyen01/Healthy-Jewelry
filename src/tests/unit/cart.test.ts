@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useCartStore } from '@/store/cart'
+import { useCartStore, MAX_LINE_QUANTITY } from '@/store/cart'
+import { makeProduct, makeVariant, makeSizedProduct } from '@/test/factories'
 import type { HJProduct } from '@/lib/shopify/types'
 
 const mockProduct: HJProduct = {
@@ -15,6 +16,9 @@ const mockProduct: HJProduct = {
   badge: 'Bestseller',
   description: 'Test',
   spec: '2mm',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [],
   svgType: 'ring-arc',
   variants: [],
 }
@@ -32,6 +36,9 @@ const mockProduct2: HJProduct = {
   badge: 'New',
   description: 'Dome ring',
   spec: '4mm',
+  currencyCode: 'USD',
+  availableForSale: true,
+  options: [],
   svgType: 'ring-dome',
   variants: [],
 }
@@ -43,6 +50,10 @@ beforeEach(() => {
     shopifyCartId: null,
     checkoutUrl: null,
     isLoading: false,
+    error: null,
+    totals: null,
+    discountCodes: [],
+    adjustments: [],
   })
 })
 
@@ -110,7 +121,7 @@ describe('removeItem', () => {
     const { addItem, removeItem } = useCartStore.getState()
     addItem(mockProduct)
     addItem(mockProduct2)
-    removeItem('hj-001')
+    removeItem(mockProduct.defaultVariantId)
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(1)
     expect(items[0].product.id).toBe('hj-002')
@@ -129,7 +140,7 @@ describe('updateQuantity', () => {
   it('updates quantity for an existing item', () => {
     const { addItem, updateQuantity } = useCartStore.getState()
     addItem(mockProduct)
-    updateQuantity('hj-001', 5)
+    updateQuantity(mockProduct.defaultVariantId, 5)
     const { items } = useCartStore.getState()
     expect(items[0].quantity).toBe(5)
   })
@@ -137,7 +148,7 @@ describe('updateQuantity', () => {
   it('removes the item when quantity is set to 0', () => {
     const { addItem, updateQuantity } = useCartStore.getState()
     addItem(mockProduct)
-    updateQuantity('hj-001', 0)
+    updateQuantity(mockProduct.defaultVariantId, 0)
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(0)
   })
@@ -145,7 +156,7 @@ describe('updateQuantity', () => {
   it('removes the item when quantity is negative', () => {
     const { addItem, updateQuantity } = useCartStore.getState()
     addItem(mockProduct)
-    updateQuantity('hj-001', -1)
+    updateQuantity(mockProduct.defaultVariantId, -1)
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(0)
   })
@@ -168,7 +179,7 @@ describe('checkoutUrl invalidation on cart edits', () => {
 
   it('removeItem clears checkoutUrl but keeps shopifyCartId', () => {
     useCartStore.getState().addItem(mockProduct)
-    useCartStore.getState().removeItem('hj-001')
+    useCartStore.getState().removeItem(mockProduct.defaultVariantId)
     const { checkoutUrl, shopifyCartId } = useCartStore.getState()
     expect(checkoutUrl).toBeNull()
     expect(shopifyCartId).toBe('gid://shopify/Cart/123')
@@ -177,7 +188,7 @@ describe('checkoutUrl invalidation on cart edits', () => {
   it('updateQuantity clears checkoutUrl but keeps shopifyCartId', () => {
     useCartStore.getState().addItem(mockProduct)
     useCartStore.setState({ checkoutUrl: 'https://checkout.shopify.com/stale' })
-    useCartStore.getState().updateQuantity('hj-001', 5)
+    useCartStore.getState().updateQuantity(mockProduct.defaultVariantId, 5)
     const { checkoutUrl, shopifyCartId } = useCartStore.getState()
     expect(checkoutUrl).toBeNull()
     expect(shopifyCartId).toBe('gid://shopify/Cart/123')
@@ -197,13 +208,116 @@ describe('addItem — variant resolution', () => {
     expect(items[0].variantId).toBe(mockProduct.defaultVariantId)
   })
 
-  it('merging quantity on an existing line keeps the originally selected variant', () => {
+  // The defect this replaces: lines were keyed by product id, so adding a
+  // second size of the same ring merged into the first line and the customer
+  // was shipped two of the size they picked first.
+  it('keeps two sizes of the same product as two separate lines', () => {
     useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
     useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-11')
     const { items } = useCartStore.getState()
+    expect(items).toHaveLength(2)
+    expect(items.map((i) => i.variantId)).toEqual([
+      'gid://shopify/ProductVariant/size-9',
+      'gid://shopify/ProductVariant/size-11',
+    ])
+    expect(items.every((i) => i.quantity === 1)).toBe(true)
+  })
+
+  it('merges quantity only when the same variant is added twice', () => {
+    useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
+    useCartStore.getState().addItem(mockProduct, 2, 'gid://shopify/ProductVariant/size-9')
+    const { items } = useCartStore.getState()
     expect(items).toHaveLength(1)
-    expect(items[0].quantity).toBe(2)
-    expect(items[0].variantId).toBe('gid://shopify/ProductVariant/size-9')
+    expect(items[0].quantity).toBe(3)
+  })
+
+  it('removes only the targeted size, leaving the other in the bag', () => {
+    useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
+    useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-11')
+    useCartStore.getState().removeItem('gid://shopify/ProductVariant/size-9')
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(1)
+    expect(items[0].variantId).toBe('gid://shopify/ProductVariant/size-11')
+  })
+
+  it('updates the quantity of only the targeted size', () => {
+    useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
+    useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-11')
+    useCartStore.getState().updateQuantity('gid://shopify/ProductVariant/size-11', 4)
+    const { items } = useCartStore.getState()
+    expect(items.find((i) => i.variantId.endsWith('size-9'))?.quantity).toBe(1)
+    expect(items.find((i) => i.variantId.endsWith('size-11'))?.quantity).toBe(4)
+  })
+
+  it('refuses to add a variant that is not available for sale', () => {
+    const soldOut = makeProduct({
+      variants: [makeVariant({ id: 'v-sold-out', availableForSale: false })],
+      defaultVariantId: 'v-sold-out',
+    })
+    useCartStore.getState().addItem(soldOut, 1, 'v-sold-out')
+    expect(useCartStore.getState().items).toHaveLength(0)
+    expect(useCartStore.getState().error?.code).toBe('unavailable')
+  })
+
+  it('snapshots the variant title and options onto the line', () => {
+    const sized = makeSizedProduct(['7', '9'])
+    const nine = sized.variants.find((v) => v.title === '9')!
+    useCartStore.getState().addItem(sized, 1, nine.id)
+    const line = useCartStore.getState().items[0]
+    expect(line.variantTitle).toBe('9')
+    expect(line.selectedOptions).toEqual([{ name: 'Size', value: '9' }])
+  })
+
+  it('uses the variant price rather than the product "from" price', () => {
+    const sized = makeSizedProduct(['7', '12'])
+    const big = sized.variants.find((v) => v.title === '12')!
+    big.price = { amount: '129.00', currencyCode: 'USD' }
+    useCartStore.getState().addItem(sized, 1, big.id)
+    expect(useCartStore.getState().items[0].unitPrice).toBe('129.00')
+    expect(useCartStore.getState().totalPrice()).toBe(129)
+  })
+})
+
+describe('quantity bounds', () => {
+  it('clamps an absurd quantity to the per-line maximum', () => {
+    useCartStore.getState().addItem(mockProduct, 9999)
+    expect(useCartStore.getState().items[0].quantity).toBe(MAX_LINE_QUANTITY)
+  })
+
+  it('clamps a merged quantity to the per-line maximum', () => {
+    useCartStore.getState().addItem(mockProduct, MAX_LINE_QUANTITY)
+    useCartStore.getState().addItem(mockProduct, 5)
+    expect(useCartStore.getState().items[0].quantity).toBe(MAX_LINE_QUANTITY)
+  })
+
+  it('floors a fractional quantity', () => {
+    useCartStore.getState().addItem(mockProduct, 2.7)
+    expect(useCartStore.getState().items[0].quantity).toBe(2)
+  })
+})
+
+describe('currencyCode selector', () => {
+  it('reports the currency carried by the products in the bag', () => {
+    const vnd = makeProduct({ currencyCode: 'VND', price: '2450000' })
+    useCartStore.getState().addItem(vnd)
+    expect(useCartStore.getState().currencyCode()).toBe('VND')
+  })
+
+  it('prefers Shopify totals currency once the cart has synced', () => {
+    useCartStore.getState().addItem(makeProduct({ currencyCode: 'USD' }))
+    useCartStore.setState({
+      totals: {
+        subtotal: { amount: '89.00', currencyCode: 'VND' },
+        total: { amount: '89.00', currencyCode: 'VND' },
+        tax: null,
+        duty: null,
+      },
+    })
+    expect(useCartStore.getState().currencyCode()).toBe('VND')
+  })
+
+  it('falls back to USD for an empty, unsynced bag', () => {
+    expect(useCartStore.getState().currencyCode()).toBe('USD')
   })
 })
 
