@@ -64,8 +64,19 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer/CartDrawer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs)
 - Data: `src/lib/data/hj-data.ts` — typed product catalog (static, Shopify-ready)
 - Shopify: `src/lib/shopify/` — client, queries, mutations, types
-- Store: `src/store/cart.ts` — Zustand cart with persist
+- Store: `src/store/cart.tsx` — Zustand cart with persist
 - Hooks: `src/lib/hooks/useReveal.ts` — IntersectionObserver scroll-reveal hook, returns `[ref, visible]` tuple, triggers once then disconnects
+
+### Commerce rules (non-negotiable)
+Full detail in `docs/COMMERCE-ARCHITECTURE.md`; Shopify-side settings in `docs/SHOPIFY-ADMIN-RUNBOOK.md`.
+
+- **A cart line is a variant, not a product.** Size 7 and size 9 of one ring are two lines. Key state, React keys and every cart mutation by `variantId`. Keying by product id shipped the wrong size.
+- **Never assume a currency.** `HJProduct.currencyCode` carries Shopify's code to the render. Use `formatPrice(amount, currency)`; never a literal `$`, never a hardcoded `'USD'`.
+- **Shopify owns money.** Show `cart.cost` once synced; before that label the figure an estimate. Never present a computed total as final.
+- **Availability comes from Shopify**, never from the collection or a hardcoded list. The size picker renders from `product.options` + variants.
+- **Never persist `checkoutUrl`.** Shopify carts expire; re-derive it from a live sync via `prepareCheckout()`.
+- **Cart failures are customer-facing.** Return a typed `CartError` and surface it through `CartNotices`. A `console.warn` is a checkout button that does nothing.
+- **Use `--titanium-text` / `--ash-text` when the token colours type.** The raw `--titanium` and `--ash` fail WCAG AA as text; keep them for borders, dividers and SVG strokes.
 
 ### Animations
 Keyframes defined in `globals.css`:
@@ -77,8 +88,8 @@ Keyframes defined in `globals.css`:
 CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 
 ## Content Data (NO STONES/GEMS)
-- `src/lib/data/hj-data.ts` — 15 products, 4 collections, 3 materials
-- Collections: rings, necklaces, earrings, bracelets
+- `src/lib/data/hj-data.ts` — 17 products, 5 collections, 3 materials. This is the *fallback* catalog, used only when Shopify is unreachable or unconfigured; the live store is the source of truth
+- Collections: rings, necklaces, earrings, bracelets, charms
 - Materials: Grade 23 Titanium, Niobium, 316L Surgical Steel
 
 ## Site Map
@@ -86,7 +97,9 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - `/shop` → All products with filter
 - `/shop/[collection]` → Per-collection (rings/necklaces/earrings/bracelets)
 - `/products/[handle]` → Product detail page
-- `/cart` → Cart page
+- `/cart` → Cart page (order summary, promotion codes)
+- `/checkout` → Checkout hand-off interstitial (retries, errors, route back to bag)
+- `/order-confirmed` → Post-purchase landing; clears the bag. Shopify must redirect here — see the admin runbook
 - `/about` → Brand story
 - `/materials` → Materials science page
 - `/search` → Search results
@@ -97,6 +110,8 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - Named + default exports on all components
 - Run `pnpm lint && pnpm build` before every commit
 - Run `pnpm test` — maintain 80%+ coverage
+- Run `pnpm e2e` for transaction-path changes — the two-sizes-one-product case is covered there
+- Build fixtures with `src/test/factories.ts`, not inline object literals
 - Commit format: `feat|fix|style|content|test|chore: description`
 
 ## PROHIBITED

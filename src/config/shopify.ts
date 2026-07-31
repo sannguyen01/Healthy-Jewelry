@@ -15,7 +15,14 @@ export const shopifyConfig = {
   get adminAccessToken(): string | undefined {
     return process.env.SHOPIFY_ADMIN_ACCESS_TOKEN
   },
-  apiVersion: '2025-01' as const,
+  // Shopify ships a new API version each quarter and supports each one for
+  // about twelve months. 2025-01 — what this was pinned to — went out of
+  // support in early 2026; requests to an unsupported version are silently
+  // served by the oldest supported one instead, so the storefront was running
+  // against a version nobody had chosen and could change under it without
+  // notice. Review this each quarter; 2026-07 is supported to 2027-07-16.
+  // https://shopify.dev/docs/api/usage/versioning
+  apiVersion: '2026-07' as const,
   get revalidationSecret(): string {
     return process.env.SHOPIFY_REVALIDATION_SECRET ?? ''
   },

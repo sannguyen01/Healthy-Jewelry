@@ -112,8 +112,32 @@ describe('collectionsNav', () => {
 // ── shopify.ts ─────────────────────────────────────────────────────────────
 
 describe('shopifyConfig', () => {
-  it('has apiVersion 2025-01', () => {
-    expect(shopifyConfig.apiVersion).toBe('2025-01')
+  it('pins a quarterly Shopify API version', () => {
+    // Shopify releases at the start of each quarter, so the month must be one
+    // of those four — a typo like 2026-08 is not a real version.
+    expect(shopifyConfig.apiVersion).toMatch(/^\d{4}-(01|04|07|10)$/)
+  })
+
+  // Shopify supports each API version for about twelve months, then silently
+  // serves requests from the oldest supported version instead. The storefront
+  // sat on 2025-01 well past its window, running against a version nobody had
+  // chosen. This fails ahead of the next expiry so the bump is a deliberate
+  // act rather than a surprise change in Shopify's behaviour.
+  // https://shopify.dev/docs/api/usage/versioning
+  it('is not approaching end of support', () => {
+    const [year, month] = shopifyConfig.apiVersion.split('-').map(Number)
+    // Released on the first of its quarter, supported ~12 months from there.
+    const endOfSupport = new Date(Date.UTC(year + 1, month - 1, 1))
+    const monthsRemaining =
+      (endOfSupport.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44)
+
+    expect(
+      monthsRemaining,
+      `Shopify API version ${shopifyConfig.apiVersion} reaches end of support on ` +
+        `${endOfSupport.toISOString().slice(0, 10)}. Bump shopifyConfig.apiVersion to the ` +
+        `current quarterly release and re-run the suite — see ` +
+        `docs/SHOPIFY-ADMIN-RUNBOOK.md for the upgrade checklist.`
+    ).toBeGreaterThan(1)
   })
   it('has all required keys', () => {
     expect(shopifyConfig).toHaveProperty('storeDomain')
