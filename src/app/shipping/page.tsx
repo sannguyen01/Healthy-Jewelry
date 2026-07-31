@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 
 export const metadata: Metadata = {
-  title: 'Shipping & Returns — Healthy Jewelry',
+  title: 'Shipping & Returns',
   description:
     'Free shipping on all Healthy Jewelry orders worldwide. 7–14 day international delivery. 30-day returns.',
 }

@@ -5,7 +5,7 @@ import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ContactForm } from '@/components/contact/ContactForm'
 
 export const metadata: Metadata = {
-  title: 'Contact — Healthy Jewelry',
+  title: 'Contact',
   description:
     'Get in touch with Healthy Jewelry. Questions about materials, sizing, or orders — we respond within 24 hours.',
 }

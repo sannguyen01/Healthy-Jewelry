@@ -6,7 +6,7 @@ import { CartDrawer } from '@/components/layout/CartDrawer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 
 export const metadata: Metadata = {
-  title: 'Our Story — Healthy Jewelry',
+  title: 'Our Story',
   description:
     'The science behind Healthy Jewelry. Grade 23 titanium, niobium, and 316L surgical steel — the same alloys used in surgical implants, now in jewelry.',
 }
@@ -18,7 +18,6 @@ export default function AboutPage() {
       <CartDrawer />
 
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
-
         {/* ── 1. Hero ────────────────────────────────────────────────── */}
         <section
           style={{
@@ -58,9 +57,8 @@ export default function AboutPage() {
               fontWeight: 300,
             }}
           >
-            Most jewelry is made for display cases. Ours is made for skin. Every alloy
-            we use has been validated in the most demanding environment possible —
-            the human body.
+            Most jewelry is made for display cases. Ours is made for skin. Every alloy we use has
+            been validated in the most demanding environment possible — the human body.
           </p>
         </section>
 
@@ -107,9 +105,9 @@ export default function AboutPage() {
                 margin: '0 0 20px',
               }}
             >
-              Titanium has been used in surgical implants for over 60 years — hip
-              replacements, bone screws, spinal rods. The Grade 23 alloy (Ti-6Al-4V
-              ELI) is chosen because the body simply does not react to it.
+              Titanium has been used in surgical implants for over 60 years — hip replacements, bone
+              screws, spinal rods. The Grade 23 alloy (Ti-6Al-4V ELI) is chosen because the body
+              simply does not react to it.
             </p>
 
             <p
@@ -121,9 +119,9 @@ export default function AboutPage() {
                 fontWeight: 300,
               }}
             >
-              We asked one question: if this metal is trusted inside the body, why are
-              so few jewelers using it? Healthy Jewelry is our answer. Every piece uses
-              the same material specifications that surgeons rely on.
+              We asked one question: if this metal is trusted inside the body, why are so few
+              jewelers using it? Healthy Jewelry is our answer. Every piece uses the same material
+              specifications that surgeons rely on.
             </p>
           </div>
 
@@ -273,8 +271,8 @@ export default function AboutPage() {
               margin: 0,
             }}
           >
-            Three metals. Each chosen for one reason: the body accepts them without
-            reaction. Read the full material science breakdown.
+            Three metals. Each chosen for one reason: the body accepts them without reaction. Read
+            the full material science breakdown.
           </p>
 
           <Link href="/materials" className="btn-ghost" style={{ marginTop: '8px' }}>
@@ -318,15 +316,14 @@ export default function AboutPage() {
               margin: 0,
             }}
           >
-            Every piece in the collection uses implant-grade metals — the same
-            standard used in medical devices.
+            Every piece in the collection uses implant-grade metals — the same standard used in
+            medical devices.
           </p>
 
           <Link href="/shop" className="btn-ghost-dark">
             Shop the Collection
           </Link>
         </section>
-
       </main>
 
       <Footer />

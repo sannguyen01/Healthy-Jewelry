@@ -6,17 +6,17 @@ import { CartDrawer } from '@/components/layout/CartDrawer'
 import { hjMaterials } from '@/lib/data/hj-data'
 
 export const metadata: Metadata = {
-  title: 'Materials — Healthy Jewelry',
+  title: 'Materials',
   description:
     'Grade 23 Titanium, Niobium, 316L Surgical Steel. The science of biocompatible jewelry metals — hypoallergenic, corrosion-proof, MRI-safe.',
 }
 
 const COMPARISON_ROWS = [
-  { property: 'Hypoallergenic',        titanium: 'Yes',         niobium: 'Yes',       steel: 'Yes'    },
-  { property: 'Corrosion resistance',  titanium: 'Excellent',   niobium: 'Excellent', steel: 'High'   },
-  { property: 'Weight',                titanium: 'Lightweight', niobium: 'Medium',    steel: 'Medium' },
-  { property: 'MRI-safe',              titanium: 'Yes',         niobium: 'Yes',       steel: 'Yes'    },
-  { property: 'Skin-safe',             titanium: 'Yes',         niobium: 'Yes',       steel: 'Yes'    },
+  { property: 'Hypoallergenic', titanium: 'Yes', niobium: 'Yes', steel: 'Yes' },
+  { property: 'Corrosion resistance', titanium: 'Excellent', niobium: 'Excellent', steel: 'High' },
+  { property: 'Weight', titanium: 'Lightweight', niobium: 'Medium', steel: 'Medium' },
+  { property: 'MRI-safe', titanium: 'Yes', niobium: 'Yes', steel: 'Yes' },
+  { property: 'Skin-safe', titanium: 'Yes', niobium: 'Yes', steel: 'Yes' },
 ] as const
 
 const FAQ = [
@@ -47,7 +47,6 @@ export default function MaterialsPage() {
       <CartDrawer />
 
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
-
         {/* ── Page header ───────────────────────────────────────────── */}
         <section
           style={{
@@ -86,9 +85,8 @@ export default function MaterialsPage() {
               maxWidth: '580px',
             }}
           >
-            Biocompatibility is not a marketing claim — it is a material property. We
-            use only metals that have been validated for long-term contact with human
-            tissue.
+            Biocompatibility is not a marketing claim — it is a material property. We use only
+            metals that have been validated for long-term contact with human tissue.
           </p>
         </section>
 
@@ -189,10 +187,7 @@ export default function MaterialsPage() {
                   ))}
                 </div>
 
-                <Link
-                  href={`/shop?material=${material.handle}`}
-                  className="btn-ghost"
-                >
+                <Link href={`/shop?material=${material.handle}`} className="btn-ghost">
                   Shop {material.title}
                 </Link>
               </div>
@@ -278,13 +273,34 @@ export default function MaterialsPage() {
                     >
                       {row.property}
                     </td>
-                    <td style={{ padding: '14px 20px', color: 'var(--ink)', borderBottom: '1px solid var(--ash)', fontWeight: 300 }}>
+                    <td
+                      style={{
+                        padding: '14px 20px',
+                        color: 'var(--ink)',
+                        borderBottom: '1px solid var(--ash)',
+                        fontWeight: 300,
+                      }}
+                    >
                       {row.titanium}
                     </td>
-                    <td style={{ padding: '14px 20px', color: 'var(--ink)', borderBottom: '1px solid var(--ash)', fontWeight: 300 }}>
+                    <td
+                      style={{
+                        padding: '14px 20px',
+                        color: 'var(--ink)',
+                        borderBottom: '1px solid var(--ash)',
+                        fontWeight: 300,
+                      }}
+                    >
                       {row.niobium}
                     </td>
-                    <td style={{ padding: '14px 20px', color: 'var(--ink)', borderBottom: '1px solid var(--ash)', fontWeight: 300 }}>
+                    <td
+                      style={{
+                        padding: '14px 20px',
+                        color: 'var(--ink)',
+                        borderBottom: '1px solid var(--ash)',
+                        fontWeight: 300,
+                      }}
+                    >
                       {row.steel}
                     </td>
                   </tr>
@@ -349,7 +365,6 @@ export default function MaterialsPage() {
             ))}
           </div>
         </section>
-
       </main>
 
       <Footer />
