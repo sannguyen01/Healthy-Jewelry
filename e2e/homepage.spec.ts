@@ -26,7 +26,9 @@ test.describe('Homepage', () => {
   })
 
   test('materials section mentions Grade 23 Titanium', async ({ page }) => {
-    await expect(page.getByText(/grade 23 titanium/i)).toBeVisible()
+    // Product cards also carry the material name, so this targets the heading
+    // in the materials section rather than any occurrence on the page.
+    await expect(page.getByRole('heading', { name: 'Grade 23 Titanium' })).toBeVisible()
   })
 
   test('materials section mentions Niobium', async ({ page }) => {
@@ -34,7 +36,7 @@ test.describe('Homepage', () => {
   })
 
   test('materials section mentions 316L Surgical Steel', async ({ page }) => {
-    await expect(page.getByText(/316L surgical steel/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: '316L Surgical Steel' })).toBeVisible()
   })
 
   test('footer is present', async ({ page }) => {

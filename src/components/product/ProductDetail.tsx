@@ -322,7 +322,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                 style={{
                   fontFamily: 'var(--font-ui)',
                   fontSize: 'var(--text-xs)',
-                  color: 'var(--titanium)',
+                  color: 'var(--titanium-text)',
                   letterSpacing: '0.16em',
                   textTransform: 'uppercase',
                 }}

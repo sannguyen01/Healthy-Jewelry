@@ -108,29 +108,68 @@ test.describe('Contact form — submission', () => {
 
     await page.getByRole('button', { name: /send message/i }).click()
 
-    await expect(page.getByText(/24 hours/i)).toBeVisible({ timeout: 8000 })
+    // "24 hours" also appears in the page heading, so this scopes to the
+    // success panel that replaces the form.
+    await expect(page.getByRole('status')).toContainText(/24 hours/i, { timeout: 8000 })
   })
 
-  test('empty name field causes API validation error — shows error state', async ({ page }) => {
+  // The form validates every field before it will call the API, so an empty
+  // name never reaches the server. This asserts the behaviour that actually
+  // happens — an inline field error and no request — rather than an API error
+  // state that cannot be produced this way.
+  test('empty name field is caught client-side, before any request', async ({ page }) => {
     await page.goto('/contact')
 
-    // Leave name empty, fill only email + message
+    let requested = false
+    await page.route('**/api/contact', (route) => {
+      requested = true
+      return route.continue()
+    })
+
     await page.getByLabel(/^email$/i).fill('san@example.com')
-    await page.getByLabel(/^message$/i).fill(
-      'Hello, this message is long enough to pass the minimum.',
-    )
+    await page
+      .getByLabel(/^message$/i)
+      .fill('Hello, this message is long enough to pass the minimum.')
 
     await page.getByRole('button', { name: /send message/i }).click()
 
-    // API returns 400 → component shows error state with fallback email link
+    await expect(page.locator('#cf-name-error')).toBeVisible({ timeout: 8000 })
+    expect(requested).toBe(false)
+  })
+
+  test('a server-side failure shows the error state', async ({ page }) => {
+    await page.goto('/contact')
+
+    // Force the failure the client cannot produce on its own.
+    await page.route('**/api/contact', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Something went wrong. Please try again.' }),
+      }),
+    )
+
+    await page.getByLabel(/^name$/i).fill('Test User')
+    await page.getByLabel(/^email$/i).fill('test@example.com')
+    await page.getByLabel(/^message$/i).fill('A question about materials and biocompatibility.')
+    await page.getByRole('button', { name: /send message/i }).click()
+
     await expect(page.getByText(/something went wrong/i)).toBeVisible({ timeout: 8000 })
   })
 
   test('error state shows direct email fallback link', async ({ page }) => {
     await page.goto('/contact')
 
-    // Trigger validation error
-    await page.getByLabel(/^email$/i).fill('not-an-email')
+    await page.route('**/api/contact', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Something went wrong. Please try again.' }),
+      }),
+    )
+
+    await page.getByLabel(/^name$/i).fill('Test User')
+    await page.getByLabel(/^email$/i).fill('test@example.com')
     await page.getByLabel(/^message$/i).fill('Hello there, a long enough message.')
 
     await page.getByRole('button', { name: /send message/i }).click()

@@ -75,7 +75,7 @@ function OrderConfirmedContent() {
               fontSize: 'var(--text-xs)',
               letterSpacing: '0.16em',
               textTransform: 'uppercase',
-              color: 'var(--titanium)',
+              color: 'var(--titanium-text)',
               margin: 0,
             }}
           >

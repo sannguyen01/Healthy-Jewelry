@@ -19,8 +19,9 @@ test.describe('Shop page', () => {
   })
 
   test('each product card links to product detail', async ({ page }) => {
-    const firstCard = page.locator('article').first()
-    const link = firstCard.getByRole('link')
+    // ProductCard renders <Link><article/></Link>, so the link is the card's
+    // ancestor — searching inside the article finds nothing.
+    const link = page.locator('a:has(article)').first()
     const href = await link.getAttribute('href')
     expect(href).toMatch(/\/products\//)
   })

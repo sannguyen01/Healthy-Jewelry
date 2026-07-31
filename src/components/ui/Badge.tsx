@@ -9,7 +9,7 @@ interface BadgeProps {
 
 const variantStyles: Record<BadgeVariant, React.CSSProperties> = {
   bestseller: {
-    color: 'var(--titanium)',
+    color: 'var(--titanium-text)',
     backgroundColor: 'rgba(157,167,175,0.12)',
     border: '1px solid rgba(157,167,175,0.3)',
   },

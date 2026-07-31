@@ -19,7 +19,7 @@ export default function NotFound() {
         style={{
           fontFamily: 'var(--font-display)',
           fontSize: 'clamp(6rem, 20vw, 14rem)',
-          color: 'var(--ash)',
+          color: 'var(--ash-text)',
           lineHeight: 1,
           margin: '0 0 16px',
           letterSpacing: '0.02em',

@@ -194,7 +194,7 @@ export default function AboutPage() {
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontSize: '3.5rem',
-                    color: 'var(--ash)',
+                    color: 'var(--ash-text)',
                     lineHeight: 1,
                     margin: '0 0 20px',
                     letterSpacing: '0.02em',
@@ -311,7 +311,7 @@ export default function AboutPage() {
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
-              color: 'var(--ash)',
+              color: 'var(--ash-text)',
               lineHeight: 1.6,
               fontWeight: 300,
               maxWidth: '480px',

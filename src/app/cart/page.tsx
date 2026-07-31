@@ -222,7 +222,7 @@ export default function CartPage() {
                             fontSize: 'var(--text-xs)',
                             letterSpacing: '0.12em',
                             textTransform: 'uppercase',
-                            color: 'var(--titanium)',
+                            color: 'var(--titanium-text)',
                             margin: '0 0 12px',
                           }}
                         >

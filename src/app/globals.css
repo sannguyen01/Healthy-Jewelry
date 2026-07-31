@@ -25,6 +25,16 @@
     --black:     #0A0A0A;  /* campaign band dark */
     --mid:       #2C2926;  /* dark hover */
 
+    /* ── Accessible text variants ──
+       --titanium and --ash are accent and border colours; as *text* on --bg
+       they measure 2.25:1 and 1.37:1, well under WCAG AA. These are the same
+       hues carried toward --ink until they pass, so the palette still reads as
+       titanium and ash while the copy is actually legible. Use the -text
+       variants wherever the token colours type; keep the originals for
+       borders, dividers, rules and SVG strokes, which AA does not govern. */
+    --titanium-text: #6B7074;  /* 4.60:1 on --bg — AA for body text */
+    --ash-text:      #908C85;  /* 3.07:1 on --bg — AA for large text only */
+
     /* ── Ease Tokens ── */
     --ease:       cubic-bezier(0.16, 1, 0.3, 1);
     --ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00);

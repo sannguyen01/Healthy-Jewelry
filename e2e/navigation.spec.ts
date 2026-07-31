@@ -14,7 +14,9 @@ test.describe('Navigation', () => {
   })
 
   test('logo links to homepage', async ({ page }) => {
-    const homeLink = page.getByRole('link', { name: /healthy jewelry.*home/i })
+    const homeLink = page
+      .getByRole('banner')
+      .getByRole('link', { name: /healthy jewelry.*home/i })
     await expect(homeLink).toBeVisible()
     await homeLink.click()
     await expect(page).toHaveURL('/')
@@ -57,12 +59,14 @@ test.describe('Navigation', () => {
     await expect(page.getByRole('dialog', { name: /shopping bag/i })).not.toBeVisible()
   })
 
-  test('search button is visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /search/i })).toBeVisible()
+  test('search control is visible', async ({ page }) => {
+    await expect(page.getByRole('link', { name: /^search$/i })).toBeVisible()
   })
 
-  test('search button navigates to /search', async ({ page }) => {
-    await page.getByRole('button', { name: /search/i }).click()
+  // It used to be a <button> with no handler — the header's only discovery
+  // control did nothing when clicked.
+  test('search control navigates to /search', async ({ page }) => {
+    await page.getByRole('link', { name: /^search$/i }).click()
     await expect(page).toHaveURL(/\/search/)
   })
 })

@@ -116,8 +116,10 @@ export function Nav({ cartCount }: NavProps) {
             gap: '20px',
           }}
         >
-          {/* Search icon */}
-          <button
+          {/* Search — was a <button> with no handler, so the header's only
+              discovery control did nothing at all. /search already exists. */}
+          <Link
+            href="/search"
             aria-label="Search"
             style={{
               background: 'none',
@@ -141,7 +143,7 @@ export function Nav({ cartCount }: NavProps) {
                 strokeLinecap="round"
               />
             </svg>
-          </button>
+          </Link>
 
           {/* BAG button */}
           <button
@@ -245,7 +247,7 @@ export function Nav({ cartCount }: NavProps) {
               fontSize: '0.65rem',
               letterSpacing: '0.22em',
               textTransform: 'uppercase',
-              color: 'var(--titanium)',
+              color: 'var(--titanium-text)',
               marginTop: '12px',
             }}
           >

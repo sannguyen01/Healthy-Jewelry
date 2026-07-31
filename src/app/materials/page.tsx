@@ -119,7 +119,7 @@ export default function MaterialsPage() {
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontSize: '5rem',
-                    color: 'var(--ash)',
+                    color: 'var(--ash-text)',
                     lineHeight: 1,
                     margin: '0 0 12px',
                     letterSpacing: '0.02em',
@@ -148,7 +148,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-xs)',
                     letterSpacing: '0.18em',
                     textTransform: 'uppercase',
-                    color: 'var(--titanium)',
+                    color: 'var(--titanium-text)',
                     margin: 0,
                   }}
                 >

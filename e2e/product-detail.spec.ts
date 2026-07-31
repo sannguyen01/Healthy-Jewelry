@@ -28,7 +28,9 @@ test.describe('Product detail — ring', () => {
   })
 
   test('shows "Grade 23 Titanium" material label', async ({ page }) => {
-    await expect(page.getByText(/grade 23 titanium/i)).toBeVisible()
+    // The description and the related-products rail also name the material,
+    // so this targets the material tag specifically.
+    await expect(page.locator('.material-tag')).toHaveText('Grade 23 Titanium')
   })
 
   test('shows trust signals', async ({ page }) => {
@@ -37,14 +39,12 @@ test.describe('Product detail — ring', () => {
     await expect(page.getByText(/MRI SAFE/)).toBeVisible()
   })
 
-  test('shows US ring size picker for rings', async ({ page }) => {
-    await expect(page.getByText(/US Ring Size/i)).toBeVisible()
+  test('shows the size picker for rings', async ({ page }) => {
+    await expect(page.getByRole('radiogroup', { name: /size/i })).toBeVisible()
   })
 
   test('ring size options are selectable', async ({ page }) => {
-    // Size buttons should be clickable
-    const sizeButtons = page.getByRole('button').filter({ hasText: /^[5-9]$|^1[0-2]$/ })
-    await expect(sizeButtons.first()).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Size 7' })).toBeEnabled()
   })
 
   test('"Add to Bag" button is present', async ({ page }) => {
@@ -52,6 +52,7 @@ test.describe('Product detail — ring', () => {
   })
 
   test('clicking "Add to Bag" opens the cart drawer', async ({ page }) => {
+    await page.getByRole('radio', { name: 'Size 7' }).click()
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
   })
@@ -59,6 +60,7 @@ test.describe('Product detail — ring', () => {
   test('cart shows product after adding to bag', async ({ page }) => {
     // Get the product title first
     const title = await page.getByRole('heading', { level: 1 }).textContent()
+    await page.getByRole('radio', { name: 'Size 7' }).click()
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
     if (title) {
@@ -67,6 +69,7 @@ test.describe('Product detail — ring', () => {
   })
 
   test('cart shows non-zero item count after adding', async ({ page }) => {
+    await page.getByRole('radio', { name: 'Size 7' }).click()
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     // Bag button count should be > 0
     const bagButton = page.getByRole('button', { name: /open bag/i })
@@ -74,6 +77,7 @@ test.describe('Product detail — ring', () => {
   })
 
   test('Checkout button is present in cart after adding item', async ({ page }) => {
+    await page.getByRole('radio', { name: 'Size 7' }).click()
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
     await expect(dialog.getByRole('button', { name: /checkout/i })).toBeVisible()
@@ -85,12 +89,13 @@ test.describe('Product detail — earring', () => {
     await page.goto(`/products/${EARRING_HANDLE}`)
   })
 
-  test('does NOT show ring size picker for earrings', async ({ page }) => {
-    await expect(page.getByText('US Ring Size')).not.toBeVisible()
+  test('does NOT show a size picker for earrings', async ({ page }) => {
+    await expect(page.getByRole('radiogroup', { name: /size/i })).toHaveCount(0)
   })
 
-  test('does NOT show bracelet size picker for earrings', async ({ page }) => {
-    await expect(page.getByText('Bracelet Size')).not.toBeVisible()
+  test('adds an unsized product to the bag without a size step', async ({ page }) => {
+    await page.getByRole('button', { name: /add.*to bag/i }).click()
+    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
   })
 })
 
@@ -99,35 +104,48 @@ test.describe('Product detail — bracelet', () => {
     await page.goto(`/products/${BRACELET_HANDLE}`)
   })
 
-  test('shows Bracelet Size picker for bracelets', async ({ page }) => {
-    await expect(page.getByText('Bracelet Size')).toBeVisible()
+  test('shows the size picker for bracelets', async ({ page }) => {
+    await expect(page.getByRole('radiogroup', { name: /size/i })).toBeVisible()
   })
 })
 
 test.describe('Product detail — size selection', () => {
-  test('clicking a ring size marks it as selected (aria-pressed="true")', async ({ page }) => {
+  test('clicking a ring size marks it as selected', async ({ page }) => {
     await page.goto(`/products/${RING_HANDLE}`)
-    const size7 = page.getByRole('button', { name: 'Ring size 7' })
+    const size7 = page.getByRole('radio', { name: 'Size 7' })
     await size7.click()
-    await expect(size7).toHaveAttribute('aria-pressed', 'true')
+    await expect(size7).toHaveAttribute('aria-checked', 'true')
   })
 
   test('clicking a different ring size deselects the previous one', async ({ page }) => {
     await page.goto(`/products/${RING_HANDLE}`)
-    const size7 = page.getByRole('button', { name: 'Ring size 7' })
-    const size9 = page.getByRole('button', { name: 'Ring size 9' })
+    const size7 = page.getByRole('radio', { name: 'Size 7' })
+    const size9 = page.getByRole('radio', { name: 'Size 9' })
     await size7.click()
-    await expect(size7).toHaveAttribute('aria-pressed', 'true')
+    await expect(size7).toHaveAttribute('aria-checked', 'true')
     await size9.click()
-    await expect(size9).toHaveAttribute('aria-pressed', 'true')
-    await expect(size7).toHaveAttribute('aria-pressed', 'false')
+    await expect(size9).toHaveAttribute('aria-checked', 'true')
+    await expect(size7).toHaveAttribute('aria-checked', 'false')
   })
 
   test('clicking a bracelet size marks it as selected', async ({ page }) => {
     await page.goto(`/products/${BRACELET_HANDLE}`)
-    const sizeM = page.getByRole('button', { name: 'Bracelet size M' })
+    const sizeM = page.getByRole('radio', { name: /^Size M/ })
     await sizeM.click()
-    await expect(sizeM).toHaveAttribute('aria-pressed', 'true')
+    await expect(sizeM).toHaveAttribute('aria-checked', 'true')
+  })
+
+  // A sized product must not be addable until a size resolves to a variant —
+  // otherwise the bag carries the product's default variant and the customer
+  // is shipped whichever size happened to be listed first.
+  test('Add to Bag is disabled until a size is chosen', async ({ page }) => {
+    await page.goto(`/products/${RING_HANDLE}`)
+    const addToBag = page.getByTestId('add-to-bag')
+    await expect(addToBag).toBeDisabled()
+    await expect(addToBag).toHaveText(/select a size/i)
+    await page.getByRole('radio', { name: 'Size 7' }).click()
+    await expect(addToBag).toBeEnabled()
+    await expect(addToBag).toHaveText(/add to bag/i)
   })
 })
 

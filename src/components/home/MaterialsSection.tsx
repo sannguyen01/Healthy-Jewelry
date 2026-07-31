@@ -94,7 +94,7 @@ export function MaterialsSection() {
                 fontFamily: 'var(--font-display)',
                 fontSize: '3rem',
                 fontWeight: 400,
-                color: 'var(--ash)',
+                color: 'var(--ash-text)',
                 lineHeight: 1,
                 margin: '0 0 16px',
                 letterSpacing: '0.02em',
@@ -124,7 +124,7 @@ export function MaterialsSection() {
                 fontSize: 'var(--text-xs)',
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
-                color: 'var(--titanium)',
+                color: 'var(--titanium-text)',
                 margin: '0 0 16px',
               }}
             >

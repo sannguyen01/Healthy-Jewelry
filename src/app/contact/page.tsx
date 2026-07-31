@@ -153,7 +153,7 @@ export default function ContactPage() {
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-base)',
-              color: 'var(--ash)',
+              color: 'var(--ash-text)',
               lineHeight: 1.7,
               fontWeight: 300,
               maxWidth: '460px',

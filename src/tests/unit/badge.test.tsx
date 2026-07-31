@@ -38,7 +38,7 @@ describe('Badge', () => {
   it('bestseller badge has titanium color style', () => {
     render(<Badge variant="bestseller" />)
     const badge = screen.getByText('Bestseller')
-    expect(badge).toHaveStyle({ color: 'var(--titanium)' })
+    expect(badge).toHaveStyle({ color: 'var(--titanium-text)' })
   })
 
   it('new badge has sage color style', () => {

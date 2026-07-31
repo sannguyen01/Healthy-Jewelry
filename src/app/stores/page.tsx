@@ -93,7 +93,7 @@ export default function StoresPage() {
                 fontSize: '0.62rem',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
-                color: 'var(--titanium)',
+                color: 'var(--titanium-text)',
                 marginBottom: '20px',
               }}
             >
@@ -147,7 +147,7 @@ export default function StoresPage() {
                 fontSize: '0.62rem',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
-                color: 'var(--titanium)',
+                color: 'var(--titanium-text)',
                 marginBottom: '20px',
               }}
             >

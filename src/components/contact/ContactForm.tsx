@@ -128,6 +128,10 @@ export function ContactForm() {
   if (status === 'sent') {
     return (
       <div
+        // The form is replaced wholesale on success. Without a live region a
+        // screen-reader user gets no confirmation that anything happened.
+        role="status"
+        aria-live="polite"
         style={{
           padding: '40px 0',
           display: 'flex',

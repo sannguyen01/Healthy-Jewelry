@@ -74,7 +74,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
                 {!isLast && (
                   <span
                     aria-hidden="true"
-                    style={{ margin: '0 8px', color: 'var(--ash)', userSelect: 'none' }}
+                    style={{ margin: '0 8px', color: 'var(--ash-text)', userSelect: 'none' }}
                   >
                     /
                   </span>

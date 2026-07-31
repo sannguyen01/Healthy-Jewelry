@@ -307,7 +307,7 @@ export function CartDrawer() {
                             fontSize: '0.65rem',
                             letterSpacing: '0.12em',
                             textTransform: 'uppercase',
-                            color: 'var(--titanium)',
+                            color: 'var(--titanium-text)',
                             margin: '3px 0 0',
                           }}
                         >

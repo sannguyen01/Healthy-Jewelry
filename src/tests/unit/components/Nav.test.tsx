@@ -148,10 +148,13 @@ describe('Nav', () => {
     })
   })
 
-  describe('search button', () => {
-    it('renders search button with aria-label', () => {
+  describe('search control', () => {
+    // It used to be a <button> with no onClick, so the header's only discovery
+    // control did nothing when clicked.
+    it('renders the search control as a link to /search', () => {
       render(<Nav />)
-      expect(screen.getByRole('button', { name: /search/i })).toBeTruthy()
+      const search = screen.getByRole('link', { name: /^search$/i })
+      expect(search.getAttribute('href')).toBe('/search')
     })
   })
 })

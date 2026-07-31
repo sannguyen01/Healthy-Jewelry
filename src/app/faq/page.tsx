@@ -157,7 +157,7 @@ export default function FAQPage() {
                   fontSize: '0.62rem',
                   letterSpacing: '0.22em',
                   textTransform: 'uppercase',
-                  color: 'var(--titanium)',
+                  color: 'var(--titanium-text)',
                   marginBottom: '32px',
                 }}
               >

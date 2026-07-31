@@ -84,7 +84,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               fontFamily: 'var(--font-display)',
               fontSize: 'clamp(8rem, 20vw, 18rem)',
               letterSpacing: '-0.02em',
-              color: 'var(--ash)',
+              color: 'var(--ash-text)',
               opacity: 0.35,
               lineHeight: 1,
               pointerEvents: 'none',
