@@ -61,19 +61,19 @@ export function Hero() {
             bottom: 0,
             left: 0,
             // Sized to the actual content column (720px + its clamp() padding)
-            // plus a breathing-room buffer — NOT inset:0 across the full section.
-            // A previous version used fixed pixel gradient stops across the whole
-            // section width, which crushed the photo to a thin sliver (or nothing)
-            // on common 1280-1440px viewports: the fade-to-transparent point sat
-            // at or past the edge of the viewport itself. Scoping the overlay's
-            // own width to the content box means the gradient's percentages are
-            // relative to THAT width, so it always fades to fully transparent
-            // right at the text's edge — full photo visible beyond it, on any
-            // viewport wider than the content column.
-            width: 'calc(720px + clamp(20px, 4vw, 64px) + 100px)',
+            // plus a fixed 48px fade strip — NOT inset:0 across the full section.
+            // The gradient below is solid for this entire width minus that 48px
+            // strip (a calc() offset, not a percentage stop), so the opaque zone
+            // always reaches the text column's real right edge regardless of the
+            // clamp()'d padding at a given viewport width — a percentage split
+            // (e.g. 55%/100%) drifts with this div's own width and was cutting
+            // the solid backing short of the text at 1280-1440px viewports while
+            // also stretching the haze/fade zone across ~400px before the photo
+            // ever became fully visible.
+            width: 'calc(720px + clamp(20px, 4vw, 64px) + 48px)',
             maxWidth: '100%',
             background:
-              'linear-gradient(90deg, var(--bg) 0%, var(--bg) 55%, rgba(247,245,241,0) 100%)',
+              'linear-gradient(90deg, var(--bg) 0, var(--bg) calc(100% - 48px), rgba(247,245,241,0) 100%)',
           }}
         />
       </div>
@@ -177,17 +177,19 @@ export function Hero() {
         </div>
       </div>
 
-      {/* Scroll indicator */}
+      {/* Scroll indicator — left-aligned to the content column's own padding
+          (not centered on the viewport) so it always sits over the solid
+          backdrop; centering on the full viewport put it over the photo,
+          barely legible, on any viewport wider than the content column. */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
           bottom: '32px',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left: 'clamp(20px, 4vw, 64px)',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: '8px',
         }}
       >
