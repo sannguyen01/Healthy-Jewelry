@@ -11,8 +11,16 @@ export function validateEmail(value: string): string | null {
   return null
 }
 
+// Strips control/line-break characters so the subject can't inject extra
+// lines into the outbound notification email or pad it unboundedly.
+export function sanitizeSubject(value: string): string {
+  return value.replace(/[\r\n\t\x00-\x1f\x7f]/g, ' ').trim()
+}
+
 export function validateSubject(value: string): string | null {
-  if (!value.trim()) return 'Subject required'
+  const t = sanitizeSubject(value)
+  if (!t) return 'Subject required'
+  if (t.length > 200) return 'Subject must be 200 characters or fewer'
   return null
 }
 

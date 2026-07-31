@@ -4,8 +4,6 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { shopifyConfig } from '@/config/shopify'
 import type { HJProduct } from '@/lib/shopify/types'
-import { CREATE_CART, ADD_TO_CART, REMOVE_FROM_CART } from '@/lib/shopify/mutations/cart'
-import { GET_CART } from '@/lib/shopify/queries/cart'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -28,14 +26,17 @@ interface ShopifyMutationResult {
   userErrors?: { field: string[]; message: string }[]
 }
 
+// `operation` is a persisted-query key, not GraphQL text — the server
+// resolves it to its own literal query string (see api/shopify/route.ts),
+// so the client can never influence an operation's selection set or args.
 async function postShopify<T>(
-  query: string,
+  operation: string,
   variables: Record<string, unknown>
 ): Promise<{ data?: T }> {
   const res = await fetch('/api/shopify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ operation, variables }),
   })
   return (await res.json()) as { data?: T }
 }
@@ -50,7 +51,7 @@ async function syncExistingCart(
   cartId: string,
   lines: SyncLine[]
 ): Promise<ShopifyCartPayload | null> {
-  const cartResult = await postShopify<{ cart: ShopifyCartPayload | null }>(GET_CART, { cartId })
+  const cartResult = await postShopify<{ cart: ShopifyCartPayload | null }>('GetCart', { cartId })
   const existingCart = cartResult.data?.cart
   if (!existingCart) {
     return null
@@ -59,7 +60,7 @@ async function syncExistingCart(
   const existingLineIds = existingCart.lines.edges.map((e) => e.node.id)
   if (existingLineIds.length > 0) {
     const removeResult = await postShopify<{ cartLinesRemove: ShopifyMutationResult }>(
-      REMOVE_FROM_CART,
+      'RemoveFromCart',
       { cartId, lineIds: existingLineIds }
     )
     const removeErrors = removeResult.data?.cartLinesRemove?.userErrors
@@ -69,7 +70,7 @@ async function syncExistingCart(
     }
   }
 
-  const addResult = await postShopify<{ cartLinesAdd: ShopifyMutationResult }>(ADD_TO_CART, {
+  const addResult = await postShopify<{ cartLinesAdd: ShopifyMutationResult }>('AddToCart', {
     cartId,
     lines,
   })
@@ -82,7 +83,7 @@ async function syncExistingCart(
 }
 
 async function createShopifyCart(lines: SyncLine[]): Promise<ShopifyCartPayload | null> {
-  const createResult = await postShopify<{ cartCreate: ShopifyMutationResult }>(CREATE_CART, {
+  const createResult = await postShopify<{ cartCreate: ShopifyMutationResult }>('CreateCart', {
     lines,
   })
   const created = createResult.data?.cartCreate
