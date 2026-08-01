@@ -1,0 +1,26 @@
+# Machine-readable safety policy for this repo's loops. Mirrors loop-constraints.md
+# and the four hard gates in ~/.claude/loop/README.md.
+#
+# SCOPE: this governs *unattended loop* edits only. It is not a claim that these
+# paths are frozen — .github/workflows and next.config.ts are actively
+# maintained by humans (see PRs #9 and #10, which rebuilt CI). The rule is that
+# an autonomous run must escalate rather than touch them on its own.
+version: 1
+
+denylist:
+  - ".env"
+  - ".env.*"
+  - "**/secrets/**"
+  - "**/credentials/**"
+  - "**/*_key*"
+  - "**/*_secret*"
+  - ".vercel/**"
+  - "**/migrations/**"
+  - ".github/workflows/**"
+  - "src/lib/shopify/**"
+  - "next.config.ts"
+
+maxFiles: 10
+
+# At L1 nothing is auto-merged (no fix phase runs), so this is empty on purpose.
+autoMergeAllowlist: []
