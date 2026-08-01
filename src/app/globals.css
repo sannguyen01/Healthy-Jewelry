@@ -21,10 +21,13 @@
     --titanium:  #9DA7AF;  /* accent — borders, tints, fills. NOT text on --bg */
     /* Titanium darkened to carry small text on light backgrounds. --titanium
        itself is 2.25:1 on --bg, well under the 4.5:1 WCAG AA floor for body
-       text; this is 5.23:1 on --bg and 4.74:1 on --nacre. Same cool grey-blue
-       character, legible at 10-12px. Enforced by
-       src/tests/unit/design-tokens-contrast.test.ts. */
-    --titanium-text: #5E6870; /* titanium-toned text on light backgrounds */
+       text; this is 5.64:1 on --bg and 5.11:1 on --nacre. Same cool grey-blue
+       character, legible at 9-12px.
+       Chosen against the *worst* surface it lands on, not the lightest: the
+       bestseller badge tints --nacre with 12% titanium first (composited
+       #E3E2DE), where an earlier #5E6870 measured 4.39:1 and quietly failed AA.
+       Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
+    --titanium-text: #59636B; /* titanium-toned text on light backgrounds */
     --sage:      #8CA89A;  /* green accent */
     --mist:      #A8A49E;  /* muted text — on dark backgrounds only */
     --on-dark:   #F0EDE8;  /* text on dark backgrounds */

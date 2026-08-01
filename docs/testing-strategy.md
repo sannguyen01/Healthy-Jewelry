@@ -149,3 +149,38 @@ For visual assets specifically, `e2e/visual-assets.spec.ts` is the model. Presen
 the tiles that started this whole effort were present, requested successfully, and invisible. Assert
 that the bytes arrive (`naturalWidth > 0`), that the element occupies space, and that the **effective**
 opacity — the product of the element's own and every ancestor's — clears the legibility floor.
+
+### …and visibility is not legibility
+
+`visual-assets.spec.ts` then passed on a mobile homepage where the hero showed only a rock wall with
+the body copy lying on top of it, unreadable. Every assertion it makes was true. The photograph was
+present, sized, and fully opaque — it was simply the wrong 25% of the frame, with text on it.
+
+`e2e/hero-legibility.spec.ts` closes that gap, and it is the model for any composition where text
+meets imagery:
+
+- **A width matrix**, not two device presets. The hero's split layout was correct above ~866px and
+  degraded continuously below it. Testing at 390px and 1280px would have found the failure; testing at
+  1280px and 1440px would have missed it entirely. The matrix straddles the breakpoints that matter.
+- **Geometry.** Where a scrim protects text, assert the text actually stays inside the opaque zone.
+  The Hero publishes its fade width as `--hj-hero-fade` so the test derives that boundary instead of
+  hardcoding a number that would go stale the next time the gradient is retuned.
+- **Rendered contrast.** For each text node, make its glyphs transparent, screenshot the element, and
+  compute the *worst* contrast between the text colour and any pixel behind it. Worst, not average:
+  averaging hides a light word sitting on one pale patch of an otherwise dark photo, which is exactly
+  the failure worth catching.
+
+**axe cannot do this.** Its `color-contrast` rule reports *incomplete* rather than *violation* when
+the backdrop is an image, because it has no way to know what the pixels are. Anything relying on axe
+alone is unprotected the moment text is placed over a photograph.
+
+Two things that took a debugging round each, and are commented in the spec so they don't take another:
+
+- Use `locator.screenshot()`, never `page.screenshot({ clip })`. Under mobile emulation
+  `boundingBox()` returns layout-viewport coordinates while `clip` resolves against the visual
+  viewport, so at a fractional device pixel ratio the captured region drifts off the element and
+  samples something else entirely.
+- Collapse entrance animations with `reducedMotion: 'reduce'`. The hero staggers its children in, and
+  a clip taken from a still-moving element lands where the element *was*. Waiting for opacity is not
+  enough either — the effect applies its starting values after mount, so a naive check reports
+  "settled" before the animation has begun.

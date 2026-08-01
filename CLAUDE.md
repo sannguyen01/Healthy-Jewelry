@@ -56,7 +56,15 @@ for borders, tints, and text on `--ink`/`--black`. Every documented pairing is e
 - Cards: image + name + price only (minimal)
 
 ## Homepage Section Sequence
-1. Hero (full viewport, "Euro Summer" lifestyle photo background with a fade into `--bg`, plus the original ring-arc SVG at low opacity)
+1. Hero — **two compositions, breakpoint at 900px**:
+   - **≥901px**: full viewport split. Copy left on `--bg`, "Euro Summer" lifestyle photo right, fading
+     into `--bg` across a 180px strip (`--hj-hero-fade`), plus the ring-arc SVG at low opacity.
+   - **≤900px**: stacked. Copy on `--bg`, photo as a full-width 16:9 band beneath it, `object-position:
+     center`; scrim, ring and scroll cue hidden. The split cannot survive here — its fade is measured
+     from the scrim's own right edge, so below ~866px the opaque zone slides under the copy, and at
+     390px the `right center` crop discards 75% of the frame including the subject.
+   - Enforced across six widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
+     photograph without a scrim behind it.
 2. HorizontalScroll — "BESTSELLING"
 3. CampaignBand — "SCIENCE BEFORE AESTHETICS." (dark)
 4. HorizontalScroll — "NEW ARRIVALS"

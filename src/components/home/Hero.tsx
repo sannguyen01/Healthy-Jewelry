@@ -28,6 +28,7 @@ export function Hero() {
 
   return (
     <section
+      className="hj-hero"
       style={{
         minHeight: '100dvh',
         backgroundColor: 'var(--bg)',
@@ -37,8 +38,10 @@ export function Hero() {
         overflow: 'hidden',
       }}
     >
-      {/* Hero photo — right side, behind content on mobile via overlay gradient */}
+      {/* Hero photo — right half of the split at >=901px, a full-width band
+          beneath the copy below that. */}
       <div
+        className="hj-hero-media"
         aria-hidden="true"
         style={{
           position: 'absolute',
@@ -55,6 +58,7 @@ export function Hero() {
           style={{ objectFit: 'cover', objectPosition: 'right center' }}
         />
         <div
+          className="hj-hero-scrim"
           style={{
             position: 'absolute',
             top: 0,
@@ -70,7 +74,12 @@ export function Hero() {
             // as an abrupt seam; easing it out gives a soft, photographic vignette
             // instead. Still far narrower than the ~400px haze an earlier version
             // of this gradient stretched across.
-            width: 'calc(720px + clamp(20px, 4vw, 64px) + 180px)',
+            // Published as a custom property, not just baked into the gradient,
+            // so e2e/hero-legibility.spec.ts can derive where the opaque zone
+            // actually ends instead of hardcoding a number that would silently
+            // go stale the next time this gradient is retuned.
+            ['--hj-hero-fade' as string]: '180px',
+            width: 'calc(720px + clamp(20px, 4vw, 64px) + var(--hj-hero-fade))',
             maxWidth: '100%',
             background:
               'linear-gradient(90deg, var(--bg) 0, var(--bg) calc(100% - 180px), rgba(247,245,241,0.56) calc(100% - 135px), rgba(247,245,241,0.25) calc(100% - 90px), rgba(247,245,241,0.06) calc(100% - 45px), rgba(247,245,241,0) 100%)',
@@ -80,6 +89,7 @@ export function Hero() {
 
       {/* Background ring — large, right side, very faint */}
       <div
+        className="hj-hero-ring"
         aria-hidden="true"
         style={{
           position: 'absolute',
@@ -99,6 +109,7 @@ export function Hero() {
       {/* Left-aligned content */}
       <div
         ref={contentRef}
+        className="hj-hero-content"
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -182,6 +193,7 @@ export function Hero() {
           backdrop; centering on the full viewport put it over the photo,
           barely legible, on any viewport wider than the content column. */}
       <div
+        className="hj-hero-scroll"
         aria-hidden="true"
         style={{
           position: 'absolute',
@@ -206,6 +218,82 @@ export function Hero() {
         </span>
         <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--ash)' }} />
       </div>
+
+      {/* ── Below 900px: stack instead of splitting ──────────────────────────
+          The split above works because the copy column ends well left of where
+          the scrim stops being opaque. That stops being true as the viewport
+          narrows: the scrim is `maxWidth: 100%`, but its fade is measured from
+          its own right edge, so once the viewport is under ~866px the opaque
+          zone slides left underneath the text. At 390px it ended at 210px on a
+          390px screen, leaving the body copy and the ghost CTA lying on bare
+          photograph.
+
+          Narrowing the copy column instead would leave ~200px for a
+          `--text-hero` headline, so the layout changes rather than compresses:
+          copy on void-white, photograph as a full-width band beneath it.
+          Legibility becomes structural — there is no text over image to protect
+          — instead of a gradient that has to be re-tuned per breakpoint.
+
+          900px is the existing breakpoint from globals.css (.hj-coll-tile,
+          .hj-mat-grid), and it clears the ~866px failure point with margin.
+          Enforced by e2e/hero-legibility.spec.ts across six widths. */}
+      {/* `!important` throughout, matching MaterialsSection and the
+          .hj-coll-tile rules in globals.css: this component styles itself with
+          inline `style` props, and an inline declaration outranks any
+          stylesheet rule that is not marked important. Without it these rules
+          parse fine and do nothing. */}
+      <style>{`
+        @media (max-width: 900px) {
+          .hj-hero {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            /* A stacked hero already fills most of a phone screen; forcing
+               100dvh only adds dead space under the photo. */
+            min-height: auto !important;
+          }
+
+          .hj-hero-content {
+            order: 1;
+            max-width: 100% !important;
+            /* Clears the 64px fixed header, which no longer overlaps a
+               full-bleed image but does overlap the copy. */
+            padding-top: 104px !important;
+            padding-bottom: 56px !important;
+          }
+
+          .hj-hero-media {
+            order: 2;
+            position: relative !important;
+            inset: auto !important;
+            width: 100% !important;
+            /* The source is 1376x768 (1.79). 16/9 is 1.778, so ~0.8% is
+               trimmed — effectively the whole frame. Deliberately not
+               1376/768: pinning today's file dimensions would start silently
+               cropping the day the photograph is replaced. */
+            aspect-ratio: 16 / 9 !important;
+          }
+
+          .hj-hero-media img {
+            /* 'right center' keeps the subject clear of the copy column in the
+               split layout. In a wide, short band it crops to bare background
+               rock — at 390px only 25% of the frame survived, none of it the
+               subject. */
+            object-position: center !important;
+          }
+
+          /* Nothing overlaps the photograph now, so there is nothing to scrim. */
+          .hj-hero-scrim {
+            display: none !important;
+          }
+
+          /* Both are positioned for the split layout; the scroll cue in
+             particular lands on the photograph once the section stacks. */
+          .hj-hero-ring,
+          .hj-hero-scroll {
+            display: none !important;
+          }
+        }
+      `}</style>
     </section>
   )
 }

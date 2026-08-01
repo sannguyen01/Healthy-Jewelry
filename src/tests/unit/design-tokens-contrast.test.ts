@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { compositeOver, contrastRatio } from '@/lib/utils/contrast'
 
 /**
  * WCAG 2.1 contrast enforcement for the T4 palette.
@@ -29,23 +30,6 @@ function readTokens(): Record<string, string> {
     tokens[match[1]] = match[2].toUpperCase()
   }
   return tokens
-}
-
-/** WCAG 2.1 relative luminance. */
-function relativeLuminance(hex: string): number {
-  const channels = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
-  const [r, g, b] = channels.map((channel) =>
-    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-  )
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
-/** WCAG 2.1 contrast ratio, always >= 1, order-independent. */
-export function contrastRatio(foreground: string, background: string): number {
-  const a = relativeLuminance(foreground)
-  const b = relativeLuminance(background)
-  const [lighter, darker] = a > b ? [a, b] : [b, a]
-  return (lighter + 0.05) / (darker + 0.05)
 }
 
 const tokens = readTokens()
@@ -145,16 +129,20 @@ describe('T4 text contrast meets WCAG 2.1 AA', () => {
   }
 })
 
-describe('contrastRatio', () => {
-  it('returns 21:1 for black on white', () => {
-    expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 5)
-  })
-
-  it('returns 1:1 for a colour against itself', () => {
-    expect(contrastRatio('#9DA7AF', '#9DA7AF')).toBeCloseTo(1, 5)
-  })
-
-  it('is order-independent', () => {
-    expect(contrastRatio('#1A1714', '#F7F5F1')).toBeCloseTo(contrastRatio('#F7F5F1', '#1A1714'), 10)
+/**
+ * Surfaces built by layering a translucent tint over a token. Checking the text
+ * against the underlying token is not enough — and is how the bestseller badge
+ * shipped at 4.39:1 while measuring 4.74:1 against bare --nacre.
+ */
+describe('Composited surfaces meet WCAG 2.1 AA', () => {
+  it('bestseller badge label on its tinted background is at least 4.5:1', () => {
+    // ProductBadge/Badge: 12% --titanium over the --nacre card tile.
+    const badgeBackground = compositeOver(token('titanium'), token('nacre'), 0.12)
+    const ratio = contrastRatio(token('titanium-text'), badgeBackground)
+    expect(
+      Number(ratio.toFixed(2)),
+      `--titanium-text on the composited badge background is ${ratio.toFixed(2)}:1`
+    ).toBeGreaterThanOrEqual(4.5)
   })
 })
+
