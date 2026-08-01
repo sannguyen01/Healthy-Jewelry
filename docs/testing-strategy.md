@@ -66,7 +66,18 @@ The repository is **private**, so Actions minutes are billed.
 | Billable minutes per push | ~27 | ~7 |
 | Superseded runs | ran to completion | cancelled |
 
-Three changes account for it:
+Measured breakdown of a green run, so the next person optimising has real numbers rather than
+guesses:
+
+| Job | Step | Time |
+|---|---|---|
+| `verify` (1m51s) | install · lint · type-check · unit | 50s |
+| | production build | 45s |
+| `e2e` (4m15s) | setup · install · artifact download | 31s |
+| | Playwright browser install | 27s |
+| | test execution | 3m21s |
+
+Three changes account for the drop from 24 minutes:
 
 1. **Production server instead of `pnpm dev`.** `playwright.config.ts` used to launch a Turbopack dev
    server, which compiles each route on first request — with ~12 routes across two projects, that
@@ -80,6 +91,33 @@ Three changes account for it:
 
 The build is produced once, in `verify`, and handed to `e2e` as an artifact, so E2E validates the exact
 artifact the gate approved.
+
+Two caches shave the fixed overhead further:
+
+- **`~/.cache/ms-playwright`**, keyed on the Playwright version rather than the lockfile — browser
+  binaries only change when Playwright does, so keying on the lockfile would discard a good 130MB
+  download every time an unrelated dependency moved. On a hit the job still runs `install-deps`,
+  because the OS packages the browser links against live outside any cacheable path.
+- **`.next/cache`**, restored before the build and deliberately excluded from the uploaded artifact,
+  so it speeds the build up without changing a byte of what E2E tests.
+
+### Deliberately not done
+
+- **Sharding E2E across runners.** It would take test execution from ~3m20s to under two minutes, but
+  it buys wall-clock time with a second runner: billable minutes go from ~7 to ~10 per push. Worth
+  revisiting if turnaround starts to hurt more than spend.
+- **Running `e2e` in parallel with `verify`.** It would save about a minute, at the cost of the
+  property that E2E tests the exact artifact the gate approved. A minute is not worth that guarantee.
+
+### Branch protection
+
+`main` requires both `verify` and `e2e` to pass. This is the part that makes the rest stick: before it,
+a red suite was ignorable, and PRs #3 and #4 were both merged with CI failing — which is how three
+defects reached production. Enabling it was only reasonable once a passing run existed to enforce
+against.
+
+PRs use GitHub auto-merge, so a change lands the moment its checks go green rather than waiting on
+someone to notice.
 
 ---
 

@@ -59,6 +59,19 @@ jobs:
         env:
           NEXT_PUBLIC_SITE_URL: https://healthyjewelry.com
 
+      # Next's incremental build cache. Restored before the build and *not*
+      # shipped in the artifact below, so it speeds the build up without
+      # changing a byte of what E2E tests. The key falls back to any cache built
+      # from the same lockfile, so a source-only change still gets a warm start
+      # rather than a cold rebuild.
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**', 'next.config.ts') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
       # New. A broken production build used to be discovered by Vercel *after*
       # merge — `next build` catches prerender failures that neither tsc nor
       # vitest can see.
@@ -109,8 +122,31 @@ jobs:
           name: next-build
           path: .next
 
+      # Keyed on the Playwright version rather than the lockfile: browser
+      # binaries only change when Playwright does, so keying on the whole
+      # lockfile would throw away a perfectly good 130MB download every time an
+      # unrelated dependency moved.
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
-        run: pnpm playwright install chromium --with-deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      # The cache holds the browser but not the OS packages it links against,
+      # and those live outside any cacheable path — so on a hit we still install
+      # the system deps, which is the cheap half of the original step.
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
 
       # PLAYWRIGHT_SKIP_BUILD tells playwright.config.ts to `pnpm start` the
       # artifact restored above instead of rebuilding it. The suite therefore
