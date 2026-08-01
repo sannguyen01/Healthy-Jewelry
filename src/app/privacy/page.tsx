@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Healthy Jewelry',
+  title: 'Privacy Policy',
   description: 'How Healthy Jewelry collects, uses, and protects your personal data.',
 }
 

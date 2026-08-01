@@ -1,22 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { shopifyConfig } from '@/config/shopify'
-// Allowlist of permitted Storefront GraphQL operation names.
-// Reject any request whose operation is not in this set.
-const ALLOWED_OPERATIONS = new Set([
-  // Queries — names match src/lib/shopify/queries/products.ts
-  'GetProductByHandle',
-  'GetProducts',
-  'GetProductsByCollection',
-  'SearchProducts',
-  'GetCollections',
-  // Cart queries — src/lib/shopify/queries/cart.ts
-  'GetCart',
-  // Cart mutations — names match src/lib/shopify/mutations/cart.ts
-  'CreateCart',
-  'AddToCart',
-  'UpdateCartLines',
-  'RemoveFromCart',
-])
+import {
+  CREATE_CART,
+  ADD_TO_CART,
+  UPDATE_CART_LINES,
+  REMOVE_FROM_CART,
+} from '@/lib/shopify/mutations/cart'
+import { GET_CART } from '@/lib/shopify/queries/cart'
+
+// Persisted queries: the browser sends an operation key, never GraphQL text.
+// The server resolves the key to its own literal query string below, so a
+// tampered/replayed request body can select a different persisted operation
+// at most — it can never smuggle a different selection set or arguments
+// shape onto an operation name it doesn't own (e.g. slipping `discountCodes`
+// or `note` into `cartCreate`'s input). Only operations this client-facing
+// proxy actually needs are listed; product/collection reads happen
+// server-side via shopifyFetch and never reach this endpoint.
+// Object.create(null): a plain {}-literal inherits from Object.prototype, so
+// an operation key like "constructor" or "toString" would resolve to an
+// inherited function (truthy) and slip past the `if (!query)` 403 check
+// below instead of being rejected as an unknown operation.
+const PERSISTED_QUERIES: Record<string, string> = Object.assign(Object.create(null), {
+  GetCart: GET_CART,
+  CreateCart: CREATE_CART,
+  AddToCart: ADD_TO_CART,
+  UpdateCartLines: UPDATE_CART_LINES,
+  RemoveFromCart: REMOVE_FROM_CART,
+})
 
 // 16 KB covers all legitimate Storefront queries
 const MAX_BODY_BYTES = 16_384
@@ -28,7 +38,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Request body too large' }, { status: 413 })
   }
 
-  let query: unknown
+  let operation: unknown
   let variables: unknown
 
   // Parse body with size guard
@@ -38,30 +48,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Request body too large' }, { status: 413 })
     }
     const body = JSON.parse(rawBody) as Record<string, unknown>
-    query = body.query
+    operation = body.operation
     variables = body.variables
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  if (typeof query !== 'string' || !query.trim()) {
-    return NextResponse.json({ error: 'Missing required field: query' }, { status: 400 })
+  if (typeof operation !== 'string' || !operation.trim()) {
+    return NextResponse.json({ error: 'Missing required field: operation' }, { status: 400 })
   }
 
   if (variables === undefined || variables === null) {
     return NextResponse.json({ error: 'Missing required field: variables' }, { status: 400 })
   }
 
-  // Enforce operation allowlist — reject unknown or anonymous operations.
-  // Not anchored to the start of the string: every query/mutation constant in
-  // this codebase interpolates its GraphQL fragment(s) before the operation
-  // keyword (see lib/shopify/queries|mutations/*.ts), so an anchored match
-  // would never find the operation name. Requiring exactly one match still
-  // rejects documents that smuggle a second, unlisted operation alongside an
-  // allowed one.
-  const operationMatches = [...query.matchAll(/\b(?:query|mutation)\s+(\w+)\s*[({]/g)]
-  const operationName = operationMatches.length === 1 ? operationMatches[0][1] : null
-  if (!operationName || !ALLOWED_OPERATIONS.has(operationName)) {
+  // Resolve the operation key to our own literal query text — the client
+  // never supplies GraphQL text, so it cannot alter an operation's selection
+  // set or arguments regardless of what the request body contains.
+  const query = PERSISTED_QUERIES[operation]
+  if (!query) {
     return NextResponse.json({ error: 'Operation not permitted' }, { status: 403 })
   }
 

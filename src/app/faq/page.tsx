@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 
 export const metadata: Metadata = {
-  title: 'FAQ — Healthy Jewelry',
+  title: 'FAQ',
   description:
     'Frequently asked questions about Healthy Jewelry. Materials, care, sizing, and orders.',
 }

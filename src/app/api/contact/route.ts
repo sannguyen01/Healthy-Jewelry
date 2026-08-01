@@ -7,6 +7,7 @@ import {
   validateEmail,
   validateSubject,
   validateMessage,
+  sanitizeSubject,
 } from '@/lib/utils/contactValidation'
 
 // Serverless-safe rate limiting.
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (rateLimited) {
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
-      { status: 429 },
+      { status: 429 }
     )
   }
 
@@ -104,20 +105,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    const cleanSubject = sanitizeSubject(subject)
     const resend = new Resend(apiKey)
     await resend.emails.send({
       from: 'Healthy Jewelry Contact <contact@healthyjewelry.com>',
       to: ['hello@healthyjewelry.com'],
       replyTo: email,
-      subject: `[Contact] ${subject} — ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`,
+      subject: `[Contact] ${cleanSubject} — ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\nSubject: ${cleanSubject}\n\nMessage:\n${message}`,
     })
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('[contact] Resend error:', err)
     return NextResponse.json(
       { error: 'Failed to send message. Please email us directly.' },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }

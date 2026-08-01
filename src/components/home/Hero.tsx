@@ -57,13 +57,23 @@ export function Hero() {
         <div
           style={{
             position: 'absolute',
-            inset: 0,
-            // Pixel-based stops (not %) so the fully-opaque zone always covers the
-            // 720px content column + padding regardless of viewport width — a
-            // percentage-based gradient shrinks its opaque zone on wider screens
-            // and can leave the tail of the copy sitting over the raw photo.
+            top: 0,
+            bottom: 0,
+            left: 0,
+            // Sized to the actual content column (720px + its clamp() padding)
+            // plus a fixed 180px fade strip — NOT inset:0 across the full section.
+            // The strip's offset is a calc() length, not a percentage stop, so the
+            // solid zone always reaches the text column's real right edge at any
+            // viewport width. Within that fixed strip, an eased 5-stop falloff
+            // (quadratic-ish: 100/56/25/6/0% alpha) blends into the photo instead
+            // of a flat linear ramp — a linear cut over a photo this detailed reads
+            // as an abrupt seam; easing it out gives a soft, photographic vignette
+            // instead. Still far narrower than the ~400px haze an earlier version
+            // of this gradient stretched across.
+            width: 'calc(720px + clamp(20px, 4vw, 64px) + 180px)',
+            maxWidth: '100%',
             background:
-              'linear-gradient(90deg, var(--bg) 0px, var(--bg) 820px, rgba(247,245,241,0.55) 1040px, rgba(247,245,241,0) 1320px)',
+              'linear-gradient(90deg, var(--bg) 0, var(--bg) calc(100% - 180px), rgba(247,245,241,0.56) calc(100% - 135px), rgba(247,245,241,0.25) calc(100% - 90px), rgba(247,245,241,0.06) calc(100% - 45px), rgba(247,245,241,0) 100%)',
           }}
         />
       </div>
@@ -167,17 +177,19 @@ export function Hero() {
         </div>
       </div>
 
-      {/* Scroll indicator */}
+      {/* Scroll indicator — left-aligned to the content column's own padding
+          (not centered on the viewport) so it always sits over the solid
+          backdrop; centering on the full viewport put it over the photo,
+          barely legible, on any viewport wider than the content column. */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
           bottom: '32px',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left: 'clamp(20px, 4vw, 64px)',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: '8px',
         }}
       >

@@ -18,8 +18,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      // Chromium-based mobile emulation, not an iPhone descriptor — CI only
+      // installs chromium (.github/workflows/ci.yml), and iPhone devices
+      // launch WebKit, which isn't installed there, so every mobile test
+      // failed at browser launch rather than reporting a real result.
       name: 'mobile',
-      use: { ...devices['iPhone 14'] },
+      use: { ...devices['Pixel 7'] },
     },
   ],
   webServer: {

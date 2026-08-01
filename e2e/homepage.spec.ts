@@ -20,13 +20,11 @@ test.describe('Homepage', () => {
   })
 
   test('campaign band shows brand tagline', async ({ page }) => {
-    await expect(
-      page.getByText(/science before aesthetics/i),
-    ).toBeVisible()
+    await expect(page.getByText(/science before aesthetics/i)).toBeVisible()
   })
 
   test('materials section mentions Grade 23 Titanium', async ({ page }) => {
-    await expect(page.getByText(/grade 23 titanium/i)).toBeVisible()
+    await expect(page.getByText(/grade 23 titanium/i).first()).toBeVisible()
   })
 
   test('materials section mentions Niobium', async ({ page }) => {
@@ -34,7 +32,7 @@ test.describe('Homepage', () => {
   })
 
   test('materials section mentions 316L Surgical Steel', async ({ page }) => {
-    await expect(page.getByText(/316L surgical steel/i)).toBeVisible()
+    await expect(page.getByText(/316L surgical steel/i).first()).toBeVisible()
   })
 
   test('footer is present', async ({ page }) => {
@@ -52,11 +50,11 @@ test.describe('Homepage', () => {
     await expect(productLinks.first()).toBeVisible()
   })
 
-  test('collection grid has 4 collection links', async ({ page }) => {
-    const rings = page.getByRole('link', { name: /rings/i })
-    const necklaces = page.getByRole('link', { name: /necklaces/i })
-    await expect(rings.first()).toBeVisible()
-    await expect(necklaces.first()).toBeVisible()
+  test('collection grid has all 5 collection links', async ({ page }) => {
+    const collectionNames = [/rings/i, /necklaces/i, /earrings/i, /bracelets/i, /charms/i]
+    for (const name of collectionNames) {
+      await expect(page.getByRole('link', { name }).first()).toBeVisible()
+    }
   })
 
   test('no console errors on load', async ({ page }) => {
@@ -68,10 +66,7 @@ test.describe('Homepage', () => {
     await page.waitForLoadState('networkidle')
     // Filter out known non-critical errors (font loading, etc.)
     const criticalErrors = errors.filter(
-      (e) =>
-        !e.includes('font') &&
-        !e.includes('favicon') &&
-        !e.includes('Not implemented'),
+      (e) => !e.includes('font') && !e.includes('favicon') && !e.includes('Not implemented')
     )
     expect(criticalErrors).toHaveLength(0)
   })

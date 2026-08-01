@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 
 export const metadata: Metadata = {
-  title: 'Legal Notice — Healthy Jewelry',
+  title: 'Legal Notice',
   description:
     'Legal notice for Healthy Jewelry. Company information, intellectual property, trademarks, and disclaimer of warranties.',
 }

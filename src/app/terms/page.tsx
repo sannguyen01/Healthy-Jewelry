@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Healthy Jewelry',
+  title: 'Terms of Service',
   description:
     'Terms of Service for Healthy Jewelry. Lifetime warranty against corrosion. Free returns within 30 days.',
 }

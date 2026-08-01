@@ -30,17 +30,18 @@ test.describe('Shop page', () => {
     await expect(firstCard.getByText(/\$/)).toBeVisible()
   })
 
-  test('shows all 4 collection filter options', async ({ page }) => {
+  test('shows all 5 collection filter options', async ({ page }) => {
     // Collection links should be available for filtering
     await expect(page.getByRole('link', { name: /rings/i }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: /necklaces/i }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: /earrings/i }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: /bracelets/i }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: /charms/i }).first()).toBeVisible()
   })
 })
 
 test.describe('Collection pages', () => {
-  const collections = ['rings', 'necklaces', 'earrings', 'bracelets']
+  const collections = ['rings', 'necklaces', 'earrings', 'bracelets', 'charms']
 
   for (const collection of collections) {
     test(`/shop/${collection} loads and shows products`, async ({ page }) => {
