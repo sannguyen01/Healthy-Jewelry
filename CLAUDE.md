@@ -50,11 +50,11 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Cards: image + name + price only (minimal)
 
 ## Homepage Section Sequence
-1. Hero (full viewport, background ring SVG at 10% opacity)
+1. Hero (full viewport, "Euro Summer" lifestyle photo background with a fade into `--bg`, plus the original ring-arc SVG at low opacity)
 2. HorizontalScroll — "BESTSELLING"
 3. CampaignBand — "SCIENCE BEFORE AESTHETICS." (dark)
 4. HorizontalScroll — "NEW ARRIVALS"
-5. CollectionGrid — 4 collection paths
+5. CollectionGrid — 5 collection paths (Charms and Earrings tiles use real photography; Rings/Necklaces/Bracelets still use the SVG placeholder pending photos)
 6. HorizontalScroll — "TITANIUM"
 7. MaterialsSection — Grade 23 Ti / Niobium / 316L Steel
 8. Footer
@@ -77,14 +77,14 @@ Keyframes defined in `globals.css`:
 CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 
 ## Content Data (NO STONES/GEMS)
-- `src/lib/data/hj-data.ts` — 15 products, 4 collections, 3 materials
-- Collections: rings, necklaces, earrings, bracelets
+- `src/lib/data/hj-data.ts` — 17 products, 5 collections, 3 materials
+- Collections: rings, necklaces, earrings, bracelets, charms
 - Materials: Grade 23 Titanium, Niobium, 316L Surgical Steel
 
 ## Site Map
 - `/` → Homepage
 - `/shop` → All products with filter
-- `/shop/[collection]` → Per-collection (rings/necklaces/earrings/bracelets)
+- `/shop/[collection]` → Per-collection (rings/necklaces/earrings/bracelets/charms)
 - `/products/[handle]` → Product detail page
 - `/cart` → Cart page
 - `/about` → Brand story
