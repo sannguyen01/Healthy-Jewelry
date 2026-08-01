@@ -108,35 +108,77 @@ test.describe('Contact form — submission', () => {
 
     await page.getByRole('button', { name: /send message/i }).click()
 
-    await expect(page.getByText(/24 hours/i)).toBeVisible({ timeout: 8000 })
+    // Scoped to the success block: the page <h1> also promises a reply within
+    // 24 hours, so a page-wide match resolves to two nodes. The point of this
+    // test is that the *confirmation* repeats the promise.
+    const success = page.getByText(/message sent/i).locator('..')
+    await expect(success.getByText(/24 hours/i)).toBeVisible({ timeout: 8000 })
   })
 
-  test('empty name field causes API validation error — shows error state', async ({ page }) => {
+  // The form validates in the browser before it ever calls the API
+  // (ContactForm's FIELD_VALIDATORS run on submit and return early), so an
+  // invalid field produces an inline message and no network request at all.
+  // These tests used to assert the opposite — a 400 from /api/contact and a
+  // generic banner — which is behaviour the form no longer has.
+  test('empty name field is rejected in the browser, with no request sent', async ({ page }) => {
     await page.goto('/contact')
+
+    let requested = false
+    await page.route('**/api/contact', async (route) => {
+      requested = true
+      await route.continue()
+    })
 
     // Leave name empty, fill only email + message
     await page.getByLabel(/^email$/i).fill('san@example.com')
-    await page.getByLabel(/^message$/i).fill(
-      'Hello, this message is long enough to pass the minimum.',
-    )
+    await page
+      .getByLabel(/^message$/i)
+      .fill('Hello, this message is long enough to pass the minimum.')
 
     await page.getByRole('button', { name: /send message/i }).click()
 
-    // API returns 400 → component shows error state with fallback email link
-    await expect(page.getByText(/something went wrong/i)).toBeVisible({ timeout: 8000 })
+    // The exact copy from validateName() in src/lib/utils/contactValidation.ts.
+    await expect(page.getByText('Name must be 2-100 characters')).toBeVisible({ timeout: 8000 })
+    // Still on the form, and the network was never touched.
+    await expect(page.getByRole('button', { name: /send message/i })).toBeVisible()
+    expect(requested, 'client-side validation should short-circuit the request').toBe(false)
   })
 
-  test('error state shows direct email fallback link', async ({ page }) => {
+  test('malformed email is rejected in the browser', async ({ page }) => {
     await page.goto('/contact')
 
-    // Trigger validation error
+    await page.getByLabel(/^name$/i).fill('San Nguyen')
     await page.getByLabel(/^email$/i).fill('not-an-email')
     await page.getByLabel(/^message$/i).fill('Hello there, a long enough message.')
 
     await page.getByRole('button', { name: /send message/i }).click()
 
-    await expect(
-      page.getByRole('link', { name: /hello@healthyjewelry\.com/i }),
-    ).toBeVisible({ timeout: 8000 })
+    // The exact copy from validateEmail().
+    await expect(page.getByText('Valid email required')).toBeVisible({ timeout: 8000 })
+    await expect(page.getByRole('button', { name: /send message/i })).toBeVisible()
+  })
+
+  // A server failure is the only path to the generic error state, and it cannot
+  // be reached through the UI now that the client validates first. Intercepting
+  // the route is what makes that branch — and its mailto fallback — testable.
+  test('a failing API shows the error state with a direct email fallback', async ({ page }) => {
+    await page.goto('/contact')
+
+    await page.route('**/api/contact', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Something went wrong. Please try again.' }),
+      })
+    )
+
+    await page.getByLabel(/^name$/i).fill('San Nguyen')
+    await page.getByLabel(/^email$/i).fill('san@example.com')
+    await page.getByLabel(/^message$/i).fill('A perfectly valid message about titanium rings.')
+
+    await page.getByRole('button', { name: /send message/i }).click()
+
+    await expect(page.getByText(/something went wrong/i)).toBeVisible({ timeout: 8000 })
+    await expect(page.getByRole('link', { name: /hello@healthyjewelry\.com/i })).toBeVisible()
   })
 })

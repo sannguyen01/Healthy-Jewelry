@@ -89,6 +89,12 @@ export function MaterialsSection() {
               borderTop: '1px solid var(--ash)',
             }}
           >
+            {/* Ordinal rules — deliberately faint. Not content: the material
+                name below carries the meaning, and these are hidden from
+                assistive tech. WCAG 1.4.3 exempts pure decoration from the
+                contrast minimum, so `--ash` stays. `data-decorative` is what
+                e2e/a11y.spec.ts excludes, keeping the exemption explicit and
+                greppable rather than an unexplained axe failure. */}
             <p
               style={{
                 fontFamily: 'var(--font-display)',
@@ -100,6 +106,7 @@ export function MaterialsSection() {
                 letterSpacing: '0.02em',
               }}
               aria-hidden="true"
+              data-decorative
             >
               {ordinals[i]}
             </p>
@@ -124,7 +131,7 @@ export function MaterialsSection() {
                 fontSize: 'var(--text-xs)',
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
-                color: 'var(--titanium)',
+                color: 'var(--titanium-text)',
                 margin: '0 0 16px',
               }}
             >

@@ -6,9 +6,31 @@ on:
   push:
     branches: [main, develop]
 
+# A push supersedes the run already in flight for the same ref. PR #8 spent
+# roughly 108 billable minutes across four pushes because every superseded run
+# was allowed to finish a 24-minute E2E job nobody would read.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Mock credentials — CI never talks to a real Shopify store. Declared once so
+  # the two jobs cannot drift apart.
+  #
+  # NEXT_PUBLIC_SITE_URL is deliberately *not* here. The unit suite asserts the
+  # production site constant (src/tests/unit/config.test.ts), while the build and
+  # the E2E server need localhost — the same name legitimately means different
+  # things per step, so each one sets it explicitly.
+  SHOPIFY_STORE_DOMAIN: mock.myshopify.com
+  SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
+  NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: mock.myshopify.com
+  SHOPIFY_WEBHOOK_SECRET: mock_webhook_secret
+
 jobs:
-  quality:
-    name: Lint · Type-check · Unit tests
+  # The merge gate. Everything here is cheap and deterministic; if this is green
+  # the change is safe to land, and E2E is confirmation rather than permission.
+  verify:
+    name: Lint · Type-check · Unit tests · Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,16 +57,36 @@ jobs:
       - name: Unit tests
         run: pnpm exec vitest run
         env:
-          SHOPIFY_STORE_DOMAIN: mock.myshopify.com
-          SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
-          NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: mock.myshopify.com
           NEXT_PUBLIC_SITE_URL: https://healthyjewelry.com
-          SHOPIFY_WEBHOOK_SECRET: mock_webhook_secret
+
+      # New. A broken production build used to be discovered by Vercel *after*
+      # merge — `next build` catches prerender failures that neither tsc nor
+      # vitest can see.
+      #
+      # Built for localhost because the E2E job serves this exact artifact.
+      # NEXT_PUBLIC_* values are inlined at build time, so the URL baked in here
+      # is the one the suite runs against.
+      - name: Production build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+      # Handed to the E2E job so it exercises the exact artifact this gate
+      # approved, and so the build is paid for once rather than twice.
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: |
+            .next
+            !.next/cache
+          retention-days: 1
+          include-hidden-files: true
 
   e2e:
     name: E2E tests (Playwright)
     runs-on: ubuntu-latest
-    needs: quality
+    needs: verify
     steps:
       - uses: actions/checkout@v4
 
@@ -61,17 +103,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next
+
       - name: Install Playwright browsers
         run: pnpm playwright install chromium --with-deps
 
+      # PLAYWRIGHT_SKIP_BUILD tells playwright.config.ts to `pnpm start` the
+      # artifact restored above instead of rebuilding it. The suite therefore
+      # runs against a production server — what Vercel actually serves, and the
+      # reason this job dropped from ~24 minutes to a few.
       - name: Run E2E tests
         run: pnpm e2e
         env:
           CI: true
-          NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: placeholder.myshopify.com
-          SHOPIFY_STOREFRONT_ACCESS_TOKEN: placeholder_token
+          PLAYWRIGHT_SKIP_BUILD: '1'
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
-          SHOPIFY_WEBHOOK_SECRET: placeholder_secret
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

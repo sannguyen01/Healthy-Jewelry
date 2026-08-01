@@ -19,10 +19,14 @@ test.describe('Shop page', () => {
   })
 
   test('each product card links to product detail', async ({ page }) => {
-    const firstCard = page.locator('article').first()
-    const link = firstCard.getByRole('link')
-    const href = await link.getAttribute('href')
-    expect(href).toMatch(/\/products\//)
+    // ProductCard renders `<Link><article>…</article></Link>`, so the link is
+    // the card's *ancestor*, not a descendant. Searching inside the <article>
+    // finds nothing and times out; filter the links by the card they contain.
+    const cardLink = page
+      .getByRole('link')
+      .filter({ has: page.locator('article') })
+      .first()
+    await expect(cardLink).toHaveAttribute('href', /\/products\//)
   })
 
   test('each product card shows a price', async ({ page }) => {

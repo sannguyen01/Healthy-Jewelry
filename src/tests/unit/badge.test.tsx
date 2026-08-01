@@ -38,7 +38,9 @@ describe('Badge', () => {
   it('bestseller badge has titanium color style', () => {
     render(<Badge variant="bestseller" />)
     const badge = screen.getByText('Bestseller')
-    expect(badge).toHaveStyle({ color: 'var(--titanium)' })
+    // The text-safe titanium, not the raw accent — badge copy is 4.5:1 content,
+    // and --titanium is 2.25:1 on --bg. See design-tokens-contrast.test.ts.
+    expect(badge).toHaveStyle({ color: 'var(--titanium-text)' })
   })
 
   it('new badge has sage color style', () => {

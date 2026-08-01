@@ -9,3 +9,26 @@
 Full documentation → see `CLAUDE.md` for AI assistant and developer guidelines.
 
 See repository files for complete setup instructions, environment variables, Shopify configuration, design system, and deployment guide.
+
+## Development
+
+```bash
+pnpm install
+pnpm dev                 # http://localhost:3000
+```
+
+## Checks
+
+```bash
+pnpm lint
+pnpm type-check
+pnpm exec vitest run     # unit tests
+pnpm build               # production build
+
+pnpm e2e                 # Playwright, desktop + mobile
+pnpm e2e:ui              # interactive runner
+```
+
+`pnpm e2e` builds and starts a production server for you — the artifact Vercel actually serves, not a
+dev server. Testing layers, the CI gating policy, and recorded accessibility exceptions are documented
+in **[`docs/testing-strategy.md`](docs/testing-strategy.md)**.
