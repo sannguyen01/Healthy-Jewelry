@@ -88,8 +88,8 @@ describe('legalLinks', () => {
 })
 
 describe('collectionsNav', () => {
-  it('has 4 collections', () => {
-    expect(collectionsNav).toHaveLength(4)
+  it('has 5 collections', () => {
+    expect(collectionsNav).toHaveLength(5)
   })
   it('each entry has handle, title, description, and href under /shop/', () => {
     collectionsNav.forEach((col) => {
@@ -99,12 +99,13 @@ describe('collectionsNav', () => {
       expect(col.href).toMatch(/^\/shop\//)
     })
   })
-  it('includes rings, necklaces, earrings, bracelets', () => {
+  it('includes rings, necklaces, earrings, bracelets, charms', () => {
     const handles = collectionsNav.map((c) => c.handle)
     expect(handles).toContain('rings')
     expect(handles).toContain('necklaces')
     expect(handles).toContain('earrings')
     expect(handles).toContain('bracelets')
+    expect(handles).toContain('charms')
   })
 })
 

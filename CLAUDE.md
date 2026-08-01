@@ -26,12 +26,18 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--ash` | #D8D3CB | Borders, dividers |
 | `--graphite` | #6B6762 | Secondary text |
 | `--ink` | #1A1714 | Primary text, logo |
-| `--titanium` | #9DA7AF | Accent color |
+| `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
+| `--titanium-text` | #5E6870 | Titanium-toned **text** on light backgrounds |
 | `--sage` | #8CA89A | Green accent |
-| `--mist` | #A8A49E | Muted text |
+| `--mist` | #A8A49E | Muted text — dark backgrounds only |
 | `--on-dark` | #F0EDE8 | Text on dark backgrounds |
 | `--black` | #0A0A0A | Campaign band dark |
 | `--mid` | #2C2926 | Dark hover states |
+
+**Contrast rule**: `--titanium` is 2.25:1 on `--bg` — below the WCAG AA 4.5:1 floor. Use
+`--titanium-text` (5.23:1) for any titanium-toned copy on a light surface; `--titanium` itself is fine
+for borders, tints, and text on `--ink`/`--black`. Every documented pairing is enforced by
+`src/tests/unit/design-tokens-contrast.test.ts` — add new pairings there.
 
 **Ease tokens**:
 - `--ease: cubic-bezier(0.16, 1, 0.3, 1)` (smooth spring)
@@ -50,11 +56,19 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Cards: image + name + price only (minimal)
 
 ## Homepage Section Sequence
-1. Hero (full viewport, background ring SVG at 10% opacity)
+1. Hero — **two compositions, breakpoint at 900px**:
+   - **≥901px**: full viewport split. Copy left on `--bg`, "Euro Summer" lifestyle photo right, fading
+     into `--bg` across a 180px strip (`--hj-hero-fade`), plus the ring-arc SVG at low opacity.
+   - **≤900px**: stacked. Copy on `--bg`, photo as a full-width 16:9 band beneath it, `object-position:
+     center`; scrim, ring and scroll cue hidden. The split cannot survive here — its fade is measured
+     from the scrim's own right edge, so below ~866px the opaque zone slides under the copy, and at
+     390px the `right center` crop discards 75% of the frame including the subject.
+   - Enforced across six widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
+     photograph without a scrim behind it.
 2. HorizontalScroll — "BESTSELLING"
 3. CampaignBand — "SCIENCE BEFORE AESTHETICS." (dark)
 4. HorizontalScroll — "NEW ARRIVALS"
-5. CollectionGrid — 4 collection paths
+5. CollectionGrid — 5 collection paths (Charms and Earrings tiles use real photography; Rings/Necklaces/Bracelets still use the SVG placeholder pending photos)
 6. HorizontalScroll — "TITANIUM"
 7. MaterialsSection — Grade 23 Ti / Niobium / 316L Steel
 8. Footer
@@ -77,14 +91,14 @@ Keyframes defined in `globals.css`:
 CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 
 ## Content Data (NO STONES/GEMS)
-- `src/lib/data/hj-data.ts` — 15 products, 4 collections, 3 materials
-- Collections: rings, necklaces, earrings, bracelets
+- `src/lib/data/hj-data.ts` — 17 products, 5 collections, 3 materials
+- Collections: rings, necklaces, earrings, bracelets, charms
 - Materials: Grade 23 Titanium, Niobium, 316L Surgical Steel
 
 ## Site Map
 - `/` → Homepage
 - `/shop` → All products with filter
-- `/shop/[collection]` → Per-collection (rings/necklaces/earrings/bracelets)
+- `/shop/[collection]` → Per-collection (rings/necklaces/earrings/bracelets/charms)
 - `/products/[handle]` → Product detail page
 - `/cart` → Cart page
 - `/about` → Brand story
@@ -98,6 +112,18 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - Run `pnpm lint && pnpm build` before every commit
 - Run `pnpm test` — maintain 80%+ coverage
 - Commit format: `feat|fix|style|content|test|chore: description`
+
+## Testing & CI
+Full detail in **`docs/testing-strategy.md`**. In short:
+
+- **`verify`** (lint · type-check · unit · build, ~2 min) is the merge gate.
+- **`e2e`** (Playwright, both projects, ~3–5 min) runs on every PR and blocks.
+- `vitest` coverage is scoped to `src/lib`, `src/store`, `src/config` on purpose — **E2E is the only
+  automated coverage the UI layer has.** Anything a user has to see or click belongs in `e2e/`.
+- Presence is not visibility. `e2e/visual-assets.spec.ts` asserts imagery actually renders — bytes
+  arrive, the box is non-zero, and the effective opacity clears the legibility floor.
+- E2E runs against a **production build** (`pnpm build && pnpm start`), never `pnpm dev` — that is what
+  Vercel serves.
 
 ## PROHIBITED
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand

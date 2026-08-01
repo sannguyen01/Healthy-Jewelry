@@ -51,6 +51,8 @@ test.describe('Cart — with items', () => {
   test.beforeEach(async ({ page }) => {
     // Add a product to cart via the product page
     await page.goto('/products/arc-band-titanium')
+    // Arc Band is a ring — Add to Bag stays disabled until a size is chosen.
+    await page.getByRole('button', { name: /ring size 7/i }).click()
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     // Cart drawer opens automatically — wait for it
     await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()

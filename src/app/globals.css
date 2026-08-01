@@ -18,9 +18,18 @@
     --ash:       #D8D3CB;  /* borders, dividers */
     --graphite:  #6B6762;  /* secondary text */
     --ink:       #1A1714;  /* primary text, logo */
-    --titanium:  #9DA7AF;  /* accent */
+    --titanium:  #9DA7AF;  /* accent — borders, tints, fills. NOT text on --bg */
+    /* Titanium darkened to carry small text on light backgrounds. --titanium
+       itself is 2.25:1 on --bg, well under the 4.5:1 WCAG AA floor for body
+       text; this is 5.64:1 on --bg and 5.11:1 on --nacre. Same cool grey-blue
+       character, legible at 9-12px.
+       Chosen against the *worst* surface it lands on, not the lightest: the
+       bestseller badge tints --nacre with 12% titanium first (composited
+       #E3E2DE), where an earlier #5E6870 measured 4.39:1 and quietly failed AA.
+       Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
+    --titanium-text: #59636B; /* titanium-toned text on light backgrounds */
     --sage:      #8CA89A;  /* green accent */
-    --mist:      #A8A49E;  /* muted text */
+    --mist:      #A8A49E;  /* muted text — on dark backgrounds only */
     --on-dark:   #F0EDE8;  /* text on dark backgrounds */
     --black:     #0A0A0A;  /* campaign band dark */
     --mid:       #2C2926;  /* dark hover */
@@ -223,9 +232,21 @@
   }
 
   /* ── Responsive Grids ── */
+  /* Flex, not CSS grid: with 5 collections, a fixed 4-col grid orphans the
+     5th tile alone on row 2, left-anchored, reading as oversized/imbalanced.
+     Flex-basis lets the trailing tile center on its own row instead. */
   .hj-coll-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .hj-coll-tile {
+    /* basis shaved below the even 20% split so the row-gap total (4 * 2px)
+       can't push the line-breaking calc over 100% and force a false wrap;
+       flex-grow fills the slack back out to a visually even 20% each */
+    flex: 1 1 calc(20% - 8px);
+    max-width: 20%;
   }
 
   .hj-mat-grid {
@@ -249,8 +270,9 @@
   }
 
   @media (max-width: 900px) {
-    .hj-coll-grid {
-      grid-template-columns: repeat(2, 1fr) !important;
+    .hj-coll-tile {
+      flex-basis: calc(50% - 2px) !important;
+      max-width: 50% !important;
     }
 
     .hj-mat-grid {
@@ -273,8 +295,9 @@
   }
 
   @media (max-width: 480px) {
-    .hj-coll-grid {
-      grid-template-columns: 1fr !important;
+    .hj-coll-tile {
+      flex-basis: 100% !important;
+      max-width: 100% !important;
     }
 
     .hj-mat-grid {

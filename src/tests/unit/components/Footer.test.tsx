@@ -32,9 +32,7 @@ describe('Footer', () => {
 
     it('renders brand tagline copy', () => {
       render(<Footer />)
-      expect(
-        screen.getByText(/metal that works with your body/i, { selector: 'p' }),
-      ).toBeTruthy()
+      expect(screen.getByText(/metal that works with your body/i, { selector: 'p' })).toBeTruthy()
     })
   })
 
@@ -44,12 +42,13 @@ describe('Footer', () => {
       expect(screen.getByText('Shop')).toBeTruthy()
     })
 
-    it('links to all 4 collection pages', () => {
+    it('links to all 5 collection pages', () => {
       render(<Footer />)
       expect(screen.getByRole('link', { name: 'Rings' })).toBeTruthy()
       expect(screen.getByRole('link', { name: 'Necklaces' })).toBeTruthy()
       expect(screen.getByRole('link', { name: 'Earrings' })).toBeTruthy()
       expect(screen.getByRole('link', { name: 'Bracelets' })).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'Charms' })).toBeTruthy()
     })
 
     it('ring link points to /shop/rings', () => {

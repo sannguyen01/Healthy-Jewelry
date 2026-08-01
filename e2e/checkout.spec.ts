@@ -5,6 +5,8 @@ const PRODUCT_URL = '/products/arc-band-titanium'
 test.describe('Checkout flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(PRODUCT_URL)
+    // Arc Band is a ring — Add to Bag stays disabled until a size is chosen.
+    await page.getByRole('button', { name: /ring size 7/i }).click()
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
   })
@@ -27,7 +29,10 @@ test.describe('Checkout flow', () => {
 
   test('adding two items increments badge to 2', async ({ page }) => {
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    await dialog.getByRole('button', { name: /increase quantity/i }).first().click()
+    await dialog
+      .getByRole('button', { name: /increase quantity/i })
+      .first()
+      .click()
     await expect(dialog.locator('[data-testid="qty-display"]').first()).toHaveText('2')
     await page.getByRole('button', { name: /close bag/i }).click()
     await expect(page.getByRole('button', { name: /open bag — 2 item/i })).toBeVisible()

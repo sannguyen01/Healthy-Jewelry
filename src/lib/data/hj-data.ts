@@ -34,6 +34,12 @@ export const hjCollections: HJCollection[] = [
     description: 'Cuffs and bangles. No tarnish. Ever.',
     count: 3,
   },
+  {
+    handle: 'charms',
+    title: 'Charms',
+    description: 'Stackable titanium charms — build your own piece',
+    count: 2,
+  },
 ]
 
 // ── Materials ──────────────────────────────────────────────────────────────
@@ -299,6 +305,38 @@ const hjProductsRaw: Omit<HJProduct, 'variants'>[] = [
     description: '316L surgical steel square links. Lobster clasp.',
     spec: '8 mm links · 18 cm',
     svgType: 'bracelet-link',
+  },
+
+  // ── Charms ───────────────────────────────────────────────────────────────
+  {
+    id: 'gid://shopify/Product/hj-016',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-016-default',
+    handle: 'classic-charm-titanium',
+    title: 'Classic Charm',
+    collection: 'charms',
+    material: 'titanium',
+    tags: ['charms', 'titanium', 'new'],
+    price: '48.00',
+    compareAtPrice: null,
+    badge: 'New',
+    description: 'Stackable titanium charm with clasp. Pairs with any chain or bangle.',
+    spec: '10 mm · 0.9 g',
+    svgType: 'charm-classic',
+  },
+  {
+    id: 'gid://shopify/Product/hj-017',
+    defaultVariantId: 'gid://shopify/ProductVariant/hj-017-default',
+    handle: 'disc-charm-surgical-steel',
+    title: 'Disc Charm',
+    collection: 'charms',
+    material: 'surgical-steel',
+    tags: ['charms', 'surgical-steel'],
+    price: '42.00',
+    compareAtPrice: null,
+    badge: null,
+    description: '316L surgical steel disc charm. Mirror-polished, nickel-free.',
+    spec: '9 mm · 0.8 g',
+    svgType: 'charm-disc',
   },
 ]
 

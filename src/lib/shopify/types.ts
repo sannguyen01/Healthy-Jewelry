@@ -104,10 +104,12 @@ export type HJSvgType =
   | 'bracelet-cuff'
   | 'bracelet-bangle'
   | 'bracelet-link'
+  | 'charm-classic'
+  | 'charm-disc'
 
 export type HJMaterialHandle = 'titanium' | 'niobium' | 'surgical-steel'
 
-export type HJCollectionHandle = 'rings' | 'necklaces' | 'earrings' | 'bracelets'
+export type HJCollectionHandle = 'rings' | 'necklaces' | 'earrings' | 'bracelets' | 'charms'
 
 export interface HJProduct {
   id: string

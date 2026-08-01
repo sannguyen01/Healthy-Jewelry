@@ -27,11 +27,8 @@ function jsonResponse(body: unknown) {
 }
 
 function operationName(body: unknown): string {
-  const { query } = body as { query: string }
-  // Not anchored to string start: real query/mutation constants interpolate
-  // their fragment before the operation keyword.
-  const match = query.match(/\b(?:query|mutation)\s+(\w+)/)
-  return match?.[1] ?? ''
+  const { operation } = body as { operation: string }
+  return operation ?? ''
 }
 
 beforeEach(() => {

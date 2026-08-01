@@ -17,6 +17,7 @@ const COLLECTION_FILTERS: { label: string; value: HJCollectionHandle | 'all' }[]
   { label: 'Necklaces', value: 'necklaces' },
   { label: 'Earrings', value: 'earrings' },
   { label: 'Bracelets', value: 'bracelets' },
+  { label: 'Charms', value: 'charms' },
 ]
 
 const SORT_OPTIONS: { label: string; value: SortKey }[] = [

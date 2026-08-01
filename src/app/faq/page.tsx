@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 
 export const metadata: Metadata = {
-  title: 'FAQ — Healthy Jewelry',
+  title: 'FAQ',
   description:
     'Frequently asked questions about Healthy Jewelry. Materials, care, sizing, and orders.',
 }
@@ -157,7 +157,7 @@ export default function FAQPage() {
                   fontSize: '0.62rem',
                   letterSpacing: '0.22em',
                   textTransform: 'uppercase',
-                  color: 'var(--titanium)',
+                  color: 'var(--titanium-text)',
                   marginBottom: '32px',
                 }}
               >

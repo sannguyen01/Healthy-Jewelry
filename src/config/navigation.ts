@@ -88,4 +88,10 @@ export const collectionsNav: CollectionNav[] = [
     description: 'Cuffs and bangles. No tarnish. Ever.',
     href: '/shop/bracelets',
   },
+  {
+    handle: 'charms',
+    title: 'Charms',
+    description: 'Stackable titanium charms — build your own piece',
+    href: '/shop/charms',
+  },
 ]

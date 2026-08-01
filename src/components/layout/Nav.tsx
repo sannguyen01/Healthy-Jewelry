@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useCartStore } from '@/store/cart'
 import { useScrolled } from '@/lib/hooks/useScrolled'
@@ -12,6 +13,7 @@ interface NavProps {
 }
 
 export function Nav({ cartCount }: NavProps) {
+  const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const scrolled = useScrolled(60)
   const storeCount = useCartStore((s) => s.totalItems())
@@ -116,9 +118,14 @@ export function Nav({ cartCount }: NavProps) {
             gap: '20px',
           }}
         >
-          {/* Search icon */}
+          {/* Search icon — /search owns the input and the query string, so this
+              control only has to get the visitor there. */}
           <button
             aria-label="Search"
+            onClick={() => {
+              setMenuOpen(false)
+              router.push('/search')
+            }}
             style={{
               background: 'none',
               border: 'none',

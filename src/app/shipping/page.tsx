@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 
 export const metadata: Metadata = {
-  title: 'Shipping & Returns — Healthy Jewelry',
+  title: 'Shipping & Returns',
   description:
     'Free shipping on all Healthy Jewelry orders worldwide. 7–14 day international delivery. 30-day returns.',
 }
@@ -112,7 +112,7 @@ export default function ShippingPage() {
               fontSize: 'var(--text-xl, 1.3rem)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
-              color: 'var(--titanium)',
+              color: 'var(--titanium-text)',
               margin: 0,
             }}
           >

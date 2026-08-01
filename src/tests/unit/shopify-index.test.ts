@@ -79,7 +79,7 @@ describe('lib/shopify/index — not configured (falls back to static data)', () 
   it('getProducts returns the full static catalog', async () => {
     const { getProducts } = await import('@/lib/shopify')
     const products = await getProducts()
-    expect(products.length).toBe(15)
+    expect(products.length).toBe(17)
   })
 
   it('getProductsByCollection returns static products for that collection', async () => {
@@ -148,9 +148,11 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
   it('maps the new tag to a New badge', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        mockJsonResponse({ data: { product: shopifyProductNode({ tags: ['rings', 'new'] }) } })
-      )
+      vi
+        .fn()
+        .mockResolvedValue(
+          mockJsonResponse({ data: { product: shopifyProductNode({ tags: ['rings', 'new'] }) } })
+        )
     )
     const { getProduct } = await import('@/lib/shopify')
     const product = await getProduct('arc-band-titanium')
@@ -284,10 +286,7 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
   })
 
   it('falls back to static data when Shopify returns no product for the handle', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(mockJsonResponse({ data: { product: null } }))
-    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockJsonResponse({ data: { product: null } })))
     const { getProduct } = await import('@/lib/shopify')
     const product = await getProduct('arc-band-titanium')
     expect(product?.handle).toBe('arc-band-titanium')
@@ -340,7 +339,7 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     )
     const { getProducts } = await import('@/lib/shopify')
     const products = await getProducts()
-    expect(products.length).toBe(15)
+    expect(products.length).toBe(17)
   })
 
   it('getProductsByCollection maps live Shopify products for the collection', async () => {
@@ -361,9 +360,9 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
   it('getProductsByCollection falls back to static when the collection has no products', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        mockJsonResponse({ data: { collection: { products: { edges: [] } } } })
-      )
+      vi
+        .fn()
+        .mockResolvedValue(mockJsonResponse({ data: { collection: { products: { edges: [] } } } }))
     )
     const { getProductsByCollection } = await import('@/lib/shopify')
     const products = await getProductsByCollection('bracelets')
@@ -374,9 +373,11 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
   it('searchProducts maps live Shopify search results', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        mockJsonResponse({ data: { search: { edges: [{ node: shopifyProductNode() }] } } })
-      )
+      vi
+        .fn()
+        .mockResolvedValue(
+          mockJsonResponse({ data: { search: { edges: [{ node: shopifyProductNode() }] } } })
+        )
     )
     const { searchProducts } = await import('@/lib/shopify')
     const results = await searchProducts('arc band')
@@ -390,9 +391,11 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
   })
 
   it('getBestsellers queries Shopify with a bestseller tag filter and maps results', async () => {
-    const mockFetch = vi.fn().mockResolvedValue(
-      mockJsonResponse({ data: { products: { edges: [{ node: shopifyProductNode() }] } } })
-    )
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(
+        mockJsonResponse({ data: { products: { edges: [{ node: shopifyProductNode() }] } } })
+      )
     vi.stubGlobal('fetch', mockFetch)
 
     const { getBestsellers } = await import('@/lib/shopify')
@@ -414,9 +417,11 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
   })
 
   it('getNewArrivals queries Shopify with a new tag filter and maps results', async () => {
-    const mockFetch = vi.fn().mockResolvedValue(
-      mockJsonResponse({ data: { products: { edges: [{ node: shopifyProductNode() }] } } })
-    )
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(
+        mockJsonResponse({ data: { products: { edges: [{ node: shopifyProductNode() }] } } })
+      )
     vi.stubGlobal('fetch', mockFetch)
 
     const { getNewArrivals } = await import('@/lib/shopify')
