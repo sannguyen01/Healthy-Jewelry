@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = {
   title: 'FAQ',
@@ -102,32 +103,7 @@ export default function FAQPage() {
             maxWidth: '900px',
           }}
         >
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.62rem',
-              letterSpacing: '0.22em',
-              textTransform: 'uppercase',
-              color: 'var(--graphite)',
-              marginBottom: '24px',
-            }}
-          >
-            Support
-          </p>
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              fontSize: 'var(--text-2xl)',
-              fontWeight: 700,
-              lineHeight: 1.1,
-              color: 'var(--ink)',
-              margin: 0,
-            }}
-          >
-            Frequently Asked Questions
-          </h1>
+          <PageHeader eyebrow="Support" title="Frequently Asked Questions" variant="compact" />
         </section>
 
         {/* Divider */}
@@ -187,7 +163,7 @@ export default function FAQPage() {
                         textTransform: 'uppercase',
                         color: 'var(--ink)',
                         margin: '0 0 14px',
-                        fontWeight: 600,
+                        fontWeight: 500,
                       }}
                     >
                       {item.q}

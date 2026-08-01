@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = {
   title: 'Locations',
@@ -25,32 +26,7 @@ export default function StoresPage() {
             maxWidth: '900px',
           }}
         >
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.62rem',
-              letterSpacing: '0.22em',
-              textTransform: 'uppercase',
-              color: 'var(--graphite)',
-              marginBottom: '24px',
-            }}
-          >
-            Locations
-          </p>
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              fontSize: 'var(--text-display)',
-              fontWeight: 700,
-              lineHeight: 1.05,
-              color: 'var(--ink)',
-              margin: '0 0 32px',
-            }}
-          >
-            Find Us
-          </h1>
+          <PageHeader eyebrow="Locations" title="Find Us" />
           <p
             style={{
               fontFamily: 'var(--font-body)',

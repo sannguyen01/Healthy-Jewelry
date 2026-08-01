@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = {
   title: 'Legal Notice',
@@ -43,32 +44,7 @@ export default function LegalPage() {
             maxWidth: '800px',
           }}
         >
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.62rem',
-              letterSpacing: '0.22em',
-              textTransform: 'uppercase',
-              color: 'var(--graphite)',
-              marginBottom: '24px',
-            }}
-          >
-            Legal
-          </p>
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              fontSize: 'var(--text-2xl)',
-              fontWeight: 700,
-              lineHeight: 1.1,
-              color: 'var(--ink)',
-              margin: '0 0 16px',
-            }}
-          >
-            Legal Notice
-          </h1>
+<PageHeader eyebrow="Legal" title="Legal Notice" variant="compact" />
           <p style={{ ...bodyStyle, color: 'var(--graphite)' }}>Last updated: January 2026</p>
         </section>
 

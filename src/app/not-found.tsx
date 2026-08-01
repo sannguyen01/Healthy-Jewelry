@@ -36,7 +36,7 @@ export default function NotFound() {
           fontSize: 'clamp(1.4rem, 3vw, 2rem)',
           color: 'var(--ink)',
           margin: '0 0 12px',
-          fontWeight: 700,
+          fontWeight: 500,
         }}
       >
         This piece doesn&apos;t exist.

@@ -4,6 +4,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = {
   title: 'Our Story',
@@ -28,24 +29,7 @@ export default function AboutPage() {
             maxWidth: '900px',
           }}
         >
-          <p className="label-eyebrow" style={{ marginBottom: '24px' }}>
-            Our Story
-          </p>
-
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              fontSize: 'var(--text-display)',
-              fontWeight: 700,
-              lineHeight: 1.05,
-              color: 'var(--ink)',
-              margin: '0 0 32px',
-            }}
-          >
-            We build jewelry for bodies that refuse compromise.
-          </h1>
+          <PageHeader eyebrow="Our Story" title="We build jewelry for bodies that refuse compromise." />
 
           <p
             style={{

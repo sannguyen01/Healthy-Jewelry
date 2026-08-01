@@ -3,6 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ContactForm } from '@/components/contact/ContactForm'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = {
   title: 'Contact',
@@ -32,24 +33,7 @@ export default function ContactPage() {
             maxWidth: '900px',
           }}
         >
-          <p className="label-eyebrow" style={{ marginBottom: '24px' }}>
-            Contact
-          </p>
-
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-display)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              color: 'var(--ink)',
-              lineHeight: 1.05,
-              margin: '0 0 28px',
-              fontWeight: 700,
-            }}
-          >
-            We respond within 24 hours.
-          </h1>
+          <PageHeader eyebrow="Contact" title="We respond within 24 hours." />
 
           <p
             style={{
