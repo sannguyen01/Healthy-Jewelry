@@ -14,7 +14,10 @@ test.describe('Navigation', () => {
   })
 
   test('logo links to homepage', async ({ page }) => {
-    const homeLink = page.getByRole('link', { name: /healthy jewelry.*home/i })
+    // Scoped to the header: the footer carries an identically-labelled home
+    // link, so a page-wide lookup resolves to two elements and trips strict
+    // mode. Both links are correct — only the query was ambiguous.
+    const homeLink = page.locator('header').getByRole('link', { name: /healthy jewelry.*home/i })
     await expect(homeLink).toBeVisible()
     await homeLink.click()
     await expect(page).toHaveURL('/')
@@ -64,6 +67,21 @@ test.describe('Navigation', () => {
   test('search button navigates to /search', async ({ page }) => {
     await page.getByRole('button', { name: /search/i }).click()
     await expect(page).toHaveURL(/\/search/)
+  })
+
+  test('the search destination is usable, not just reachable', async ({ page }) => {
+    // The button shipped for months with no click handler at all. Landing on
+    // /search is only half of it — the page has to offer a working query input,
+    // otherwise the control is still a dead end.
+    await page.getByRole('button', { name: /search/i }).click()
+    await expect(page).toHaveURL(/\/search/)
+
+    // `searchbox`, not `textbox` — the input is `type="search"`.
+    const input = page.getByRole('searchbox', { name: /search products/i })
+    await expect(input).toBeVisible()
+    await input.fill('titanium')
+    await input.press('Enter')
+    await expect(page).toHaveURL(/\/search\?q=titanium/)
   })
 })
 

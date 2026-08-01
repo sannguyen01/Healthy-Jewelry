@@ -146,7 +146,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-xs)',
                     letterSpacing: '0.18em',
                     textTransform: 'uppercase',
-                    color: 'var(--titanium)',
+                    color: 'var(--titanium-text)',
                     margin: 0,
                   }}
                 >

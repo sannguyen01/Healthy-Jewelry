@@ -28,6 +28,12 @@ vi.mock('@/lib/hooks/useScrolled', () => ({
   useScrolled: vi.fn(() => false),
 }))
 
+// jsdom has no app router mounted, so `useRouter()` throws on render.
+const push = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
+}))
+
 beforeEach(() => {
   useCartStore.setState({
     items: [],
@@ -172,6 +178,15 @@ describe('Nav', () => {
     it('renders search button with aria-label', () => {
       render(<Nav />)
       expect(screen.getByRole('button', { name: /search/i })).toBeTruthy()
+    })
+
+    it('navigates to /search when clicked', () => {
+      // This control shipped with no click handler at all: it rendered, it was
+      // focusable, it was correctly labelled, and it did nothing. Rendering
+      // assertions cannot tell the difference — this one can.
+      render(<Nav />)
+      fireEvent.click(screen.getByRole('button', { name: /search/i }))
+      expect(push).toHaveBeenCalledWith('/search')
     })
   })
 })

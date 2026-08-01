@@ -26,12 +26,18 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--ash` | #D8D3CB | Borders, dividers |
 | `--graphite` | #6B6762 | Secondary text |
 | `--ink` | #1A1714 | Primary text, logo |
-| `--titanium` | #9DA7AF | Accent color |
+| `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
+| `--titanium-text` | #5E6870 | Titanium-toned **text** on light backgrounds |
 | `--sage` | #8CA89A | Green accent |
-| `--mist` | #A8A49E | Muted text |
+| `--mist` | #A8A49E | Muted text — dark backgrounds only |
 | `--on-dark` | #F0EDE8 | Text on dark backgrounds |
 | `--black` | #0A0A0A | Campaign band dark |
 | `--mid` | #2C2926 | Dark hover states |
+
+**Contrast rule**: `--titanium` is 2.25:1 on `--bg` — below the WCAG AA 4.5:1 floor. Use
+`--titanium-text` (5.23:1) for any titanium-toned copy on a light surface; `--titanium` itself is fine
+for borders, tints, and text on `--ink`/`--black`. Every documented pairing is enforced by
+`src/tests/unit/design-tokens-contrast.test.ts` — add new pairings there.
 
 **Ease tokens**:
 - `--ease: cubic-bezier(0.16, 1, 0.3, 1)` (smooth spring)
@@ -98,6 +104,18 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - Run `pnpm lint && pnpm build` before every commit
 - Run `pnpm test` — maintain 80%+ coverage
 - Commit format: `feat|fix|style|content|test|chore: description`
+
+## Testing & CI
+Full detail in **`docs/testing-strategy.md`**. In short:
+
+- **`verify`** (lint · type-check · unit · build, ~2 min) is the merge gate.
+- **`e2e`** (Playwright, both projects, ~3–5 min) runs on every PR and blocks.
+- `vitest` coverage is scoped to `src/lib`, `src/store`, `src/config` on purpose — **E2E is the only
+  automated coverage the UI layer has.** Anything a user has to see or click belongs in `e2e/`.
+- Presence is not visibility. `e2e/visual-assets.spec.ts` asserts imagery actually renders — bytes
+  arrive, the box is non-zero, and the effective opacity clears the legibility floor.
+- E2E runs against a **production build** (`pnpm build && pnpm start`), never `pnpm dev` — that is what
+  Vercel serves.
 
 ## PROHIBITED
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand

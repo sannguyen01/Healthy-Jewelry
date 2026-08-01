@@ -1,9 +1,19 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 // Use a known product from the static data catalog
 const RING_HANDLE = 'arc-band-titanium'
 const EARRING_HANDLE = 'disc-studs-titanium'
 const BRACELET_HANDLE = 'cable-cuff-titanium'
+
+/**
+ * Rings keep "Add to Bag" disabled until a size is chosen, so every add-to-bag
+ * journey has to pass through the size picker first. Named rather than inlined
+ * so the requirement is stated once — `cart.spec.ts` and `checkout.spec.ts`
+ * carry the same step.
+ */
+async function selectRingSize(page: Page, size = 7): Promise<void> {
+  await page.getByRole('button', { name: `Ring size ${size}` }).click()
+}
 
 test.describe('Product detail — ring', () => {
   test.beforeEach(async ({ page }) => {
@@ -28,7 +38,10 @@ test.describe('Product detail — ring', () => {
   })
 
   test('shows "Grade 23 Titanium" material label', async ({ page }) => {
-    await expect(page.getByText(/grade 23 titanium/i)).toBeVisible()
+    // Scoped to the material tag, not the page: the product description also
+    // says "Grade 23 titanium", so a page-wide text match resolves to two
+    // elements and trips strict mode. This asserts the label specifically.
+    await expect(page.locator('.material-tag')).toHaveText(/grade 23 titanium/i)
   })
 
   test('shows trust signals', async ({ page }) => {
@@ -51,7 +64,20 @@ test.describe('Product detail — ring', () => {
     await expect(page.getByRole('button', { name: /add.*to bag/i })).toBeVisible()
   })
 
+  test('"Add to Bag" is gated until a size is chosen', async ({ page }) => {
+    // The gate is a feature, not an obstacle — a ring cannot be added without a
+    // size. It is asserted here so the size-selection steps in the tests below
+    // read as deliberate rather than as incidental setup.
+    const addToBag = page.getByRole('button', { name: /add.*to bag/i })
+    await expect(addToBag).toBeDisabled()
+    await expect(addToBag).toHaveAttribute('aria-label', /select a size/i)
+
+    await selectRingSize(page)
+    await expect(addToBag).toBeEnabled()
+  })
+
   test('clicking "Add to Bag" opens the cart drawer', async ({ page }) => {
+    await selectRingSize(page)
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
   })
@@ -59,6 +85,7 @@ test.describe('Product detail — ring', () => {
   test('cart shows product after adding to bag', async ({ page }) => {
     // Get the product title first
     const title = await page.getByRole('heading', { level: 1 }).textContent()
+    await selectRingSize(page)
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
     if (title) {
@@ -67,6 +94,7 @@ test.describe('Product detail — ring', () => {
   })
 
   test('cart shows non-zero item count after adding', async ({ page }) => {
+    await selectRingSize(page)
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     // Bag button count should be > 0
     const bagButton = page.getByRole('button', { name: /open bag/i })
@@ -74,6 +102,7 @@ test.describe('Product detail — ring', () => {
   })
 
   test('Checkout button is present in cart after adding item', async ({ page }) => {
+    await selectRingSize(page)
     await page.getByRole('button', { name: /add.*to bag/i }).click()
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
     await expect(dialog.getByRole('button', { name: /checkout/i })).toBeVisible()

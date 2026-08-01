@@ -142,7 +142,7 @@ export function Footer() {
               fontFamily: 'var(--font-ui)',
               fontSize: '0.65rem',
               letterSpacing: '0.12em',
-              color: 'var(--titanium)',
+              color: 'var(--titanium-text)',
             }}
           >
             © 2026 Healthy Jewelry
@@ -153,7 +153,7 @@ export function Footer() {
               fontSize: '0.65rem',
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: 'var(--titanium)',
+              color: 'var(--titanium-text)',
               fontStyle: 'italic',
             }}
           >

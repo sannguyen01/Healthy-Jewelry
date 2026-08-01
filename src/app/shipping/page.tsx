@@ -112,7 +112,7 @@ export default function ShippingPage() {
               fontSize: 'var(--text-xl, 1.3rem)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
-              color: 'var(--titanium)',
+              color: 'var(--titanium-text)',
               margin: 0,
             }}
           >

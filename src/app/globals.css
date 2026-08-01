@@ -18,9 +18,15 @@
     --ash:       #D8D3CB;  /* borders, dividers */
     --graphite:  #6B6762;  /* secondary text */
     --ink:       #1A1714;  /* primary text, logo */
-    --titanium:  #9DA7AF;  /* accent */
+    --titanium:  #9DA7AF;  /* accent — borders, tints, fills. NOT text on --bg */
+    /* Titanium darkened to carry small text on light backgrounds. --titanium
+       itself is 2.25:1 on --bg, well under the 4.5:1 WCAG AA floor for body
+       text; this is 5.23:1 on --bg and 4.74:1 on --nacre. Same cool grey-blue
+       character, legible at 10-12px. Enforced by
+       src/tests/unit/design-tokens-contrast.test.ts. */
+    --titanium-text: #5E6870; /* titanium-toned text on light backgrounds */
     --sage:      #8CA89A;  /* green accent */
-    --mist:      #A8A49E;  /* muted text */
+    --mist:      #A8A49E;  /* muted text — on dark backgrounds only */
     --on-dark:   #F0EDE8;  /* text on dark backgrounds */
     --black:     #0A0A0A;  /* campaign band dark */
     --mid:       #2C2926;  /* dark hover */
