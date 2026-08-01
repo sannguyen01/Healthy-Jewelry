@@ -1,6 +1,7 @@
 # Loop State — Healthy-Jewelry
 
-Last run: never
+Last run: never (scaffold not yet scheduled)
+Last refreshed by hand: 2026-08-01
 
 ## High Priority (loop is acting or waiting on human)
 
@@ -11,46 +12,62 @@ Last run: never
 - [ ] SHOPIFY-WEBHOOK — Shopify webhook not yet registered to `/api/webhooks/shopify`
   Loop action: report only
   Human decision: pending
-- [ ] VISUAL-QA — live browser visual QA + axe a11y + checkout redirect not yet
-  run against the deployed Vercel URL
+- [ ] VISUAL-QA-LIVE — visual QA and the checkout redirect to a real Shopify URL
+  still need checking against the deployed Vercel URL from a normal browser.
+  Automated coverage now exists for the rest (see Testing baseline), but the
+  sandboxed sessions that produced it cannot reach the Vercel hosts.
   Loop action: report only
   Human decision: pending
 
 ## Watch List
 
-- [ ] MAIN-CI-FAILING — `main`'s CI has been failing on every push since
-  2026-06-29, across multiple unrelated causes on different commits. Not
-  caused by this loop and not an auto-fix target; flagged for human
-  awareness only. Do not treat a green loop run as evidence that `main`'s
-  CI is currently healthy.
+- (empty)
 
-## Recent Noise (ignored this run)
+## Resolved
+
+- [x] MAIN-CI-FAILING — resolved 2026-08-01. `main`'s CI had failed on every
+  push since 2026-06-29. PR #9 found the cause was not one bug but a suite that
+  had never passed: 24.2 min, 24 failures, of which 10 were specs describing
+  behaviour the app no longer had and 2 were real defects live on the site.
+  PR #10 then cached the fixed overhead. `main` is green as of `07a6986` and
+  `74b0a3a`.
+- [x] CLAUDE-MD-COLLECTIONS — resolved. PR #7 updated `CLAUDE.md` to 5
+  collections / 17 products after PR #4 merged.
+- [x] SECURITY-2026-06-30 — both findings in
+  `.gstack/security-reports/2026-06-30-security.json` are fixed on `main`: the
+  contact route now uses `@upstash/ratelimit` with a Redis backend, and the
+  fallback log line is `'[contact] Inquiry received'` with no PII.
+
+## Testing baseline
+
+As of 2026-08-01 on `main`: **443 unit tests**, **11 E2E spec files**
+(homepage, navigation, legal-pages, shop, product-detail, cart, contact,
+checkout, a11y, visual-assets, hero-legibility). E2E runs in ~4 min against a
+production build across two projects (chromium + mobile).
+
+Report a *shrinking* count as a finding; a growing one is not itself news.
 
 ## Architecture / design decisions
 
-See `C:\Users\DELL\memory\decision.md` (global) and this repo's own `CLAUDE.md`
-for the T4 design system, brand prohibitions, and architecture principles.
-This loop appends new decisions it observes below, but does not duplicate
-CLAUDE.md's content.
+See this repo's `CLAUDE.md` for the T4 design system, brand prohibitions, and
+architecture principles, and `docs/testing-strategy.md` for what each test layer
+covers and why. This loop appends new decisions it observes below; it does not
+duplicate those files.
 
-- **2026-07-28**: PR split — a single combined session's work was split into
-  two PRs because bundling it violated this scaffold's own `maxFiles: 10` /
-  one-fix-per-run rule (see `gate.yaml`, `loop-constraints.md`):
-  - `euro-summer-visual-assets` (PR #4) — visual/Charms feature work, adding
-    Charms as a 5th product collection alongside rings/necklaces/earrings/
-    bracelets. Still open/draft. Went through a full review-fix cycle this
-    session — scrim fix, Charms rollout completeness, dead asset removal,
-    gradient fix — all landed.
-  - `chore/loop-engineering-scaffold` (PR #5) — this loop tooling itself.
-    Still open/draft.
-  - **Follow-up needed once PR #4 merges**: `CLAUDE.md` still documents "4
-    collections: rings, necklaces, earrings, bracelets" — this will be stale
-    once Charms lands and should be updated to 5 collections. Deliberately
-    not fixed here since PR #4 has not merged yet; whoever merges PR #4
-    should update `CLAUDE.md` in the same change or immediately after.
-  - Separately, this session also found and fixed a pre-existing E2E bug in
-    `e2e/cart.spec.ts` (missing ring-size selection before add-to-bag),
-    unrelated to either PR, on its own branch `fix/e2e-cart-size-selection`.
+- **2026-07-28**: PR split — one session's work was split because bundling it
+  violated this scaffold's own `maxFiles: 10` / one-fix-per-run rule:
+  `euro-summer-visual-assets` (PR #4, merged) and
+  `chore/loop-engineering-scaffold` (PR #5, this branch).
+- **2026-08-01**: CI became a gate rather than a notification. Two jobs:
+  `verify` (~2 min — lint, type-check, unit, build) is the merge gate and hands
+  its `.next` artifact to `e2e`, so the build is paid for once and E2E validates
+  exactly what the gate approved. `main` requires both.
+- **2026-08-01**: Two guardrails encode lessons that cost real defects.
+  `e2e/visual-assets.spec.ts` — presence is not visibility (the collection tiles
+  shipped present, requested successfully, and invisible at `opacity: 0.12`).
+  `e2e/hero-legibility.spec.ts` — visibility is not legibility; it samples
+  rendered pixels behind text across six widths, because axe reports
+  *incomplete* rather than *violation* when the backdrop is an image.
 
 ## Dedupe ledger
 

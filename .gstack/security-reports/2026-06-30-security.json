@@ -4,17 +4,41 @@
   "mode": "targeted",
   "scope": "contact,webhook,revalidate",
   "diff_mode": false,
-  "phases_run": [0, 1, 6, 9, 12, 13, 14],
+  "phases_run": [
+    0,
+    1,
+    6,
+    9,
+    12,
+    13,
+    14
+  ],
   "attack_surface": {
-    "code": { "public_endpoints": 1, "authenticated": 0, "admin": 0, "api": 3, "uploads": 0, "integrations": 2, "background_jobs": 0, "websockets": 0 },
-    "infrastructure": { "ci_workflows": 2, "webhook_receivers": 1, "container_configs": 0, "iac_configs": 0, "deploy_targets": 1, "secret_management": "env_vars" }
+    "code": {
+      "public_endpoints": 1,
+      "authenticated": 0,
+      "admin": 0,
+      "api": 3,
+      "uploads": 0,
+      "integrations": 2,
+      "background_jobs": 0,
+      "websockets": 0
+    },
+    "infrastructure": {
+      "ci_workflows": 2,
+      "webhook_receivers": 1,
+      "container_configs": 0,
+      "iac_configs": 0,
+      "deploy_targets": 1,
+      "secret_management": "env_vars"
+    }
   },
   "findings": [
     {
       "id": 1,
       "severity": "MEDIUM",
       "confidence": 9,
-      "status": "VERIFIED",
+      "status": "RESOLVED",
       "phase": 9,
       "phase_name": "OWASP A04 - Insecure Design",
       "category": "Rate Limiting",
@@ -22,17 +46,19 @@
       "title": "In-memory rate limiter ineffective on multi-instance serverless",
       "file": "src/app/api/contact/route.ts",
       "line": 5,
-      "description": "rateLimitMap is module-level. Each Vercel serverless instance has independent memory. Effective limit is 5×N not 5.",
-      "exploit_scenario": "Send 50 concurrent POSTs. Vercel spawns 10 instances. Each sees ≤5 from the IP. All 50 pass.",
+      "description": "rateLimitMap is module-level. Each Vercel serverless instance has independent memory. Effective limit is 5\u00d7N not 5.",
+      "exploit_scenario": "Send 50 concurrent POSTs. Vercel spawns 10 instances. Each sees \u22645 from the IP. All 50 pass.",
       "impact": "Contact inbox spam, Resend API cost amplification",
       "recommendation": "Replace with @upstash/ratelimit using Redis.fromEnv()",
-      "verification": "self-verified"
+      "verification": "self-verified",
+      "resolution": "Fixed on main: src/app/api/contact/route.ts now uses @upstash/ratelimit with Redis.fromEnv(), keeping the in-memory map only as a fallback when Upstash env vars are absent.",
+      "resolved_date": "2026-08-01"
     },
     {
       "id": 2,
       "severity": "LOW",
       "confidence": 8,
-      "status": "VERIFIED",
+      "status": "RESOLVED",
       "phase": 9,
       "phase_name": "OWASP A09 - Logging Failures",
       "category": "Privacy/Logging",
@@ -44,7 +70,9 @@
       "exploit_scenario": "Vercel viewer opens Function Logs, sees customer emails in plaintext.",
       "impact": "GDPR data minimisation violation; PII in logs without documented purpose",
       "recommendation": "Remove email from log line. Log only 'inquiry received' without PII.",
-      "verification": "self-verified"
+      "verification": "self-verified",
+      "resolution": "Fixed on main: the fallback log line is now console.info('[contact] Inquiry received') with no submitter email.",
+      "resolved_date": "2026-08-01"
     }
   ],
   "filter_stats": {
@@ -54,5 +82,13 @@
     "verification_filtered": 0,
     "reported": 2
   },
-  "totals": { "critical": 0, "high": 0, "medium": 1, "tentative": 0 }
+  "totals": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "tentative": 0,
+    "resolved": 2
+  },
+  "resolved_date": "2026-08-01",
+  "note": "Both findings verified fixed on main as of 2026-08-01. Retained as a record of the audit, not as open work."
 }

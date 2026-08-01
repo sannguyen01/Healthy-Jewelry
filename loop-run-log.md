@@ -1,4 +1,4 @@
-# Loop Run Log — YOUR_PROJECT
+# Loop Run Log — Healthy-Jewelry
 
 Append one entry per run. Prune entries older than 30 days.
 

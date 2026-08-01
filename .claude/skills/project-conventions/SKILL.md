@@ -41,10 +41,15 @@ flag it if you see:
 
 ## Testing baseline
 
-353 unit tests + 9 E2E spec files were passing as of the last session
+As of 2026-08-01 on `main`: **443 unit tests** and **11 E2E spec files**
 (homepage, navigation, legal-pages, shop, product-detail, cart, contact,
-checkout, a11y via @axe-core/playwright). Report a *shrinking* test count as
-a finding; a growing one is not itself news.
+checkout, a11y via @axe-core/playwright, visual-assets, hero-legibility).
+Report a *shrinking* count as a finding; a growing one is not itself news.
+
+CI is two jobs — `verify` (lint, type-check, unit, build; the merge gate) and
+`e2e` (Playwright against a production build, both projects). Both are required
+checks on `main`. See `docs/testing-strategy.md` for what each layer covers,
+the measured timings, and the recorded a11y exception.
 
 ## Outstanding known work (carry-forward — see STATE.md for current status)
 
@@ -55,5 +60,8 @@ running these yourself):
   `RESEND_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 - Shopify webhook registration: Admin -> Settings -> Notifications -> Webhooks
   -> point to `/api/webhooks/shopify`.
-- Visual QA against the live Vercel deploy URL, including axe a11y and the
-  checkout redirect to a real Shopify URL.
+- Visual QA against the live Vercel deploy URL and the checkout redirect to a
+  real Shopify URL. Note that axe a11y and visual-asset rendering are now
+  covered automatically (`e2e/a11y.spec.ts`, `e2e/visual-assets.spec.ts`,
+  `e2e/hero-legibility.spec.ts`); what still needs a human is the live
+  deployment itself, which sandboxed sessions cannot reach.

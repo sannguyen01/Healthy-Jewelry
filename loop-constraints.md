@@ -6,7 +6,9 @@
 
 ## Push & Merge
 - Don't push before telling me
-- Never auto-merge to main without human approval
+- A loop never merges its own work to main. GitHub auto-merge on a human-opened
+  PR is a different thing and is fine: it lands only after `verify` and `e2e`
+  (both required checks) pass.
 - Always create a draft PR first; let me review before marking ready
 
 ## Paths
@@ -34,9 +36,12 @@
 
 - Never push to `main`. A merge to `main` auto-deploys to Vercel production
   (project `prj_yXFNldDpw3O3r3BWnM0g5ExpfVmN`) via its native Git integration.
+  `main` is branch-protected and requires `verify` + `e2e` to pass.
 - Never edit `.env`, `.env.*`, `.vercel/`, or any Vercel environment variable.
-- Never edit `src/lib/shopify/**` (Storefront API client/queries/mutations),
-  `.github/workflows/**`, or `next.config.ts`'s security headers.
+- Never *autonomously* edit `src/lib/shopify/**` (Storefront API client/queries/
+  mutations), `.github/workflows/**`, or `next.config.ts`'s security headers —
+  escalate instead. These are maintained, not frozen; a human-directed change to
+  them is ordinary work.
 - Dependency major-version bumps (`next`, `react`, `react-dom`, any `@shopify/*`
   package) and any high-severity CVE fix must escalate with written rationale.
 - Always use `pnpm`, never `npm` — this repo has no package-lock.json.

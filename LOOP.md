@@ -4,8 +4,11 @@
 
 | Pattern | Cadence | Status | Command |
 |---------|---------|--------|---------|
-| Daily Triage | 1d, 08:00 | L1 report-only | `run-loop.ps1 -Pattern daily-triage` (scheduled, see `~/.claude/loop/register-tasks.ps1`) |
-| Dependency Sweeper | Weekly | L1 report-only | `run-loop.ps1 -Pattern dependency-sweeper` |
+| Daily Triage | 1d, 08:00 | L1 report-only | `run-loop --pattern daily-triage` |
+| Dependency Sweeper | Weekly | L1 report-only | `run-loop --pattern dependency-sweeper` |
+
+Scheduling is machine-local — a scheduled task, cron entry, or the runner's own
+scheduler, whichever this checkout runs on. Nothing in this repo registers it.
 
 ## Human Gates
 
