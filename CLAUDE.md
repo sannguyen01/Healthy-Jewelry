@@ -48,6 +48,25 @@ for borders, tints, and text on `--ink`/`--black`. Every documented pairing is e
 - `--font-ui` → DM Sans (nav links, metadata, labels, eyebrows, utility)
 - `--font-body` → DM Sans (body text, prices, descriptions)
 
+**Loaded weights — never request one that isn't here:**
+
+| Token | Font | Weights available |
+|-------|------|-------------------|
+| `--font-display` | Barlow Condensed | **400, 500** |
+| `--font-ui` / `--font-body` | DM Sans | **300, 400, 500** |
+
+A weight with no downloaded face is not ignored — the browser *synthesises* it,
+smearing the strokes of the nearest face and distorting the letterforms, so the text reads as a
+different typeface. Nine pages once asked Barlow Condensed for 700 and rendered a fake bold beside the
+homepage's real 500. Enforced by `src/tests/unit/typography-weights.test.ts`, which resolves each
+`--font-*` token back to its loader and fails on any weight that font does not ship. To use a heavier
+face, add it to the `next/font` call in `src/app/layout.tsx` first.
+
+**Page titles use `PageHeader`** (`src/components/ui/PageHeader.tsx`) — never a hand-rolled `<h1>`.
+Two variants, chosen by what the page is for: `display` for brand/marketing routes (Our Story, Contact,
+Materials, Stores) and `compact` for utility/legal routes (FAQ, Shipping, Terms, Privacy, Legal). The
+homepage hero is the one exception, since it owns `--text-hero`.
+
 ### Architecture (Gentle Monster style)
 - Horizontal scroll strips on homepage (no product grids)
 - Void-white (#F7F5F1) everywhere

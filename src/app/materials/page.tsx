@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { hjMaterials } from '@/lib/data/hj-data'
 
 export const metadata: Metadata = {
@@ -57,23 +58,8 @@ export default function MaterialsPage() {
             maxWidth: '860px',
           }}
         >
-          <p className="label-eyebrow" style={{ marginBottom: '24px' }}>
-            The Materials
-          </p>
 
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-display)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              color: 'var(--ink)',
-              margin: '0 0 28px',
-              lineHeight: 1.05,
-            }}
-          >
-            Not all metals are equal.
-          </h1>
+          <PageHeader eyebrow="The Materials" title="Not all metals are equal." />
 
           <p
             style={{
