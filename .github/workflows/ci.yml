@@ -16,10 +16,14 @@ concurrency:
 env:
   # Mock credentials — CI never talks to a real Shopify store. Declared once so
   # the two jobs cannot drift apart.
+  #
+  # NEXT_PUBLIC_SITE_URL is deliberately *not* here. The unit suite asserts the
+  # production site constant (src/tests/unit/config.test.ts), while the build and
+  # the E2E server need localhost — the same name legitimately means different
+  # things per step, so each one sets it explicitly.
   SHOPIFY_STORE_DOMAIN: mock.myshopify.com
   SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: mock.myshopify.com
-  NEXT_PUBLIC_SITE_URL: http://localhost:3000
   SHOPIFY_WEBHOOK_SECRET: mock_webhook_secret
 
 jobs:
@@ -52,12 +56,20 @@ jobs:
 
       - name: Unit tests
         run: pnpm exec vitest run
+        env:
+          NEXT_PUBLIC_SITE_URL: https://healthyjewelry.com
 
       # New. A broken production build used to be discovered by Vercel *after*
       # merge — `next build` catches prerender failures that neither tsc nor
       # vitest can see.
+      #
+      # Built for localhost because the E2E job serves this exact artifact.
+      # NEXT_PUBLIC_* values are inlined at build time, so the URL baked in here
+      # is the one the suite runs against.
       - name: Production build
         run: pnpm build
+        env:
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
       # Handed to the E2E job so it exercises the exact artifact this gate
       # approved, and so the build is paid for once rather than twice.
@@ -109,6 +121,7 @@ jobs:
         env:
           CI: true
           PLAYWRIGHT_SKIP_BUILD: '1'
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
