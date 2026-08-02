@@ -222,3 +222,104 @@ Two things that took a debugging round each, and are commented in the spec so th
   a clip taken from a still-moving element lands where the element *was*. Waiting for opacity is not
   enough either — the effect applies its starting values after mount, so a naive check reports
   "settled" before the animation has begun.
+
+---
+
+## Checkout, currency, and configuration
+
+Placing an order produced nothing — no confirmation screen, no payment step. Tracing it end to end
+found six independent breaks, and the E2E suite reported the feature as working the whole time.
+
+### Why the suite was green
+
+`e2e/checkout.spec.ts` asserted only that clicking Checkout navigated *away from the product page*.
+Its own comment conceded "or `/checkout` fallback when no store domain" — so the one outcome that
+matters, landing on Shopify's hosted checkout, was never asserted, and the dead end was inside the
+assertion's definition of success.
+
+It now asserts the two outcomes that exist: on success the browser ends at the Shopify checkout URL
+(payment happens there; the site never takes a card), and on failure the customer is told what
+happened, in their language, with the bag intact. Shopify is reached through the `/api/shopify`
+persisted-query proxy, so intercepting that single route drives the whole flow without credentials.
+
+**The site sends no order confirmation, deliberately.** Shopify's own confirmation email *is* the
+confirmation. A second email from us would arrive with worse data, no order status, and no way to stay
+in sync with refunds or fulfilment.
+
+### There is no confirmation screen either, and that is not the bug
+
+The site hands off to Shopify's hosted checkout and the customer never returns. If nothing appears
+after clicking Checkout, the redirect failed — the new error states name which of the causes below it
+was, rather than spinning.
+
+### Currency: the price quoted must be the price charged
+
+Every price on the site was rendered as USD unconditionally — `formatPrice(price, 'USD')` in the card
+and detail page, bare `$` template literals in the cart drawer, the cart page and the **homepage
+strips**, and `priceCurrency: 'USD'` in the Product JSON-LD that feeds Google Shopping. Meanwhile
+`mapShopifyProduct` discarded `priceRange.minVariantPrice.currencyCode`, so the real currency never
+reached the UI to contradict any of it.
+
+For a store selling in VND that means advertising "$89.00" and charging ₫ — a hundred-fold misquote,
+shown at the moment a customer decides to buy and published to search engines before they arrive.
+
+`HJProduct.currencyCode` now carries Shopify's currency through to every surface.
+`src/tests/unit/currency-consistency.test.tsx` enforces it from both ends:
+
+- **Behaviour** — a VND product must render `₫`, must not render `$`, and must render no decimal
+  places, because dong has no minor unit. A USD product must still render `$`: a blanket swap would be
+  as wrong as the hardcoded dollar it replaced.
+- **Source** — no file outside the formatter may pass a currency literal to `formatPrice`, omit the
+  currency argument, or print a currency symbol beside an interpolated price.
+
+That second rule is what found the homepage strips. They never called `formatPrice` at all, so a check
+that only inspected the formatter's arguments would have declared the site fixed while six surfaces
+still said `$`.
+
+**E2E assertions must not pin `$`.** `product-detail.spec.ts` and `shop.spec.ts` now match
+`/[$€£₫]\s?[\d,]+/`. Pinning the dollar sign would turn those specs red the day a non-USD store
+connects — failing for correct behaviour, which is the worst kind of failing test.
+
+### Configuration traps that produce no error message
+
+`src/lib/shopify/env-check.ts` prints these at build time when a variable is missing. It **warns, it
+does not throw**: the static-fallback catalog exists so the site builds without Shopify, and a throw
+would break local development and the architecture the check protects.
+
+- **`NEXT_PUBLIC_*` is inlined at build time.** Setting `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` in Vercel
+  does nothing to an already-built deployment, and a *redeploy* can reuse the cached build. It takes a
+  **fresh build**. This is very likely why earlier attempts to "just set the env vars" appeared to
+  change nothing.
+- **Vercel scopes variables per environment.** Setting them for Production alone leaves every Preview
+  deployment broken in exactly the same way, with no warning that the two differ.
+- **Missing configuration is silent by design.** Because every fetch falls back to the static catalog,
+  an unconfigured deployment builds clean, renders every page and reports healthy — right up until a
+  customer clicks Checkout.
+
+CI sets mock values for all four (`.github/workflows/ci.yml`) so the warning stays silent there. A log
+that always prints "Shopify is not fully configured" trains everyone to ignore the one line that would
+catch a genuinely unconfigured deploy.
+
+### Webhooks
+
+`orders/create` and `orders/paid` are logged without PII — id, name, total, currency, status, line
+count. HMAC verification runs over the **raw body** before any `JSON.parse`, and returns 401 on
+mismatch.
+
+**Shopify retries, so duplicate deliveries are expected.** They are harmless here because the handler
+only logs and revalidates. An in-memory dedupe map would not help: serverless invocations do not share
+memory, which this repo already learned when the in-memory rate limiter was replaced with Upstash
+Redis. If a future handler ever mutates state, dedupe must be durable.
+
+### Known tradeoffs, recorded rather than silently accepted
+
+- **Abandoned checkouts are not tracked.** `checkoutUrl` is only requested at sync time, so a bag
+  abandoned before the customer clicks Checkout never appears in Shopify Admin. Fixing it costs a
+  Shopify API call per add-to-cart and creates a real cart for every casual browse.
+- **The real catalog needs `svg:` tags.** Without them `src/lib/shopify/index.ts` falls back to
+  matching the handle as a substring, and then to `'ring-arc'` — so an untagged product silently
+  renders the wrong illustration.
+- **The static catalog's variant IDs are placeholders.** `gid://shopify/ProductVariant/hj-001-default`
+  is not a GID Shopify will accept; real ones are numeric. The store now refuses to sync a bag
+  containing one rather than firing a mutation that is certain to fail, so tests of the success path
+  must seed a realistic ID (see `seedBag` in `e2e/checkout.spec.ts`).

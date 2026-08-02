@@ -18,6 +18,17 @@ Last refreshed by hand: 2026-08-01
   sandboxed sessions that produced it cannot reach the Vercel hosts.
   Loop action: report only
   Human decision: pending
+- [ ] SHOPIFY-CURRENCY — confirm the connected store's currency matches what the
+  site renders. Prices now carry `HJProduct.currencyCode` end to end instead of
+  a hardcoded USD, so the site will quote whatever Shopify returns — which is
+  only correct if the store is configured as intended.
+  Loop action: report only
+  Human decision: pending
+- [ ] SHOPIFY-SVG-TAGS — real catalog products need `svg:` tags, else
+  `src/lib/shopify/index.ts` falls back to handle-substring matching and then
+  to `'ring-arc'`, rendering the wrong illustration silently.
+  Loop action: report only
+  Human decision: pending
 
 ## Watch List
 
@@ -40,10 +51,10 @@ Last refreshed by hand: 2026-08-01
 
 ## Testing baseline
 
-As of 2026-08-01 on `main`: **443 unit tests**, **11 E2E spec files**
-(homepage, navigation, legal-pages, shop, product-detail, cart, contact,
-checkout, a11y, visual-assets, hero-legibility). E2E runs in ~4 min against a
-production build across two projects (chromium + mobile).
+As of 2026-08-02: **497 unit tests** across 28 files, **294 E2E tests** in 11
+spec files (homepage, navigation, legal-pages, shop, product-detail, cart,
+contact, checkout, a11y, visual-assets, hero-legibility). E2E runs in ~3 min
+against a production build across two projects (chromium + mobile).
 
 Report a *shrinking* count as a finding; a growing one is not itself news.
 
@@ -68,6 +79,25 @@ duplicate those files.
   `e2e/hero-legibility.spec.ts` — visibility is not legibility; it samples
   rendered pixels behind text across six widths, because axe reports
   *incomplete* rather than *violation* when the backdrop is an image.
+- **2026-08-02**: Checkout failures are typed and visible instead of swallowed.
+  `CheckoutError` distinguishes `not-configured` / `placeholder-catalog` /
+  `network` / `shopify-error`, retry is offered only where retrying can work,
+  and the cart drawer surfaces the error inline rather than punting to
+  `/checkout` to fail a second time. The site sends no order confirmation on
+  purpose — Shopify's own email is the confirmation.
+- **2026-08-02**: Prices carry `HJProduct.currencyCode` end to end. Ten
+  surfaces hardcoded USD, including the homepage strips, which printed a raw
+  `$` and never called `formatPrice` at all.
+  `src/tests/unit/currency-consistency.test.tsx` guards both the rendered
+  output and the source, because a rule that only checked formatter arguments
+  would have missed six of them. Third guardrail in the same shape as
+  visual-assets and hero-legibility: the rule is enforced, not just fixed.
+- **2026-08-02**: `src/lib/shopify/env-check.ts` warns at build time when
+  Shopify configuration is missing, naming the build-time `NEXT_PUBLIC_*`
+  inlining and per-environment scoping traps explicitly. It warns rather than
+  throws — the static-fallback catalog is the reason the site builds without
+  Shopify, and a throw would break the architecture the check exists to
+  protect. See `docs/testing-strategy.md`.
 
 ## Dedupe ledger
 
