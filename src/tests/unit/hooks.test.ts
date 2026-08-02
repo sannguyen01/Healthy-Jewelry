@@ -173,6 +173,7 @@ const testProduct: HJProduct = {
   tags: ['rings', 'titanium'],
   price: '89.00',
   compareAtPrice: null,
+  currencyCode: 'USD',
   badge: null,
   description: 'Titanium ring used for unit testing.',
   spec: '2 mm · 1.8 g',

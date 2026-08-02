@@ -28,7 +28,11 @@ export function productJsonLd(product: HJProduct): Record<string, unknown> {
     offers: {
       '@type': 'Offer',
       price: product.price,
-      priceCurrency: 'USD',
+      // Must match what Shopify charges. A hardcoded USD here would publish
+      // dollar prices for a VND store to Google Shopping and every rich
+      // result — wrong in the one place a customer sees a price before they
+      // ever reach the site.
+      priceCurrency: product.currencyCode,
       availability: 'https://schema.org/InStock',
       url: `${SITE_URL}/products/${product.handle}`,
     },

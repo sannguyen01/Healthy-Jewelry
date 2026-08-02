@@ -56,6 +56,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     revalidateTag('collections')
   }
 
+  // Orders. The site takes no part in payment — Shopify's hosted checkout
+  // charges the card and sends the confirmation email — so this exists to give
+  // the storefront a record that a sale happened, and a place to hang future
+  // fulfilment work.
+  //
+  // Deliberately does not send its own confirmation email: Shopify already
+  // sends one, and a second would be worse than none.
+  if (topic.startsWith('orders/')) {
+    try {
+      const order = JSON.parse(rawBody.toString('utf-8')) as {
+        id?: unknown
+        name?: unknown
+        total_price?: unknown
+        currency?: unknown
+        financial_status?: unknown
+        line_items?: unknown
+      }
+      const lineCount = Array.isArray(order.line_items) ? order.line_items.length : 0
+      // Order name (e.g. "#1001") and totals only — no customer name, email or
+      // address. Vercel function logs are visible to every project member, and
+      // the contact route already had to be fixed for logging PII.
+      console.info('[webhooks/shopify] order event', {
+        topic,
+        id: typeof order.id === 'number' || typeof order.id === 'string' ? order.id : null,
+        name: typeof order.name === 'string' ? order.name : null,
+        total: typeof order.total_price === 'string' ? order.total_price : null,
+        currency: typeof order.currency === 'string' ? order.currency : null,
+        financialStatus:
+          typeof order.financial_status === 'string' ? order.financial_status : null,
+        lineCount,
+      })
+    } catch {
+      // A malformed body must not fail the webhook — Shopify retries on a
+      // non-2xx, and repeated retries of an unparseable payload help nobody.
+      console.warn(`[webhooks/shopify] order event with unparseable payload: ${topic}`)
+    }
+  }
+
   console.info(`[webhooks/shopify] Processed topic: ${topic}`)
   return NextResponse.json({ ok: true })
 }

@@ -16,6 +16,7 @@ const mockProduct: HJProduct = {
   tags: ['rings', 'titanium', 'bestseller'],
   price: '89.00',
   compareAtPrice: null,
+  currencyCode: 'USD',
   badge: 'Bestseller',
   description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
   spec: '2 mm · 1.8 g',

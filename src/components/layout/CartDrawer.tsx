@@ -4,6 +4,8 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { useCartStore } from '@/store/cart'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
+import { checkoutMessage, supportMailto, SUPPORT_EMAIL } from '@/lib/utils/checkoutMessages'
+import { formatPrice, cartCurrencyCode } from '@/lib/utils/formatPrice'
 
 export function CartDrawer() {
   const isOpen = useCartStore((s) => s.isOpen)
@@ -14,6 +16,8 @@ export function CartDrawer() {
   const total = useCartStore((s) => s.totalPrice())
   const syncWithShopify = useCartStore((s) => s.syncWithShopify)
   const isLoading = useCartStore((s) => s.isLoading)
+  const checkoutError = useCartStore((s) => s.checkoutError)
+  const cartCurrency = cartCurrencyCode(items)
 
   // Lock body scroll when open
   useEffect(() => {
@@ -347,14 +351,69 @@ export function CartDrawer() {
                   color: 'var(--ink)',
                 }}
               >
-                ${total.toFixed(2)}
+                {formatPrice(total, cartCurrency)}
               </span>
             </div>
+            {checkoutError && (
+              <div
+                role="alert"
+                style={{
+                  marginBottom: '16px',
+                  padding: '14px 16px',
+                  border: '1px solid var(--ash)',
+                  backgroundColor: 'var(--nacre)',
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 'var(--text-xs)',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--ink)',
+                    margin: '0 0 6px',
+                  }}
+                >
+                  {checkoutMessage(checkoutError).title}
+                </p>
+                <p
+                  style={{
+                    fontFamily: 'var(--font-body)',
+                    fontWeight: 300,
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--graphite)',
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
+                  {checkoutMessage(checkoutError).body}{' '}
+                  <a
+                    href={supportMailto(
+                      items.map((i) => `${i.quantity} × ${i.product.title}`).join('\n')
+                    )}
+                    style={{ color: 'var(--ink)', textDecoration: 'underline' }}
+                  >
+                    {SUPPORT_EMAIL}
+                  </a>
+                </p>
+              </div>
+            )}
+
             <button
               onClick={async () => {
                 await syncWithShopify()
-                const url = useCartStore.getState().checkoutUrl
-                window.location.href = url ?? '/checkout'
+                const { checkoutUrl, checkoutError: err } = useCartStore.getState()
+                if (checkoutUrl) {
+                  window.location.href = checkoutUrl
+                  return
+                }
+                // Previously this navigated to /checkout regardless, where the
+                // same sync failed again and left the customer on a spinner.
+                // With no URL the error is shown here instead, beside the bag
+                // that is still intact.
+                if (!err) {
+                  window.location.href = '/checkout'
+                }
               }}
               disabled={isLoading}
               style={{

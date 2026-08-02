@@ -25,6 +25,11 @@ env:
   SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: mock.myshopify.com
   SHOPIFY_WEBHOOK_SECRET: mock_webhook_secret
+  # Set so the build's own configuration warning (src/lib/shopify/env-check.ts)
+  # stays silent here. A CI log that always prints "Shopify is not fully
+  # configured" trains everyone to ignore the one place that would catch a
+  # genuinely unconfigured deploy.
+  SHOPIFY_REVALIDATION_SECRET: mock_revalidation_secret
 
 jobs:
   # The merge gate. Everything here is cheap and deterministic; if this is green

@@ -1,4 +1,12 @@
 import type { NextConfig } from 'next'
+// Relative, not the `@/` alias: next.config.ts is loaded by Next's own config
+// loader, which does not apply tsconfig path mappings.
+import { warnIfShopifyUnconfigured } from './src/lib/shopify/env-check'
+
+// Runs once per build (and once on `next start`), so a deployment that will
+// serve a catalog nobody can buy from says so in the build log rather than
+// looking perfectly healthy until a customer clicks Checkout.
+warnIfShopifyUnconfigured()
 
 const nextConfig: NextConfig = {
   images: {

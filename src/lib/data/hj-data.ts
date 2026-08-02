@@ -6,6 +6,21 @@ import type {
   ProductVariant,
   Money,
 } from '@/lib/shopify/types'
+import type { CurrencyCode } from '@/lib/utils/formatPrice'
+
+/**
+ * The fallback catalog's prices are illustrative, so USD is a presentation
+ * default rather than a claim about the store. When Shopify is connected the
+ * real currency arrives with the real products, via `mapShopifyProduct`.
+ *
+ * Declared once so the product's `currencyCode` and its variants' `Money`
+ * can never drift apart — a card showing "$89.00" over a variant priced in
+ * another currency is exactly the misquote this field exists to prevent.
+ */
+const FALLBACK_CURRENCY: CurrencyCode = 'USD'
+
+/** A catalog entry before variants and currency are derived from it. */
+type HJProductSeed = Omit<HJProduct, 'variants' | 'currencyCode'>
 
 // ── Collections ────────────────────────────────────────────────────────────
 
@@ -73,7 +88,8 @@ export const hjMaterials: HJMaterial[] = [
 // can be synthesized once, by collection, instead of hand-writing 8 ring
 // sizes / 5 bracelet sizes into every product literal.
 
-const hjProductsRaw: Omit<HJProduct, 'variants'>[] = [
+// currencyCode is supplied by the map() below, not repeated on all 17 entries.
+const hjProductsRaw: HJProductSeed[] = [
   // ── Rings ────────────────────────────────────────────────────────────────
   {
     id: 'gid://shopify/Product/hj-001',
@@ -347,18 +363,18 @@ const RING_SIZES = ['5', '6', '7', '8', '9', '10', '11', '12']
 // the UI resolves to the matching variant here.
 const BRACELET_SIZES = ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)']
 
-function money(amount: string): Money {
-  return { amount, currencyCode: 'USD' }
+function money(amount: string, currencyCode: CurrencyCode): Money {
+  return { amount, currencyCode }
 }
 
-function buildVariants(product: Omit<HJProduct, 'variants'>): ProductVariant[] {
-  const compareAtPrice = product.compareAtPrice ? money(product.compareAtPrice) : null
+function buildVariants(product: HJProductSeed, currencyCode: CurrencyCode): ProductVariant[] {
+  const compareAtPrice = product.compareAtPrice ? money(product.compareAtPrice, currencyCode) : null
 
   if (product.collection === 'rings') {
     return RING_SIZES.map((size) => ({
       id: `${product.id}-size-${size}`,
       title: size,
-      price: money(product.price),
+      price: money(product.price, currencyCode),
       compareAtPrice,
       availableForSale: true,
       selectedOptions: [{ name: 'Size', value: size }],
@@ -369,7 +385,7 @@ function buildVariants(product: Omit<HJProduct, 'variants'>): ProductVariant[] {
     return BRACELET_SIZES.map((size) => ({
       id: `${product.id}-size-${size.slice(0, size.indexOf(' '))}`,
       title: size,
-      price: money(product.price),
+      price: money(product.price, currencyCode),
       compareAtPrice,
       availableForSale: true,
       selectedOptions: [{ name: 'Size', value: size }],
@@ -380,7 +396,7 @@ function buildVariants(product: Omit<HJProduct, 'variants'>): ProductVariant[] {
     {
       id: product.defaultVariantId,
       title: 'Default',
-      price: money(product.price),
+      price: money(product.price, currencyCode),
       compareAtPrice,
       availableForSale: true,
       selectedOptions: [],
@@ -390,7 +406,8 @@ function buildVariants(product: Omit<HJProduct, 'variants'>): ProductVariant[] {
 
 export const hjProducts: HJProduct[] = hjProductsRaw.map((product) => ({
   ...product,
-  variants: buildVariants(product),
+  currencyCode: FALLBACK_CURRENCY,
+  variants: buildVariants(product, FALLBACK_CURRENCY),
 }))
 
 // ── Helper functions ───────────────────────────────────────────────────────

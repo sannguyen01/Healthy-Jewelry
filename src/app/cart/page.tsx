@@ -6,12 +6,14 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { useCartStore } from '@/store/cart'
+import { formatPrice, cartCurrencyCode } from '@/lib/utils/formatPrice'
 
 export default function CartPage() {
   const items = useCartStore((s) => s.items)
   const removeItem = useCartStore((s) => s.removeItem)
   const updateQuantity = useCartStore((s) => s.updateQuantity)
   const total = useCartStore((s) => s.totalPrice())
+  const cartCurrency = cartCurrencyCode(items)
   const totalItems = useCartStore((s) => s.totalItems())
 
   return (
@@ -277,7 +279,7 @@ export default function CartPage() {
                           margin: 0,
                         }}
                       >
-                        ${(parseFloat(product.price) * quantity).toFixed(2)}
+                        {formatPrice(parseFloat(product.price) * quantity, cartCurrency)}
                       </p>
                       {quantity > 1 && (
                         <p
@@ -289,7 +291,7 @@ export default function CartPage() {
                             margin: '4px 0 0',
                           }}
                         >
-                          ${product.price} each
+                          {formatPrice(product.price, cartCurrency)} each
                         </p>
                       )}
                     </div>
@@ -360,7 +362,7 @@ export default function CartPage() {
                       fontWeight: 300,
                     }}
                   >
-                    ${total.toFixed(2)}
+                    {formatPrice(total, cartCurrency)}
                   </span>
                 </div>
 
@@ -410,7 +412,7 @@ export default function CartPage() {
                       color: 'var(--ink)',
                     }}
                   >
-                    ${total.toFixed(2)}
+                    {formatPrice(total, cartCurrency)}
                   </span>
                 </div>
               </div>

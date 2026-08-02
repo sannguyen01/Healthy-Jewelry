@@ -3,9 +3,33 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { shopifyConfig } from '@/config/shopify'
+import { isPlaceholderVariantId } from '@/lib/shopify/variant-id'
 import type { HJProduct } from '@/lib/shopify/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────
+
+/**
+ * Why a checkout could not be started.
+ *
+ * Every one of these used to collapse into a `console.warn` and a null
+ * `checkoutUrl`, so the UI had no way to say anything more useful than a
+ * spinner — which is exactly what customers saw. The reason has to leave this
+ * function for anything upstream to respond honestly.
+ *
+ * - `not-configured`    — no store domain in the bundle. NEXT_PUBLIC_* values
+ *                         are inlined at build time, so this means the variable
+ *                         was missing *when the deployment was built*.
+ * - `placeholder-catalog` — the cart holds ids from the static fallback catalog,
+ *                         so Shopify is unreachable or unauthenticated and the
+ *                         products on screen are not real Shopify products.
+ * - `network`           — the request to our own /api/shopify proxy failed.
+ * - `shopify-error`     — Shopify answered, and refused.
+ */
+export type CheckoutError =
+  | 'not-configured'
+  | 'placeholder-catalog'
+  | 'network'
+  | 'shopify-error'
 
 export interface CartItem {
   product: HJProduct
@@ -100,6 +124,17 @@ export interface CartState {
   shopifyCartId: string | null
   checkoutUrl: string | null
   isLoading: boolean
+  /** Null until a sync fails. Cleared at the start of each attempt. */
+  checkoutError: CheckoutError | null
+  /**
+   * False until the persisted bag has been read back from localStorage.
+   *
+   * Rehydration is asynchronous, so on first render `items` is always `[]`
+   * regardless of what the customer actually has. Anything that branches on an
+   * empty bag — redirects especially — must wait for this, or it acts on a
+   * state that was never true.
+   */
+  hasHydrated: boolean
 
   // Mutations
   addItem: (product: HJProduct, quantity?: number, variantId?: string) => void
@@ -114,6 +149,9 @@ export interface CartState {
 
   // Shopify sync
   syncWithShopify: () => Promise<void>
+
+  // Hydration
+  setHasHydrated: (value: boolean) => void
 
   // Computed selectors (called as functions to stay reactive with zustand)
   totalItems: () => number
@@ -130,6 +168,10 @@ export const useCartStore = create<CartState>()(
       shopifyCartId: null,
       checkoutUrl: null,
       isLoading: false,
+      checkoutError: null,
+      hasHydrated: false,
+
+      setHasHydrated: (value) => set({ hasHydrated: value }),
 
       addItem: (product, quantity = 1, variantId) => {
         const resolvedVariantId = variantId ?? product.defaultVariantId
@@ -145,13 +187,17 @@ export const useCartStore = create<CartState>()(
                   : item
               ),
               // A cart-content change invalidates any previously-synced
-              // checkout URL so the checkout page never redirects to a stale cart.
+              // checkout URL so the checkout page never redirects to a stale
+              // cart — and clears any error from the previous attempt, which
+              // may no longer apply to these lines.
               checkoutUrl: null,
+              checkoutError: null,
             }
           }
           return {
             items: [...state.items, { product, quantity, variantId: resolvedVariantId }],
             checkoutUrl: null,
+            checkoutError: null,
           }
         })
       },
@@ -160,6 +206,7 @@ export const useCartStore = create<CartState>()(
         set((state) => ({
           items: state.items.filter((item) => item.product.id !== productId),
           checkoutUrl: null,
+          checkoutError: null,
         }))
       },
 
@@ -173,10 +220,12 @@ export const useCartStore = create<CartState>()(
             item.product.id === productId ? { ...item, quantity } : item
           ),
           checkoutUrl: null,
+          checkoutError: null,
         }))
       },
 
-      clearCart: () => set({ items: [], shopifyCartId: null, checkoutUrl: null }),
+      clearCart: () =>
+        set({ items: [], shopifyCartId: null, checkoutUrl: null, checkoutError: null }),
 
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
@@ -184,6 +233,11 @@ export const useCartStore = create<CartState>()(
 
       syncWithShopify: async () => {
         if (!shopifyConfig.storeDomain) {
+          // NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN is inlined at build time, so an
+          // empty value here means it was absent when this deployment was
+          // built — setting it in the dashboard afterwards changes nothing
+          // until a rebuild.
+          set({ checkoutError: 'not-configured' })
           return
         }
 
@@ -192,7 +246,15 @@ export const useCartStore = create<CartState>()(
           return
         }
 
-        set({ isLoading: true })
+        // A cart built from the static fallback catalog can never check out:
+        // Shopify does not know these ids. Failing here names the cause;
+        // sending the request would return an opaque userError instead.
+        if (items.some((item) => isPlaceholderVariantId(item.variantId))) {
+          set({ checkoutError: 'placeholder-catalog' })
+          return
+        }
+
+        set({ isLoading: true, checkoutError: null })
 
         try {
           const lines: SyncLine[] = items.map((item) => ({
@@ -209,10 +271,15 @@ export const useCartStore = create<CartState>()(
             : await createShopifyCart(lines)
 
           if (cart) {
-            set({ shopifyCartId: cart.id, checkoutUrl: cart.checkoutUrl })
+            set({ shopifyCartId: cart.id, checkoutUrl: cart.checkoutUrl, checkoutError: null })
+          } else {
+            // Shopify answered but produced no cart — a userError on create or
+            // on the re-add path. Already logged in detail by the helpers.
+            set({ checkoutError: 'shopify-error' })
           }
         } catch (err) {
           console.warn('[HJ] Shopify cart sync failed — local cart still active', err)
+          set({ checkoutError: 'network' })
         } finally {
           set({ isLoading: false })
         }
@@ -241,12 +308,24 @@ export const useCartStore = create<CartState>()(
           return { getItem: () => null, setItem: () => {}, removeItem: () => {} }
         }
       }),
-      // Persist cart items, Shopify cart ID, and checkoutUrl; do not persist transient UI state
+      // Persist cart items, Shopify cart ID, and checkoutUrl; do not persist
+      // transient UI state, error reasons, or the hydration flag itself.
       partialize: (state) => ({
         items: state.items,
         shopifyCartId: state.shopifyCartId,
         checkoutUrl: state.checkoutUrl,
       }),
+      // Rehydration is async. Until it finishes, `items` is [] for every
+      // visitor — including ones with a full bag — so consumers that redirect
+      // on an empty bag need to know the difference between "empty" and "not
+      // read yet". Runs on error too: a storage failure must not leave the app
+      // waiting forever for a hydration that will never arrive.
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[HJ] cart rehydration failed', error)
+        }
+        state?.setHasHydrated(true)
+      },
     }
   )
 )

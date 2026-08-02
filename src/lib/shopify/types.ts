@@ -1,5 +1,7 @@
 // Healthy Jewelry — Shopify Storefront API TypeScript types
 
+import type { CurrencyCode } from '@/lib/utils/formatPrice'
+
 // ── Primitive Shopify types ────────────────────────────────────────────────
 
 export interface Money {
@@ -121,6 +123,15 @@ export interface HJProduct {
   tags: string[]
   price: string
   compareAtPrice: string | null
+  /**
+   * The currency Shopify will actually charge in.
+   *
+   * Carried from `priceRange.minVariantPrice.currencyCode` rather than assumed,
+   * because every price on the site was previously rendered as USD regardless.
+   * A store selling in VND would advertise "$89.00" and then charge ₫ at
+   * checkout — quoting a customer a price in a currency nobody is charging.
+   */
+  currencyCode: CurrencyCode
   badge: HJBadge
   description: string
   spec: string
