@@ -100,6 +100,7 @@ describe('Nav', () => {
               tags: [],
               price: '89.00',
               compareAtPrice: null,
+              currencyCode: 'USD',
               badge: null,
               description: 'Test',
               spec: '2mm',

@@ -5,6 +5,7 @@ import type { HJProduct } from '@/lib/shopify/types'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { Badge } from '@/components/ui/Badge'
 import { useReveal } from '@/lib/hooks/useReveal'
+import { formatPrice } from '@/lib/utils/formatPrice'
 
 interface HorizontalScrollProps {
   label: string
@@ -163,7 +164,7 @@ export function HorizontalScroll({ label, products, viewAllHref = '/shop' }: Hor
                   margin: 0,
                 }}
               >
-                ${product.price}
+                {formatPrice(product.price, product.currencyCode)}
               </p>
             </div>
           </Link>

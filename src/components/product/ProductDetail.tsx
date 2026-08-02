@@ -161,7 +161,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                 color: 'var(--ink)',
               }}
             >
-              {formatPrice(product.price, 'USD')}
+              {formatPrice(product.price, product.currencyCode)}
             </span>
 
             {product.compareAtPrice !== null && (
@@ -174,7 +174,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                   textDecoration: 'line-through',
                 }}
               >
-                {formatPrice(product.compareAtPrice, 'USD')}
+                {formatPrice(product.compareAtPrice, product.currencyCode)}
               </span>
             )}
           </div>

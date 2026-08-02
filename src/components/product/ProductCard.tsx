@@ -119,7 +119,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                 color: 'var(--ink)',
               }}
             >
-              {formatPrice(product.price, 'USD')}
+              {formatPrice(product.price, product.currencyCode)}
             </span>
 
             {product.compareAtPrice !== null && (
@@ -132,7 +132,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                   textDecoration: 'line-through',
                 }}
               >
-                {formatPrice(product.compareAtPrice, 'USD')}
+                {formatPrice(product.compareAtPrice, product.currencyCode)}
               </span>
             )}
           </div>

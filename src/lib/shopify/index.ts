@@ -1,4 +1,5 @@
 import { shopifyConfig } from '@/config/shopify'
+import type { CurrencyCode } from '@/lib/utils/formatPrice'
 import { shopifyFetch, ShopifyFetchError } from './client'
 import {
   GET_PRODUCT_BY_HANDLE,
@@ -25,6 +26,24 @@ import {
   hjCollections,
 } from '@/lib/data/hj-data'
 
+/**
+ * Narrows Shopify's free-form currency string to the codes formatPrice knows.
+ * An unrecognised code falls back to USD *and warns*, because silently
+ * mislabelling money is the failure this whole field exists to prevent.
+ */
+function normaliseCurrency(code: string | undefined): CurrencyCode {
+  const supported: readonly CurrencyCode[] = ['USD', 'VND', 'EUR', 'GBP']
+  if (code && (supported as readonly string[]).includes(code)) {
+    return code as CurrencyCode
+  }
+  if (code) {
+    console.warn(
+      `[shopify] unsupported currency "${code}" — falling back to USD. Add it to CurrencyCode in src/lib/utils/formatPrice.ts.`
+    )
+  }
+  return 'USD'
+}
+
 function isShopifyConfigured(): boolean {
   return !!(shopifyConfig.storefrontAccessToken && shopifyConfig.storeDomain)
 }
@@ -40,6 +59,11 @@ function mapShopifyProduct(node: Product): HJProduct {
 
   const priceAmount = node.priceRange?.minVariantPrice?.amount ?? '0'
   const price = parseFloat(priceAmount).toFixed(2)
+
+  // The currency Shopify will charge. Never assume USD: a VND store would
+  // otherwise have every price on the site rendered with a dollar sign while
+  // checkout charges dong.
+  const currencyCode = normaliseCurrency(node.priceRange?.minVariantPrice?.currencyCode)
 
   const compareAtAmount = node.compareAtPriceRange?.minVariantPrice?.amount ?? null
   // Shopify returns "0.0" (not null) when no compare-at price is set — guard against it
@@ -98,6 +122,7 @@ function mapShopifyProduct(node: Product): HJProduct {
     title: node.title,
     description: node.description,
     price,
+    currencyCode,
     compareAtPrice,
     collection,
     material,

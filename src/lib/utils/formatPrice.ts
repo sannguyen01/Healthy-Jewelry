@@ -9,12 +9,39 @@ export type CurrencyCode = 'USD' | 'VND' | 'EUR' | 'GBP'
 export function formatPrice(amount: string | number, currencyCode: CurrencyCode = 'USD'): string {
   const numeric = typeof amount === 'string' ? parseFloat(amount) : amount
 
+  // VND has no minor unit — "₫89.00" is wrong, and rendering two decimal
+  // places on a dong amount reads as a hundredfold error.
+  const fractionDigits = currencyCode === 'VND' ? 0 : 2
+
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currencyCode,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(numeric)
+}
+
+/**
+ * The currency a bag should be totalled in.
+ *
+ * A single Shopify store sells in one currency, so in practice every line
+ * agrees. This exists so the answer is defined rather than assumed: an empty
+ * bag falls back to USD, and a genuinely mixed bag takes the first line and
+ * warns instead of silently totalling two currencies into one number.
+ */
+export function cartCurrencyCode(
+  items: readonly { product: { currencyCode?: CurrencyCode } }[]
+): CurrencyCode {
+  const codes = new Set(
+    items.map((item) => item.product.currencyCode).filter((code): code is CurrencyCode => !!code)
+  )
+  if (codes.size === 0) return 'USD'
+  if (codes.size > 1) {
+    console.warn(
+      `[HJ] bag contains mixed currencies (${[...codes].join(', ')}) — totalling in ${[...codes][0]}`
+    )
+  }
+  return [...codes][0]
 }
 
 /**

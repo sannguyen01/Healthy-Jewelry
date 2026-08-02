@@ -1,7 +1,7 @@
 'use client'
 
 import { useCartStore } from '@/store/cart'
-import type { CartItem } from '@/store/cart'
+import type { CartItem, CheckoutError } from '@/store/cart'
 
 // Re-export the main store hook
 export { useCartStore }
@@ -46,4 +46,11 @@ export function useCheckoutUrl(): string | null {
  */
 export function useCartIsLoading(): boolean {
   return useCartStore((state) => state.isLoading)
+}
+
+/**
+ * Returns why the last checkout attempt failed, or null if none has.
+ */
+export function useCheckoutError(): CheckoutError | null {
+  return useCartStore((state) => state.checkoutError)
 }

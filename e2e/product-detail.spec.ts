@@ -25,8 +25,13 @@ test.describe('Product detail — ring', () => {
     await expect(h1).toBeVisible()
   })
 
-  test('shows price with dollar sign', async ({ page }) => {
-    await expect(page.getByText(/\$\d+/).first()).toBeVisible()
+  test('shows a formatted price in the store currency', async ({ page }) => {
+    // Not `/\$\d+/`. The price is now rendered in whatever currency Shopify
+    // charges, so pinning the dollar sign here would turn red the day a
+    // non-USD store connects — failing for correct behaviour. What matters is
+    // that a formatted amount is shown at all; `currency-consistency.test.tsx`
+    // owns the question of *which* currency.
+    await expect(page.getByText(/[$€£₫]\s?[\d,]+/).first()).toBeVisible()
   })
 
   test('shows product description', async ({ page }) => {

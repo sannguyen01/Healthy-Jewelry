@@ -7,7 +7,7 @@ vi.stubGlobal('fetch', mockFetch)
 
 const mockProduct: HJProduct = {
   id: 'hj-001',
-  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
+  defaultVariantId: 'gid://shopify/ProductVariant/44123456789',
   handle: 'arc-band',
   title: 'Arc Band',
   collection: 'rings',
@@ -15,6 +15,7 @@ const mockProduct: HJProduct = {
   tags: ['rings'],
   price: '89.00',
   compareAtPrice: null,
+  currencyCode: 'USD',
   badge: null,
   description: 'Test',
   spec: '2mm',

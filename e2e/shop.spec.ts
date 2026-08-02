@@ -30,8 +30,9 @@ test.describe('Shop page', () => {
   })
 
   test('each product card shows a price', async ({ page }) => {
+    // Currency-agnostic on purpose — see product-detail.spec.ts.
     const firstCard = page.locator('article').first()
-    await expect(firstCard.getByText(/\$/)).toBeVisible()
+    await expect(firstCard.getByText(/[$€£₫]\s?[\d,]+/)).toBeVisible()
   })
 
   test('shows all 5 collection filter options', async ({ page }) => {
