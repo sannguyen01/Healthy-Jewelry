@@ -33,7 +33,15 @@ export function ProductDetail({ product }: ProductDetailProps) {
         v.selectedOptions.some((o) => o.name === 'Size' && o.value === selectedSize)
       )
     : undefined
-  const canAddToBag = !requiresSize || selectedVariant !== undefined
+  // Unsized products carry exactly one ('Default') variant — that one stands
+  // in for "the product" when checking availability outside a size context.
+  const relevantVariant = requiresSize ? selectedVariant : product.variants[0]
+  const isSoldOut =
+    product.variants.length > 0 && product.variants.every((v) => !v.availableForSale)
+  const variantSoldOut = relevantVariant !== undefined && !relevantVariant.availableForSale
+  const canAddToBag = requiresSize
+    ? selectedVariant !== undefined && !variantSoldOut
+    : !variantSoldOut
 
   function handleAddToBag() {
     if (!canAddToBag) return
@@ -90,11 +98,17 @@ export function ProductDetail({ product }: ProductDetailProps) {
             justifyContent: 'center',
           }}
         >
-          {/* Badge */}
-          {product.badge !== null && (
+          {/* Badge — sold-out status pre-empts promotional badges */}
+          {isSoldOut ? (
             <div>
-              <ProductBadge badge={product.badge} />
+              <span className="badge">Sold Out</span>
             </div>
+          ) : (
+            product.badge !== null && (
+              <div>
+                <ProductBadge badge={product.badge} />
+              </div>
+            )
           )}
 
           {/* Title */}
@@ -217,10 +231,16 @@ export function ProductDetail({ product }: ProductDetailProps) {
             aria-label={
               requiresSize && !selectedVariant
                 ? `Select a size before adding ${product.title} to bag`
-                : `Add ${product.title} to bag`
+                : variantSoldOut
+                  ? `${product.title} is sold out`
+                  : `Add ${product.title} to bag`
             }
           >
-            {requiresSize && !selectedVariant ? 'Select a Size' : 'Add to Bag'}
+            {requiresSize && !selectedVariant
+              ? 'Select a Size'
+              : variantSoldOut
+                ? 'Sold Out'
+                : 'Add to Bag'}
           </button>
 
           {/* Trust signals */}

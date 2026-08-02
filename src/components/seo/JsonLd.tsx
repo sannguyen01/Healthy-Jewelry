@@ -3,6 +3,7 @@
 
 import type { HJProduct } from '@/lib/shopify/types'
 import { SITE_NAME, SITE_URL } from '@/config/site'
+import type { BreadcrumbItem } from './Breadcrumbs'
 
 // ── Material handle → full name map ───────────────────────────────────────
 
@@ -33,7 +34,13 @@ export function productJsonLd(product: HJProduct): Record<string, unknown> {
       // result — wrong in the one place a customer sees a price before they
       // ever reach the site.
       priceCurrency: product.currencyCode,
-      availability: 'https://schema.org/InStock',
+      // Same "every variant unavailable" rule the UI uses (ProductCard,
+      // ProductDetail) — empty variants means no signal, not confirmed
+      // out of stock, so it still reads InStock.
+      availability:
+        product.variants.length > 0 && product.variants.every((v) => !v.availableForSale)
+          ? 'https://schema.org/OutOfStock'
+          : 'https://schema.org/InStock',
       url: `${SITE_URL}/products/${product.handle}`,
     },
   }
@@ -63,6 +70,21 @@ export function organizationJsonLd(): Record<string, unknown> {
   }
 }
 
+// ── Helper: breadcrumbJsonLd ───────────────────────────────────────────────
+
+export function breadcrumbJsonLd(items: BreadcrumbItem[]): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.label,
+      ...(item.href ? { item: `${SITE_URL}${item.href}` } : {}),
+    })),
+  }
+}
+
 // ── Helper: webSiteJsonLd ──────────────────────────────────────────────────
 
 export function webSiteJsonLd(): Record<string, unknown> {
@@ -85,18 +107,16 @@ export function webSiteJsonLd(): Record<string, unknown> {
 // ── Component ──────────────────────────────────────────────────────────────
 
 interface JsonLdProps {
-  type: 'Product' | 'Organization' | 'WebSite'
+  type: 'Product' | 'Organization' | 'WebSite' | 'BreadcrumbList'
   data: Record<string, unknown>
 }
 
 export function JsonLd({ data }: JsonLdProps) {
-  // Safe: data is server-generated structured data only, never user-supplied HTML.
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
-    />
-  )
+  // Data is server-generated structured data (Shopify catalog fields), never
+  // end-user input. Still escaping "<" as defense-in-depth: a catalog field
+  // containing "</script>" would otherwise break out of this tag.
+  const json = JSON.stringify(data).replace(/</g, '\\u003c')
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: json }} />
 }
 
 export default JsonLd

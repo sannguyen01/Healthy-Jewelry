@@ -94,7 +94,7 @@ homepage hero is the one exception, since it owns `--text-hero`.
 
 ## Architecture Principles
 - Server Components by default; `'use client'` only for interactive elements
-- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer/CartDrawer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs)
+- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer/CartDrawer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
 - Data: `src/lib/data/hj-data.ts` — typed product catalog (static, Shopify-ready)
 - Shopify: `src/lib/shopify/` — client, queries, mutations, types
 - Store: `src/store/cart.ts` — Zustand cart with persist

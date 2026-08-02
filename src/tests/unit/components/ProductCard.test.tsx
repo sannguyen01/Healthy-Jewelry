@@ -118,6 +118,49 @@ describe('ProductCard', () => {
     })
   })
 
+  describe('sold out', () => {
+    const soldOutVariant = {
+      id: 'gid://shopify/ProductVariant/hj-001-default',
+      title: 'Default',
+      price: { amount: '89.00', currencyCode: 'USD' },
+      compareAtPrice: null,
+      availableForSale: false,
+      selectedOptions: [],
+    }
+
+    it('does not render Sold Out when variants is empty (no availability signal)', () => {
+      render(<ProductCard product={baseProduct} />)
+      expect(screen.queryByText('Sold Out')).toBeNull()
+    })
+
+    it('renders Sold Out when every variant is unavailable', () => {
+      render(<ProductCard product={{ ...baseProduct, variants: [soldOutVariant] }} />)
+      expect(screen.getByText('Sold Out')).toBeTruthy()
+    })
+
+    it('does not render Sold Out when at least one variant is available', () => {
+      render(
+        <ProductCard
+          product={{
+            ...baseProduct,
+            variants: [soldOutVariant, { ...soldOutVariant, id: 'v2', availableForSale: true }],
+          }}
+        />
+      )
+      expect(screen.queryByText('Sold Out')).toBeNull()
+    })
+
+    it('Sold Out pre-empts the promotional badge', () => {
+      render(
+        <ProductCard
+          product={{ ...baseProduct, badge: 'Bestseller', variants: [soldOutVariant] }}
+        />
+      )
+      expect(screen.getByText('Sold Out')).toBeTruthy()
+      expect(screen.queryByText('Bestseller')).toBeNull()
+    })
+  })
+
   describe('className prop', () => {
     it('appends custom className to the article', () => {
       const { container } = render(

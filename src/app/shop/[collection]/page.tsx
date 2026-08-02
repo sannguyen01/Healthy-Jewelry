@@ -4,6 +4,8 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductGrid } from '@/components/product/ProductGrid'
+import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
+import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import { hjCollections } from '@/lib/data/hj-data'
 import { getProductsByCollection } from '@/lib/shopify'
 import type { HJCollectionHandle } from '@/lib/shopify/types'
@@ -32,9 +34,7 @@ interface CollectionPageProps {
   params: Promise<{ collection: string }>
 }
 
-export async function generateMetadata({
-  params,
-}: CollectionPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: CollectionPageProps): Promise<Metadata> {
   const { collection } = await params
   const col = hjCollections.find((c) => c.handle === collection)
   if (!col) {
@@ -57,10 +57,19 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
   const col = hjCollections.find((c) => c.handle === handle)
   const products = await getProductsByCollection(handle)
 
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: 'Shop', href: '/shop' },
+    { label: col?.title ?? handle },
+  ]
+
   return (
     <>
+      <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
       <main style={{ paddingTop: '64px' }}>
+        <Breadcrumbs items={breadcrumbItems} />
+
         {/* Collection header */}
         <section
           style={{

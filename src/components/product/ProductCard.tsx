@@ -12,6 +12,13 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
+  // availableForSale comes from Shopify per variant; the static fallback
+  // catalog hardcodes every variant to true, so this only activates once
+  // real inventory data flows through. No variants means no availability
+  // signal at all, not a confirmed sold-out state.
+  const isSoldOut =
+    product.variants.length > 0 && product.variants.every((v) => !v.availableForSale)
+
   return (
     <Link
       href={`/products/${product.handle}`}
@@ -48,11 +55,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             position: 'relative',
           }}
         >
-          <JewelrySVG
-            type={product.svgType}
-            className=""
-            style={{ width: '65%', height: '65%' }}
-          />
+          <JewelrySVG type={product.svgType} className="" style={{ width: '65%', height: '65%' }} />
 
           {/* Spec overlay — revealed on hover */}
           <p
@@ -76,11 +79,17 @@ export function ProductCard({ product, className }: ProductCardProps) {
           </p>
         </div>
 
-        {/* Badge — absolute top-left */}
-        {product.badge !== null && (
+        {/* Badge — absolute top-left. Sold-out status pre-empts promotional badges. */}
+        {isSoldOut ? (
           <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
-            <ProductBadge badge={product.badge} />
+            <span className="badge">Sold Out</span>
           </div>
+        ) : (
+          product.badge !== null && (
+            <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
+              <ProductBadge badge={product.badge} />
+            </div>
+          )
         )}
 
         {/* Info bar */}
@@ -98,9 +107,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             {product.title}
           </p>
 
-          <span className="material-tag">
-            {product.material.replace('-', ' ').toUpperCase()}
-          </span>
+          <span className="material-tag">{product.material.replace('-', ' ').toUpperCase()}</span>
 
           {/* Price row */}
           <div
