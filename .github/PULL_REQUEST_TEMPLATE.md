@@ -17,10 +17,10 @@ Closes #<!-- issue number -->
 
 ## Checklist
 
-- [ ] `npm run lint` passes locally
-- [ ] `npx tsc --noEmit` passes locally
-- [ ] `npm run test` passes locally
-- [ ] New utility functions have unit tests in `tests/unit/`
+- [ ] `pnpm lint` passes locally
+- [ ] `pnpm type-check` passes locally
+- [ ] `pnpm exec vitest run` passes locally
+- [ ] New utility functions have unit tests in `src/tests/unit/`
 - [ ] No hardcoded hex colour values (use `--hj-*` tokens)
 - [ ] No hardcoded product data in page components (use `lib/shopify/` or `lib/data/hj-data.ts`)
 - [ ] All copy matches brand voice guidelines in `CLAUDE.md §1`

@@ -270,6 +270,51 @@ describe('ProductDetail', () => {
     })
   })
 
+  describe('sold out', () => {
+    it('disables Add to Bag and shows "Sold Out" for an unsized product with no availability', () => {
+      const soldOutEarring = {
+        ...earringProduct,
+        variants: earringProduct.variants.map((v) => ({ ...v, availableForSale: false })),
+      }
+      render(<ProductDetail product={soldOutEarring} />)
+      const button = screen.getByRole('button', { name: /disc studs is sold out/i })
+      expect(button).toBeDisabled()
+    })
+
+    it('clicking the sold-out button does not add anything to the cart', () => {
+      const soldOutEarring = {
+        ...earringProduct,
+        variants: earringProduct.variants.map((v) => ({ ...v, availableForSale: false })),
+      }
+      render(<ProductDetail product={soldOutEarring} />)
+      fireEvent.click(screen.getByRole('button', { name: /disc studs is sold out/i }))
+      expect(useCartStore.getState().items).toHaveLength(0)
+    })
+
+    it('disables Add to Bag for a sold-out size once selected, on a sized product', () => {
+      const soldOutSize9 = {
+        ...ringProduct,
+        variants: ringProduct.variants.map((v) =>
+          v.selectedOptions.some((o) => o.value === '9') ? { ...v, availableForSale: false } : v
+        ),
+      }
+      render(<ProductDetail product={soldOutSize9} />)
+      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
+      const button = screen.getByRole('button', { name: /arc band is sold out/i })
+      expect(button).toBeDisabled()
+    })
+
+    it('shows the Sold Out badge instead of the promotional badge when every variant is unavailable', () => {
+      const soldOutRing = {
+        ...ringProduct,
+        variants: ringProduct.variants.map((v) => ({ ...v, availableForSale: false })),
+      }
+      render(<ProductDetail product={soldOutRing} />)
+      expect(screen.getByText('Sold Out')).toBeTruthy()
+      expect(screen.queryByText('Bestseller')).toBeNull()
+    })
+  })
+
   describe('trust signals', () => {
     it('shows IMPLANT GRADE trust signal', () => {
       render(<ProductDetail product={ringProduct} />)

@@ -1,15 +1,14 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { HorizontalScroll } from '@/components/home/HorizontalScroll'
-import { getAllProducts, getProductByHandle } from '@/lib/data/hj-data'
+import { getAllProducts, getProductByHandle, hjCollections } from '@/lib/data/hj-data'
 import { getProduct, getProductsByCollection } from '@/lib/shopify'
-import { JsonLd, productJsonLd } from '@/components/seo/JsonLd'
-import { SITE_URL } from '@/config/site'
+import { JsonLd, productJsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
+import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 
 interface ProductPageProps {
   params: Promise<{ handle: string }>
@@ -43,71 +42,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
     (p) => p.id !== product.id
   )
 
+  // Matches the title shown on /shop/[collection] rather than the raw
+  // handle, so JSON-LD and the rendered breadcrumb agree on the same name.
+  const collectionTitle =
+    hjCollections.find((c) => c.handle === product.collection)?.title ?? product.collection
+
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: 'Shop', href: '/shop' },
+    { label: collectionTitle, href: `/shop/${product.collection}` },
+    { label: product.title },
+  ]
+
   return (
     <>
       <JsonLd type="Product" data={productJsonLd(product)} />
-      <JsonLd
-        type="Organization"
-        data={{
-          '@context': 'https://schema.org',
-          '@type': 'BreadcrumbList',
-          itemListElement: [
-            { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
-            { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE_URL}/shop` },
-            {
-              '@type': 'ListItem',
-              position: 3,
-              name: product.collection,
-              item: `${SITE_URL}/shop/${product.collection}`,
-            },
-            {
-              '@type': 'ListItem',
-              position: 4,
-              name: product.title,
-              item: `${SITE_URL}/products/${product.handle}`,
-            },
-          ],
-        }}
-      />
+      <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
       <main style={{ paddingTop: '64px' }}>
-        {/* Breadcrumbs */}
-        <style>{`
-          .hj-bc-link { color: var(--graphite); text-decoration: none; transition: color 0.2s ease; }
-          .hj-bc-link:hover { color: var(--ink); }
-        `}</style>
-        <nav
-          aria-label="Breadcrumb"
-          style={{
-            padding: '20px var(--space-gutter) 0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-xs)',
-            color: 'var(--graphite)',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-          }}
-        >
-          <Link href="/" className="hj-bc-link">
-            Home
-          </Link>
-          <span aria-hidden="true">›</span>
-          <Link href="/shop" className="hj-bc-link">
-            Shop
-          </Link>
-          <span aria-hidden="true">›</span>
-          <Link
-            href={`/shop/${product.collection}`}
-            className="hj-bc-link"
-            style={{ textTransform: 'capitalize' }}
-          >
-            {product.collection}
-          </Link>
-          <span aria-hidden="true">›</span>
-          <span style={{ color: 'var(--ink)' }}>{product.title}</span>
-        </nav>
+        <Breadcrumbs items={breadcrumbItems} />
 
         {/* Product detail */}
         <section

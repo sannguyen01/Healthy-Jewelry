@@ -77,9 +77,12 @@ homepage hero is the one exception, since it owns `--text-hero`.
 ## Homepage Section Sequence
 1. Hero — **two compositions, breakpoint at 900px**:
    - **≥901px**: full viewport split. Copy left on `--bg`, "Euro Summer" lifestyle photo right, fading
-     into `--bg` across a 180px strip (`--hj-hero-fade`), plus the ring-arc SVG at low opacity.
+     into `--bg` across a 180px strip (`--hj-hero-fade`). No decorative overlay on the photo itself —
+     the ring-arc SVG background ornament was removed (2026-08-03): it sat directly on top of the
+     photograph at `right: -120px`, and a translucent circular outline stacked on a rectangular
+     scrim gradient read as a distorted double-overlay, not a deliberate composition.
    - **≤900px**: stacked. Copy on `--bg`, photo as a full-width 16:9 band beneath it, `object-position:
-     center`; scrim, ring and scroll cue hidden. The split cannot survive here — its fade is measured
+     center`; scrim and scroll cue hidden. The split cannot survive here — its fade is measured
      from the scrim's own right edge, so below ~866px the opaque zone slides under the copy, and at
      390px the `right center` crop discards 75% of the frame including the subject.
    - Enforced across six widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
@@ -94,7 +97,7 @@ homepage hero is the one exception, since it owns `--text-hero`.
 
 ## Architecture Principles
 - Server Components by default; `'use client'` only for interactive elements
-- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer/CartDrawer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs)
+- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer/CartDrawer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
 - Data: `src/lib/data/hj-data.ts` — typed product catalog (static, Shopify-ready)
 - Shopify: `src/lib/shopify/` — client, queries, mutations, types
 - Store: `src/store/cart.ts` — Zustand cart with persist

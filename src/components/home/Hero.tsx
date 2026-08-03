@@ -3,7 +3,6 @@
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { JewelrySVG } from '@/components/svg/JewelrySVG'
 
 export function Hero() {
   const contentRef = useRef<HTMLDivElement>(null)
@@ -85,25 +84,6 @@ export function Hero() {
               'linear-gradient(90deg, var(--bg) 0, var(--bg) calc(100% - 180px), rgba(247,245,241,0.56) calc(100% - 135px), rgba(247,245,241,0.25) calc(100% - 90px), rgba(247,245,241,0.06) calc(100% - 45px), rgba(247,245,241,0) 100%)',
           }}
         />
-      </div>
-
-      {/* Background ring — large, right side, very faint */}
-      <div
-        className="hj-hero-ring"
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          right: '-120px',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 'min(60vw, 640px)',
-          height: 'min(60vw, 640px)',
-          opacity: 0.06,
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      >
-        <JewelrySVG type="ring-arc" className="w-full h-full" />
       </div>
 
       {/* Left-aligned content */}
@@ -286,9 +266,8 @@ export function Hero() {
             display: none !important;
           }
 
-          /* Both are positioned for the split layout; the scroll cue in
-             particular lands on the photograph once the section stacks. */
-          .hj-hero-ring,
+          /* Positioned for the split layout; the scroll cue lands on the
+             photograph once the section stacks. */
           .hj-hero-scroll {
             display: none !important;
           }

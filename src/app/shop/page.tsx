@@ -3,7 +3,11 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductGrid } from '@/components/product/ProductGrid'
+import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
+import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import { getProducts } from '@/lib/shopify'
+
+const BREADCRUMB_ITEMS = [{ label: 'Home', href: '/' }, { label: 'Shop' }]
 
 export const metadata: Metadata = {
   title: 'Shop All',
@@ -16,8 +20,11 @@ export default async function ShopPage() {
 
   return (
     <>
+      <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(BREADCRUMB_ITEMS)} />
       <Nav />
       <main style={{ paddingTop: '64px' }}>
+        <Breadcrumbs items={BREADCRUMB_ITEMS} />
+
         {/* Section header */}
         <section
           style={{
