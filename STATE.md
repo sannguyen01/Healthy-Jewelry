@@ -5,14 +5,19 @@ Last refreshed by hand: 2026-08-01
 
 ## High Priority (loop is acting or waiting on human)
 
-- [ ] VERCEL-ENV — 8 Vercel env vars not yet set (Shopify tokens, site URL,
-  webhook/revalidation secrets, Resend key, Upstash Redis URL+token)
+- [ ] VERCEL-ENV — 4 of 8 Vercel env vars confirmed set in Production as of
+  2026-08-04 (`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`,
+  `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_REVALIDATION_SECRET` — verified
+  via `vercel env ls production` + `vercel env pull`). Still unset: Resend
+  key, Upstash Redis URL+token, and the webhook secret (see SHOPIFY-WEBHOOK).
   Loop action: report only, never propose setting these yourself
   Human decision: pending
-  **2026-08-04 update**: if `NEXT_PUBLIC_SITE_URL` is ever set explicitly in
-  Vercel, it must be `https://healthyjewellery.com` (double-L) — see
-  DOMAIN-MISMATCH below. Until set, the code's own fallback now matches, so
-  this is a should-set, not a currently-broken, item.
+  **2026-08-04 update**: `NEXT_PUBLIC_SITE_URL` is confirmed set to
+  `https://healthyjewellery.com` (double-L) — correct. DNS for the domain is
+  fully delegated to Vercel nameservers (no split authority with Shopify);
+  the only Shopify-owned record is the `checkout` CNAME to
+  `shops.myshopify.com`, which is the expected shape for this headless
+  architecture, not a conflict.
 - [ ] SHOPIFY-WEBHOOK — Shopify webhook not yet registered to `/api/webhooks/shopify`
   Loop action: report only
   Human decision: pending
@@ -36,7 +41,17 @@ Last refreshed by hand: 2026-08-01
 
 ## Watch List
 
-- (empty)
+- **Branch coordination (2026-08-05)**: `integrate/shopify-transactions`
+  (worktree `.claude/worktrees/agent-ab8803cce02d5162f`) is mid-merge with 28
+  unresolved conflicts as of this note — active work, not touched here. It
+  branched from `origin/main` at `f3de8d2` (PR #13), which predates PR #14
+  (`chore/audit-docs-and-gaps` → domain-drift fix, `src/config/site.ts` and
+  ~20 consumers). Three files are live conflicts *there* and also touched by
+  #14: `e2e/checkout.spec.ts`, `e2e/contact.spec.ts`,
+  `src/components/seo/JsonLd.tsx`. Once #14 merges, that branch should
+  rebase/merge `main` — resolving those three conflicts against pre-#14
+  content would silently reintroduce the single-L domain in JSON-LD and the
+  e2e specs.
 
 ## Resolved
 
