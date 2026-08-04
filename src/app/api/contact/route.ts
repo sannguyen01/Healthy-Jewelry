@@ -9,6 +9,7 @@ import {
   validateMessage,
   sanitizeSubject,
 } from '@/lib/utils/contactValidation'
+import { CONTACT_EMAIL, SENDER_EMAIL } from '@/config/site'
 
 // Serverless-safe rate limiting.
 // Production: set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN in Vercel env vars
@@ -108,8 +109,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cleanSubject = sanitizeSubject(subject)
     const resend = new Resend(apiKey)
     await resend.emails.send({
-      from: 'Healthy Jewelry Contact <contact@healthyjewelry.com>',
-      to: ['hello@healthyjewelry.com'],
+      from: `Healthy Jewelry Contact <${SENDER_EMAIL}>`,
+      to: [CONTACT_EMAIL],
       replyTo: email,
       subject: `[Contact] ${cleanSubject} — ${name}`,
       text: `Name: ${name}\nEmail: ${email}\nSubject: ${cleanSubject}\n\nMessage:\n${message}`,

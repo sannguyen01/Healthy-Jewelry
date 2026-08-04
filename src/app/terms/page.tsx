@@ -3,6 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { CONTACT_EMAIL, SITE_DOMAIN } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
@@ -54,7 +55,7 @@ export default function TermsPage() {
             maxWidth: '800px',
           }}
         >
-<PageHeader eyebrow="Terms" title="Terms of Service" variant="compact" />
+          <PageHeader eyebrow="Terms" title="Terms of Service" variant="compact" />
           <p style={{ ...bodyStyle, color: 'var(--graphite)' }}>Last updated: January 2026</p>
         </section>
 
@@ -81,9 +82,9 @@ export default function TermsPage() {
           <div>
             <h2 style={sectionHeadStyle}>Acceptance of Terms</h2>
             <p style={bodyStyle}>
-              By accessing or using the Healthy Jewelry website (healthyjewelry.com) or placing an
-              order, you agree to be bound by these Terms of Service. If you do not agree, please do
-              not use our site or services.
+              By accessing or using the Healthy Jewelry website ({SITE_DOMAIN}) or placing an order,
+              you agree to be bound by these Terms of Service. If you do not agree, please do not
+              use our site or services.
             </p>
             <p style={bodyStyle}>
               These terms apply to all visitors, customers, and others who access or use our
@@ -173,10 +174,10 @@ export default function TermsPage() {
               physical damage from impact, loss, or damage from improper use (e.g., exposure to
               concentrated chemicals or extreme heat). To make a warranty claim, email{' '}
               <a
-                href="mailto:hello@healthyjewelry.com"
+                href={`mailto:${CONTACT_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                hello@healthyjewelry.com
+                {CONTACT_EMAIL}
               </a>{' '}
               with your order number and a description of the issue.
             </p>
@@ -207,10 +208,10 @@ export default function TermsPage() {
             <p style={bodyStyle}>
               Contact us at{' '}
               <a
-                href="mailto:hello@healthyjewelry.com"
+                href={`mailto:${CONTACT_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                hello@healthyjewelry.com
+                {CONTACT_EMAIL}
               </a>{' '}
               before any formal proceedings.
             </p>
@@ -223,10 +224,10 @@ export default function TermsPage() {
             <p style={bodyStyle}>
               <strong>Email:</strong>{' '}
               <a
-                href="mailto:hello@healthyjewelry.com"
+                href={`mailto:${CONTACT_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                hello@healthyjewelry.com
+                {CONTACT_EMAIL}
               </a>
               <br />
               <strong>Address:</strong> Healthy Jewelry

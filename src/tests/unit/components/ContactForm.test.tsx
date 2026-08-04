@@ -231,9 +231,9 @@ describe('ContactForm', () => {
     await user.click(screen.getByRole('button', { name: /send message/i }))
 
     await waitFor(() => {
-      const link = screen.getByRole('link', { name: /hello@healthyjewelry\.com/i })
+      const link = screen.getByRole('link', { name: /hello@healthyjewellery\.com/i })
       expect(link).toBeInTheDocument()
-      expect(link).toHaveAttribute('href', 'mailto:hello@healthyjewelry.com')
+      expect(link).toHaveAttribute('href', 'mailto:hello@healthyjewellery.com')
     })
   })
 

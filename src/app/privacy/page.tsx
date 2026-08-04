@@ -3,6 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { PRIVACY_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
@@ -53,7 +54,7 @@ export default function PrivacyPage() {
             maxWidth: '800px',
           }}
         >
-<PageHeader eyebrow="Privacy" title="Privacy Policy" variant="compact" />
+          <PageHeader eyebrow="Privacy" title="Privacy Policy" variant="compact" />
           <p style={{ ...bodyStyle, color: 'var(--graphite)' }}>Last updated: January 2026</p>
         </section>
 
@@ -189,10 +190,10 @@ export default function PrivacyPage() {
             <p style={bodyStyle}>
               To exercise any of these rights, email us at{' '}
               <a
-                href="mailto:privacy@healthyjewelry.com"
+                href={`mailto:${PRIVACY_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                privacy@healthyjewelry.com
+                {PRIVACY_EMAIL}
               </a>
               . We will respond within 30 days.
             </p>
@@ -205,10 +206,10 @@ export default function PrivacyPage() {
             <p style={bodyStyle}>
               <strong>Email:</strong>{' '}
               <a
-                href="mailto:privacy@healthyjewelry.com"
+                href={`mailto:${PRIVACY_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                privacy@healthyjewelry.com
+                {PRIVACY_EMAIL}
               </a>
               <br />
               <strong>Address:</strong> Healthy Jewelry

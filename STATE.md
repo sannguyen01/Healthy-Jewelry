@@ -9,6 +9,10 @@ Last refreshed by hand: 2026-08-01
   webhook/revalidation secrets, Resend key, Upstash Redis URL+token)
   Loop action: report only, never propose setting these yourself
   Human decision: pending
+  **2026-08-04 update**: if `NEXT_PUBLIC_SITE_URL` is ever set explicitly in
+  Vercel, it must be `https://healthyjewellery.com` (double-L) — see
+  DOMAIN-MISMATCH below. Until set, the code's own fallback now matches, so
+  this is a should-set, not a currently-broken, item.
 - [ ] SHOPIFY-WEBHOOK — Shopify webhook not yet registered to `/api/webhooks/shopify`
   Loop action: report only
   Human decision: pending
@@ -36,6 +40,26 @@ Last refreshed by hand: 2026-08-01
 
 ## Resolved
 
+- [x] DOMAIN-MISMATCH — resolved 2026-08-04. `healthyjewelry.com` (single-L)
+  was hardcoded as the canonical domain in ~20 files (metadata, sitemap,
+  `robots.txt`, JSON-LD, CI defaults, and every contact/legal email:
+  `hello@`, `support@`, `privacy@`, `legal@`, `contact@`). That domain is not
+  owned by this brand — its nameservers are `ns1/ns2.afternic.com` (GoDaddy's
+  resale marketplace) and it carries an explicit null MX record (RFC 7505),
+  so every one of those mailto links has been bouncing mail silently. The
+  live, owned, Vercel-deployed domain is `healthyjewellery.com` (double-L),
+  confirmed via Mat Bao's registrar panel, Vercel's authoritative NS
+  delegation, a live HTTP 200 with real page content, and this repo's own
+  README (`instagram.com/healthyjewellery`). Fixed at the source
+  (`src/config/site.ts`: `SITE_URL`, `SOCIAL_LINKS`, `CONTACT_EMAIL`,
+  `SUPPORT_EMAIL`, plus new `PRIVACY_EMAIL` / `LEGAL_EMAIL` / `SENDER_EMAIL` /
+  `SITE_DOMAIN`), with every consumer refactored to import rather than
+  retype, a build-time guard that throws if the env var ever regresses to the
+  wrong domain, `src/tests/unit/domain-consistency.test.ts` re-scanning the
+  whole tree every CI run, and an ESLint rule
+  (`eslint-rules/no-hardcoded-domain.js`) that fails `pnpm lint` on any new
+  hardcoded literal outside `config/site.ts`. Separately: `.env.local.example`
+  had carried a *third* spelling (`healthyjewelry.vn`) — also corrected.
 - [x] MAIN-CI-FAILING — resolved 2026-08-01. `main`'s CI had failed on every
   push since 2026-06-29. PR #9 found the cause was not one bug but a suite that
   had never passed: 24.2 min, 24 failures, of which 10 were specs describing

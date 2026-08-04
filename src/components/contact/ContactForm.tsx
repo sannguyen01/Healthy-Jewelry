@@ -7,6 +7,7 @@ import {
   validateSubject,
   validateMessage,
 } from '@/lib/utils/contactValidation'
+import { CONTACT_EMAIL } from '@/config/site'
 
 type FormStatus = 'idle' | 'sending' | 'sent' | 'error'
 
@@ -283,10 +284,10 @@ export function ContactForm() {
           >
             {errorMessage} Try emailing us directly at{' '}
             <a
-              href="mailto:hello@healthyjewelry.com"
+              href={`mailto:${CONTACT_EMAIL}`}
               style={{ color: 'var(--ink)', textDecoration: 'underline' }}
             >
-              hello@healthyjewelry.com
+              {CONTACT_EMAIL}
             </a>
           </p>
         )}

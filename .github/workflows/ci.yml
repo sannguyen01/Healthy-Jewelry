@@ -62,7 +62,7 @@ jobs:
       - name: Unit tests
         run: pnpm exec vitest run
         env:
-          NEXT_PUBLIC_SITE_URL: https://healthyjewelry.com
+          NEXT_PUBLIC_SITE_URL: https://healthyjewellery.com
 
       # Next's incremental build cache. Restored before the build and *not*
       # shipped in the artifact below, so it speeds the build up without

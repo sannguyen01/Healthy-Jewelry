@@ -18,7 +18,7 @@ test.describe('Contact page — layout', () => {
   })
 
   test('contact info shows email address', async ({ page }) => {
-    await expect(page.getByText(/hello@healthyjewelry\.com/)).toBeVisible()
+    await expect(page.getByText(/hello@healthyjewellery\.com/)).toBeVisible()
   })
 
   test('contact info shows response time label', async ({ page }) => {
@@ -30,9 +30,10 @@ test.describe('Contact page — layout', () => {
   })
 
   test('materials guide link navigates to /materials', async ({ page }) => {
-    await expect(
-      page.getByRole('link', { name: /view materials guide/i }),
-    ).toHaveAttribute('href', '/materials')
+    await expect(page.getByRole('link', { name: /view materials guide/i })).toHaveAttribute(
+      'href',
+      '/materials'
+    )
   })
 })
 
@@ -84,9 +85,9 @@ test.describe('Contact form — submission', () => {
 
     await page.getByLabel(/^name$/i).fill('San Nguyen')
     await page.getByLabel(/^email$/i).fill('san@example.com')
-    await page.getByLabel(/^message$/i).fill(
-      'Hello, I have a question about titanium rings and sizing.',
-    )
+    await page
+      .getByLabel(/^message$/i)
+      .fill('Hello, I have a question about titanium rings and sizing.')
 
     await page.getByRole('button', { name: /send message/i }).click()
 
@@ -94,9 +95,7 @@ test.describe('Contact form — submission', () => {
     await expect(page.getByText(/message sent/i)).toBeVisible({ timeout: 8000 })
 
     // Form is replaced by success state — submit button should be gone
-    await expect(
-      page.getByRole('button', { name: /send message/i }),
-    ).not.toBeVisible()
+    await expect(page.getByRole('button', { name: /send message/i })).not.toBeVisible()
   })
 
   test('success message includes follow-up copy', async ({ page }) => {
@@ -179,6 +178,6 @@ test.describe('Contact form — submission', () => {
     await page.getByRole('button', { name: /send message/i }).click()
 
     await expect(page.getByText(/something went wrong/i)).toBeVisible({ timeout: 8000 })
-    await expect(page.getByRole('link', { name: /hello@healthyjewelry\.com/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /hello@healthyjewellery\.com/i })).toBeVisible()
   })
 })

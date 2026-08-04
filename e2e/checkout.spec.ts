@@ -189,7 +189,7 @@ test.describe('Checkout — failure is visible to the customer', () => {
     await expect(page.getByRole('button', { name: /try again/i })).toBeVisible()
     await expect(page.getByRole('link', { name: /email us/i })).toHaveAttribute(
       'href',
-      /^mailto:hello@healthyjewelry\.com/
+      /^mailto:hello@healthyjewellery\.com/
     )
     await expect(page.getByRole('link', { name: /back to bag/i })).toBeVisible()
   })

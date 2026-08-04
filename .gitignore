@@ -8,6 +8,9 @@
 /coverage
 /playwright-report
 /test-results
+/artifacts
+/temp
+/docs/index.html
 
 # next.js
 /.next/
@@ -34,6 +37,7 @@ yarn-error.log*
 
 # agent session state
 .omc/
+.claude/worktrees/
 
 # typescript
 *.tsbuildinfo
