@@ -12,12 +12,16 @@ import { shopifyConfig, REVALIDATE } from '@/config/shopify'
 import {
   SITE_NAME,
   SITE_URL,
+  SITE_DOMAIN,
   SITE_DESCRIPTION,
   SITE_TAGLINE,
   SEO_DEFAULTS,
   SOCIAL_LINKS,
   CONTACT_EMAIL,
   SUPPORT_EMAIL,
+  PRIVACY_EMAIL,
+  LEGAL_EMAIL,
+  SENDER_EMAIL,
   SHOPIFY_STOREFRONT_ENDPOINT,
   SHOPIFY_STOREFRONT_TOKEN,
   SHOPIFY_REVALIDATION_SECRET,
@@ -148,8 +152,11 @@ describe('site constants', () => {
   it('SITE_NAME is Healthy Jewelry', () => {
     expect(SITE_NAME).toBe('Healthy Jewelry')
   })
-  it('SITE_URL contains healthyjewelry', () => {
-    expect(SITE_URL).toContain('healthyjewelry')
+  it('SITE_URL contains the correct (double-L) domain', () => {
+    expect(SITE_URL).toContain('healthyjewellery')
+  })
+  it('SITE_DOMAIN is the bare hostname of SITE_URL', () => {
+    expect(SITE_DOMAIN).toBe('healthyjewellery.com')
   })
   it('SITE_DESCRIPTION mentions titanium', () => {
     expect(SITE_DESCRIPTION.toLowerCase()).toContain('titanium')
@@ -158,13 +165,20 @@ describe('site constants', () => {
     expect(SITE_TAGLINE).toBeTruthy()
     expect(typeof SITE_TAGLINE).toBe('string')
   })
-  it('CONTACT_EMAIL is a valid email address', () => {
+  it('CONTACT_EMAIL is a valid address on the correct domain', () => {
     expect(CONTACT_EMAIL).toContain('@')
-    expect(CONTACT_EMAIL).toContain('healthyjewelry')
+    expect(CONTACT_EMAIL).toContain('healthyjewellery')
   })
-  it('SUPPORT_EMAIL is a valid email address', () => {
+  it('SUPPORT_EMAIL is a valid address on the correct domain', () => {
     expect(SUPPORT_EMAIL).toContain('@')
-    expect(SUPPORT_EMAIL).toContain('healthyjewelry')
+    expect(SUPPORT_EMAIL).toContain('healthyjewellery')
+  })
+  it('PRIVACY_EMAIL and LEGAL_EMAIL are valid addresses on the correct domain', () => {
+    expect(PRIVACY_EMAIL).toBe('privacy@healthyjewellery.com')
+    expect(LEGAL_EMAIL).toBe('legal@healthyjewellery.com')
+  })
+  it('SENDER_EMAIL is a valid address on the correct domain', () => {
+    expect(SENDER_EMAIL).toBe('contact@healthyjewellery.com')
   })
 })
 

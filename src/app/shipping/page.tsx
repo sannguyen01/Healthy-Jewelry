@@ -3,6 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { SUPPORT_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Shipping & Returns',
@@ -81,7 +82,7 @@ export default function ShippingPage() {
             maxWidth: '900px',
           }}
         >
-<PageHeader eyebrow="Customer Service" title="Shipping & Returns" variant="compact" />
+          <PageHeader eyebrow="Customer Service" title="Shipping & Returns" variant="compact" />
           <p
             style={{
               fontFamily: 'var(--font-display)',
@@ -159,10 +160,10 @@ export default function ShippingPage() {
               <li>
                 Initiate a return by emailing{' '}
                 <a
-                  href="mailto:support@healthyjewelry.com"
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   style={{ color: 'var(--ink)', textDecoration: 'underline' }}
                 >
-                  support@healthyjewelry.com
+                  {SUPPORT_EMAIL}
                 </a>{' '}
                 with your order number.
               </li>
@@ -194,10 +195,10 @@ export default function ShippingPage() {
             <p style={bodyStyle}>
               To start an exchange, email{' '}
               <a
-                href="mailto:support@healthyjewelry.com"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                support@healthyjewelry.com
+                {SUPPORT_EMAIL}
               </a>{' '}
               with your order number and the item you would like instead.
             </p>
@@ -209,10 +210,10 @@ export default function ShippingPage() {
             <p style={bodyStyle}>
               Contact our support team at{' '}
               <a
-                href="mailto:support@healthyjewelry.com"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                support@healthyjewelry.com
+                {SUPPORT_EMAIL}
               </a>
               . We respond within 24 hours on business days.
             </p>

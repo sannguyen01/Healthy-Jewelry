@@ -3,6 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { SUPPORT_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'FAQ',
@@ -81,7 +82,7 @@ const sections: Section[] = [
       },
       {
         q: 'Can I return or exchange?',
-        a: 'Yes. We accept returns and exchanges within 30 days of delivery. Items must be unworn and in original condition. Email support@healthyjewelry.com with your order number to initiate a return or exchange. We provide a prepaid return label for all eligible orders.',
+        a: `Yes. We accept returns and exchanges within 30 days of delivery. Items must be unworn and in original condition. Email ${SUPPORT_EMAIL} with your order number to initiate a return or exchange. We provide a prepaid return label for all eligible orders.`,
       },
     ],
   },

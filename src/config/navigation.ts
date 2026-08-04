@@ -1,5 +1,7 @@
 // Healthy Jewelry — Navigation configuration
 
+import { SOCIAL_LINKS } from '@/config/site'
+
 export interface NavLink {
   label: string
   href: string
@@ -47,10 +49,10 @@ export const footerNavLinks: NavLink[] = [
 // ── Social links ───────────────────────────────────────────────────────────
 
 export const socialLinks = [
-  { label: 'Instagram', href: 'https://instagram.com/healthyjewelry', icon: 'instagram' },
-  { label: 'TikTok', href: 'https://tiktok.com/@healthyjewelry', icon: 'tiktok' },
-  { label: 'Pinterest', href: 'https://pinterest.com/healthyjewelry', icon: 'pinterest' },
-  { label: 'YouTube', href: 'https://youtube.com/@healthyjewelry', icon: 'youtube' },
+  { label: 'Instagram', href: SOCIAL_LINKS.instagram, icon: 'instagram' },
+  { label: 'TikTok', href: SOCIAL_LINKS.tiktok, icon: 'tiktok' },
+  { label: 'Pinterest', href: SOCIAL_LINKS.pinterest, icon: 'pinterest' },
+  { label: 'YouTube', href: SOCIAL_LINKS.youtube, icon: 'youtube' },
 ] as const
 
 // ── Legal links ────────────────────────────────────────────────────────────

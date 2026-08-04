@@ -2,7 +2,7 @@
 // dangerouslySetInnerHTML is safe here: data is server-generated structured data, never user input.
 
 import type { HJProduct } from '@/lib/shopify/types'
-import { SITE_NAME, SITE_URL } from '@/config/site'
+import { SITE_NAME, SITE_URL, CONTACT_EMAIL, SOCIAL_LINKS } from '@/config/site'
 import type { BreadcrumbItem } from './Breadcrumbs'
 
 // ── Material handle → full name map ───────────────────────────────────────
@@ -59,14 +59,10 @@ export function organizationJsonLd(): Record<string, unknown> {
       'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic, corrosion-proof, and designed to last a lifetime.',
     contactPoint: {
       '@type': 'ContactPoint',
-      email: 'hello@healthyjewelry.com',
+      email: CONTACT_EMAIL,
       contactType: 'customer service',
     },
-    sameAs: [
-      'https://instagram.com/healthyjewelry',
-      'https://tiktok.com/@healthyjewelry',
-      'https://pinterest.com/healthyjewelry',
-    ],
+    sameAs: Object.values(SOCIAL_LINKS),
   }
 }
 

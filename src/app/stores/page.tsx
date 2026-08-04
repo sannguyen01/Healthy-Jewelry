@@ -3,6 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { CONTACT_EMAIL, SITE_DOMAIN } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Locations',
@@ -99,8 +100,8 @@ export default function StoresPage() {
                 margin: '0 0 16px',
               }}
             >
-              Our full collection is available at healthyjewelry.com. Free shipping to every
-              country, no minimum order.
+              Our full collection is available at {SITE_DOMAIN}. Free shipping to every country, no
+              minimum order.
             </p>
             <p
               style={{
@@ -223,16 +224,16 @@ export default function StoresPage() {
             >
               For showroom appointments or in-person consultations, email us at{' '}
               <a
-                href="mailto:hello@healthyjewelry.com"
+                href={`mailto:${CONTACT_EMAIL}`}
                 style={{ color: 'var(--ink)', textDecoration: 'underline' }}
               >
-                hello@healthyjewelry.com
+                {CONTACT_EMAIL}
               </a>
               . We will arrange a time that works for you.
             </p>
             <div>
               <a
-                href="mailto:hello@healthyjewelry.com"
+                href={`mailto:${CONTACT_EMAIL}`}
                 className="btn-ghost"
                 style={{ display: 'inline-block' }}
               >

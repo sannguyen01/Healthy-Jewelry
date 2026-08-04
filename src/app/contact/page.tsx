@@ -4,6 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ContactForm } from '@/components/contact/ContactForm'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { CONTACT_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Contact',
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 }
 
 const INFO_ITEMS = [
-  { label: 'Email', value: 'hello@healthyjewelry.com' },
+  { label: 'Email', value: CONTACT_EMAIL },
   { label: 'Response time', value: 'Within 24 hours' },
 ] as const
 

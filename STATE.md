@@ -5,10 +5,19 @@ Last refreshed by hand: 2026-08-01
 
 ## High Priority (loop is acting or waiting on human)
 
-- [ ] VERCEL-ENV — 8 Vercel env vars not yet set (Shopify tokens, site URL,
-  webhook/revalidation secrets, Resend key, Upstash Redis URL+token)
+- [ ] VERCEL-ENV — 4 of 8 Vercel env vars confirmed set in Production as of
+  2026-08-04 (`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`,
+  `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_REVALIDATION_SECRET` — verified
+  via `vercel env ls production` + `vercel env pull`). Still unset: Resend
+  key, Upstash Redis URL+token, and the webhook secret (see SHOPIFY-WEBHOOK).
   Loop action: report only, never propose setting these yourself
   Human decision: pending
+  **2026-08-04 update**: `NEXT_PUBLIC_SITE_URL` is confirmed set to
+  `https://healthyjewellery.com` (double-L) — correct. DNS for the domain is
+  fully delegated to Vercel nameservers (no split authority with Shopify);
+  the only Shopify-owned record is the `checkout` CNAME to
+  `shops.myshopify.com`, which is the expected shape for this headless
+  architecture, not a conflict.
 - [ ] SHOPIFY-WEBHOOK — Shopify webhook not yet registered to `/api/webhooks/shopify`
   Loop action: report only
   Human decision: pending
@@ -32,10 +41,40 @@ Last refreshed by hand: 2026-08-01
 
 ## Watch List
 
-- (empty)
+- **Branch coordination (2026-08-05)**: `integrate/shopify-transactions`
+  (worktree `.claude/worktrees/agent-ab8803cce02d5162f`) is mid-merge with 28
+  unresolved conflicts as of this note — active work, not touched here. It
+  branched from `origin/main` at `f3de8d2` (PR #13), which predates PR #14
+  (`chore/audit-docs-and-gaps` → domain-drift fix, `src/config/site.ts` and
+  ~20 consumers). Three files are live conflicts *there* and also touched by
+  #14: `e2e/checkout.spec.ts`, `e2e/contact.spec.ts`,
+  `src/components/seo/JsonLd.tsx`. Once #14 merges, that branch should
+  rebase/merge `main` — resolving those three conflicts against pre-#14
+  content would silently reintroduce the single-L domain in JSON-LD and the
+  e2e specs.
 
 ## Resolved
 
+- [x] DOMAIN-MISMATCH — resolved 2026-08-04. `healthyjewelry.com` (single-L)
+  was hardcoded as the canonical domain in ~20 files (metadata, sitemap,
+  `robots.txt`, JSON-LD, CI defaults, and every contact/legal email:
+  `hello@`, `support@`, `privacy@`, `legal@`, `contact@`). That domain is not
+  owned by this brand — its nameservers are `ns1/ns2.afternic.com` (GoDaddy's
+  resale marketplace) and it carries an explicit null MX record (RFC 7505),
+  so every one of those mailto links has been bouncing mail silently. The
+  live, owned, Vercel-deployed domain is `healthyjewellery.com` (double-L),
+  confirmed via Mat Bao's registrar panel, Vercel's authoritative NS
+  delegation, a live HTTP 200 with real page content, and this repo's own
+  README (`instagram.com/healthyjewellery`). Fixed at the source
+  (`src/config/site.ts`: `SITE_URL`, `SOCIAL_LINKS`, `CONTACT_EMAIL`,
+  `SUPPORT_EMAIL`, plus new `PRIVACY_EMAIL` / `LEGAL_EMAIL` / `SENDER_EMAIL` /
+  `SITE_DOMAIN`), with every consumer refactored to import rather than
+  retype, a build-time guard that throws if the env var ever regresses to the
+  wrong domain, `src/tests/unit/domain-consistency.test.ts` re-scanning the
+  whole tree every CI run, and an ESLint rule
+  (`eslint-rules/no-hardcoded-domain.js`) that fails `pnpm lint` on any new
+  hardcoded literal outside `config/site.ts`. Separately: `.env.local.example`
+  had carried a *third* spelling (`healthyjewelry.vn`) — also corrected.
 - [x] MAIN-CI-FAILING — resolved 2026-08-01. `main`'s CI had failed on every
   push since 2026-06-29. PR #9 found the cause was not one bug but a suite that
   had never passed: 24.2 min, 24 failures, of which 10 were specs describing

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
 import { CartProvider } from '@/store/cart'
+import { SITE_URL } from '@/config/site'
 
 const barlowCondensed = Barlow_Condensed({
   weight: ['400', '500'],
@@ -39,11 +40,11 @@ export const metadata: Metadata = {
   authors: [{ name: 'Healthy Jewelry' }],
   creator: 'Healthy Jewelry',
   publisher: 'Healthy Jewelry',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://healthyjewelry.com'),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://healthyjewelry.com',
+    url: SITE_URL,
     siteName: 'Healthy Jewelry',
     title: 'Healthy Jewelry — Implant-Grade Titanium',
     description:

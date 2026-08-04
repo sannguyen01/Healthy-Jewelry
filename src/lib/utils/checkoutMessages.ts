@@ -1,4 +1,5 @@
 import type { CheckoutError } from '@/store/cart'
+import { CONTACT_EMAIL } from '@/config/site'
 
 /**
  * What a customer is told when checkout cannot start.
@@ -15,8 +16,14 @@ import type { CheckoutError } from '@/store/cart'
  * as one system.
  */
 
-/** The address already used as the contact-form fallback. */
-export const SUPPORT_EMAIL = 'hello@healthyjewelry.com'
+/**
+ * The address already used as the contact-form fallback — deliberately
+ * `CONTACT_EMAIL` ("hello@"), not `config/site`'s own `SUPPORT_EMAIL`
+ * ("support@"). Same name, different address, on purpose: this is the
+ * "email us and we'll complete the order" fallback shown next to the
+ * ContactForm's identical fallback, so the two must read as one system.
+ */
+export const SUPPORT_EMAIL = CONTACT_EMAIL
 
 export interface CheckoutMessage {
   /** Short headline. */
@@ -31,7 +38,7 @@ const MESSAGES: Record<CheckoutError, CheckoutMessage> = {
   // Transient by nature — a retry is genuinely worth offering first.
   network: {
     title: "We couldn't reach checkout",
-    body: "Your connection dropped before we could start your order. Nothing has been charged and your bag is exactly as you left it.",
+    body: 'Your connection dropped before we could start your order. Nothing has been charged and your bag is exactly as you left it.',
     retryable: true,
   },
   // Shopify answered and refused. Often stock or a variant change, so a retry
@@ -63,7 +70,9 @@ export function checkoutMessage(error: CheckoutError): CheckoutMessage {
 export function supportMailto(itemSummary?: string): string {
   const subject = encodeURIComponent('Order enquiry — checkout unavailable')
   const body = itemSummary
-    ? encodeURIComponent(`I tried to order the following but checkout was unavailable:\n\n${itemSummary}\n\n`)
+    ? encodeURIComponent(
+        `I tried to order the following but checkout was unavailable:\n\n${itemSummary}\n\n`
+      )
     : ''
   return `mailto:${SUPPORT_EMAIL}?subject=${subject}${body ? `&body=${body}` : ''}`
 }
