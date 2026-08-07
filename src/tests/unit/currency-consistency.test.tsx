@@ -282,6 +282,38 @@ describe('no surface hardcodes a currency', () => {
     expect(offences, `bare currency symbol in markup:\n${report(offences)}`).toEqual([])
   })
 
+  /**
+   * The gap this rule closes, found by looking at a screenshot of the live site
+   * rather than at the code.
+   *
+   * The cart drawer rendered `{product.price}` — the raw string, on its own JSX
+   * line. The line item read "112.00" while the total two elements below read
+   * "$112.00". Every clause above missed it: it calls no formatter, so the
+   * argument rules have nothing to inspect, and it prints no currency symbol,
+   * so the symbol rule has nothing to match. An unformatted price is invisible
+   * to a guard that only looks for *wrong* formatting.
+   *
+   * A price is money. It is never correct to render one as a bare number.
+   */
+  it('no component renders a raw price value with no formatting at all', () => {
+    // A JSX expression whose entire content is a price-named property access:
+    // `{product.price}`, `{item.product.compareAtPrice}`, `{total}`.
+    const BARE_PRICE_EXPRESSION =
+      /^\{\s*[\w.[\]]*\b(?:price|compareAtPrice|total|subtotal|amount)\b[\w.[\]]*\s*\}$/i
+
+    const offences = scan((line) => {
+      const trimmed = line.trim()
+      if (!BARE_PRICE_EXPRESSION.test(trimmed)) return false
+      // `{formatPrice(...)}` and friends are already excluded by the shape
+      // above (they contain a call), so anything reaching here is unformatted.
+      return true
+    })
+    expect(
+      offences,
+      `price rendered without formatPrice — money must never print as a bare number:\n${report(offences)}`
+    ).toEqual([])
+  })
+
   it('JSON-LD takes priceCurrency from the product', () => {
     const source = readFileSync(path.join(SRC, 'components/seo/JsonLd.tsx'), 'utf8')
     expect(source).toMatch(/priceCurrency:\s*product\.currencyCode/)

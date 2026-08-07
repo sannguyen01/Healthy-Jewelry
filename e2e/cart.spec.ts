@@ -63,9 +63,17 @@ test.describe('Cart — with items', () => {
     await expect(dialog.getByText('Arc Band')).toBeVisible()
   })
 
-  test('cart shows correct price', async ({ page }) => {
+  test('cart shows correct price — on the line item and the total', async ({ page }) => {
+    // This used to assert a single match, and passed for the wrong reason: the
+    // line item rendered the raw string "89.00" while only the total was
+    // formatted, so exactly one element read "$89.00". A bag showing an
+    // unformatted number beside a formatted one is what shipped to production.
     const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    await expect(dialog.getByText(/\$89\.00/)).toBeVisible()
+    await expect(dialog.getByText(/\$89\.00/)).toHaveCount(2)
+    await expect(dialog.getByText(/\$89\.00/).first()).toBeVisible()
+
+    // And no bare, unformatted amount anywhere in the bag.
+    await expect(dialog.getByText(/^\s*89\.00\s*$/)).toHaveCount(0)
   })
 
   test('cart shows quantity 1 initially', async ({ page }) => {

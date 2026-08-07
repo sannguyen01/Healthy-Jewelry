@@ -3,17 +3,39 @@
 export type CurrencyCode = 'USD' | 'VND' | 'EUR' | 'GBP'
 
 /**
+ * The locale each currency is conventionally written in.
+ *
+ * Formatting every currency as `en-US` puts the symbol in front of the amount,
+ * which is right for dollars and wrong for dong: Vietnamese convention is
+ * `1.450.000 ₫`, and the connected store's own money format is
+ * `{{amount_no_decimals_with_comma_separator}}₫`. Rendering `₫1,450,000` on the
+ * product page and handing the customer to a checkout that says `1.450.000₫`
+ * makes two correct prices look like two different prices, at the moment they
+ * are deciding to pay.
+ */
+const CURRENCY_LOCALE: Readonly<Record<CurrencyCode, string>> = {
+  USD: 'en-US',
+  VND: 'vi-VN',
+  EUR: 'de-DE',
+  GBP: 'en-GB',
+}
+
+/**
+ * Currencies with no minor unit. Rendering two decimal places on a dong amount
+ * reads as a hundredfold error — "₫89.00" is not a price anyone in Vietnam
+ * would recognise.
+ */
+const ZERO_DECIMAL: ReadonlySet<CurrencyCode> = new Set<CurrencyCode>(['VND'])
+
+/**
  * Format a price amount into a localised currency string.
  * Accepts both string and numeric amounts.
  */
 export function formatPrice(amount: string | number, currencyCode: CurrencyCode = 'USD'): string {
   const numeric = typeof amount === 'string' ? parseFloat(amount) : amount
+  const fractionDigits = ZERO_DECIMAL.has(currencyCode) ? 0 : 2
 
-  // VND has no minor unit — "₫89.00" is wrong, and rendering two decimal
-  // places on a dong amount reads as a hundredfold error.
-  const fractionDigits = currencyCode === 'VND' ? 0 : 2
-
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(CURRENCY_LOCALE[currencyCode] ?? 'en-US', {
     style: 'currency',
     currency: currencyCode,
     minimumFractionDigits: fractionDigits,
@@ -46,14 +68,16 @@ export function cartCurrencyCode(
 
 /**
  * Format a price in VND.
+ *
+ * Now a thin alias for `formatPrice(amount, 'VND')` rather than a second
+ * implementation. It was the only function that already knew dong is written
+ * `vi-VN` with no decimals, while `formatPrice` — the one every component
+ * actually calls — did not. Two functions disagreeing about how to write the
+ * same currency is how a site ends up quoting two different prices for one
+ * product.
  */
 export function formatPriceVND(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
+  return formatPrice(amount, 'VND')
 }
 
 export interface CompareAtPriceResult {

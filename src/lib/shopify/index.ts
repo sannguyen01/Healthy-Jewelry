@@ -9,14 +9,8 @@ import {
   GET_NEW_ARRIVALS,
   SEARCH_PRODUCTS,
 } from './queries/products'
-import type {
-  HJProduct,
-  HJCollection,
-  HJCollectionHandle,
-  HJMaterialHandle,
-  HJSvgType,
-  Product,
-} from './types'
+import { parseMaterial, parseSvgType } from './tags'
+import type { HJProduct, HJCollection, HJCollectionHandle, Product } from './types'
 import {
   getAllProducts as staticGetAllProducts,
   getProductByHandle as staticGetProductByHandle,
@@ -52,10 +46,11 @@ function isShopifyConfigured(): boolean {
 function mapShopifyProduct(node: Product): HJProduct {
   const tags = node.tags ?? []
 
-  const material: HJMaterialHandle =
-    (tags.find((t) =>
-      (['titanium', 'niobium', 'surgical-steel'] as const).includes(t as HJMaterialHandle)
-    ) as HJMaterialHandle | undefined) ?? 'titanium'
+  // Tags are the only place Shopify carries "which metal is this", and the
+  // store's vocabulary is not the code's — `material:steel` here means
+  // `surgical-steel` there. parseMaterial owns that translation; a silent
+  // mismatch used to label every product Grade 23 Titanium.
+  const { material, matched: materialMatched } = parseMaterial(tags)
 
   const priceAmount = node.priceRange?.minVariantPrice?.amount ?? '0'
   const price = parseFloat(priceAmount).toFixed(2)
@@ -85,22 +80,30 @@ function mapShopifyProduct(node: Product): HJProduct {
     })
   }
 
-  // Tag-based svgType: Shopify admin adds e.g. "svg:ring-dome" to override the fallback
-  const svgTag = tags.find((t) => t.startsWith('svg:'))
-  let svgType: HJSvgType = svgTag ? (svgTag.replace('svg:', '') as HJSvgType) : 'ring-arc'
-  if (!svgTag) {
-    if (handle.includes('necklace') || handle.includes('pendant')) {
-      svgType = 'necklace-drop'
-    } else if (handle.includes('earring') || handle.includes('stud')) {
-      svgType = 'earring-hoop'
-    } else if (handle.includes('bracelet') || handle.includes('cuff')) {
-      svgType = 'bracelet-cuff'
-    } else {
-      console.warn('[shopify] product missing svg: tag, defaulting to "ring-arc":', {
-        handle,
-        id: node.id,
-      })
-    }
+  // Warned after `handle` is known so the log names the offending product.
+  if (!materialMatched && tags.length > 0) {
+    console.warn('[shopify] no recognised material tag, defaulting to "titanium":', {
+      handle,
+      id: node.id,
+      tags,
+    })
+  }
+
+  // Validated, never cast. `svg:ring-halo` is a legal tag to write in Shopify
+  // Admin and was not a legal HJSvgType — the old cast let it through and
+  // JewelrySVG rendered nothing at all for nine products.
+  const {
+    svgType,
+    matched: svgMatched,
+    unknownTag,
+  } = parseSvgType(tags, collection, handle)
+  if (!svgMatched) {
+    console.warn('[shopify] svg type unresolved, using collection fallback:', {
+      handle,
+      id: node.id,
+      unknownTag: unknownTag ?? null,
+      svgType,
+    })
   }
 
   // Badge priority: explicit bestseller/new tags win, then an active
@@ -129,7 +132,9 @@ function mapShopifyProduct(node: Product): HJProduct {
     tags,
     svgType,
     badge,
-    spec: '',
+    // Optional by design: Shopify has no native field for a physical spec, so
+    // it lives in `custom.spec`. Absent means the detail page hides the line.
+    spec: node.spec?.value?.trim() ?? '',
     variants,
   }
 }

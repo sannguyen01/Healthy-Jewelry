@@ -262,8 +262,34 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     const product = await getProduct('mystery-item')
     expect(product?.svgType).toBe('ring-arc')
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('missing svg:'),
+      expect.stringContaining('svg type unresolved'),
       expect.objectContaining({ handle: 'mystery-item' })
+    )
+  })
+
+  it('falls back rather than passing an unknown svg tag through to the renderer', async () => {
+    // The live catalog tags products `svg:ring-halo`, `svg:charm-star` and six
+    // other names. Those used to be cast straight to HJSvgType and handed to
+    // JewelrySVG, which returned null — a blank tile with no error anywhere.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        mockJsonResponse({
+          data: {
+            product: shopifyProductNode({
+              handle: 'invented-item',
+              tags: ['svg:not-a-real-shape'],
+            }),
+          },
+        })
+      )
+    )
+    const { getProduct } = await import('@/lib/shopify')
+    const product = await getProduct('invented-item')
+    expect(product?.svgType).toBe('ring-arc')
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('svg type unresolved'),
+      expect.objectContaining({ unknownTag: 'not-a-real-shape' })
     )
   })
 

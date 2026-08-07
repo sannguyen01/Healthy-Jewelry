@@ -129,18 +129,23 @@ export function ProductDetail({ product }: ProductDetailProps) {
             <span className="material-tag">{materialName}</span>
           </div>
 
-          {/* Spec */}
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-xs)',
-              color: 'var(--graphite)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {product.spec}
-          </p>
+          {/* Spec — Shopify products carry this in the `custom.spec` metafield,
+              which is optional. An empty one used to render a blank uppercase
+              line with its own margins, so the layout showed a gap where a
+              measurement should be. */}
+          {product.spec.trim() !== '' && (
+            <p
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--graphite)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {product.spec}
+            </p>
+          )}
 
           {/* Description */}
           <p
