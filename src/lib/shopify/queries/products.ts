@@ -53,6 +53,12 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
         }
       }
     }
+    # Physical spec ("2 mm · 1.8 g"). Optional: Shopify has no native field for
+    # it, so it lives in a metafield and resolves to null when unset — the
+    # detail page hides the line rather than rendering an empty one.
+    spec: metafield(namespace: "custom", key: "spec") {
+      value
+    }
   }
 `
 

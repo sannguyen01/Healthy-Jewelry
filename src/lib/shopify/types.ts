@@ -48,6 +48,8 @@ export interface Product {
   collections: {
     edges: { node: { handle: string; title: string } }[]
   }
+  /** `custom.spec` metafield — null when the merchant has not set one. */
+  spec?: { value: string } | null
 }
 
 export interface Collection {
@@ -90,24 +92,48 @@ export interface ShopifyResponse<T> {
 
 export type HJBadge = 'Bestseller' | 'New' | 'Sale' | null
 
-export type HJSvgType =
-  | 'ring-arc'
-  | 'ring-dome'
-  | 'ring-flat'
-  | 'ring-split'
-  | 'necklace-disc'
-  | 'necklace-bar'
-  | 'necklace-drop'
-  | 'necklace-chain'
-  | 'earring-stud'
-  | 'earring-hoop'
-  | 'earring-drop'
-  | 'earring-cone'
-  | 'bracelet-cuff'
-  | 'bracelet-bangle'
-  | 'bracelet-link'
-  | 'charm-classic'
-  | 'charm-disc'
+/**
+ * Every illustration `JewelrySVG` can draw.
+ *
+ * Declared as a runtime array with the type derived from it, not as a bare
+ * union, for two reasons. Tests can walk it — `svg-coverage.test.ts` renders
+ * every member and fails if any returns nothing. And `parseSvgType` can
+ * *validate* a Shopify tag against it instead of casting: the old code cast
+ * `svg:ring-halo` straight to this type, so nine products carrying illustration
+ * names that do not exist here rendered a completely blank tile with no error
+ * anywhere.
+ *
+ * Adding a type here without drawing it in `JewelrySVG` fails the coverage test.
+ */
+export const HJ_SVG_TYPES = [
+  'ring-arc',
+  'ring-dome',
+  'ring-flat',
+  'ring-split',
+  'ring-halo',
+  'ring-facet',
+  'necklace-disc',
+  'necklace-bar',
+  'necklace-drop',
+  'necklace-chain',
+  'earring-stud',
+  'earring-hoop',
+  'earring-drop',
+  'earring-cone',
+  'earring-threader',
+  'bracelet-cuff',
+  'bracelet-bangle',
+  'bracelet-link',
+  'bracelet-chain',
+  'bracelet-bead',
+  'charm-classic',
+  'charm-disc',
+  'charm-anchor',
+  'charm-star',
+  'charm-heart',
+] as const
+
+export type HJSvgType = (typeof HJ_SVG_TYPES)[number]
 
 export type HJMaterialHandle = 'titanium' | 'niobium' | 'surgical-steel'
 

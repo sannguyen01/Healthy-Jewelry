@@ -227,7 +227,7 @@ export function CartDrawer() {
                         fontWeight: 300,
                       }}
                     >
-                      {product.price}
+                      {formatPrice(product.price, product.currencyCode)}
                     </p>
 
                     {/* Quantity controls */}

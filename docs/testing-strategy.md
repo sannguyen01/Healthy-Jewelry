@@ -316,10 +316,106 @@ Redis. If a future handler ever mutates state, dedupe must be durable.
 - **Abandoned checkouts are not tracked.** `checkoutUrl` is only requested at sync time, so a bag
   abandoned before the customer clicks Checkout never appears in Shopify Admin. Fixing it costs a
   Shopify API call per add-to-cart and creates a real cart for every casual browse.
-- **The real catalog needs `svg:` tags.** Without them `src/lib/shopify/index.ts` falls back to
-  matching the handle as a substring, and then to `'ring-arc'` — so an untagged product silently
-  renders the wrong illustration.
+- **`svg:` tags now degrade rather than disappear.** An untagged product falls back to its
+  *collection's* illustration, and an unrecognised tag does too. Previously an untagged product got
+  `'ring-arc'` regardless, and an unrecognised one got nothing at all — see below.
 - **The static catalog's variant IDs are placeholders.** `gid://shopify/ProductVariant/hj-001-default`
   is not a GID Shopify will accept; real ones are numeric. The store now refuses to sync a bag
   containing one rather than firing a mutation that is certain to fail, so tests of the success path
   must seed a realistic ID (see `seedBag` in `e2e/checkout.spec.ts`).
+
+---
+
+## The headless storefront, and the four failures with no error message
+
+Next.js on Vercel renders the site; Shopify serves catalogue and checkout through a Storefront API
+token. Four things must be true for an order to reach Shopify, and **none of them produces an error
+anywhere when false** — the site builds, renders, and reports healthy in all four cases, because the
+static fallback catalogue absorbs every one of them.
+
+They are listed in the order they must be fixed. Each survives the fix below it, which is why fixing
+them out of order looks like nothing changed.
+
+### 1. Products must be published to the headless channel
+
+This is the one that costs days. A Storefront API token is scoped to the app that issued it, and it
+can only see products published to **that app's publication**. Publishing to the Online Store is not
+enough and is not the same thing.
+
+The live store had 22 products on Online Store and **0 on the headless channel**. Every Storefront
+query returned an empty list, `getProducts()` fell back to the static catalogue, and the static
+catalogue's placeholder variant IDs made `cartCreate` fail. The visible symptom — "online checkout is
+temporarily unavailable" — is three layers away from the cause.
+
+Confirm it, don't assume it:
+
+```graphql
+{ productsCount(query: "publication_ids:<HEADLESS_PUBLICATION_ID>") { count } }
+```
+
+If that count is lower than your total product count, nothing else in this section matters yet. Fix
+with `publishablePublish`, and publish the **collections** too — collection queries fail identically
+and independently.
+
+### 2. Environment variables, in every environment, followed by a fresh build
+
+Covered above. Worth repeating only that the store domain is the `*.myshopify.com` one Shopify
+assigns, which is usually **not** a recognisable brand string.
+
+### 3. Variants must be sellable
+
+`inventoryQuantity: 0` with `tracked: true` and `inventoryPolicy: DENY` gives `availableForSale:
+false`. The site handles this correctly — every product renders "Sold Out" and Add to Bag is disabled
+— which means a fully-configured, fully-published store can still sell nothing, honestly and
+silently. For made-to-order stock, `inventoryItem.tracked: false` makes variants permanently
+sellable with no counts to maintain.
+
+### 4. Webhooks must be registered
+
+`orders/create` and `orders/paid` must point at `/api/webhooks/shopify`. HMAC verification has been
+correct and waiting the whole time; with no subscription there is simply nothing to verify.
+
+---
+
+## Data integrity: the store's vocabulary is not the code's
+
+Connecting Shopify does not just switch the data source — it switches the *vocabulary*. Three
+defects were dormant behind the static catalogue and would all have gone live together.
+
+**Tags are a translation layer, and translation failures are silent.** Shopify tags products
+`material:steel`; the code's handle is `surgical-steel`. The old matcher looked for bare, exact
+handles, matched nothing on any of the 22 products, and fell through to `?? 'titanium'`. Six niobium
+and four steel pieces would each have claimed to be titanium — on a brand that exists so people with
+metal sensitivities know what is against their skin. An unmatched tag is indistinguishable from an
+absent one, which is why nothing complained.
+
+`src/lib/shopify/tags.ts` now owns both translations, accepts the prefixed and bare forms, and
+reports whether it matched so the caller can warn. `src/tests/unit/shopify-mapping.test.ts` asserts
+it against **tag arrays captured verbatim from the live store**. That matters more than it sounds:
+the previous tests used synthetic fixtures written in the code's own vocabulary, so they asserted the
+mapper agreed with itself and passed throughout. A fixture that cannot disagree with you cannot catch
+this class of bug.
+
+**`JewelrySVG` must never return `null`.** It ended in `default: return null`, and two types its own
+union declared — `charm-classic`, `charm-disc` — had no case at all, so the entire Charms collection
+rendered empty boxes. The live catalogue then added nine products tagged with shapes the union never
+contained (`svg:ring-halo`, `svg:charm-star`, …), and the mapper *cast* the tag straight to
+`HJSvgType`. A tag anyone can type in Shopify Admin could blank out a product tile.
+
+Three changes close it: `HJ_SVG_TYPES` is a runtime array with the type derived from it, so tests can
+walk it; `parseSvgType` validates instead of casting and degrades to the collection's illustration;
+and the `default` branch draws a visible mark that identifies itself, so
+`src/tests/unit/svg-coverage.test.ts` can tell a real case from a silent fallback.
+
+**Money is never a bare number.** `CartDrawer` rendered `{product.price}` — the raw string — so the
+line item read "112.00" beside a total reading "$112.00". The currency guard missed it because that
+line calls no formatter and prints no symbol: it is invisible to a rule that looks for *wrong*
+formatting rather than *absent* formatting. `currency-consistency.test.tsx` gained a fourth clause
+for exactly this shape, and the E2E cart assertion now checks both the line item and the total
+(it previously matched one element and passed for that reason).
+
+**Locale, not just currency.** `formatPrice` formatted everything as `en-US`, giving `₫1,450,000`,
+while Shopify's own money format is `{{amount}}₫` and its checkout shows `1.450.000₫`. Same currency,
+same amount, two shapes — shown at the moment a customer compares the site against the checkout.
+Locale is now chosen per currency, and `formatPriceVND` is an alias rather than a second
+implementation that knew better than the function everything actually calls.

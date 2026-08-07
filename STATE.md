@@ -18,7 +18,13 @@ Last refreshed by hand: 2026-08-01
   the only Shopify-owned record is the `checkout` CNAME to
   `shops.myshopify.com`, which is the expected shape for this headless
   architecture, not a conflict.
-- [ ] SHOPIFY-WEBHOOK — Shopify webhook not yet registered to `/api/webhooks/shopify`
+- [ ] SHOPIFY-WEBHOOK — still 0 webhook subscriptions on the store, confirmed
+  live 2026-08-05. `orders/create` and `orders/paid` must point at
+  `https://healthyjewellery.com/api/webhooks/shopify`. Cannot be automated from
+  an agent session: the Shopify MCP server blocks `webhookSubscriptionCreate`
+  by policy, since webhook creation routes store data to an external host. Must
+  be done by hand in Settings → Notifications → Webhooks, and the resulting
+  signing secret set as `SHOPIFY_WEBHOOK_SECRET` in Vercel.
   Loop action: report only
   Human decision: pending
 - [ ] VISUAL-QA-LIVE — visual QA and the checkout redirect to a real Shopify URL
@@ -27,15 +33,18 @@ Last refreshed by hand: 2026-08-01
   sandboxed sessions that produced it cannot reach the Vercel hosts.
   Loop action: report only
   Human decision: pending
-- [ ] SHOPIFY-CURRENCY — confirm the connected store's currency matches what the
-  site renders. Prices now carry `HJProduct.currencyCode` end to end instead of
-  a hardcoded USD, so the site will quote whatever Shopify returns — which is
-  only correct if the store is configured as intended.
+- [ ] SHOPIFY-PAYMENTS — `shop.paymentSettings.supportedDigitalWallets` is empty
+  on `y0k9ve-q1.myshopify.com`. That may only mean no wallets are enabled, but
+  confirm an actual payment provider is active in Settings → Payments before
+  the first real order: a store with none accepts a checkout and then cannot
+  take money.
   Loop action: report only
   Human decision: pending
-- [ ] SHOPIFY-SVG-TAGS — real catalog products need `svg:` tags, else
-  `src/lib/shopify/index.ts` falls back to handle-substring matching and then
-  to `'ring-arc'`, rendering the wrong illustration silently.
+- [ ] SHOPIFY-SPEC-METAFIELD — product specs ("2 mm · 1.8 g") now read from the
+  `custom.spec` metafield, which no product has set. The detail page hides the
+  line when empty rather than rendering a blank one, so this is cosmetic, not
+  broken. Deliberately not auto-populated: specs are physical measurements and
+  inventing them would put fabricated product claims on a store.
   Loop action: report only
   Human decision: pending
 
@@ -55,6 +64,41 @@ Last refreshed by hand: 2026-08-01
 
 ## Resolved
 
+- [x] SHOPIFY-HEADLESS-PUBLISH — resolved 2026-08-05. **The blocker no code
+  change or env var could work around.** The store had 22 products published to
+  Online Store and **0 to the headless channel** ("Healthy Jewellery Store",
+  `gid://shopify/Publication/193327071310`, an AppCatalog named "…for My Store 2
+  Headless"). A Storefront API token only sees products published to its own
+  app's publication, so every query returned an empty catalogue, `getProducts()`
+  fell back to the static USD data, and its placeholder variant IDs made
+  `cartCreate` fail. This is why the live site showed "Dome Ring · 112.00" — a
+  product that does not exist in Shopify — while the env vars were already set
+  correctly in Vercel Production. All 22 products and all 6 collections
+  published via `publishablePublish`; verified 22/22 on the headless
+  publication.
+- [x] SHOPIFY-INVENTORY — resolved 2026-08-05. All 38 variants were
+  `inventoryQuantity: 0`, `tracked: true`, `inventoryPolicy: DENY` →
+  `availableForSale: false`. A fully-configured store would still have sold
+  nothing, correctly showing "Sold Out" everywhere (PR #13's UI working as
+  intended). Set `inventoryItem.tracked: false` on all 38 — made-to-order, no
+  counts to maintain. Verified 38/38 now `availableForSale: true`.
+- [x] SHOPIFY-CURRENCY — resolved 2026-08-05. The store is **VND**, confirmed
+  live (`y0k9ve-q1.myshopify.com`, Basic plan, Vietnam, money format
+  `{{amount_no_decimals_with_comma_separator}}₫`). So the PR #12 currency work
+  was not hypothetical — it is load-bearing for this store. `formatPrice` now
+  also picks the locale from the currency (`vi-VN` for VND), so the site writes
+  `1.450.000 ₫` the way Shopify's own checkout does instead of `₫1,450,000`.
+- [x] SHOPIFY-SVG-TAGS — resolved 2026-08-05, and it was worse than recorded.
+  All 22 live products *do* carry `svg:` tags, but nine name shapes
+  `HJSvgType` never contained (`ring-halo`, `ring-facet`, `earring-threader`,
+  `bracelet-chain`, `bracelet-bead`, `charm-anchor`, `charm-star`,
+  `charm-heart`) — and the mapper cast the tag straight to the type, so
+  `JewelrySVG` returned `null`: nine blank tiles. Separately, `charm-classic`
+  and `charm-disc` were declared in the union with **no case in JewelrySVG at
+  all**, so the entire Charms collection had been rendering empty boxes since
+  charms were added. Ten illustrations drawn, `default: return null` replaced
+  with a self-identifying fallback, and `svg-coverage.test.ts` now walks every
+  declared type.
 - [x] DOMAIN-MISMATCH — resolved 2026-08-04. `healthyjewelry.com` (single-L)
   was hardcoded as the canonical domain in ~20 files (metadata, sitemap,
   `robots.txt`, JSON-LD, CI defaults, and every contact/legal email:
@@ -90,7 +134,7 @@ Last refreshed by hand: 2026-08-01
 
 ## Testing baseline
 
-As of 2026-08-02: **497 unit tests** across 28 files, **294 E2E tests** in 11
+As of 2026-08-05: **588 unit tests** across 31 files, **294 E2E tests** in 11
 spec files (homepage, navigation, legal-pages, shop, product-detail, cart,
 contact, checkout, a11y, visual-assets, hero-legibility). E2E runs in ~3 min
 against a production build across two projects (chromium + mobile).
@@ -131,6 +175,17 @@ duplicate those files.
   output and the source, because a rule that only checked formatter arguments
   would have missed six of them. Third guardrail in the same shape as
   visual-assets and hero-legibility: the rule is enforced, not just fixed.
+- **2026-08-05**: Shopify tag parsing extracted to `src/lib/shopify/tags.ts`
+  and tested against tag arrays captured verbatim from the live store. The
+  general lesson, and the reason the previous tests could not have caught it:
+  *a fixture written in your own vocabulary asserts only that you agree with
+  yourself.* `material:steel` mismatched `surgical-steel` on all 22 products
+  and every existing test passed throughout.
+- **2026-08-05**: `HJ_SVG_TYPES` became a runtime array with `HJSvgType`
+  derived from it, so tests can enumerate the union. `JewelrySVG` no longer
+  returns `null` for anything — the `default` branch draws a mark that
+  identifies itself, which is what lets `svg-coverage.test.ts` distinguish a
+  drawn case from a silent fallback. Fourth guardrail in the family.
 - **2026-08-02**: `src/lib/shopify/env-check.ts` warns at build time when
   Shopify configuration is missing, naming the build-time `NEXT_PUBLIC_*`
   inlining and per-environment scoping traps explicitly. It warns rather than
