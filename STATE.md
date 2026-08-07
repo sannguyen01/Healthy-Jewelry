@@ -18,13 +18,28 @@ Last refreshed by hand: 2026-08-01
   the only Shopify-owned record is the `checkout` CNAME to
   `shops.myshopify.com`, which is the expected shape for this headless
   architecture, not a conflict.
-- [ ] SHOPIFY-WEBHOOK — still 0 webhook subscriptions on the store, confirmed
-  live 2026-08-05. `orders/create` and `orders/paid` must point at
-  `https://healthyjewellery.com/api/webhooks/shopify`. Cannot be automated from
-  an agent session: the Shopify MCP server blocks `webhookSubscriptionCreate`
-  by policy, since webhook creation routes store data to an external host. Must
-  be done by hand in Settings → Notifications → Webhooks, and the resulting
-  signing secret set as `SHOPIFY_WEBHOOK_SECRET` in Vercel.
+- [ ] SHOPIFY-WEBHOOK-SECRET — the user reports the webhooks are registered.
+  **This cannot be confirmed by API and their absence is not evidence:** the
+  Admin `webhookSubscriptions` query returns only webhooks *owned by the
+  querying app*, so webhooks created in Settings → Notifications are invisible
+  to it. What matters instead is which of **two different secrets** is set as
+  `SHOPIFY_WEBHOOK_SECRET`: an app-created webhook signs with the app client
+  secret; an Admin-UI webhook signs with the signing secret shown on the
+  Notifications page. The wrong one 401s every delivery, silently and forever.
+  Since the Admin API shows no app-owned subscriptions, these are almost
+  certainly Admin-UI webhooks and need that page's secret.
+  Verify by placing one order and checking Vercel function logs for
+  `[webhooks/shopify] order event`. On a mismatch the route now logs the trap
+  by name (2026-08-07).
+  Loop action: report only
+  Human decision: pending
+- [ ] UPSTASH-REDIS — `/api/shopify` is now rate-limited (2026-08-07), sharing
+  `src/lib/utils/rateLimit.ts` with `/api/contact`. It is only durable across
+  serverless invocations if `UPSTASH_REDIS_REST_URL` and
+  `UPSTASH_REDIS_REST_TOKEN` are set; without them it falls back to an
+  in-memory map that counts per Lambda instance — the same single-instance
+  weakness the 2026-06-30 security audit already corrected once for the contact
+  route.
   Loop action: report only
   Human decision: pending
 - [ ] VISUAL-QA-LIVE — visual QA and the checkout redirect to a real Shopify URL
@@ -134,7 +149,7 @@ Last refreshed by hand: 2026-08-01
 
 ## Testing baseline
 
-As of 2026-08-05: **588 unit tests** across 31 files, **294 E2E tests** in 11
+As of 2026-08-07: **643 unit tests** across 34 files, **296 E2E tests** in 11
 spec files (homepage, navigation, legal-pages, shop, product-detail, cart,
 contact, checkout, a11y, visual-assets, hero-legibility). E2E runs in ~3 min
 against a production build across two projects (chromium + mobile).
@@ -175,6 +190,26 @@ duplicate those files.
   output and the source, because a rule that only checked formatter arguments
   would have missed six of them. Third guardrail in the same shape as
   visual-assets and hero-legibility: the rule is enforced, not just fixed.
+- **2026-08-07**: The purchase journey has an ending. Shopify deletes a cart on
+  order creation and exposes no completion flag (documented verbatim in
+  `docs/testing-strategy.md`), so a completed order and an expired cart look
+  identical. Both were collapsed into "rebuild the cart" — a customer who had
+  paid returned to a bag still holding what they bought, with a live Checkout
+  button. `pendingCheckoutCartId` is the discriminator; the *expiry* half is
+  guarded as carefully as the order half, because the obvious fix breaks it.
+- **2026-08-07**: Shopify is authoritative for money. The bag persisted prices
+  in `localStorage` with no expiry and totalled from those; `CART_FRAGMENT` had
+  been fetching `cost.totalAmount` all along and the payload type discarded it.
+  Third time this project shipped a price nothing guaranteed — after hardcoded
+  USD and the unformatted line item.
+- **2026-08-07**: Client/server config split. `config/shopify-public.ts` carries
+  only browser-safe values; `config/shopify.ts` keeps the secrets and is no
+  longer reachable from the client graph. Nothing had leaked (Next inlines
+  non-public env vars as `undefined`), but the only test asserted
+  `typeof === 'string'`, which `''` passes — covered-looking and worthless.
+  `secret-exposure.test.ts` walks the real client import graph instead, and
+  asserts the graph is non-empty first so a broken resolver cannot make it
+  vacuously green.
 - **2026-08-05**: Shopify tag parsing extracted to `src/lib/shopify/tags.ts`
   and tested against tag arrays captured verbatim from the live store. The
   general lesson, and the reason the previous tests could not have caught it:

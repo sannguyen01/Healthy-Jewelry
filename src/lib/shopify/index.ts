@@ -42,6 +42,34 @@ function isShopifyConfigured(): boolean {
   return !!(shopifyConfig.storefrontAccessToken && shopifyConfig.storeDomain)
 }
 
+/**
+ * Why the storefront is serving the bundled catalogue instead of the store.
+ *
+ * The fallback is deliberate — a Shopify outage must not take the site down —
+ * but it is also the single reason every failure in this project stayed hidden
+ * for so long. An unconfigured deployment renders every page, returns 200
+ * everywhere, and looks completely healthy right up until someone tries to buy
+ * something that does not exist in Shopify.
+ *
+ * So the fallback stays, and stops being quiet. `console.error` rather than
+ * `warn`: in Vercel's function logs this is the difference between a line
+ * nobody filters for and one that shows up in the error view. It names the
+ * fetcher and the reason, because "products are static" and "this one product
+ * 404'd in Shopify" need different responses.
+ */
+type FallbackReason = 'not-configured' | 'empty-response' | 'fetch-failed'
+
+function reportFallback(fetcher: string, reason: FallbackReason, detail?: string): void {
+  console.error('[shopify] SERVING STATIC FALLBACK CATALOG', {
+    fetcher,
+    reason,
+    detail: detail ?? null,
+    // The two questions anyone reading this log will immediately ask.
+    storeDomainConfigured: !!shopifyConfig.storeDomain,
+    storefrontTokenConfigured: !!shopifyConfig.storefrontAccessToken,
+  })
+}
+
 // Map Shopify GraphQL Product node → HJProduct
 function mapShopifyProduct(node: Product): HJProduct {
   const tags = node.tags ?? []
@@ -141,6 +169,7 @@ function mapShopifyProduct(node: Product): HJProduct {
 
 export async function getProduct(handle: string): Promise<HJProduct | null> {
   if (!isShopifyConfigured()) {
+    reportFallback('getProduct', 'not-configured', handle)
     return staticGetProductByHandle(handle) ?? null
   }
   try {
@@ -150,12 +179,13 @@ export async function getProduct(handle: string): Promise<HJProduct | null> {
       { revalidate: 3600, tags: ['products', `product:${handle}`] }
     )
     if (!response.data?.product) {
+      reportFallback('getProduct', 'empty-response', handle)
       return staticGetProductByHandle(handle) ?? null
     }
     return mapShopifyProduct(response.data.product)
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
-      console.warn('[shopify] getProduct fallback to static:', e.message)
+      reportFallback('getProduct', 'fetch-failed', e.message)
     }
     return staticGetProductByHandle(handle) ?? null
   }
@@ -170,6 +200,7 @@ type ProductsPage = {
 
 export async function getProducts(maxItems = 250): Promise<HJProduct[]> {
   if (!isShopifyConfigured()) {
+    reportFallback('getProducts', 'not-configured')
     return staticGetAllProducts()
   }
   try {
@@ -191,10 +222,11 @@ export async function getProducts(maxItems = 250): Promise<HJProduct[]> {
       cursor = pageInfo.endCursor
     }
 
+    if (all.length === 0) reportFallback('getProducts', 'empty-response')
     return all.length > 0 ? all : staticGetAllProducts()
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
-      console.warn('[shopify] getProducts fallback to static:', e.message)
+      reportFallback('getProducts', 'fetch-failed', e.message)
     }
     return staticGetAllProducts()
   }
@@ -205,6 +237,7 @@ export async function getProductsByCollection(
   first = 20
 ): Promise<HJProduct[]> {
   if (!isShopifyConfigured()) {
+    reportFallback('getProductsByCollection', 'not-configured', collectionHandle)
     return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
   }
   try {
@@ -217,12 +250,13 @@ export async function getProductsByCollection(
     )
     const edges = response.data?.collection?.products?.edges ?? []
     if (edges.length === 0) {
+      reportFallback('getProductsByCollection', 'empty-response', collectionHandle)
       return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
     }
     return edges.map((e) => mapShopifyProduct(e.node))
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
-      console.warn('[shopify] getProductsByCollection fallback:', e.message)
+      reportFallback('getProductsByCollection', 'fetch-failed', e.message)
     }
     return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
   }
@@ -231,6 +265,7 @@ export async function getProductsByCollection(
 export async function searchProducts(query: string, first = 20): Promise<HJProduct[]> {
   const q = query.toLowerCase().trim()
   if (!isShopifyConfigured() || !q) {
+    if (!isShopifyConfigured()) reportFallback('searchProducts', 'not-configured', q)
     return staticGetAllProducts().filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
@@ -254,6 +289,7 @@ export async function searchProducts(query: string, first = 20): Promise<HJProdu
 
 export async function getBestsellers(first = 8): Promise<HJProduct[]> {
   if (!isShopifyConfigured()) {
+    reportFallback('getBestsellers', 'not-configured')
     return staticGetBestsellers()
   }
   try {
@@ -263,10 +299,11 @@ export async function getBestsellers(first = 8): Promise<HJProduct[]> {
       { revalidate: 3600, tags: ['products'] }
     )
     const edges = response.data?.products?.edges ?? []
+    if (edges.length === 0) reportFallback('getBestsellers', 'empty-response')
     return edges.length > 0 ? edges.map((e) => mapShopifyProduct(e.node)) : staticGetBestsellers()
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
-      console.warn('[shopify] getBestsellers fallback to static:', e.message)
+      reportFallback('getBestsellers', 'fetch-failed', e.message)
     }
     return staticGetBestsellers()
   }
@@ -274,6 +311,7 @@ export async function getBestsellers(first = 8): Promise<HJProduct[]> {
 
 export async function getNewArrivals(first = 8): Promise<HJProduct[]> {
   if (!isShopifyConfigured()) {
+    reportFallback('getNewArrivals', 'not-configured')
     return staticGetNewArrivals()
   }
   try {
@@ -283,10 +321,11 @@ export async function getNewArrivals(first = 8): Promise<HJProduct[]> {
       { revalidate: 3600, tags: ['products'] }
     )
     const edges = response.data?.products?.edges ?? []
+    if (edges.length === 0) reportFallback('getNewArrivals', 'empty-response')
     return edges.length > 0 ? edges.map((e) => mapShopifyProduct(e.node)) : staticGetNewArrivals()
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
-      console.warn('[shopify] getNewArrivals fallback to static:', e.message)
+      reportFallback('getNewArrivals', 'fetch-failed', e.message)
     }
     return staticGetNewArrivals()
   }

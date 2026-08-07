@@ -60,7 +60,30 @@ const MESSAGES: Record<CheckoutError, CheckoutMessage> = {
     body: 'We are unable to take orders through the site right now. Your bag is saved. Email us and we will take your order directly.',
     retryable: false,
   },
+  // Shopify accepted the cart but returned fewer lines than were sent, so a
+  // piece is no longer sellable. This one *does* name the cause, because it is
+  // the only case the customer can act on themselves — and sending them to a
+  // checkout quietly missing an item would be worse than saying so.
+  'lines-unavailable': {
+    title: 'Something in your bag is no longer available',
+    body: 'One or more pieces sold out while they were in your bag. Nothing has been charged. Remove the unavailable piece to continue, or email us and we will sort it out.',
+    retryable: false,
+  },
 }
+
+/**
+ * What the customer is told when they come back from a completed checkout.
+ *
+ * Shopify sends the receipt by email — this exists so the last thing the site
+ * says to someone who has just paid is not "Preparing checkout…". It claims
+ * nothing the site cannot know: no order number, no total, no delivery date,
+ * because the storefront genuinely does not have them. Shopify deletes the
+ * cart on order creation and exposes no way to query it afterwards.
+ */
+export const ORDER_CONFIRMATION = {
+  title: 'Thank you — your order is placed',
+  body: 'Shopify has your order and a confirmation email is on its way. Your bag has been cleared. If the email does not arrive within a few minutes, check your spam folder or email us.',
+} as const
 
 export function checkoutMessage(error: CheckoutError): CheckoutMessage {
   return MESSAGES[error]

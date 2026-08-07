@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useCartStore } from '@/store/cart'
 import { useCheckoutUrl, useCartIsLoading, useCheckoutError } from '@/lib/hooks/useCart'
-import { checkoutMessage, supportMailto } from '@/lib/utils/checkoutMessages'
+import { checkoutMessage, supportMailto, ORDER_CONFIRMATION } from '@/lib/utils/checkoutMessages'
 
 /**
  * The handoff to Shopify's hosted checkout.
@@ -27,6 +27,8 @@ export default function CheckoutPage() {
   const isLoading = useCartIsLoading()
   const checkoutError = useCheckoutError()
   const hasHydrated = useCartStore((state) => state.hasHydrated)
+  const beginCheckout = useCartStore((state) => state.beginCheckout)
+  const justCompleted = useCartStore((state) => state.justCompleted)
 
   // Waits for the persisted bag to be read back before acting. The previous
   // version ran once on mount with an empty dependency array, so it always saw
@@ -35,6 +37,10 @@ export default function CheckoutPage() {
   // unreachable by direct navigation or refresh.
   useEffect(() => {
     if (!hasHydrated) return
+    // A completed order empties the bag, so the empty-bag redirect below would
+    // bounce the customer to /cart and swallow their confirmation. The order
+    // outranks it.
+    if (useCartStore.getState().justCompleted) return
     if (items.length === 0) {
       router.push('/cart')
       return
@@ -44,9 +50,13 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (checkoutUrl) {
+      // Record which cart is being paid for before leaving the origin — see
+      // `beginCheckout`. Shopify deletes the cart on order creation, so this is
+      // the only evidence that distinguishes "they paid" from "it expired".
+      beginCheckout()
       window.location.href = checkoutUrl
     }
-  }, [checkoutUrl])
+  }, [checkoutUrl, beginCheckout])
 
   const itemSummary = items
     .map((item) => `${item.quantity} × ${item.product.title}`)
@@ -64,7 +74,9 @@ export default function CheckoutPage() {
         padding: 'clamp(24px, 6vw, 80px)',
       }}
     >
-      {checkoutError ? (
+      {justCompleted ? (
+        <OrderConfirmation />
+      ) : checkoutError ? (
         <CheckoutFailure error={checkoutError} itemSummary={itemSummary} onRetry={syncWithShopify} />
       ) : (
         <p
@@ -80,6 +92,58 @@ export default function CheckoutPage() {
         </p>
       )}
     </main>
+  )
+}
+
+/**
+ * What a customer sees on returning from a completed checkout.
+ *
+ * Shopify's hosted checkout never sends them back here on its own, so this is
+ * reached the next time they open the site — which is exactly when the bag
+ * used to still be full of what they had just bought.
+ */
+function OrderConfirmation() {
+  const acknowledge = useCartStore((state) => state.acknowledgeCompletion)
+
+  return (
+    <div style={{ maxWidth: '460px', textAlign: 'center' }} role="status">
+      <h1
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'var(--text-2xl)',
+          fontWeight: 500,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: 'var(--ink)',
+          lineHeight: 1.1,
+          margin: '0 0 16px',
+        }}
+      >
+        {ORDER_CONFIRMATION.title}
+      </h1>
+
+      <p
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontWeight: 300,
+          fontSize: 'var(--text-base)',
+          color: 'var(--graphite)',
+          lineHeight: 1.7,
+          margin: '0 0 32px',
+        }}
+      >
+        {ORDER_CONFIRMATION.body}
+      </p>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
+        <Link href="/shop" onClick={acknowledge} className="btn-ghost">
+          Continue shopping
+        </Link>
+        <a href={supportMailto()} className="btn-ghost">
+          Email us
+        </a>
+      </div>
+    </div>
   )
 }
 

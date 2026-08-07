@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
 import {
   validateName,
   validateEmail,
@@ -10,49 +8,16 @@ import {
   sanitizeSubject,
 } from '@/lib/utils/contactValidation'
 import { CONTACT_EMAIL, SENDER_EMAIL } from '@/config/site'
+import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 
-// Serverless-safe rate limiting.
-// Production: set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN in Vercel env vars
-// to enable distributed rate limiting that works across all Lambda instances.
-// Development / staging without those vars: falls back to in-memory (single-instance only).
-const upstashRl =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-    ? new Ratelimit({
-        redis: Redis.fromEnv(),
-        limiter: Ratelimit.slidingWindow(5, '1 h'),
-        prefix: 'hj:contact',
-      })
-    : null
-
-// In-memory fallback — NOT multi-instance safe; acceptable for local dev only.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-function isRateLimitedLocal(ip: string): boolean {
-  const now = Date.now()
-  // Prune expired entries on each call to prevent unbounded map growth.
-  for (const [key, val] of rateLimitMap) {
-    if (now > val.resetAt) rateLimitMap.delete(key)
-  }
-  const entry = rateLimitMap.get(ip)
-  if (!entry) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 3600_000 })
-    return false
-  }
-  if (entry.count >= 5) return true
-  entry.count++
-  return false
-}
+// Rate limiting now lives in `@/lib/utils/rateLimit`, shared with
+// `/api/shopify`. It used to be two hand-rolled copies; the Shopify proxy had
+// none at all, which made the un-audited route the softer target.
+const limiter = createRateLimiter({ limit: 5, window: '1 h', prefix: 'hj:contact' })
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // 1. Rate limit by IP
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-
-  let rateLimited: boolean
-  if (upstashRl) {
-    const { success } = await upstashRl.limit(ip)
-    rateLimited = !success
-  } else {
-    rateLimited = isRateLimitedLocal(ip)
-  }
+  const rateLimited = await limiter.isLimited(clientIp(request.headers))
 
   if (rateLimited) {
     return NextResponse.json(

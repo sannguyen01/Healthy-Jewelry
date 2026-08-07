@@ -7,6 +7,7 @@ import {
   REMOVE_FROM_CART,
 } from '@/lib/shopify/mutations/cart'
 import { GET_CART } from '@/lib/shopify/queries/cart'
+import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 
 // Persisted queries: the browser sends an operation key, never GraphQL text.
 // The server resolves the key to its own literal query string below, so a
@@ -31,7 +32,27 @@ const PERSISTED_QUERIES: Record<string, string> = Object.assign(Object.create(nu
 // 16 KB covers all legitimate Storefront queries
 const MAX_BODY_BYTES = 16_384
 
+/**
+ * This route spends the store's Shopify API quota and can create real carts,
+ * and it is public and unauthenticated by necessity — the browser has to reach
+ * it. Without a limiter, anyone could exhaust the Storefront rate limit for
+ * every genuine shopper, and fill Shopify Admin's abandoned-checkout report
+ * with carts nobody built.
+ *
+ * The window is far looser than the contact form's (5/hour): a real shopper
+ * legitimately triggers several operations per checkout attempt, and each bag
+ * edit re-syncs. This is a ceiling on abuse, not a budget for browsing.
+ */
+const limiter = createRateLimiter({ limit: 60, window: '1 m', prefix: 'hj:shopify' })
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (await limiter.isLimited(clientIp(request.headers))) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again in a moment.' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    )
+  }
+
   // Enforce payload size limit before parsing
   const contentLength = request.headers.get('content-length')
   if (contentLength !== null && parseInt(contentLength, 10) > MAX_BODY_BYTES) {

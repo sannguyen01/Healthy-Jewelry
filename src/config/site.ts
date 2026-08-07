@@ -74,7 +74,18 @@ export const LEGAL_EMAIL = 'legal@healthyjewellery.com'
 /** Resend "from" sender identity only — not a real inbox. */
 export const SENDER_EMAIL = 'contact@healthyjewellery.com'
 
-// Legacy aliases kept for backward compatibility with existing imports
-export const SHOPIFY_STOREFRONT_ENDPOINT = process.env.SHOPIFY_STOREFRONT_URL ?? ''
-export const SHOPIFY_STOREFRONT_TOKEN = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN ?? ''
-export const SHOPIFY_REVALIDATION_SECRET = process.env.SHOPIFY_REVALIDATION_SECRET ?? ''
+// Removed 2026-08-07: three legacy aliases read server-only Shopify secrets
+// (`SHOPIFY_STOREFRONT_URL`, `SHOPIFY_STOREFRONT_ACCESS_TOKEN`,
+// `SHOPIFY_REVALIDATION_SECRET`) from this module — which `ContactForm.tsx`
+// imports, and which is therefore a client module.
+//
+// Nothing leaked: Next inlines non-`NEXT_PUBLIC_` env vars as `undefined` in
+// the client bundle, so they were always `''` in the browser. But they were
+// entirely unused (only a test referenced them, asserting `typeof === 'string'`
+// — which passes on `''` and proves nothing), and a secret-named export in a
+// client-reachable file is one rename away from being real. The genuine
+// consumers read `process.env` server-side, via `config/shopify.ts` and
+// `api/revalidate/route.ts`.
+//
+// `src/tests/unit/secret-exposure.test.ts` now enforces the rule rather than
+// relying on nobody re-adding them.
