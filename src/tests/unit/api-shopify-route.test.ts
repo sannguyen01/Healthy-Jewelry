@@ -246,3 +246,85 @@ describe('POST /api/shopify', () => {
     })
   })
 })
+
+/**
+ * This route is public and unauthenticated by necessity — the browser has to
+ * reach it — and it spends the store's Shopify API quota and creates real
+ * carts. It had no limiter at all, while `/api/contact` (which sends an email)
+ * had one added after a security audit. The softer target was the one that
+ * costs money.
+ */
+describe('rate limiting', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', 'test-shop.myshopify.com')
+    vi.stubEnv('SHOPIFY_STOREFRONT_ACCESS_TOKEN', 'token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { cart: null } }),
+      })
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  function reqFrom(ip: string): NextRequest {
+    return new NextRequest('http://localhost/api/shopify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip },
+      body: JSON.stringify({ operation: 'GetCart', variables: { cartId: 'gid://x/1' } }),
+    })
+  }
+
+  it('refuses a caller that exceeds the window', async () => {
+    const ip = '203.0.113.10'
+    let sawLimit = false
+    // The limit is deliberately generous (a real checkout is several
+    // operations), so this pushes well past it rather than guessing the exact
+    // boundary — the contract is "there is a ceiling", not "it is exactly 60".
+    for (let i = 0; i < 80; i += 1) {
+      const res = await POST(reqFrom(ip))
+      if (res.status === 429) {
+        sawLimit = true
+        break
+      }
+    }
+    expect(sawLimit, 'the proxy never rate-limited an abusive caller').toBe(true)
+  })
+
+  it('tells the caller when to come back', async () => {
+    const ip = '203.0.113.11'
+    let limited: Response | null = null
+    for (let i = 0; i < 80; i += 1) {
+      const res = await POST(reqFrom(ip))
+      if (res.status === 429) {
+        limited = res
+        break
+      }
+    }
+    expect(limited?.headers.get('Retry-After')).toBeTruthy()
+  })
+
+  it('buckets by client IP, so one abuser cannot lock out everyone', async () => {
+    const abuser = '203.0.113.12'
+    for (let i = 0; i < 80; i += 1) await POST(reqFrom(abuser))
+
+    // A different shopper, on a different address, is unaffected.
+    const res = await POST(reqFrom('198.51.100.7'))
+    expect(res.status).not.toBe(429)
+  })
+
+  it('reads the original client from a proxy chain, not the edge', async () => {
+    // `x-forwarded-for` is a chain; taking the last entry would bucket every
+    // request behind Vercel's own edge into one, and the first genuine shopper
+    // would rate-limit the entire site.
+    const { clientIp } = await import('@/lib/utils/rateLimit')
+    const headers = new Headers({ 'x-forwarded-for': '203.0.113.20, 70.41.3.18, 150.172.238.178' })
+    expect(clientIp(headers)).toBe('203.0.113.20')
+  })
+})

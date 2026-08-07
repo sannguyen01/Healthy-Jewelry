@@ -4,7 +4,12 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { useCartStore } from '@/store/cart'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import { checkoutMessage, supportMailto, SUPPORT_EMAIL } from '@/lib/utils/checkoutMessages'
+import {
+  checkoutMessage,
+  supportMailto,
+  SUPPORT_EMAIL,
+  ORDER_CONFIRMATION,
+} from '@/lib/utils/checkoutMessages'
 import { formatPrice, cartCurrencyCode } from '@/lib/utils/formatPrice'
 
 export function CartDrawer() {
@@ -17,7 +22,14 @@ export function CartDrawer() {
   const syncWithShopify = useCartStore((s) => s.syncWithShopify)
   const isLoading = useCartStore((s) => s.isLoading)
   const checkoutError = useCartStore((s) => s.checkoutError)
+  const justCompleted = useCartStore((s) => s.justCompleted)
+  const shopifyTotal = useCartStore((s) => s.shopifyTotal)
   const cartCurrency = cartCurrencyCode(items)
+  // Shopify's figure when we have one, the local sum only until the first
+  // sync. `total` is summed from prices captured in localStorage when each
+  // item was added, which for a bag left open across a price change is not
+  // what the customer will be charged.
+  const displayTotal = shopifyTotal ?? total
 
   // Lock body scroll when open
   useEffect(() => {
@@ -155,8 +167,29 @@ export function CartDrawer() {
                   color: 'var(--graphite)',
                 }}
               >
-                Your bag is empty
+                {/* An empty bag means two very different things depending on
+                    whether the customer just paid. "Your bag is empty" is a
+                    cold thing to show someone thirty seconds after they were
+                    charged. */}
+                {justCompleted ? ORDER_CONFIRMATION.title : 'Your bag is empty'}
               </p>
+              {justCompleted && (
+                <p
+                  role="status"
+                  style={{
+                    fontFamily: 'var(--font-body)',
+                    fontWeight: 300,
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--graphite)',
+                    lineHeight: 1.7,
+                    textAlign: 'center',
+                    maxWidth: '30ch',
+                    margin: 0,
+                  }}
+                >
+                  {ORDER_CONFIRMATION.body}
+                </p>
+              )}
               <Link
                 href="/shop"
                 onClick={closeCart}
@@ -351,7 +384,7 @@ export function CartDrawer() {
                   color: 'var(--ink)',
                 }}
               >
-                {formatPrice(total, cartCurrency)}
+                {formatPrice(displayTotal, cartCurrency)}
               </span>
             </div>
             {checkoutError && (
@@ -402,8 +435,17 @@ export function CartDrawer() {
             <button
               onClick={async () => {
                 await syncWithShopify()
-                const { checkoutUrl, checkoutError: err } = useCartStore.getState()
+                const {
+                  checkoutUrl,
+                  checkoutError: err,
+                  beginCheckout,
+                } = useCartStore.getState()
                 if (checkoutUrl) {
+                  // Record which cart we are sending them to pay for. Shopify
+                  // deletes a cart once an order is created from it, so this id
+                  // is the only way to tell a completed purchase apart from an
+                  // expired cart when they come back.
+                  beginCheckout()
                   window.location.href = checkoutUrl
                   return
                 }

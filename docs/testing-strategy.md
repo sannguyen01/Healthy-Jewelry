@@ -419,3 +419,131 @@ while Shopify's own money format is `{{amount}}₫` and its checkout shows `1.45
 same amount, two shapes — shown at the moment a customer compares the site against the checkout.
 Locale is now chosen per currency, and `formatPriceVND` is an alias rather than a second
 implementation that knew better than the function everything actually calls.
+
+---
+
+## The purchase journey has an ending
+
+Everything above concerns getting a customer *to* Shopify. This is about what happens after, and it
+is the part with the worst failure mode in the whole system.
+
+### Completed carts are deleted, and Shopify will not tell you they were
+
+From Shopify's Cart API documentation, verbatim:
+
+> **"Completed carts are deleted upon order creation.** Unlike the Checkout API, you can't query a
+> completed cart for order information or completion status. You can subscribe to webhooks to receive
+> information about the created order."
+
+So a successful purchase and an expired cart are **indistinguishable** from the storefront: `cart(id:)`
+returns null for both. The store collapsed both into "no cart" and silently rebuilt it from the local
+lines, which meant a customer who had just paid returned to a bag still holding everything they had
+bought, with a live Checkout button. **The failure mode is charging someone twice.**
+
+Shopify offers no completion flag, so the discriminator has to be one we record: `pendingCheckoutCartId`
+is written the instant a customer is sent to pay. On the next sync, a cart that is gone *and* matches
+that id is an order — clear the bag, show the confirmation. A cart that is gone and does *not* match is
+expiry — rebuild it silently, exactly as before.
+
+**Both halves are load-bearing, and the second is the one at risk.** The obvious fix — treat every
+missing cart as an order — would empty the bag of anyone whose cart merely expired.
+`checkout-journey.test.ts` pins both, and reintroducing the old collapse turns 7 assertions red while
+leaving the 9 expiry assertions green. That split *is* the specification.
+
+`pendingCheckoutCartId` and `justCompleted` are in `partialize` on purpose: paying takes the customer
+off this origin entirely and they return on a fresh page load, so anything held only in memory is gone
+at exactly the moment it is needed.
+
+**The site still sends no confirmation email.** Shopify's is the receipt. The on-site confirmation
+claims nothing the storefront cannot know — no order number, no total, no delivery date — because it
+genuinely does not have them.
+
+### Money: Shopify is the source of truth, not `localStorage`
+
+The bag persists the whole product, price included, with no expiry, and totals were summed from those
+frozen numbers. A bag left open across a price change quoted the old price while Shopify charged the
+new one.
+
+`CART_FRAGMENT` had been fetching `cost.totalAmount` and every line's `merchandise.price` the entire
+time; `ShopifyCartPayload` declared three fields and discarded the rest. The fix was reading what was
+already on the wire. Every sync now adopts Shopify's line prices and total.
+
+**This is the third time this project has shipped a price nothing guaranteed.** Hardcoded USD;
+`{product.price}` rendered as a bare number; now a stale persisted price. Different mechanism each
+time, same rule broken. If you are touching anything that renders money, assume you are about to be
+the fourth.
+
+### Failures now distinguish "try again" from "this cannot work"
+
+`postShopify` ignored the HTTP status entirely, so a **503** from our own proxy — which is what it
+returns when the *server-side* `SHOPIFY_STOREFRONT_ACCESS_TOKEN` is missing while the public store
+domain is set — arrived as "a body with no data", identical to Shopify refusing the cart. The customer
+was shown "try again" and a button that could never work, forever. The client's only configuration
+check is the public domain, which cannot see a server-side variable.
+
+Status now maps explicitly: 503 → `not-configured` (no retry offered), 5xx/429 → `network`, other
+non-2xx → `shopify-error`. Shopify also signals throttling **in band** — HTTP 200 with a `THROTTLED`
+code in the GraphQL `errors` array, which the old transport dropped — so that is retried exactly once,
+then reported.
+
+A cart that comes back with fewer lines than were sent is `lines-unavailable`. That one names its cause
+in the customer-facing copy, breaking the general rule, because a sold-out piece is the only failure
+here the customer can resolve themselves.
+
+### Two webhook secrets, and picking the wrong one is silent
+
+An **app-created** webhook (Admin API `webhookSubscriptionCreate`) is signed with the **app's client
+secret**. A webhook created in **Settings → Notifications** is signed with the **signing secret shown
+on that page**. They are different values, and using the wrong one 401s every delivery forever with
+nothing in any log to say why.
+
+The route now logs which trap it is likely hitting on a signature mismatch. The *response* stays a bare
+401 — a wrong secret and a forged request are indistinguishable from the signature alone — but the log
+is actionable.
+
+Related, and worth knowing before you conclude your webhooks are missing: the Admin API's
+`webhookSubscriptions` query returns **only webhooks owned by the querying app**. Webhooks created in
+the Admin UI are invisible to it. An empty result is not evidence they do not exist.
+
+The endpoint also now allowlists topics (unhandled ones get `202`, which acknowledges receipt without
+claiming work that never happened, and without retry-baiting Shopify) and rejects deliveries whose
+`x-shopify-shop-domain` is not the configured store.
+
+### `/api/shopify` is rate-limited
+
+It is public and unauthenticated by necessity — the browser must reach it — and it spends the store's
+Shopify API quota and creates real carts. It had no limiter, while `/api/contact` got one after a
+security audit; the softer target was the one that costs money.
+
+Both routes now share `src/lib/utils/rateLimit.ts`. ⚠️ **It is only durable if
+`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set.** Without them it falls back to an
+in-memory map, which on Vercel counts per Lambda instance — the exact single-instance weakness that
+audit already corrected once. `RateLimiter.distributed` reports which mode is active rather than
+leaving it to be assumed.
+
+### Secrets and the client module graph
+
+`config/site.ts` exported three `SHOPIFY_*` constants read from non-public env vars, and
+`ContactForm.tsx` (`'use client'`) imports that file. Separately, `config/shopify.ts` — with getters
+for the Storefront token, the Admin token and the revalidation secret — was imported by the cart
+store, which is also a client module.
+
+**Nothing leaked**: Next inlines non-`NEXT_PUBLIC_` env vars as `undefined` in client bundles. The
+danger was that the only test on them asserted `typeof === 'string'`, which `''` satisfies — the code
+looked covered while proving nothing, and one rename to `NEXT_PUBLIC_*` would have shipped a Storefront
+token to every visitor with no test turning red.
+
+The dead exports are gone, and `config/shopify-public.ts` now carries the browser-safe values so the
+cart store never imports the server config. `secret-exposure.test.ts` walks the **real client import
+graph** — following `'use client'` entry points through their imports, so a module is caught by being
+*reachable*, not by lacking a directive. It also asserts the graph is non-empty first, because a broken
+resolver would otherwise make every assertion vacuously true, which is precisely the failure this file
+exists to prevent.
+
+### The fallback is still there, and no longer quiet
+
+An unconfigured deployment renders every page and returns 200 everywhere, which is why every failure in
+this project stayed hidden so long. The fallback stays — a Shopify outage must not take the site down —
+but `reportFallback()` now emits one structured `console.error` naming the fetcher, the reason, and
+whether each credential is present. `error` rather than `warn`, because in Vercel's logs that is the
+difference between a line nobody filters for and one that surfaces.

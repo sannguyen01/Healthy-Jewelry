@@ -22,9 +22,6 @@ import {
   PRIVACY_EMAIL,
   LEGAL_EMAIL,
   SENDER_EMAIL,
-  SHOPIFY_STOREFRONT_ENDPOINT,
-  SHOPIFY_STOREFRONT_TOKEN,
-  SHOPIFY_REVALIDATION_SECRET,
 } from '@/config/site'
 
 // ── navigation.ts ──────────────────────────────────────────────────────────
@@ -220,14 +217,9 @@ describe('SOCIAL_LINKS', () => {
   })
 })
 
-describe('legacy Shopify exports', () => {
-  it('SHOPIFY_STOREFRONT_ENDPOINT is a string', () => {
-    expect(typeof SHOPIFY_STOREFRONT_ENDPOINT).toBe('string')
-  })
-  it('SHOPIFY_STOREFRONT_TOKEN is a string', () => {
-    expect(typeof SHOPIFY_STOREFRONT_TOKEN).toBe('string')
-  })
-  it('SHOPIFY_REVALIDATION_SECRET is a string', () => {
-    expect(typeof SHOPIFY_REVALIDATION_SECRET).toBe('string')
-  })
-})
+// The three legacy `SHOPIFY_*` aliases that used to be asserted here were
+// removed from `config/site.ts` on 2026-08-07: they were unused, and they read
+// server-only secrets from a module that client components import. The
+// assertions were `typeof x === 'string'`, which `''` satisfies — they would
+// have passed just as happily if the token really had been exposed.
+// `src/tests/unit/secret-exposure.test.ts` now enforces the actual rule.

@@ -287,3 +287,155 @@ test.describe('Checkout — the bag itself', () => {
     await expect(page.getByRole('button', { name: /open bag — 2 item/i })).toBeVisible()
   })
 })
+
+test.describe('Checkout — the journey has an ending', () => {
+  /**
+   * Shopify deletes a cart when an order is created from it, and offers no way
+   * to ask whether that is what happened — so a completed purchase and an
+   * expired cart look identical from the storefront.
+   *
+   * They used to be treated identically too: the bag was silently rebuilt from
+   * the local lines. A customer who had just paid came back to a bag still
+   * holding everything they had bought, with a live Checkout button. These
+   * cover both halves, because the obvious fix breaks the other one.
+   */
+
+  /** Answers GetCart with `cart: null` — how a deleted cart reads. */
+  async function mockCartDeleted(page: Page): Promise<void> {
+    await page.route('**/api/shopify', async (route) => {
+      const body = route.request().postDataJSON() as { operation?: string }
+      if (body?.operation === 'GetCart') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { cart: null } }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            cartCreate: {
+              cart: {
+                id: 'gid://shopify/Cart/rebuilt',
+                checkoutUrl: FAKE_CHECKOUT_URL,
+                cost: { totalAmount: { amount: '89.00', currencyCode: 'USD' } },
+                lines: {
+                  edges: [
+                    {
+                      node: {
+                        id: 'l1',
+                        quantity: 1,
+                        merchandise: {
+                          id: 'gid://shopify/ProductVariant/44123456789',
+                          availableForSale: true,
+                          price: { amount: '89.00', currencyCode: 'USD' },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+              userErrors: [],
+            },
+          },
+        }),
+      })
+    })
+  }
+
+  /**
+   * A bag that has already been handed to Shopify's checkout.
+   *
+   * Seeded **once**, not on every navigation. `addInitScript` runs before every
+   * document, so an unconditional write would re-seed the original bag on the
+   * next page load and wipe the very completion state under test — the test
+   * would then fail for a reason that has nothing to do with the product.
+   */
+  async function seedBagAwaitingPayment(page: Page, cartId: string): Promise<void> {
+    await page.addInitScript(
+      ([id]) => {
+        if (localStorage.getItem('hj-e2e-seeded') === '1') return
+        localStorage.setItem('hj-e2e-seeded', '1')
+        const product = {
+          id: 'hj-001',
+          defaultVariantId: 'gid://shopify/ProductVariant/44123456789',
+          handle: 'arc-band-titanium',
+          title: 'Arc Band',
+          collection: 'rings',
+          material: 'titanium',
+          tags: ['rings'],
+          price: '89.00',
+          compareAtPrice: null,
+          currencyCode: 'USD',
+          badge: null,
+          description: 'Test',
+          spec: '2mm',
+          svgType: 'ring-arc',
+          variants: [],
+        }
+        localStorage.setItem(
+          'hj-cart',
+          JSON.stringify({
+            state: {
+              items: [
+                { product, quantity: 1, variantId: 'gid://shopify/ProductVariant/44123456789' },
+              ],
+              shopifyCartId: id,
+              checkoutUrl: null,
+              pendingCheckoutCartId: id,
+              justCompleted: false,
+            },
+            version: 0,
+          })
+        )
+      },
+      [cartId] as const
+    )
+  }
+
+  test('a completed order empties the bag and says so', async ({ page }) => {
+    await seedBagAwaitingPayment(page, 'gid://shopify/Cart/paid')
+    await mockCartDeleted(page)
+
+    await page.goto('/checkout')
+
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      /thank you|order is placed/i,
+      { timeout: 10_000 }
+    )
+
+    // The bag icon is what a returning customer actually looks at — and it
+    // lives in the Nav, which `/checkout` does not render (it is a deliberately
+    // bare hand-off page). `/cart` is where the count is visible.
+    await page.goto('/cart')
+    await expect(page.getByRole('button', { name: /open bag — 0 item/i })).toBeVisible()
+  })
+
+  test('the confirmation is reachable from the bag too', async ({ page }) => {
+    await seedBagAwaitingPayment(page, 'gid://shopify/Cart/paid')
+    await mockCartDeleted(page)
+    await page.goto('/checkout')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
+
+    await page.goto('/cart')
+    await page.getByRole('button', { name: /open bag/i }).click()
+    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
+    // Not "Your bag is empty" — a cold thing to show someone who just paid.
+    await expect(dialog.getByText(/thank you|order is placed/i)).toBeVisible()
+  })
+
+  test('an expired cart keeps the bag and is rebuilt silently', async ({ page }) => {
+    // Same deleted cart, but this customer was never sent to pay. Treating this
+    // as an order would empty a bag nobody bought.
+    await seedBag(page)
+    await stubShopifyHostedCheckout(page)
+    await mockCartDeleted(page)
+
+    await page.goto('/cart')
+    await expect(page.getByRole('button', { name: /open bag — 1 item/i })).toBeVisible()
+    await expect(page.getByText(/thank you|order is placed/i)).toHaveCount(0)
+  })
+})

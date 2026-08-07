@@ -13,8 +13,12 @@ export default function CartPage() {
   const removeItem = useCartStore((s) => s.removeItem)
   const updateQuantity = useCartStore((s) => s.updateQuantity)
   const total = useCartStore((s) => s.totalPrice())
+  const shopifyTotal = useCartStore((s) => s.shopifyTotal)
   const cartCurrency = cartCurrencyCode(items)
   const totalItems = useCartStore((s) => s.totalItems())
+  // See CartDrawer: Shopify's total is what will be charged; the local sum is
+  // a snapshot from whenever each item was added.
+  const displayTotal = shopifyTotal ?? total
 
   return (
     <>
@@ -362,7 +366,7 @@ export default function CartPage() {
                       fontWeight: 300,
                     }}
                   >
-                    {formatPrice(total, cartCurrency)}
+                    {formatPrice(displayTotal, cartCurrency)}
                   </span>
                 </div>
 
@@ -412,7 +416,7 @@ export default function CartPage() {
                       color: 'var(--ink)',
                     }}
                   >
-                    {formatPrice(total, cartCurrency)}
+                    {formatPrice(displayTotal, cartCurrency)}
                   </span>
                 </div>
               </div>

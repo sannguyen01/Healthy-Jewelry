@@ -174,6 +174,7 @@ describe('customer-facing copy', () => {
     'placeholder-catalog',
     'network',
     'shopify-error',
+    'lines-unavailable',
   ]
 
   it('has a message for every failure reason', () => {
@@ -209,6 +210,153 @@ describe('customer-facing copy', () => {
     // always fails wastes the customer's time.
     expect(checkoutMessage('not-configured').retryable).toBe(false)
     expect(checkoutMessage('placeholder-catalog').retryable).toBe(false)
+    // Nothing the customer clicks makes a sold-out piece available; the copy
+    // tells them to remove it instead.
+    expect(checkoutMessage('lines-unavailable').retryable).toBe(false)
+  })
+
+  it('names the cause only where the customer can act on it', () => {
+    // The general rule is never to expose the cause — "the storefront token was
+    // rejected" is our problem, not theirs. A sold-out line is the exception:
+    // it is the one failure they can resolve themselves, so saying so is help
+    // rather than leakage.
+    expect(checkoutMessage('lines-unavailable').body.toLowerCase()).toMatch(/sold out|available/)
+    for (const error of ['not-configured', 'shopify-error', 'network'] as CheckoutError[]) {
+      const body = checkoutMessage(error).body.toLowerCase()
+      expect(body, `${error} must not leak the cause`).not.toMatch(/token|shopify store|api|config/)
+    }
+  })
+})
+
+/**
+ * The transport used to drop the HTTP status entirely, so every non-2xx from
+ * our own proxy arrived as "a body with no data" — indistinguishable from
+ * Shopify refusing the cart.
+ *
+ * The 503 case is the one with real customer cost. It is what `/api/shopify`
+ * returns when the *server-side* `SHOPIFY_STOREFRONT_ACCESS_TOKEN` is missing
+ * while the public store domain is set — a genuinely reachable half-configured
+ * deployment, and the client's only config check (the public domain) cannot see
+ * it. Reported as `shopify-error`, the customer got "try again" and a button
+ * that could never succeed, forever.
+ */
+describe('HTTP status decides what the customer is told', () => {
+  const cases: { status: number; expected: CheckoutError; why: string }[] = [
+    { status: 503, expected: 'not-configured', why: 'server-side token missing' },
+    { status: 502, expected: 'network', why: 'proxy could not reach Shopify' },
+    { status: 429, expected: 'network', why: 'rate limited' },
+    { status: 500, expected: 'network', why: 'proxy fault' },
+    { status: 403, expected: 'shopify-error', why: 'operation not permitted' },
+    { status: 400, expected: 'shopify-error', why: 'malformed request' },
+  ]
+
+  it.each(cases)('$status → $expected ($why)', async ({ status, expected }) => {
+    const variantId = 'gid://shopify/ProductVariant/44123456789'
+    useCartStore.setState({
+      items: [{ product: productWith(variantId), quantity: 1, variantId }],
+      shopifyCartId: null,
+      checkoutUrl: null,
+      checkoutError: null,
+      pendingCheckoutCartId: null,
+      justCompleted: false,
+      shopifyTotal: null,
+    })
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status,
+      json: async () => ({ error: 'nope' }),
+    } as Response)
+
+    await useCartStore.getState().syncWithShopify()
+    expect(useCartStore.getState().checkoutError).toBe(expected)
+  })
+
+  it('a 503 offers no retry button', () => {
+    // The two halves have to agree: mapping 503 correctly is pointless if the
+    // copy still invites a retry.
+    expect(checkoutMessage('not-configured').retryable).toBe(false)
+  })
+})
+
+/**
+ * Shopify signals rate limiting *in band* — HTTP 200 with a THROTTLED code in
+ * the GraphQL `errors` array. The old transport returned only `data`, so this
+ * was invisible: a throttled cart create looked exactly like a refused one and
+ * nothing retried.
+ */
+describe('throttling is retried once, then reported honestly', () => {
+  const variantId = 'gid://shopify/ProductVariant/44123456789'
+
+  beforeEach(() => {
+    useCartStore.setState({
+      items: [{ product: productWith(variantId), quantity: 1, variantId }],
+      shopifyCartId: null,
+      checkoutUrl: null,
+      checkoutError: null,
+      pendingCheckoutCartId: null,
+      justCompleted: false,
+      shopifyTotal: null,
+    })
+  })
+
+  const throttled = {
+    ok: true,
+    status: 200,
+    json: async () => ({ errors: [{ message: 'Throttled', extensions: { code: 'THROTTLED' } }] }),
+  } as Response
+
+  it('retries a throttled request', async () => {
+    mockFetch.mockResolvedValue(throttled)
+    await useCartStore.getState().syncWithShopify()
+    // One original + one retry for the single CreateCart operation.
+    expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('succeeds when the retry succeeds', async () => {
+    mockFetch.mockResolvedValueOnce(throttled).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          cartCreate: {
+            cart: {
+              id: 'gid://shopify/Cart/ok',
+              checkoutUrl: 'https://test-shop.myshopify.com/checkouts/ok',
+              cost: { totalAmount: { amount: '89.00', currencyCode: 'USD' } },
+              lines: {
+                edges: [
+                  {
+                    node: {
+                      id: 'l1',
+                      quantity: 1,
+                      merchandise: {
+                        id: variantId,
+                        availableForSale: true,
+                        price: { amount: '89.00', currencyCode: 'USD' },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            userErrors: [],
+          },
+        },
+      }),
+    } as Response)
+
+    await useCartStore.getState().syncWithShopify()
+    expect(useCartStore.getState().checkoutError).toBeNull()
+    expect(useCartStore.getState().checkoutUrl).toContain('checkouts/ok')
+  })
+
+  it('stops at one retry rather than hammering a limiter', async () => {
+    mockFetch.mockResolvedValue(throttled)
+    await useCartStore.getState().syncWithShopify()
+    // A retry loop would sit behind a spinner and add load to the thing
+    // already refusing us.
+    expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(2)
+    expect(useCartStore.getState().checkoutError).toBe('shopify-error')
   })
 })
 
