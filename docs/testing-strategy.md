@@ -67,6 +67,34 @@ become a merge freeze.
 the alternative (`paymentGatewayNames` on an order) needs an order to exist. That one is human-only;
 see `docs/go-live-runbook.md`.
 
+### A fallback indistinguishable from the real thing is indistinguishable from a bug
+
+The static catalogue exists so the site builds and serves without Shopify. That is load-bearing, and
+`src/lib/shopify/env-check.ts` warns rather than throws specifically to protect it.
+
+But it has a cost that took a second outage to see. The product page read Shopify in its body and
+static `hj-data` in its `generateMetadata`, and because the two catalogues are nearly disjoint, 20 of
+the 22 live products served `<title>Product Not Found</title>` from a page that rendered perfectly.
+The Open Graph image, `generateStaticParams` and `/search` had the same split.
+
+**No hermetic test could have caught any of it.** Unit tests run with no Shopify credentials; E2E runs
+against `placeholder.myshopify.com`. Both are exactly the conditions under which the two data sources
+return *the same thing*. The bug is only observable where the catalogues differ, which is production.
+
+Two responses, and the second is the general one:
+
+- `src/tests/unit/metadata-data-source.test.ts` forbids any route under `src/app/` from importing a
+  product lookup out of `@/lib/data/hj-data`. Static data is the fallback, reachable only from behind
+  `@/lib/shopify` — which already degrades on its own. A route reaching past that door is not "using
+  the fallback", it is bypassing Shopify permanently.
+- `scripts/verify-production.mjs` asserts the same properties against a **Shopify-only handle** on the
+  live deployment, because that is the only place the two sources can disagree.
+
+The same reasoning explains why `searchProducts` shipped broken in a subtler way: it returned `[]`
+rather than the static catalogue when a Shopify call failed, alone among the fetchers. Empty renders
+as a confident `No results` — a wrong answer that looks like a right one. It went unnoticed because
+nothing called the function at all until `/search` was migrated onto it.
+
 Removing it would not break the site. It would remove the only thing standing between a rendering
 regression and production — which is exactly how the two defects below reached production in the first
 place.

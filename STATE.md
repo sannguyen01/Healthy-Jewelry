@@ -84,6 +84,19 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   configuration.
   Loop action: report only
   Human decision: pending
+- [ ] SOFT-404-PRODUCT — **new 2026-08-08.** `/products/<unknown-handle>` answers
+  **HTTP 200** while rendering `not-found.tsx`. A soft 404 lets search engines
+  index every mistyped or stale product URL as a real page, and the title they
+  index is `Product Not Found — Healthy Jewelry`.
+  Verified **identical on `HEAD`** before the metadata migration, so this is
+  pre-existing Next routing behaviour, not a catalogue-source bug — recorded
+  rather than half-fixed inside an unrelated change. `src/app/not-found.tsx`
+  exists and no route sets `dynamicParams`.
+  `e2e/metadata.spec.ts` asserts the *content* (a missing product must not render
+  as a product) rather than the status, so it does not encode the wrong
+  behaviour as correct while this is open.
+  Loop action: may fix — isolated to `src/app/products/[handle]/`
+  Human decision: pending
 - [ ] UPSTASH-REDIS — `/api/shopify` is now rate-limited (2026-08-07), sharing
   `src/lib/utils/rateLimit.ts` with `/api/contact`. It is only durable across
   serverless invocations if `UPSTASH_REDIS_REST_URL` and
@@ -91,7 +104,15 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   in-memory map that counts per Lambda instance — the same single-instance
   weakness the 2026-06-30 security audit already corrected once for the contact
   route.
-  Loop action: report only
+  **Now checkable rather than invisible (2026-08-08)**: `GET /api/health` returns
+  `{ rateLimitDistributed, redis, healthy }` and answers **503** when degraded.
+  It does not merely report whether the env vars are set — it spends one real
+  round-trip against Redis, because a typo'd URL, a revoked token or a paused
+  database all leave the flag `true` while every limit check fails open.
+  `production-smoke` asserts it on a schedule.
+  Set both vars in Vercel **Production and Preview** — scoping them to Production
+  alone is the way this gets "fixed" and stays broken.
+  Loop action: report only, never propose setting these yourself
   Human decision: pending
 - [ ] PRODUCTION-SMOKE-SECRETS — `.github/workflows/production-smoke.yml` exists
   as of 2026-08-08 but cannot run until five repository secrets are set:
@@ -107,6 +128,10 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   `cartCreate` yields a real `checkoutUrl`), but no test has opinions about
   whether the site looks right. Sandboxed sessions have no public-web egress, so
   this cannot move into an agent loop — only into CI or a human.
+  **Do the mobile hand-off specifically, not desktop-and-assume-parity.** Both
+  mobile-only defects this project has had — the hero crop and the invisible
+  collection tiles — passed every desktop check, which is why
+  `hero-legibility.spec.ts` samples six widths.
   Loop action: report only
   Human decision: pending
 - [ ] SHOPIFY-SPEC-METAFIELD — **downgraded 2026-08-08: the code path now works,
@@ -124,6 +149,17 @@ policy**, so the existing Vercel token must be copied rather than a second minte
 
 ## Watch List
 
+- **`integrate/shopify-transactions` — resolved as absent, 2026-08-08.** Checked
+  again after a report that it risked reverting PR #16's `pendingCheckoutCartId`
+  discriminator and the secret-exposure split: the branch exists in **neither the
+  local clone nor origin** (only `main` and the two `claude/*` branches). There is
+  nothing to gate.
+  Recording the process point in case it resurfaces, because the proposed gate
+  was *weaker* than what already runs: `secret-exposure.test.ts` and
+  `checkout-journey.test.ts` are both part of `pnpm exec vitest run`, which the
+  `verify` job runs on every PR. Treating those two files as the merge gate would
+  narrow the check, not tighten it. The merge result is already gated on both,
+  plus 666 other tests.
 - **Stale entry, 2026-08-08**: the `integrate/shopify-transactions` note below
   describes a branch and worktree that **do not exist in this clone** — only
   `main` and the current working branch are present, and PR #14 has long since
@@ -281,6 +317,25 @@ duplicate those files.
   `secret-exposure.test.ts` walks the real client import graph instead, and
   asserts the graph is non-empty first so a broken resolver cannot make it
   vacuously green.
+- **2026-08-08**: The SEO/social layer had never migrated to Shopify. The product
+  page read Shopify in its body and static `hj-data` in its `generateMetadata`,
+  and the two catalogues are nearly disjoint — so 20 of the 22 live products
+  served `title: 'Product Not Found'` from a page that rendered perfectly. The OG
+  image, `generateStaticParams` and `/search` had the same split; site search
+  could not find a single product actually for sale.
+  The general lesson, and the reason nothing caught it: **a fallback that is
+  indistinguishable from the real thing in every test environment is
+  indistinguishable from a bug.** Both suites run without Shopify credentials,
+  which is precisely the condition under which both sources return the same data.
+  `metadata-data-source.test.ts` now forbids reaching past `@/lib/shopify` for
+  catalogue data anywhere under `src/app/`; static data is the fallback, and it is
+  reachable only from behind that door. Sixth guardrail in the family.
+- **2026-08-08**: `searchProducts` was the only fetcher that returned `[]` on a
+  failed Shopify call instead of degrading to the static catalogue. Empty renders
+  as a confident `No results for "titanium"` — telling a customer the product does
+  not exist when the truth is that Shopify did not answer. Nothing noticed because
+  nothing called it: the function was fully implemented, tested, and unreferenced
+  until `/search` was migrated onto it.
 - **2026-08-08**: A third test tier, because the first two run against a fiction.
   `ci.yml` points every unit and E2E test at `mock.myshopify.com`, so until now no
   automated test had ever touched the real store — and all three commerce outages

@@ -279,6 +279,117 @@ async function cartCreateReturnsCheckoutUrl() {
   return `cartCreate → ${created.checkoutUrl} (${created.cost?.totalAmount?.amount} ${currency}, via ${candidate.handle})`
 }
 
+/**
+ * The metadata layer, checked where the bug actually lived.
+ *
+ * `generateMetadata` and the OG image read the *static* catalogue while the page
+ * body read Shopify. Because the two are nearly disjoint, 20 of the 22 live
+ * products served `<title>Product Not Found</title>` from a page that rendered
+ * perfectly — and nothing hermetic could see it, because without Shopify
+ * credentials both sources return the same thing. Only a Shopify-only handle
+ * against the real deployment can tell them apart.
+ */
+async function productMetadataNamesTheProduct() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const handle = SHOPIFY_ONLY_HANDLES[0]
+  const res = await fetch(new URL(`/products/${handle}`, siteUrl), {
+    headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+  })
+  if (!res.ok) throw new Error(`GET /products/${handle} returned ${res.status}`)
+  const html = await res.text()
+
+  const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? ''
+  if (/product not found/i.test(title)) {
+    throw new Error(
+      `/products/${handle} renders, but its <title> is "${title}".\n` +
+        `  generateMetadata is reading the static catalogue instead of Shopify —\n` +
+        `  this handle exists only in Shopify, so the static lookup returns nothing.`,
+    )
+  }
+  if (title.trim().length === 0) throw new Error(`/products/${handle} has an empty <title>`)
+
+  const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]*)"/i)?.[1] ?? ''
+  if (!ogTitle || ogTitle.trim() === 'Product') {
+    throw new Error(
+      `og:title is "${ogTitle || '(missing)'}" — the share card is not naming the product.`,
+    )
+  }
+
+  return `"${title.trim()}" (og:title "${ogTitle.trim()}")`
+}
+
+/**
+ * The Satori failure was invisible from everywhere except a request: the route
+ * compiled, type-checked, deployed, and threw only when a crawler asked.
+ */
+async function openGraphImageRenders() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const handle = SHOPIFY_ONLY_HANDLES[0]
+  const res = await fetch(new URL(`/products/${handle}/opengraph-image`, siteUrl), {
+    headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+  })
+
+  if (!res.ok) throw new Error(`OG image returned ${res.status}`)
+  const type = res.headers.get('content-type') ?? ''
+  if (!type.includes('image/png')) throw new Error(`OG image content-type is "${type}"`)
+
+  const bytes = (await res.arrayBuffer()).byteLength
+  // A Satori failure can still answer 200 with a near-empty body.
+  if (bytes < 1000) throw new Error(`OG image is only ${bytes} bytes — likely a render failure`)
+
+  return `${(bytes / 1024).toFixed(0)} KB PNG for ${handle}`
+}
+
+/**
+ * Site search ran against the static catalogue from the browser, so it could
+ * not find a single product actually for sale.
+ */
+async function searchFindsShopifyProducts() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const res = await fetch(new URL('/search?q=cuff', siteUrl), {
+    headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+  })
+  if (!res.ok) throw new Error(`GET /search returned ${res.status}`)
+  const html = await res.text()
+
+  const found = SHOPIFY_ONLY_HANDLES.filter((h) => html.includes(h))
+  if (found.length === 0) {
+    throw new Error(
+      'Search for "cuff" returned no Shopify-only product. Either /search is still\n' +
+        '  reading the static catalogue, or the Shopify search query returned nothing.',
+    )
+  }
+
+  return `found ${found.join(', ')}`
+}
+
+/**
+ * Rate limiting is only durable when Upstash is configured *and answering*.
+ * Without it, the in-memory fallback counts per Lambda instance, so the
+ * effective limit is `limit × instances` on the unauthenticated endpoint that
+ * creates carts.
+ */
+async function rateLimitingIsDistributed() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const res = await fetch(new URL('/api/health', siteUrl))
+  const body = await res.json()
+
+  if (!body.rateLimitDistributed) {
+    throw new Error(
+      'Rate limiting is NOT distributed — UPSTASH_REDIS_REST_URL / _TOKEN are unset in\n' +
+        `  this environment. ${body.hint ?? ''}`,
+    )
+  }
+  if (body.redis !== 'ok') {
+    throw new Error(
+      `Upstash is configured but reported "${body.redis}" — limits are failing open.\n` +
+        `  ${body.hint ?? ''}`,
+    )
+  }
+
+  return 'rate limits are shared across instances (Upstash answering)'
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -290,6 +401,10 @@ async function main() {
     everyProductPublishedToHeadless,
   )
   await check('A real cart yields a real checkout URL', cartCreateReturnsCheckoutUrl)
+  await check('Product metadata names the product, not "Not Found"', productMetadataNamesTheProduct)
+  await check('The Open Graph image renders a real PNG', openGraphImageRenders)
+  await check('Site search finds Shopify products', searchFindsShopifyProducts)
+  await check('Rate limiting is distributed, not per-instance', rateLimitingIsDistributed)
 
   const failed = results.filter((r) => !r.ok)
   console.log('─'.repeat(70))

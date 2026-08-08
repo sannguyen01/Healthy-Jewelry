@@ -97,15 +97,44 @@ If the order succeeded but no log line appears, the webhook is not reaching the
 deployment at all — re-run step 2, which distinguishes "wrong secret" from "not
 configured" from "never arrived."
 
-## Step 5 — Make rate limiting durable
+## Step 5 — Verify the mobile checkout hand-off by hand
 
-Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in Vercel.
+Desktop parity is not a safe assumption here. Both mobile-only defects this
+project has shipped — the hero crop that discarded 75% of the frame at 390px,
+and the collection tiles that rendered at `opacity: 0.12` — passed every desktop
+check. That is why `hero-legibility.spec.ts` samples six widths.
+
+On a real phone, not an emulator: add to bag → open the bag → Checkout, and
+confirm the redirect lands on Shopify's hosted checkout with the right items and
+a VND total. This is the half of `VISUAL-QA-LIVE` that automation cannot reach.
+
+## Step 6 — Make rate limiting durable
+
+Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in Vercel, for
+**Production and Preview**. Scoping them to Production alone is how this gets
+"fixed" and stays broken.
 
 Without them, `src/lib/utils/rateLimit.ts` falls back to an in-memory map that
-counts per Lambda instance — so the limit is effectively per-instance, not
-per-user. `/api/shopify` is unauthenticated and creates carts, which makes it the
-endpoint that most wants a real limiter. This project already fixed this exact
-weakness once for `/api/contact`.
+counts per Lambda instance — so the effective limit is `limit × concurrent
+instances`. `/api/shopify` is unauthenticated and creates carts, which makes it
+the endpoint that most wants a real limiter. This project already fixed this
+exact weakness once for `/api/contact`.
+
+Check it with one call:
+
+```bash
+curl -s https://healthyjewellery.com/api/health
+```
+
+| Response | Meaning |
+|---|---|
+| `{"rateLimitDistributed":true,"redis":"ok","healthy":true}` (200) | Limits are shared across instances. |
+| `"redis":"unreachable"` (503) | Configured, but Upstash is not answering — limits are failing open. |
+| `"rateLimitDistributed":false` (503) | The env vars are unset in this environment. |
+
+The endpoint spends a real Redis round-trip rather than just reading the env
+vars, because a typo'd URL, a revoked token, or a paused database all leave the
+flag `true` while every limit check silently fails open.
 
 ---
 
@@ -125,7 +154,9 @@ re-checks steps 2–4's preconditions daily and on demand
 
 It checks that the live site serves Shopify data rather than the static fallback,
 that every product is still published to the headless publication, that a real
-cart yields a real checkout URL, and that the webhook secret still verifies.
+cart yields a real checkout URL, that product metadata and the Open Graph image
+name the real product, that site search finds Shopify products, that rate
+limiting is distributed, and that the webhook secret still verifies.
 
 It is deliberately **not** part of the merge gate and branch protection must not
 require it — it is meant to fail for reasons unrelated to the commit under
