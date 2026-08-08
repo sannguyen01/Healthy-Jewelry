@@ -20,10 +20,52 @@ That is also not the useful question. The useful one is what the suite is *for*,
 | Unit | `pnpm exec vitest run` | `src/lib`, `src/store`, `src/config`, design tokens, and component behaviour under jsdom | ~12 s |
 | Build | `pnpm build` | Prerender of all 45 routes | ~40 s |
 | E2E | `pnpm e2e` | The rendered application in a real browser, desktop + mobile | ~3-5 min |
+| Production smoke | `pnpm verify:production` · `pnpm verify:webhook` | The **real** store and the **live** deployment | ~10 s |
 
 `vitest.config.ts` scopes **coverage** to the business-logic layer on purpose, with the comment *"UI
 components are verified via E2E"*. That single line is the whole argument: with coverage thresholds
 deliberately not applied to the rendering layer, **E2E is the only automated coverage the UI has.**
+
+### The production tier, and why it had to exist
+
+Every layer above the last one runs against `mock.myshopify.com` (`ci.yml` declares the mock
+credentials once, for both jobs). That is the correct design for a merge gate — hermetic, fast, and
+impossible for someone else's outage to turn red — but it has a consequence worth stating plainly:
+
+> **Until 2026-08-08, no automated test had ever touched the real store.** The suite proved the code
+> was correct against a fiction.
+
+Every commerce outage this project has had lived in exactly that blind spot, and none of them were
+code defects the mock could have caught:
+
+- 22 products published to Online Store and **0** to the headless channel, so the Storefront token saw
+  an empty catalogue and every page silently served the static fallback;
+- all 38 variants `availableForSale: false`, so a fully-correct store would still have sold nothing;
+- prices rendered in USD by a store that charges VND.
+
+`scripts/verify-production.mjs` closes that gap from the outside: it loads the live `/shop` page and
+asserts it is serving Shopify rather than the fallback, that every product is still published to the
+headless publication, and that a real `cartCreate` yields a real `checkoutUrl`.
+
+The fallback/live discrimination is the load-bearing idea. The two catalogues are almost entirely
+disjoint, so `dome-ring-titanium` on the live page is *proof of fallback* and `meridian-cuff` is *proof
+of a real Storefront fetch*. That only holds while the lists stay disjoint —
+`src/tests/unit/production-smoke-handles.test.ts` asserts the invariant against `hj-data.ts`, because a
+discriminator that stops discriminating keeps passing while testing nothing.
+
+Publication scope is asserted as *every product, no exceptions*, never as a count of 22. The way this
+regresses is a new product added and not published, which a hardcoded number would happily pass once
+the total moved on.
+
+**It is deliberately not a merge gate.** `.github/workflows/production-smoke.yml` is a separate
+workflow on a schedule plus `workflow_dispatch`, and branch protection must never require it: it is
+*meant* to fail for reasons unrelated to the commit under review, and a Shopify incident must not
+become a merge freeze.
+
+**What it still cannot tell you:** whether a payment provider is active. Admin GraphQL's
+`PaymentSettings` exposes only `supportedDigitalWallets` — there is no field for enabled providers, and
+the alternative (`paymentGatewayNames` on an order) needs an order to exist. That one is human-only;
+see `docs/go-live-runbook.md`.
 
 Removing it would not break the site. It would remove the only thing standing between a rendering
 regression and production — which is exactly how the two defects below reached production in the first

@@ -1,7 +1,37 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-08-01
+Last refreshed by hand: 2026-08-08
+
+## Live verification — 2026-08-08
+
+First session with live Shopify Admin API access. Everything below was **checked
+against the store**, not inferred from the diff:
+
+| Claim | Result |
+|---|---|
+| Store identity | ✅ `y0k9ve-q1.myshopify.com`, VND, Basic, Vietnam |
+| Money format | ✅ `{{amount_no_decimals_with_comma_separator}}₫` → `1.450.000₫` |
+| Headless publish fix held | ✅ 22/22 on `Publication/193327071310` |
+| Inventory fix held | ✅ all `tracksInventory: false`, all `ACTIVE` |
+| Collections | ✅ 5 real (5+4+4+5+4 = 22) + `frontpage`, all published |
+| App-owned webhooks | 0 — consistent with Admin-UI webhooks, **not** evidence of absence |
+| **Orders placed, ever** | **0** (`ordersCount: 0`) |
+
+**The remaining work is a chain, not a checklist:**
+
+```
+payment provider ──> an order can exist ──> a webhook can fire ──> the secret can be tested
+```
+
+Doing these out of order spends the first real transaction discovering something
+the earlier steps would have reported for free. See `docs/go-live-runbook.md`.
+
+Two constraints found this session, worth recording so they are not rediscovered:
+sandboxed sessions have **no public-web egress** (Shopify Admin API works;
+`healthyjewellery.com` is blocked by the proxy), which is why live checks belong
+in CI runners; and `storefrontAccessTokenCreate` is **refused by the MCP safety
+policy**, so the existing Vercel token must be copied rather than a second minted.
 
 ## High Priority (loop is acting or waiting on human)
 
@@ -18,19 +48,40 @@ Last refreshed by hand: 2026-08-01
   the only Shopify-owned record is the `checkout` CNAME to
   `shops.myshopify.com`, which is the expected shape for this headless
   architecture, not a conflict.
-- [ ] SHOPIFY-WEBHOOK-SECRET — the user reports the webhooks are registered.
-  **This cannot be confirmed by API and their absence is not evidence:** the
-  Admin `webhookSubscriptions` query returns only webhooks *owned by the
-  querying app*, so webhooks created in Settings → Notifications are invisible
-  to it. What matters instead is which of **two different secrets** is set as
-  `SHOPIFY_WEBHOOK_SECRET`: an app-created webhook signs with the app client
-  secret; an Admin-UI webhook signs with the signing secret shown on the
-  Notifications page. The wrong one 401s every delivery, silently and forever.
-  Since the Admin API shows no app-owned subscriptions, these are almost
-  certainly Admin-UI webhooks and need that page's secret.
-  Verify by placing one order and checking Vercel function logs for
-  `[webhooks/shopify] order event`. On a mismatch the route now logs the trap
-  by name (2026-08-07).
+- [ ] SHOPIFY-PAYMENTS — **the head of the chain, and therefore the real
+  blocker.** `shop.paymentSettings.supportedDigitalWallets` is empty on
+  `y0k9ve-q1.myshopify.com`. That alone means only that no wallets are enabled,
+  which is independent of whether a card or manual provider is — so it is not
+  evidence either way. Confirm an actual provider is active in Settings →
+  Payments **before** the first real order: a store with none accepts a checkout
+  and then cannot take money, so the order is never created, so the webhook never
+  fires, so SHOPIFY-WEBHOOK-SECRET below cannot be tested at all.
+  Shopify Payments does not serve Vietnam — expect a manual method or a
+  third-party gateway; do not assume it is configured.
+  **Not machine-verifiable, confirmed against the live schema 2026-08-08**:
+  Admin GraphQL's `PaymentSettings` exposes *only* `supportedDigitalWallets`
+  (`acceptedCardBrands` / `shopifyPaymentsAccountId` are rejected as
+  non-existent), and the alternative — `paymentGatewayNames` on an order —
+  needs an order to exist, which is the thing this unblocks.
+  Loop action: report only, never propose enabling a payment provider yourself
+  Human decision: pending
+- [ ] SHOPIFY-WEBHOOK-SECRET — **no longer requires an order to test.** Which of
+  **two different secrets** is set as `SHOPIFY_WEBHOOK_SECRET` decides everything:
+  an app-created webhook signs with the app client secret; an Admin-UI webhook
+  signs with the signing secret shown on the Notifications page. The wrong one
+  401s every delivery, silently and forever.
+  As of 2026-08-08 this is answerable for free and repeatably:
+  `SHOPIFY_WEBHOOK_SECRET=... pnpm verify:webhook https://healthyjewellery.com`
+  signs a synthetic `products/update` payload and reads the route's own contract
+  back (200 correct · 202 correct-but-unhandled · 401 wrong secret · 503 unset).
+  The old instruction — place an order and watch Vercel logs — was one-shot, cost
+  money, and produced an ephemeral signal.
+  **The Admin API still cannot tell you whether webhooks exist**: the
+  `webhookSubscriptions` query returns only webhooks *owned by the querying app*,
+  so Settings → Notifications webhooks are invisible to it and an empty result is
+  not evidence of absence. Zero app-owned subscriptions were confirmed again on
+  2026-08-08, which makes Admin-UI webhooks (and that page's secret) the likely
+  configuration.
   Loop action: report only
   Human decision: pending
 - [ ] UPSTASH-REDIS — `/api/shopify` is now rate-limited (2026-08-07), sharing
@@ -42,29 +93,44 @@ Last refreshed by hand: 2026-08-01
   route.
   Loop action: report only
   Human decision: pending
-- [ ] VISUAL-QA-LIVE — visual QA and the checkout redirect to a real Shopify URL
-  still need checking against the deployed Vercel URL from a normal browser.
-  Automated coverage now exists for the rest (see Testing baseline), but the
-  sandboxed sessions that produced it cannot reach the Vercel hosts.
+- [ ] PRODUCTION-SMOKE-SECRETS — `.github/workflows/production-smoke.yml` exists
+  as of 2026-08-08 but cannot run until five repository secrets are set:
+  `PRODUCTION_SITE_URL`, `SHOPIFY_STORE_DOMAIN`,
+  `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_ADMIN_ACCESS_TOKEN`,
+  `SHOPIFY_WEBHOOK_SECRET`. Copy the Storefront token already working in Vercel
+  rather than minting a second one — `storefrontAccessTokenCreate` is refused by
+  the MCP safety policy, and a second credential is a second thing to rotate.
+  Loop action: report only, never propose setting these yourself
+  Human decision: pending
+- [ ] VISUAL-QA-LIVE — visual QA still needs a human with a browser. The checkout
+  redirect *is* now machine-checked (`verify-production.mjs` asserts a real
+  `cartCreate` yields a real `checkoutUrl`), but no test has opinions about
+  whether the site looks right. Sandboxed sessions have no public-web egress, so
+  this cannot move into an agent loop — only into CI or a human.
   Loop action: report only
   Human decision: pending
-- [ ] SHOPIFY-PAYMENTS — `shop.paymentSettings.supportedDigitalWallets` is empty
-  on `y0k9ve-q1.myshopify.com`. That may only mean no wallets are enabled, but
-  confirm an actual payment provider is active in Settings → Payments before
-  the first real order: a store with none accepts a checkout and then cannot
-  take money.
-  Loop action: report only
-  Human decision: pending
-- [ ] SHOPIFY-SPEC-METAFIELD — product specs ("2 mm · 1.8 g") now read from the
-  `custom.spec` metafield, which no product has set. The detail page hides the
-  line when empty rather than rendering a blank one, so this is cosmetic, not
-  broken. Deliberately not auto-populated: specs are physical measurements and
-  inventing them would put fabricated product claims on a store.
-  Loop action: report only
-  Human decision: pending
+- [ ] SHOPIFY-SPEC-METAFIELD — **downgraded 2026-08-08: the code path now works,
+  it is simply unpopulated.** The store previously had *zero metafield
+  definitions of any kind*, and the Storefront API cannot read an undefined
+  metafield — so `custom.spec` was structurally unreadable, not merely unset, and
+  D5's read path could never have returned anything. The definition now exists
+  (`gid://shopify/MetafieldDefinition/236811976782`, `custom.spec`,
+  `single_line_text_field`, `storefront: PUBLIC_READ`, pinned).
+  Values remain deliberately unpopulated: specs are physical measurements and
+  inventing them would put fabricated product claims on a store. The detail page
+  hides the line when empty rather than rendering a blank one.
+  Loop action: report only; never invent spec values
+  Human decision: pending (enter real measurements in Admin when known)
 
 ## Watch List
 
+- **Stale entry, 2026-08-08**: the `integrate/shopify-transactions` note below
+  describes a branch and worktree that **do not exist in this clone** — only
+  `main` and the current working branch are present, and PR #14 has long since
+  merged. Either the work landed, was abandoned, or lives only on another
+  machine. Left in place rather than deleted because "a branch I cannot see" is
+  not the same as "a branch that is gone", and deleting the warning would lose
+  the conflict detail if it resurfaces. Confirm and remove.
 - **Branch coordination (2026-08-05)**: `integrate/shopify-transactions`
   (worktree `.claude/worktrees/agent-ab8803cce02d5162f`) is mid-merge with 28
   unresolved conflicts as of this note — active work, not touched here. It
@@ -149,12 +215,17 @@ Last refreshed by hand: 2026-08-01
 
 ## Testing baseline
 
-As of 2026-08-07: **643 unit tests** across 34 files, **296 E2E tests** in 11
+As of 2026-08-08: **661 unit tests** across 36 files, **296 E2E tests** in 11
 spec files (homepage, navigation, legal-pages, shop, product-detail, cart,
 contact, checkout, a11y, visual-assets, hero-legibility). E2E runs in ~3 min
 against a production build across two projects (chromium + mobile).
 
 Report a *shrinking* count as a finding; a growing one is not itself news.
+
+**Both suites run entirely against `mock.myshopify.com`.** That is deliberate —
+the merge gate must be hermetic — but it means neither number says anything about
+the real store. Production reality is a third, non-blocking tier
+(`.github/workflows/production-smoke.yml`); see `docs/testing-strategy.md`.
 
 ## Architecture / design decisions
 
@@ -210,6 +281,24 @@ duplicate those files.
   `secret-exposure.test.ts` walks the real client import graph instead, and
   asserts the graph is non-empty first so a broken resolver cannot make it
   vacuously green.
+- **2026-08-08**: A third test tier, because the first two run against a fiction.
+  `ci.yml` points every unit and E2E test at `mock.myshopify.com`, so until now no
+  automated test had ever touched the real store — and all three commerce outages
+  this project has had (0 products on the headless publication, 38 unsellable
+  variants, USD prices on a VND store) lived in exactly that blind spot. None were
+  code defects a mock could catch; all three were visible from the live `/shop`
+  page. `verify-production.mjs` looks at it. The discrimination is what matters:
+  the static and Shopify catalogues turn out to be nearly disjoint, so
+  `dome-ring-titanium` on the live page proves fallback and `meridian-cuff` proves
+  a real fetch — an invariant `production-smoke-handles.test.ts` now guards,
+  because a discriminator that stops discriminating keeps passing while testing
+  nothing. Fifth guardrail in the family.
+- **2026-08-08**: The webhook secret stopped needing a real order to test.
+  `verify-webhook-secret.mjs` signs a synthetic payload and reads the route's own
+  status contract back. Its test does not compare against a fixture — it feeds the
+  script's bytes into the real `POST` handler and lets the route judge, so the two
+  cannot drift. The old procedure (place an order, watch Vercel logs) was one-shot,
+  cost money, and left no repeatable artifact.
 - **2026-08-05**: Shopify tag parsing extracted to `src/lib/shopify/tags.ts`
   and tested against tag arrays captured verbatim from the live store. The
   general lesson, and the reason the previous tests could not have caught it:

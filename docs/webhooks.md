@@ -15,9 +15,42 @@ Every request is HMAC-verified before any part of the body is parsed:
 4. Return `401` on any mismatch, `503` if `SHOPIFY_WEBHOOK_SECRET` isn't configured at
    all — both **before** `JSON.parse` ever runs on the body.
 
+Then, separately: the `x-shopify-shop-domain` header is checked against the configured
+store. The signature proves the sender holds our secret; this proves the payload is about
+*our* store, and rejects cross-shop deliveries with `401`. Only enforced when a store
+domain is configured, so an unconfigured preview deployment does not reject everything.
+
+## The two-secret trap
+
+There are **two different signing secrets**, and they are not interchangeable:
+
+- a webhook created in **Settings → Notifications** is signed with the **signing secret
+  shown on that page**;
+- a webhook created **by an app** (Admin API `webhookSubscriptionCreate`) is signed with
+  that **app's client secret**.
+
+The wrong one produces identical, permanent `401`s with zero diagnostic signal. A wrong
+secret and a forgery are cryptographically indistinguishable, so the route never changes
+its *response* — it stays a bare `401` — it only names the trap in the log line.
+
+**Verify the secret without placing an order:**
+
+```bash
+SHOPIFY_WEBHOOK_SECRET=... pnpm verify:webhook https://healthyjewellery.com
+```
+
+`scripts/verify-webhook-secret.mjs` signs a synthetic `products/update` payload and reads
+the status back: `200` correct, `202` correct but unhandled topic, `401` wrong secret,
+`503` not set. See `docs/go-live-runbook.md`.
+
+> **The Admin API cannot tell you whether webhooks exist.** `webhookSubscriptions` returns
+> only webhooks owned by the *querying app*, so Admin-UI webhooks are invisible to it. An
+> empty result is **not** evidence of absence — a previous session concluded "zero
+> webhooks" from exactly that signal and was wrong.
+
 ## Topics subscribed
 
-Registered in Shopify Admin per `SHOPIFY_SETUP.md`; handled by topic prefix:
+Registered in Shopify Admin per `SHOPIFY_SETUP.md`. Only these prefixes are handled:
 
 | Topic prefix | Effect |
 |---|---|
@@ -25,8 +58,12 @@ Registered in Shopify Admin per `SHOPIFY_SETUP.md`; handled by topic prefix:
 | `collections/*` | `revalidatePath('/shop/[collection]')`, `revalidateTag('collections')` |
 | `orders/create`, `orders/paid` | Logged only (see below) — no revalidation |
 
-Any other topic falls through with no action beyond the `Processed topic: <topic>` log
-line.
+Anything else is **allowlisted out** and answered `202 {ok:true, handled:false, topic}`.
+
+The status code is the point. A `200` would claim work that never happened, lying to
+Shopify's delivery log; a non-2xx would make Shopify retry a topic that will never be
+handled. `202` says *received and authenticated, deliberately not acted on* — which is
+the truth.
 
 ## Order events
 
@@ -60,5 +97,11 @@ is a shared store (Upstash Redis, same as the contact route), not an in-memory m
 
 ## Testing
 
-Route logic is covered by `src/tests/unit/api-shopify-route.test.ts` and the HMAC/topic
-handling paths in the webhook route itself. E2E coverage lives in `e2e/checkout.spec.ts`.
+Route logic is covered by `src/tests/unit/api-webhooks-shopify-route.test.ts`, and
+`src/tests/unit/webhook-signature-script.test.ts` proves `scripts/verify-webhook-secret.mjs`
+signs bodies the route accepts — by feeding the script's own bytes and headers into the real
+`POST` handler rather than comparing against a fixture, so the two cannot drift apart. E2E
+coverage lives in `e2e/checkout.spec.ts`.
+
+Against the live deployment, `.github/workflows/production-smoke.yml` re-runs the secret
+check daily.
