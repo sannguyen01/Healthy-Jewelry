@@ -1,0 +1,63 @@
+name: Production smoke
+
+# Deliberately a separate workflow, not a job in ci.yml.
+#
+# `ci.yml` is the merge gate and must stay hermetic: it runs against
+# `mock.myshopify.com` so it is fast, deterministic, and cannot be turned red by
+# someone else's outage. This workflow is the opposite by design — it talks to
+# the real store and the real deployment, so it is allowed to fail for reasons
+# that have nothing to do with the commit under review.
+#
+# Keeping them apart is the point. Branch protection requires `verify` and
+# `e2e`; it must never require this one, or a Shopify incident becomes a merge
+# freeze.
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:00 UTC = 13:00 Asia/Ho_Chi_Minh, during the store's working day, so a
+    # failure is seen by someone who can act on it rather than at 3am local.
+    - cron: '0 6 * * *'
+
+# A manual run should supersede a scheduled one already in flight rather than
+# racing it against the same store.
+concurrency:
+  group: production-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Verify the live store and deployment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No `pnpm install`. Both scripts are dependency-free and use Node 22's
+      # global fetch and node:crypto, so this job needs no lockfile, no cache,
+      # and no build — which is also why it cannot be broken by a dependency
+      # change that the merge gate has not seen yet.
+
+      # Catalogue, publishing scope, and the real cart → checkoutUrl path.
+      # Runs every check even when one fails, so a run reports the whole picture.
+      - name: Live store and storefront
+        env:
+          PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
+          SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
+          SHOPIFY_STOREFRONT_ACCESS_TOKEN: ${{ secrets.SHOPIFY_STOREFRONT_ACCESS_TOKEN }}
+          SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
+        run: node scripts/verify-production.mjs
+
+      # Separate step, and `if: always()`, because the webhook secret is an
+      # independent question. A catalogue problem should not hide a secret
+      # problem — that pairing is how the original outage stayed undiagnosed.
+      - name: Webhook signing secret
+        if: always()
+        env:
+          PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
+          SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
+          SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
+        run: node scripts/verify-webhook-secret.mjs
