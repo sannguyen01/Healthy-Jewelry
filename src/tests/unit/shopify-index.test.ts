@@ -410,10 +410,19 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     expect(results).toHaveLength(1)
   })
 
-  it('searchProducts returns an empty array when the Shopify search fails', async () => {
+  it('searchProducts falls back to the static catalogue when the Shopify search fails', async () => {
+    // Previously asserted `[]`, which encoded a real defect: an empty result is
+    // rendered as a confident `No results for "arc band"`, telling the customer
+    // the product does not exist when the truth is that Shopify did not answer.
+    // Every sibling fetcher already degrades to the static catalogue; search was
+    // the only one that did not, and nothing noticed because — until the search
+    // page was migrated off `hj-data` — nothing called it.
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
     const { searchProducts } = await import('@/lib/shopify')
-    expect(await searchProducts('arc band')).toEqual([])
+
+    const results = await searchProducts('arc band')
+    expect(results.length).toBeGreaterThan(0)
+    expect(results.every((p) => p.title.toLowerCase().includes('arc band'))).toBe(true)
   })
 
   it('getBestsellers queries Shopify with a bestseller tag filter and maps results', async () => {

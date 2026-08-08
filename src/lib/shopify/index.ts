@@ -262,17 +262,22 @@ export async function getProductsByCollection(
   }
 }
 
+/** Static-catalogue search, used whenever Shopify cannot answer. */
+function staticSearch(q: string): HJProduct[] {
+  return staticGetAllProducts().filter(
+    (p) =>
+      p.title.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.material.toLowerCase().includes(q) ||
+      p.tags.some((t) => t.toLowerCase().includes(q))
+  )
+}
+
 export async function searchProducts(query: string, first = 20): Promise<HJProduct[]> {
   const q = query.toLowerCase().trim()
   if (!isShopifyConfigured() || !q) {
     if (!isShopifyConfigured()) reportFallback('searchProducts', 'not-configured', q)
-    return staticGetAllProducts().filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.material.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q))
-    )
+    return staticSearch(q)
   }
   try {
     const response = await shopifyFetch<{
@@ -280,10 +285,17 @@ export async function searchProducts(query: string, first = 20): Promise<HJProdu
     }>(SEARCH_PRODUCTS, { query, first }, { revalidate: 0 })
     return (response.data?.search?.edges ?? []).map((e) => mapShopifyProduct(e.node))
   } catch (e) {
+    // Degrade to the static catalogue, like every other fetcher in this module.
+    // This alone returned `[]` on failure, which renders as a confident
+    // `No results for "titanium"` — telling the customer the product does not
+    // exist when the truth is that Shopify did not answer. Every sibling
+    // (`getProduct`, `getProducts`, `getProductsByCollection`, `getBestsellers`,
+    // `getNewArrivals`) already falls back; search was the odd one out, and
+    // nothing noticed because nothing called it.
     if (e instanceof ShopifyFetchError) {
-      console.warn('[shopify] searchProducts fallback:', e.message)
+      reportFallback('searchProducts', 'fetch-failed', e.message)
     }
-    return []
+    return staticSearch(q)
   }
 }
 

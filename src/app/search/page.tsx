@@ -1,34 +1,35 @@
-'use client'
-
 import { Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductCard } from '@/components/product/ProductCard'
-import { getAllProducts } from '@/lib/data/hj-data'
+import { searchProducts } from '@/lib/shopify'
 
-// ── Inner component that reads search params ───────────────────────────────
+export const metadata: Metadata = {
+  title: 'Search',
+  description: 'Search titanium, niobium and surgical steel jewelry.',
+}
 
-function SearchResults() {
-  const searchParams = useSearchParams()
-  const query = searchParams.get('q') ?? ''
-  const allProducts = getAllProducts()
+interface SearchPageProps {
+  searchParams: Promise<{ q?: string }>
+}
 
-  const results =
-    query.trim().length === 0
-      ? []
-      : allProducts.filter((p) => {
-          const q = query.toLowerCase()
-          return (
-            p.title.toLowerCase().includes(q) ||
-            p.description.toLowerCase().includes(q) ||
-            p.material.toLowerCase().includes(q) ||
-            p.tags.some((tag) => tag.toLowerCase().includes(q)) ||
-            p.collection.toLowerCase().includes(q)
-          )
-        })
+/**
+ * A server component now, because this page used to search
+ * `getAllProducts()` — the *static* catalogue — from the browser.
+ *
+ * The static and Shopify catalogues are nearly disjoint, so site search
+ * returned products that 404 on click and could not find a single one of the
+ * 22 products actually for sale. `searchProducts()` had been sitting in
+ * `src/lib/shopify/index.ts` fully implemented and called from nowhere.
+ */
+async function SearchResults({ query }: { query: string }) {
+  // `searchProducts` treats an empty query as "match everything" and returns
+  // the whole static catalogue, so the empty case is answered here instead —
+  // preserving the "Start typing to search" state this page has always had.
+  const results = query.trim().length === 0 ? [] : await searchProducts(query)
 
   return (
     <main
@@ -222,13 +223,20 @@ function SearchResults() {
 
 // ── Page component with Suspense boundary ─────────────────────────────────
 
-export default function SearchPage() {
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const { q } = await searchParams
+  const query = q ?? ''
+
   return (
     <>
       <Nav />
       <CartDrawer />
 
+      {/* Keyed on the query so navigating between searches re-suspends and
+          shows the fallback, rather than holding the previous results on
+          screen while the next fetch runs. */}
       <Suspense
+        key={query}
         fallback={
           <main
             style={{
@@ -254,7 +262,7 @@ export default function SearchPage() {
           </main>
         }
       >
-        <SearchResults />
+        <SearchResults query={query} />
       </Suspense>
 
       <Footer />
