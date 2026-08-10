@@ -22,16 +22,12 @@ domain is configured, so an unconfigured preview deployment does not reject ever
 
 ## The two-secret trap
 
-There are **two different signing secrets**, and they are not interchangeable:
+Shopify signs with one of **two different secrets** depending on how the webhook was
+created, they are not interchangeable, and the wrong one produces permanent silent 401s.
+The route answers a bare `401` either way — a wrong secret and a forgery are
+cryptographically indistinguishable — and names the trap only in the log.
 
-- a webhook created in **Settings → Notifications** is signed with the **signing secret
-  shown on that page**;
-- a webhook created **by an app** (Admin API `webhookSubscriptionCreate`) is signed with
-  that **app's client secret**.
-
-The wrong one produces identical, permanent `401`s with zero diagnostic signal. A wrong
-secret and a forgery are cryptographically indistinguishable, so the route never changes
-its *response* — it stays a bare `401` — it only names the trap in the log line.
+Full rationale: **[ADR 001](adr/001-two-webhook-secrets.md)**.
 
 **Verify the secret without placing an order:**
 
@@ -54,9 +50,20 @@ Registered in Shopify Admin per `SHOPIFY_SETUP.md`. Only these prefixes are hand
 
 | Topic prefix | Effect |
 |---|---|
-| `products/*` | `revalidatePath('/')`, `revalidatePath('/shop')`, `revalidateTag('products')`, plus `revalidateTag('product:<handle>')` when the payload includes a handle |
-| `collections/*` | `revalidatePath('/shop/[collection]')`, `revalidateTag('collections')` |
+| `products/*` | `revalidatePath('/')`, `revalidatePath('/shop')`, `revalidateTag(PRODUCTS_TAG)`, plus `revalidateTag(productTag(handle))` when the payload includes a handle |
+| `collections/*` | `revalidatePath('/shop/[collection]')`, plus `revalidateTag(collectionTag(handle))` when the payload includes a handle |
 | `orders/create`, `orders/paid` | Logged only (see below) — no revalidation |
+
+Both sides of every tag come from `src/lib/shopify/cacheTags.ts`. Until 2026-08-08 this
+branch revalidated a bare `'collections'` string that **no fetch anywhere registered**, so
+collection pages never invalidated and sat stale for the full 3600s — while the tag they
+*did* register (`collection:<handle>`) was never revalidated by anything. The test that
+should have caught it asserted `revalidateTag` was called with `'collections'`: the same
+wrong string the route used. `src/tests/unit/cache-tag-contract.test.ts` now compares the
+two files against each other, in both directions.
+
+`collections/*` deliberately does **not** sweep `PRODUCTS_TAG` — that is every product
+cache in the store, and a collection changing does not invalidate the products themselves.
 
 Anything else is **allowlisted out** and answered `202 {ok:true, handled:false, topic}`.
 
@@ -104,4 +111,6 @@ signs bodies the route accepts — by feeding the script's own bytes and headers
 coverage lives in `e2e/checkout.spec.ts`.
 
 Against the live deployment, `.github/workflows/production-smoke.yml` re-runs the secret
-check daily.
+check every 6 hours, and separately proves a signed webhook **actually drops the cached
+page** by watching `x-nextjs-cache` move off `HIT` — the one link in the Shopify → Vercel
+direction that no hermetic test can establish.

@@ -84,6 +84,16 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   configuration.
   Loop action: report only
   Human decision: pending
+- [x] REPO-VISIBILITY-DOC — **resolved 2026-08-08.** `docs/testing-strategy.md` stated
+  "The repository is **private**, so Actions minutes are billed." Both halves were wrong:
+  verified via the GitHub API, `private: false`, `visibility: "public"`,
+  `allow_forking: true`. The billing half was harmless; the privacy half was not — PR #17
+  added five CI secrets, and anyone reasoning about their exposure from that sentence
+  reached the opposite of the truth. Corrected in place *with the evidence* rather than
+  silently edited. Smoke-test secrets moved to a `production-readonly` GitHub Environment;
+  schedule raised to every 6h since public-repo Actions minutes are free.
+  **You must create the Environment** (Settings → Environments) — a job naming one that
+  does not exist fails at dispatch.
 - [ ] SOFT-404-PRODUCT — **new 2026-08-08.** `/products/<unknown-handle>` answers
   **HTTP 200** while rendering `not-found.tsx`. A soft 404 lets search engines
   index every mistyped or stale product URL as a real page, and the title they
@@ -115,12 +125,16 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   Loop action: report only, never propose setting these yourself
   Human decision: pending
 - [ ] PRODUCTION-SMOKE-SECRETS — `.github/workflows/production-smoke.yml` exists
-  as of 2026-08-08 but cannot run until five repository secrets are set:
+  as of 2026-08-08 but cannot run until a `production-readonly` **GitHub
+  Environment** exists (Settings → Environments) carrying five secrets:
   `PRODUCTION_SITE_URL`, `SHOPIFY_STORE_DOMAIN`,
   `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_ADMIN_ACCESS_TOKEN`,
   `SHOPIFY_WEBHOOK_SECRET`. Copy the Storefront token already working in Vercel
   rather than minting a second one — `storefrontAccessTokenCreate` is refused by
   the MCP safety policy, and a second credential is a second thing to rotate.
+  Environment-scoped, not repository-scoped: this repo is **public and forkable**
+  (see REPO-VISIBILITY-DOC), and repository secrets are readable by every workflow
+  and everyone with write access.
   Loop action: report only, never propose setting these yourself
   Human decision: pending
 - [ ] VISUAL-QA-LIVE — visual QA still needs a human with a browser. The checkout
@@ -146,6 +160,19 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   hides the line when empty rather than rendering a blank one.
   Loop action: report only; never invent spec values
   Human decision: pending (enter real measurements in Admin when known)
+
+## Decided against
+
+- **I18N-VIETNAMESE — decided 2026-08-08, English-only.** Raised as a conversion gap: a
+  Vietnam-based, VND-priced store with an entirely English UI. Checked live before
+  deciding — `shopLocales` returns **`en` only** (primary, published), no unpublished
+  locale exists, and the "Vietnam" market has `webPresence: null`. So the cheap path
+  commonly suggested (surface existing translations via `translatableResources`) **has
+  nothing to read**: this is creating content, not exposing it.
+  Currency formatting is separate and already correct — `formatPrice` writes `1.450.000₫`
+  the way Shopify's checkout does. Prerequisite if revisited: publish a `vi` locale and
+  translate 22 products in Shopify Admin *first*; product copy must not be fabricated, the
+  same rule that keeps `custom.spec` empty. See `docs/adr/005-english-only-storefront.md`.
 
 ## Watch List
 
@@ -317,6 +344,23 @@ duplicate those files.
   `secret-exposure.test.ts` walks the real client import graph instead, and
   asserts the graph is non-empty first so a broken resolver cannot make it
   vacuously green.
+- **2026-08-08**: Cache tags are a contract with two sides and nothing joining them.
+  `getProductsByCollection` registered `collection:<handle>`; the webhook revalidated
+  `collections`, which **no fetch anywhere registered**. Both failure modes at once — an
+  orphan (revalidating a tag nothing registers) and a widow (registering a tag nothing
+  revalidates) — so collection pages never invalidated and sat stale for the full 3600s.
+  The existing test asserted `revalidateTag` was called with `'collections'`: the same
+  wrong string the route used, which is why it passed throughout. A test that restates the
+  implementation cannot see the implementation is wrong.
+  `src/lib/shopify/cacheTags.ts` makes the drift inexpressible and
+  `cache-tag-contract.test.ts` compares the two files against each other in both
+  directions. Seventh guardrail in the family.
+- **2026-08-08**: The catalogue guardrail only covered `src/app/`. It therefore could not
+  see `components/home/CollectionGrid.tsx` reading `getProductsByCollection` out of the
+  static catalogue — the exact bug it was written to prevent, one directory outside its
+  reach. **A guardrail that covers most of the surface area is one you trust more than it
+  deserves.** Extended to all of `src/`; `CollectionGrid` now takes resolved tiles as props
+  from the server parent, because a `'use client'` component cannot await Shopify.
 - **2026-08-08**: The SEO/social layer had never migrated to Shopify. The product
   page read Shopify in its body and static `hj-data` in its `generateMetadata`,
   and the two catalogues are nearly disjoint — so 20 of the 22 live products
