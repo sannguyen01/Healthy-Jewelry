@@ -36,6 +36,8 @@
  * picture rather than only the first problem.
  */
 
+import { buildProbeRequest } from './verify-webhook-secret.mjs'
+
 const API_VERSION = '2025-01'
 
 /** The publication the Storefront token reads from. Found by name, not by a
@@ -390,6 +392,93 @@ async function rateLimitingIsDistributed() {
   return 'rate limits are shared across instances (Upstash answering)'
 }
 
+/**
+ * Proves the whole revalidation chain, which nothing hermetic can.
+ *
+ * A unit test can only assert that `revalidateTag` was called with some string.
+ * That is exactly the assertion that stayed green for months while
+ * `revalidateTag('collections')` named a tag no fetch registered — the test and
+ * the bug agreed with each other. `cache-tag-contract.test.ts` now catches that
+ * class offline, but it still cannot prove the deployed function reaches the
+ * deployed cache.
+ *
+ * So: send a genuinely signed webhook, then watch the page's cache state move.
+ * `x-nextjs-cache` reports HIT for a page served from the full-route cache; a
+ * successful revalidation drops that entry, so the next request must not be a
+ * HIT.
+ *
+ * Deliberately does **not** mutate the store. An earlier proposal compared a
+ * product's price before and after a real edit, which needs a price change to
+ * exist and rewrites live catalogue data to run a test.
+ *
+ * **Fails closed.** If the header is absent the check reports that it could not
+ * verify rather than passing — a cache assertion that silently degrades into a
+ * no-op is worse than no assertion, because it reads as proof.
+ */
+async function webhookRevalidatesTheCachedPage() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const secret = required('SHOPIFY_WEBHOOK_SECRET')
+  const shopDomain = required('SHOPIFY_STORE_DOMAIN')
+  const handle = SHOPIFY_ONLY_HANDLES[0]
+  const pageUrl = new URL(`/products/${handle}`, siteUrl)
+
+  const fetchPage = async () => {
+    const res = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+      cache: 'no-store',
+    })
+    if (!res.ok) throw new Error(`GET /products/${handle} returned ${res.status}`)
+    return res.headers.get('x-nextjs-cache')
+  }
+
+  // Warm it, so the page is definitely in the route cache before we try to
+  // knock it out. Two requests: the first may MISS while it generates.
+  await fetchPage()
+  const warmed = await fetchPage()
+
+  if (warmed === null) {
+    throw new Error(
+      'No x-nextjs-cache header on the product page, so revalidation cannot be\n' +
+        '  verified from outside. Reporting this as a failure rather than a pass:\n' +
+        '  a cache check that silently stops checking reads as proof and is not.',
+    )
+  }
+  if (warmed !== 'HIT') {
+    throw new Error(
+      `Expected the page to be cached (HIT) after warming, got "${warmed}". The route\n` +
+        '  may be opting out of the full-route cache, which would make the\n' +
+        '  revalidation contract meaningless.',
+    )
+  }
+
+  // A real, correctly signed products/update for this handle.
+  const { url, init } = buildProbeRequest({
+    siteUrl,
+    secret,
+    shopDomain,
+    body: Buffer.from(JSON.stringify({ id: 0, handle }), 'utf-8'),
+  })
+  const hook = await fetch(url, init)
+  if (hook.status !== 200) {
+    throw new Error(
+      `The webhook was not accepted (HTTP ${hook.status}), so this check cannot say\n` +
+        '  anything about revalidation. Run `pnpm verify:webhook` first.',
+    )
+  }
+
+  const after = await fetchPage()
+  if (after === 'HIT') {
+    throw new Error(
+      `The page is still served from cache (HIT) after a signed products/update for\n` +
+        `  "${handle}". The webhook is authenticated but its revalidation is not\n` +
+        '  reaching this page — check that the tag it revalidates is the tag the\n' +
+        '  fetch registers (src/lib/shopify/cacheTags.ts).',
+    )
+  }
+
+  return `cache went HIT → ${after} after a signed products/update for ${handle}`
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -405,6 +494,7 @@ async function main() {
   await check('The Open Graph image renders a real PNG', openGraphImageRenders)
   await check('Site search finds Shopify products', searchFindsShopifyProducts)
   await check('Rate limiting is distributed, not per-instance', rateLimitingIsDistributed)
+  await check('A signed webhook actually revalidates the cached page', webhookRevalidatesTheCachedPage)
 
   const failed = results.filter((r) => !r.ok)
   console.log('─'.repeat(70))

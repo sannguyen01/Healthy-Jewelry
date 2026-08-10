@@ -126,14 +126,37 @@ satisfied does not protect anything.
 If E2E is ever red and the change is genuinely urgent, merging is still possible: nothing in GitHub
 prevents it. That should be a decision someone makes deliberately, not the default state.
 
-### Cost
+### Cost, and a correction with security consequences
 
-The repository is **private**, so Actions minutes are billed.
+> **This section previously stated "The repository is private, so Actions minutes are billed."
+> That was wrong in both halves.** Verified against the GitHub API on 2026-08-08:
+> `private: false`, `visibility: "public"`, `allow_forking: true`.
+
+Two things follow, and the second matters more than the first.
+
+**Actions minutes are free.** GitHub does not bill Actions for public repositories, so the
+numbers below are wall-clock time and developer-latency, not money. They are still worth
+keeping — a 24-minute gate is a gate people learn to ignore — but no cost argument should
+be made from them. The `production-smoke` tier runs every 6 hours precisely because that
+costs nothing.
+
+**The repository is public, so secret handling is a real constraint, not a formality.**
+Repository secrets are readable by every workflow in the repo and by anyone with write
+access, and the repo is forkable. GitHub withholds secrets from `pull_request` runs
+triggered by forks, but `push`, `schedule` and `workflow_dispatch` runs get them in full.
+`production-smoke.yml` therefore uses an **environment** (`production-readonly`) rather
+than bare repository secrets, so the credential set carries a boundary that can hold
+required reviewers and a branch allowlist. Its secrets are read-only by design: a
+Storefront token (public-safe by construction, the same class already shipped to browsers),
+a read-scoped Admin token used only for a publication count, and the webhook signing secret.
+
+Anyone reasoning about exposure from the old sentence would have concluded the opposite of
+the truth. That is the reason this correction is recorded rather than silently edited.
 
 | | Before | After |
 |---|---|---|
 | E2E wall time | 24.2 min | ~3-5 min |
-| Billable minutes per push | ~27 | ~7 |
+| Runner minutes per push | ~27 | ~7 |
 | Superseded runs | ran to completion | cancelled |
 
 Measured breakdown of a green run, so the next person optimising has real numbers rather than

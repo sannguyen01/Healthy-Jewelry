@@ -140,23 +140,46 @@ flag `true` while every limit check silently fails open.
 
 ## Continuous verification
 
-Once the GitHub secrets below are set, `.github/workflows/production-smoke.yml`
-re-checks steps 2–4's preconditions daily and on demand
-(**Actions → Production smoke → Run workflow**):
+Once the secrets below are set, `.github/workflows/production-smoke.yml`
+re-checks steps 2–4's preconditions **every 6 hours** and on demand
+(**Actions → Production smoke → Run workflow**).
+
+### First, create the environment
+
+**This repository is public and forkable**, so the smoke-test credentials live in a GitHub
+Environment rather than as bare repository secrets — an environment can carry required
+reviewers and a branch allowlist, so widening the credential set later is a visible action
+rather than an unreviewed edit.
+
+1. **Settings → Environments → New environment**, named exactly `production-readonly`.
+2. Add the five secrets below **to that environment**, not to repository secrets.
+
+The workflow names this environment in its `smoke` job. **Until the environment exists, the
+workflow fails at dispatch** — a job referencing an environment that has not been created
+cannot start. Create it before the first run.
 
 | Secret | Where to get it |
 |---|---|
 | `PRODUCTION_SITE_URL` | `https://healthyjewellery.com` |
 | `SHOPIFY_STORE_DOMAIN` | `y0k9ve-q1.myshopify.com` |
 | `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Copy the value already working in Vercel — do not mint a second one |
-| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Shopify Admin → Apps → your custom app |
+| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Shopify Admin → Apps → your custom app. Read scopes only |
 | `SHOPIFY_WEBHOOK_SECRET` | The same value as Vercel, once step 2 passes |
+
+Every one is read-only by design. The Storefront token is public-safe by construction — it
+is the same class of credential already shipped to browsers. The Admin token is used for a
+single publication-count query. No workflow step echoes a secret or interpolates one into a
+`run:` string; they reach the scripts through `env:`, where log masking applies.
 
 It checks that the live site serves Shopify data rather than the static fallback,
 that every product is still published to the headless publication, that a real
 cart yields a real checkout URL, that product metadata and the Open Graph image
 name the real product, that site search finds Shopify products, that rate
-limiting is distributed, and that the webhook secret still verifies.
+limiting is distributed, that the webhook secret still verifies, and that a
+signed webhook **actually drops the cached page** — the one link in the
+Shopify → Vercel direction that no hermetic test can prove, since a unit test can
+only assert `revalidateTag` was called with some string, which is exactly the
+assertion that stayed green while that string matched nothing.
 
 It is deliberately **not** part of the merge gate and branch protection must not
 require it — it is meant to fail for reasons unrelated to the commit under

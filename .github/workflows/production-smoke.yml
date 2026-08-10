@@ -14,9 +14,11 @@ name: Production smoke
 on:
   workflow_dispatch:
   schedule:
-    # 06:00 UTC = 13:00 Asia/Ho_Chi_Minh, during the store's working day, so a
-    # failure is seen by someone who can act on it rather than at 3am local.
-    - cron: '0 6 * * *'
+    # Every 6 hours. This repository is **public**, so Actions minutes are not
+    # billed and the cost argument that keeps `ci.yml` lean does not apply here.
+    # Drift between deploys is exactly what this tier exists to catch: all three
+    # of this project's commerce outages happened while nobody was pushing.
+    - cron: '0 */6 * * *'
 
 # A manual run should supersede a scheduled one already in flight rather than
 # racing it against the same store.
@@ -28,6 +30,18 @@ jobs:
   smoke:
     name: Verify the live store and deployment
     runs-on: ubuntu-latest
+    # Environment-scoped secrets, not repository secrets.
+    #
+    # This repository is **public** and forkable. Repository secrets are readable
+    # by every workflow in the repo and by anyone with write access; an
+    # environment adds a boundary that can carry required reviewers and a branch
+    # allowlist, so widening the credential set later is a visible action rather
+    # than an edit nobody reviews.
+    #
+    # The environment must exist before this workflow can run — a job naming an
+    # environment that has not been created fails at dispatch. See
+    # docs/go-live-runbook.md.
+    environment: production-readonly
     steps:
       - uses: actions/checkout@v4
 
@@ -61,3 +75,8 @@ jobs:
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
           SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
         run: node scripts/verify-webhook-secret.mjs
+
+# No step echoes a secret, interpolates one into a `run:` string, or writes one
+# to a file. Every secret reaches a script through `env:`, where the runner's
+# log masking applies — `run: echo ${{ secrets.X }}` would bypass that by
+# embedding the value in the command line before masking sees it.
