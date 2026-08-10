@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { shopifyConfig } from '@/config/shopify'
+import { PRODUCTS_TAG, productTag, collectionTag } from '@/lib/shopify/cacheTags'
 
 /**
  * Topics this endpoint is built to handle.
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // the product that changed instead of every generated product page.
     revalidatePath('/', 'page')
     revalidatePath('/shop', 'page')
-    revalidateTag('products')
+    revalidateTag(PRODUCTS_TAG)
 
     let handle: string | undefined
     try {
@@ -106,17 +107,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     } catch {
       // Payload shape varies by topic / Shopify API version — fall back to
-      // the broad 'products' tag above rather than failing the webhook.
+      // the broad products tag above rather than failing the webhook.
     }
 
     if (handle) {
-      revalidateTag(`product:${handle}`)
+      revalidateTag(productTag(handle))
     }
   }
 
   if (topic.startsWith('collections/')) {
     revalidatePath('/shop/[collection]', 'page')
-    revalidateTag('collections')
+    // Collection listings are fetched with `collectionTag(handle)`. This branch
+    // used to revalidate a bare 'collections' string that no fetch ever
+    // registered, so the call did nothing at all and collection pages stayed
+    // stale for the full 3600s regardless of what changed in Shopify Admin.
+    // `cache-tag-contract.test.ts` now fails on any tag only one side knows.
+    //
+    // Deliberately not PRODUCTS_TAG: that is every product cache in the store,
+    // and a collection changing does not invalidate the products themselves.
+    // Scoping was an explicit decision the previous tests already guarded.
+    let handle: string | undefined
+    try {
+      const payload = JSON.parse(rawBody.toString('utf-8')) as { handle?: unknown }
+      if (typeof payload.handle === 'string' && payload.handle) {
+        handle = payload.handle
+      }
+    } catch {
+      // Same tolerance as the products branch: a payload we cannot parse still
+      // gets the broad invalidation above rather than failing the delivery.
+    }
+
+    if (handle) {
+      revalidateTag(collectionTag(handle))
+    }
   }
 
   // Orders. The site takes no part in payment — Shopify's hosted checkout

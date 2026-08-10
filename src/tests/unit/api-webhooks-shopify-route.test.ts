@@ -172,7 +172,34 @@ describe('POST /api/webhooks/shopify', () => {
       const req = makeSignedReq(body, TEST_SECRET, 'collections/update')
       await POST(req)
       expect(revalidatePath).toHaveBeenCalledWith('/shop/[collection]', 'page')
-      expect(revalidateTag).toHaveBeenCalledWith('collections')
+    })
+
+    it('revalidates the specific collection tag the listing fetch registers', async () => {
+      // Previously asserted `revalidateTag('collections')`. That string was
+      // never registered by any fetch, so the call did nothing and collection
+      // pages stayed stale for the full 3600s — the test passed throughout
+      // because it asserted the same wrong string the route used.
+      // `getProductsByCollection` registers `collection:<handle>`; that is what
+      // has to be revalidated. See `cache-tag-contract.test.ts`.
+      const body = JSON.stringify({ id: 10, handle: 'rings' })
+      const req = makeSignedReq(body, TEST_SECRET, 'collections/update')
+      await POST(req)
+
+      expect(revalidateTag).toHaveBeenCalledWith('collection:rings')
+      expect(revalidateTag).not.toHaveBeenCalledWith('collections')
+    })
+
+    it('falls back to path revalidation when the collection payload has no handle', async () => {
+      // Payload shape varies by topic and API version. Without a handle there
+      // is no scoped tag to invalidate, so the path revalidation above is the
+      // whole of the response — deliberately not a broad `products` sweep,
+      // which would drop every product cache in the store.
+      const body = JSON.stringify({ id: 10 })
+      const req = makeSignedReq(body, TEST_SECRET, 'collections/update')
+      await POST(req)
+
+      expect(revalidatePath).toHaveBeenCalledWith('/shop/[collection]', 'page')
+      expect(revalidateTag).not.toHaveBeenCalled()
     })
 
     it('does not revalidate products for collections topic', async () => {
