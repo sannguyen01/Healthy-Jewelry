@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { getProduct } from '@/lib/shopify'
 import { formatPrice } from '@/lib/utils/formatPrice'
+import { productSeo } from '@/lib/seo/productSeo'
 
 // Deliberately NOT `runtime = 'edge'`.
 //
@@ -29,7 +30,8 @@ export default async function Image({ params }: Props) {
   // unconfigured or unreachable, so this is strictly better-informed than the
   // direct `getProductByHandle` it replaces — never worse.
   const product = await getProduct(handle)
-  const title = product?.title ?? 'Product'
+  // Same derivation as generateMetadata and the JSON-LD.
+  const title = product ? productSeo(product).title : 'Product'
   const material = MATERIAL_LABELS[product?.material ?? ''] ?? 'TITANIUM'
   // Formatted, not interpolated. A bare `{product.price}` renders "1450000"
   // beside a store that charges "1.450.000₫" — the fourth time this project

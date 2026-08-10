@@ -27,7 +27,23 @@ import { join, relative } from 'node:path'
  * material descriptions — not catalogue data, and importing them is correct.
  */
 
-const APP_DIR = join(process.cwd(), 'src/app')
+const SRC_DIR = join(process.cwd(), 'src')
+const APP_DIR = join(SRC_DIR, 'app')
+
+/**
+ * Directories exempt from the rule, and why each one is:
+ *
+ *   - `lib/data`     — the fallback catalogue itself.
+ *   - `lib/shopify`  — the one legitimate consumer. It imports the static
+ *                      catalogue *in order to* fall back to it, which is the
+ *                      door every other surface is required to go through.
+ *   - `tests`        — fixtures and assertions naturally name both sources.
+ */
+const EXEMPT_DIRS = [join(SRC_DIR, 'lib/data'), join(SRC_DIR, 'lib/shopify'), join(SRC_DIR, 'tests')]
+
+function isExempt(file: string): boolean {
+  return EXEMPT_DIRS.some((dir) => file.startsWith(dir))
+}
 
 /**
  * Product-catalogue lookups. Importing any of these from `hj-data` inside a
@@ -66,19 +82,25 @@ function hjDataImports(source: string): string[] {
 }
 
 describe('catalogue data source', () => {
+  // Every surface, not just routes. The first version of this test walked only
+  // `src/app`, which is why it did not see `components/home/CollectionGrid.tsx`
+  // reading `getProductsByCollection` out of the static catalogue — the exact
+  // bug it was written to prevent, sitting one directory outside its reach.
+  const sourceFiles = walk(SRC_DIR).filter((f) => !isExempt(f))
   const routeFiles = walk(APP_DIR)
 
-  it('finds route files to check', () => {
+  it('finds source files to check', () => {
     // A broken walk would make every assertion below vacuously pass — the same
     // "covered-looking and worthless" failure secret-exposure.test.ts guards
     // against by asserting its import graph is non-empty first.
     expect(routeFiles.length).toBeGreaterThan(10)
+    expect(sourceFiles.length).toBeGreaterThan(routeFiles.length)
   })
 
-  it('no route imports a product lookup directly from hj-data', () => {
+  it('no module outside lib/shopify imports a product lookup from hj-data', () => {
     const offenders: string[] = []
 
-    for (const file of routeFiles) {
+    for (const file of sourceFiles) {
       const imported = hjDataImports(readFileSync(file, 'utf-8'))
       const catalogue = imported.filter((name) => CATALOGUE_EXPORTS.includes(name))
       if (catalogue.length > 0) {

@@ -9,7 +9,9 @@ import {
   CollectionGrid,
   MaterialsSection,
 } from '@/components/home'
+import type { CollectionTile } from '@/components/home/CollectionGrid'
 import { getBestsellers, getNewArrivals, getProductsByCollection } from '@/lib/shopify'
+import { hjCollections } from '@/lib/data/hj-data'
 
 export const metadata: Metadata = {
   title: 'Healthy Jewelry — Implant-Grade Titanium',
@@ -25,10 +27,25 @@ export const metadata: Metadata = {
 }
 
 export default async function HomePage() {
-  const [bestsellers, newArrivals, titaniumNecklaces] = await Promise.all([
+  const [bestsellers, newArrivals, titaniumNecklaces, collectionTiles] = await Promise.all([
     getBestsellers(),
     getNewArrivals(),
     getProductsByCollection('necklaces'),
+    // Resolved here because `CollectionGrid` is a client component and cannot
+    // await Shopify. It previously read the static catalogue directly, so the
+    // tile illustrations came from the bundled fixture rather than the store.
+    // `hjCollections` is site structure — five fixed routes — not catalogue
+    // data, so it stays.
+    Promise.all(
+      hjCollections.map(async (collection): Promise<CollectionTile> => {
+        const products = await getProductsByCollection(collection.handle)
+        return {
+          handle: collection.handle,
+          title: collection.title,
+          svgType: products[0]?.svgType ?? null,
+        }
+      })
+    ),
   ])
 
   return (
@@ -39,7 +56,7 @@ export default async function HomePage() {
         <HorizontalScroll label="BESTSELLING" products={bestsellers} />
         <CampaignBand />
         <HorizontalScroll label="NEW ARRIVALS" products={newArrivals} />
-        <CollectionGrid />
+        <CollectionGrid tiles={collectionTiles} />
         <HorizontalScroll label="TITANIUM" products={titaniumNecklaces} />
         <MaterialsSection />
       </main>

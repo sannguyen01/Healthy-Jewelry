@@ -3,6 +3,7 @@
 
 import type { HJProduct } from '@/lib/shopify/types'
 import { SITE_NAME, SITE_URL, CONTACT_EMAIL, SOCIAL_LINKS } from '@/config/site'
+import { productSeo } from '@/lib/seo/productSeo'
 import type { BreadcrumbItem } from './Breadcrumbs'
 
 // ── Material handle → full name map ───────────────────────────────────────
@@ -19,8 +20,8 @@ export function productJsonLd(product: HJProduct): Record<string, unknown> {
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: product.title,
-    description: product.description,
+    name: productSeo(product).title,
+    description: productSeo(product).description,
     brand: {
       '@type': 'Brand',
       name: SITE_NAME,

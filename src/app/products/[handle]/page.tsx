@@ -7,7 +7,8 @@ import { ProductDetail } from '@/components/product/ProductDetail'
 import { HorizontalScroll } from '@/components/home/HorizontalScroll'
 import { hjCollections } from '@/lib/data/hj-data'
 import { getProduct, getProducts, getProductsByCollection } from '@/lib/shopify'
-import { SEO_DEFAULTS, SITE_URL } from '@/config/site'
+import { SITE_URL } from '@/config/site'
+import { productSeo } from '@/lib/seo/productSeo'
 import { JsonLd, productJsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 
@@ -38,23 +39,26 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     return { title: 'Product Not Found' }
   }
 
-  const description = product.description || SEO_DEFAULTS.description
+  // Shared, pure derivation — the same one the OG image and JSON-LD use, so
+  // the tab, the share card and the structured data cannot describe the
+  // product differently.
+  const { title, description } = productSeo(product)
 
   return {
-    title: product.title,
+    title,
     description,
     // The route's own opengraph-image.tsx supplies the image; naming title and
     // description here keeps the share card's text from falling back to the
     // site-wide defaults.
     openGraph: {
-      title: product.title,
+      title,
       description,
       type: 'website',
       url: `${SITE_URL}/products/${product.handle}`,
     },
     twitter: {
       card: 'summary_large_image',
-      title: product.title,
+      title,
       description,
     },
   }
