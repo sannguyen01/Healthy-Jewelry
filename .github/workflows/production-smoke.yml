@@ -11,6 +11,16 @@ name: Production smoke
 # Keeping them apart is the point. Branch protection requires `verify` and
 # `e2e`; it must never require this one, or a Shopify incident becomes a merge
 # freeze.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# THIS WORKFLOW CANNOT RUN UNTIL IT IS ON THE DEFAULT BRANCH.
+#
+# Scheduled runs execute only from the default branch, and `workflow_dispatch`
+# needs the file there before the "Run workflow" button appears. While this
+# lives only on a feature branch it is not failing — it does not exist as far as
+# the Actions API is concerned. That is a merge-order fact, not a
+# misconfiguration.
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   workflow_dispatch:
   schedule:
@@ -26,21 +36,30 @@ concurrency:
   group: production-smoke
   cancel-in-progress: true
 
+# Only what the failure-notification step needs. `contents: read` is the default
+# for everything else; nothing here writes to the repository.
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   smoke:
     name: Verify the live store and deployment
     runs-on: ubuntu-latest
     # Environment-scoped secrets, not repository secrets.
     #
-    # This repository is **public** and forkable. Repository secrets are readable
-    # by every workflow in the repo and by anyone with write access; an
-    # environment adds a boundary that can carry required reviewers and a branch
-    # allowlist, so widening the credential set later is a visible action rather
-    # than an edit nobody reviews.
+    # This repository is public and forkable, so an environment is the boundary
+    # that can carry required reviewers and a branch allowlist.
     #
-    # The environment must exist before this workflow can run — a job naming an
-    # environment that has not been created fails at dispatch. See
-    # docs/go-live-runbook.md.
+    # BUT this key is not, by itself, a control:
+    #
+    #   · Naming an environment that does not exist does NOT fail. GitHub
+    #     creates it automatically, with no protection rules and no secrets.
+    #   · A job with an `environment:` key still receives REPOSITORY secrets.
+    #
+    # So five repo-scoped secrets would turn this green with zero isolation and
+    # no signal anywhere. The preflight step below is what makes the difference
+    # observable. See docs/adr/006-controls-must-fail-loudly.md.
     environment: production-readonly
     steps:
       - uses: actions/checkout@v4
@@ -50,33 +69,174 @@ jobs:
         with:
           node-version: '22'
 
-      # No `pnpm install`. Both scripts are dependency-free and use Node 22's
-      # global fetch and node:crypto, so this job needs no lockfile, no cache,
-      # and no build — which is also why it cannot be broken by a dependency
-      # change that the merge gate has not seen yet.
+      # No `pnpm install`. Every script here is dependency-free and uses Node
+      # 22's global fetch and node:crypto, so this job needs no lockfile, no
+      # cache, and no build — which is also why it cannot be broken by a
+      # dependency change the merge gate has not seen yet.
 
-      # Catalogue, publishing scope, and the real cart → checkoutUrl path.
-      # Runs every check even when one fails, so a run reports the whole picture.
-      - name: Live store and storefront
+      # One message naming everything that is missing, before any request goes
+      # out. Without this, `required()` inside verify-production.mjs throws on
+      # the first absent variable, so configuring from scratch costs five
+      # sequential red runs to learn five facts knowable up front.
+      #
+      # It also asserts SMOKE_SECRETS_SOURCE, which is set only on the
+      # environment — the marker that distinguishes "isolated" from "green but
+      # sourced from repository scope".
+      - name: Preflight — secrets present and environment-scoped
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
           SHOPIFY_STOREFRONT_ACCESS_TOKEN: ${{ secrets.SHOPIFY_STOREFRONT_ACCESS_TOKEN }}
           SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
-        run: node scripts/verify-production.mjs
+          SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
+          SMOKE_SECRETS_SOURCE: ${{ vars.SMOKE_SECRETS_SOURCE }}
+        run: |
+          node scripts/preflight-secrets.mjs \
+            PRODUCTION_SITE_URL \
+            SHOPIFY_STORE_DOMAIN \
+            SHOPIFY_STOREFRONT_ACCESS_TOKEN \
+            SHOPIFY_ADMIN_ACCESS_TOKEN \
+            SHOPIFY_WEBHOOK_SECRET
+
+      # Catalogue, publishing scope, the real cart → checkoutUrl path, metadata,
+      # search, rate-limit durability, and cache revalidation.
+      # Runs every check even when one fails, so a run reports the whole picture.
+      - name: Live store and storefront
+        id: storefront
+        env:
+          PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
+          SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
+          SHOPIFY_STOREFRONT_ACCESS_TOKEN: ${{ secrets.SHOPIFY_STOREFRONT_ACCESS_TOKEN }}
+          SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
+          SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
+        run: node scripts/verify-production.mjs | tee storefront.log
 
       # Separate step, and `if: always()`, because the webhook secret is an
       # independent question. A catalogue problem should not hide a secret
       # problem — that pairing is how the original outage stayed undiagnosed.
       - name: Webhook signing secret
+        id: webhook
         if: always()
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
           SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
-        run: node scripts/verify-webhook-secret.mjs
+        run: node scripts/verify-webhook-secret.mjs | tee webhook.log
+
+      # A readable verdict in the Actions tab without opening logs.
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Production smoke"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| Live store and storefront | ${{ steps.storefront.outcome }} |"
+            echo "| Webhook signing secret | ${{ steps.webhook.outcome }} |"
+            echo ""
+            echo "<details><summary>Storefront output</summary>"
+            echo ""
+            echo '```'
+            cat storefront.log 2>/dev/null || echo "(step did not run)"
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # A non-blocking scheduled job that nobody watches will rot silently: it is
+      # excluded from branch protection on purpose, so a failure surfaces nowhere
+      # unless someone happens to open the Actions tab. An issue is the one
+      # channel that reaches a human by default — GitHub emails on issue
+      # activity — and it needs no new credential.
+      #
+      # `continue-on-error` because a notification problem must never mask a
+      # smoke result or manufacture one.
+      - name: Report failure as an issue
+        if: failure()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'production-smoke'
+            const title = 'Production smoke is failing'
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+            const body = [
+              'The scheduled production smoke run failed.',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'This checks the **live** store and deployment, so it can fail for reasons',
+              'unrelated to any commit — a Shopify incident, an expired credential, or a',
+              'configuration change. It is deliberately not part of branch protection.',
+              '',
+              'See `docs/go-live-runbook.md` and `docs/credential-inventory.md`.',
+            ].join('\n')
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            if (open.length > 0) {
+              // Update rather than open a second one: a scheduled job that files a
+              // fresh issue every 6 hours is a job people mute.
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open[0].number,
+                body: `Still failing.\n\nRun: ${runUrl}`,
+              })
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              })
+            }
+
+      # Closing on recovery is what keeps the issue meaningful. An alert that
+      # only ever opens becomes a list nobody reads.
+      - name: Close the failure issue on recovery
+        if: success()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'production-smoke'
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Recovered — production smoke passed.\n\nRun: ${runUrl}`,
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              })
+            }
 
 # No step echoes a secret, interpolates one into a `run:` string, or writes one
-# to a file. Every secret reaches a script through `env:`, where the runner's
-# log masking applies — `run: echo ${{ secrets.X }}` would bypass that by
-# embedding the value in the command line before masking sees it.
+# to a file. Every secret reaches a script through `env:`, where the runner's log
+# masking applies. Interpolating a secret directly into a `run:` command line
+# would place the value there before masking sees it — which is exactly what the
+# deleted deploy-production.yml did with the Vercel token.

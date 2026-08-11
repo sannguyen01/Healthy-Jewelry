@@ -1,7 +1,7 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-08-08
+Last refreshed by hand: 2026-08-10
 
 ## Live verification — 2026-08-08
 
@@ -92,8 +92,30 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   reached the opposite of the truth. Corrected in place *with the evidence* rather than
   silently edited. Smoke-test secrets moved to a `production-readonly` GitHub Environment;
   schedule raised to every 6h since public-repo Actions minutes are free.
-  **You must create the Environment** (Settings → Environments) — a job naming one that
-  does not exist fails at dispatch.
+  **Superseded 2026-08-10**: this entry originally said "you must create the Environment —
+  a job naming one that does not exist fails at dispatch." That is false. GitHub
+  auto-creates it, empty, so the environment key alone provides nothing. See
+  PRODUCTION-SMOKE-SECRETS below and `docs/adr/006-controls-must-fail-loudly.md`.
+- [ ] VERCEL-TOKEN-ORPHAN — **new 2026-08-10, highest-priority credential item.**
+  `deploy-production.yml` used `secrets.VERCEL_TOKEN`; it was reduced to that single
+  secret on 2026-06-08 (`bc53f5d`) and the workflow was **deleted** on 2026-06-29
+  (`88ef686`, "remove redundant deploy workflow"). **Deleting a workflow does not delete
+  its secrets** — so the token has most likely sat in this *public* repo's settings for
+  ~2.5 months, unrotated, and mentioned in zero documents until now.
+  Not an ordinary credential: that workflow ran `vercel pull --environment=production`,
+  which downloads **every** production env var — the Storefront token, the revalidation
+  secret, the webhook secret, and Upstash/Resend once set. It is a master key to every
+  other secret here, and it can deploy.
+  Severity stated honestly: fork PRs never receive repository secrets, and this repo has
+  exactly **one collaborator** (`sannguyen01`, admin), so there is no present attacker.
+  The risk is a non-expiring high-privilege credential nobody owns or rotates.
+  **Action: revoke in Vercel → Account Settings → Tokens, then delete the repository
+  secret.** Zero functional cost — Vercel's Git integration deploys on its own, which is
+  why the workflow was called redundant. `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` are
+  orphaned too but are identifiers, not credentials, and already public.
+  Reproduce any time: `pnpm audit:secrets`. See `docs/credential-inventory.md`.
+  Loop action: report only, never touch credentials
+  Human decision: pending
 - [ ] SOFT-404-PRODUCT — **new 2026-08-08.** `/products/<unknown-handle>` answers
   **HTTP 200** while rendering `not-found.tsx`. A soft 404 lets search engines
   index every mistyped or stale product URL as a real page, and the title they
@@ -135,6 +157,18 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   Environment-scoped, not repository-scoped: this repo is **public and forkable**
   (see REPO-VISIBILITY-DOC), and repository secrets are readable by every workflow
   and everyone with write access.
+  **Two corrections, 2026-08-10.** (1) An earlier note here said the workflow "fails at
+  dispatch" without the environment. **Wrong, and wrong in the dangerous direction**:
+  GitHub *auto-creates* a named environment with no protection rules and no secrets, and
+  a job with an `environment:` key still receives *repository* secrets — so skipping the
+  setup produces a **green run with zero isolation**. `scripts/preflight-secrets.mjs` now
+  asserts a `SMOKE_SECRETS_SOURCE=environment` marker so the difference is observable;
+  see `docs/adr/006-controls-must-fail-loudly.md`. (2) The workflow **cannot run at all
+  until PR #17 merges** — scheduled and `workflow_dispatch` triggers fire only from the
+  default branch, and the Actions API currently returns 404 for it. Nothing is failing;
+  nothing is scheduled.
+  On failure it now opens a `production-smoke` issue and closes it on recovery, because a
+  non-blocking scheduled job nobody watches will rot silently.
   Loop action: report only, never propose setting these yourself
   Human decision: pending
 - [ ] VISUAL-QA-LIVE — visual QA still needs a human with a browser. The checkout
@@ -344,6 +378,22 @@ duplicate those files.
   `secret-exposure.test.ts` walks the real client import graph instead, and
   asserts the graph is non-empty first so a broken resolver cannot make it
   vacuously green.
+- **2026-08-10**: A control whose benefit depends on manual setup must fail loudly
+  without it. `environment: production-readonly` read as hardening in the YAML and two
+  docs while providing nothing: GitHub auto-creates the environment empty, and a job with
+  an `environment:` key still gets repository secrets, so the intended failure never
+  happens and a green run is read as evidence. Second time this project shipped something
+  that *looked* verified and was not — the first was a suite running entirely against
+  `mock.myshopify.com`. Same shape: the artefact meant to provide confidence was
+  structurally incapable of producing it, and looked identical either way.
+  The test for every future control: *if the setup step never happens, does anything go
+  red?* See `docs/adr/006-controls-must-fail-loudly.md`.
+- **2026-08-10**: Deleting a workflow does not delete its secrets, and nothing in GitHub
+  marks a secret unused. `pnpm audit:secrets` walks every version of every workflow in git
+  history and classifies each reference live / pending / orphan. It guards the *false
+  positive* rather than the false negative: the first grep-based pass reported a secret
+  named `X` that came from a comment documenting an anti-pattern, and a tool that reports
+  phantoms teaches its reader to skim. Eighth guardrail in the family.
 - **2026-08-08**: Cache tags are a contract with two sides and nothing joining them.
   `getProductsByCollection` registered `collection:<handle>`; the webhook revalidated
   `collections`, which **no fetch anywhere registered**. Both failure modes at once — an

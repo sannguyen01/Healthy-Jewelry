@@ -146,7 +146,11 @@ access, and the repo is forkable. GitHub withholds secrets from `pull_request` r
 triggered by forks, but `push`, `schedule` and `workflow_dispatch` runs get them in full.
 `production-smoke.yml` therefore uses an **environment** (`production-readonly`) rather
 than bare repository secrets, so the credential set carries a boundary that can hold
-required reviewers and a branch allowlist. Its secrets are read-only by design: a
+required reviewers and a branch allowlist. **That key is not a control on its own**:
+GitHub auto-creates a named environment with no protection rules, and a job with an
+`environment:` key still receives repository secrets, so a misconfiguration goes green
+silently. `scripts/preflight-secrets.mjs` is what makes the difference observable — see
+[ADR 006](adr/006-controls-must-fail-loudly.md). Its secrets are read-only by design: a
 Storefront token (public-safe by construction, the same class already shipped to browsers),
 a read-scoped Admin token used only for a publication count, and the webhook signing secret.
 

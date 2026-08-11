@@ -144,6 +144,14 @@ Once the secrets below are set, `.github/workflows/production-smoke.yml`
 re-checks steps 2–4's preconditions **every 6 hours** and on demand
 (**Actions → Production smoke → Run workflow**).
 
+> **It cannot run until PR #17 is merged.** Scheduled runs execute only from the default
+> branch, and `workflow_dispatch` needs the file there before the "Run workflow" button
+> appears. While the workflow lives only on a feature branch it is not failing — it does
+> not exist as far as the Actions API is concerned. Merge first, then configure.
+
+**On failure it opens a GitHub issue** labelled `production-smoke` (and closes it on
+recovery), because a non-blocking scheduled job nobody watches will rot silently.
+
 ### First, create the environment
 
 **This repository is public and forkable**, so the smoke-test credentials live in a GitHub
@@ -151,12 +159,22 @@ Environment rather than as bare repository secrets — an environment can carry 
 reviewers and a branch allowlist, so widening the credential set later is a visible action
 rather than an unreviewed edit.
 
-1. **Settings → Environments → New environment**, named exactly `production-readonly`.
+1. **Settings → Environments → `production-readonly`.** It may already exist: GitHub
+   **creates an environment automatically** the first time a workflow names one. Its
+   existence therefore proves nothing — an auto-created environment has **no protection
+   rules and no secrets**.
 2. Add the five secrets below **to that environment**, not to repository secrets.
+3. Add an environment **variable** `SMOKE_SECRETS_SOURCE` = `environment`.
 
-The workflow names this environment in its `smoke` job. **Until the environment exists, the
-workflow fails at dispatch** — a job referencing an environment that has not been created
-cannot start. Create it before the first run.
+Step 3 is not decoration. A job with an `environment:` key **still receives repository
+secrets**, so five repo-scoped secrets would turn this workflow green with no isolation and
+no signal anywhere. `scripts/preflight-secrets.mjs` asserts that marker and fails the run
+when it is absent, which is the only way the difference is observable. See
+[ADR 006](adr/006-controls-must-fail-loudly.md).
+
+> An earlier revision of this runbook claimed the workflow "fails at dispatch" until the
+> environment is created. That was wrong, and wrong in the dangerous direction — it implied
+> the setup step could not be skipped, when in fact skipping it produces a green run.
 
 | Secret | Where to get it |
 |---|---|
