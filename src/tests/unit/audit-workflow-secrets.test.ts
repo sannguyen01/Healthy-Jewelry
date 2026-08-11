@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-const { stripYamlComments, secretsReferencedIn, auditSecrets } = await import(
+const { stripYamlComments, secretsReferencedIn, auditSecrets, isShallowClone } = await import(
   '../../../scripts/audit-workflow-secrets.mjs'
 )
 
@@ -87,19 +87,43 @@ describe('secretsReferencedIn', () => {
   })
 })
 
+describe('shallow clones', () => {
+  it('refuses to report rather than returning a false all-clear', () => {
+    // The first CI run of this script printed "No orphaned secrets" and exited 0 while
+    // three real orphans sat in repository settings — because `actions/checkout` clones
+    // with `fetch-depth: 1` and every commit that deleted a workflow was absent.
+    //
+    // A security tool that under-reports on a misconfigured checkout is worse than no
+    // tool: the green run is read as an all-clear. So the only two honest answers are the
+    // real one and "I cannot tell".
+    if (isShallowClone()) {
+      expect(() => auditSecrets()).toThrow(/shallow/i)
+    } else {
+      // Full history here, so prove the guard is wired by asking for the shallow path
+      // explicitly: `allowShallow` is the only way past it.
+      expect(() => auditSecrets({ allowShallow: true })).not.toThrow()
+    }
+  })
+})
+
 describe('auditSecrets against this repository', () => {
   // Deliberately run against real git history rather than a fixture. A fixture written in
   // our own vocabulary asserts only that we agree with ourselves — the failure mode that
   // let `material:steel` mismatch `surgical-steel` on all 22 products while every test
   // stayed green.
-  const results = auditSecrets() as AuditEntry[]
+  //
+  // Skipped on a shallow clone, where the history simply is not present. `ci.yml` sets
+  // `fetch-depth: 0` so these run for real there rather than being quietly skipped.
+  const shallow = isShallowClone()
+  const results = shallow ? [] : (auditSecrets() as AuditEntry[])
   const byName = new Map(results.map((r) => [r.name, r]))
+  const itFull = shallow ? it.skip : it
 
-  it('finds secrets to classify', () => {
+  itFull('finds secrets to classify', () => {
     expect(results.length).toBeGreaterThan(0)
   })
 
-  it('classifies the Vercel deploy credentials as orphans', () => {
+  itFull('classifies the Vercel deploy credentials as orphans', () => {
     // `deploy-production.yml` was deleted 2026-06-29 as redundant; its secrets were never
     // removed, and no document has ever mentioned them.
     for (const name of ['VERCEL_TOKEN', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID']) {
@@ -108,12 +132,12 @@ describe('auditSecrets against this repository', () => {
     }
   })
 
-  it('does not report the commented anti-pattern example as a secret', () => {
+  itFull('does not report the commented anti-pattern example as a secret', () => {
     // `production-smoke.yml` documents `secrets.X` inside a comment.
     expect(byName.has('X')).toBe(false)
   })
 
-  it('classifies the smoke-test secrets as pending, not orphaned', () => {
+  itFull('classifies the smoke-test secrets as pending, not orphaned', () => {
     // They are referenced by a workflow that exists but has not reached the default
     // branch, so they are needed — they just cannot do anything yet.
     for (const name of [
@@ -129,7 +153,7 @@ describe('auditSecrets against this repository', () => {
     }
   })
 
-  it('names the workflow each secret was last seen in', () => {
+  itFull('names the workflow each secret was last seen in', () => {
     // An audit that says "something is unused" without saying what used to use it leaves
     // the reader unable to judge whether deleting it is safe.
     expect(byName.get('VERCEL_TOKEN')?.workflows).toContain(

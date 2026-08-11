@@ -39,6 +39,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history, not the default depth-1 shallow clone.
+          #
+          # `audit-workflow-secrets.mjs` finds credentials whose workflow was deleted, so
+          # it needs the commits where those deletions happened. On a shallow clone it saw
+          # no deleted workflows, reported no orphans, and exited 0 — a false all-clear
+          # from a security tool, while three real orphans sat in repository settings.
+          #
+          # The script now refuses outright rather than under-reporting, which is why this
+          # has to be 0: without it the audit cannot run at all.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:

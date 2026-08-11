@@ -88,6 +88,40 @@ function git(args) {
   return execFileSync('git', args, { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
 }
 
+/**
+ * Thrown instead of reporting a result that would be wrong.
+ */
+export class ShallowHistoryError extends Error {
+  constructor() {
+    super(
+      'Cannot audit: this is a SHALLOW clone, so the history that would contain\n' +
+        '  deleted workflows is not present.\n\n' +
+        '  Reporting "no orphaned secrets" from a shallow clone would be a false all-clear —\n' +
+        '  the orphan this tool exists to find lives in a workflow deleted months ago.\n\n' +
+        '  Locally:  git fetch --unshallow\n' +
+        '  In CI:    actions/checkout@v4 with `fetch-depth: 0` (it defaults to 1)',
+    )
+    this.name = 'ShallowHistoryError'
+  }
+}
+
+/**
+ * `actions/checkout` clones with `fetch-depth: 1` by default, which is the single most
+ * likely way this tool silently stops working: every commit that deleted a workflow is
+ * absent, so nothing looks orphaned and the run goes green.
+ *
+ * This was not hypothetical — it is exactly what happened on the first CI run of this
+ * script, which reported "No orphaned secrets" and exited 0 while three real orphans sat
+ * in the repository's settings.
+ */
+export function isShallowClone() {
+  try {
+    return git(['rev-parse', '--is-shallow-repository']).trim() === 'true'
+  } catch {
+    return false
+  }
+}
+
 /** Workflow files present on a given ref. */
 function workflowsAt(ref) {
   try {
@@ -117,9 +151,16 @@ function fileAt(ref, path) {
  * - `orphan`  — referenced only by workflows that no longer exist anywhere. **Candidate
  *               for revocation.**
  *
- * @param {{ defaultBranch?: string }} [opts]
+ * @param {{ defaultBranch?: string, allowShallow?: boolean }} [opts]
+ *   `allowShallow` exists only so a test can exercise the non-refusing path on a full
+ *   clone. Never pass it in real use — the whole point of the guard is that a shallow
+ *   clone cannot see deleted workflows and would report a false all-clear.
  */
-export function auditSecrets({ defaultBranch = 'origin/main' } = {}) {
+export function auditSecrets({ defaultBranch = 'origin/main', allowShallow = false } = {}) {
+  // Refuse rather than under-report. A shallow clone cannot see the deleted workflows
+  // that produce orphans, so the only honest answers are the real one and "I cannot tell".
+  if (!allowShallow && isShallowClone()) throw new ShallowHistoryError()
+
   /** @type {Map<string, { status: string, workflows: Set<string>, lastSeen: string }>} */
   const found = new Map()
 
@@ -173,7 +214,16 @@ export function auditSecrets({ defaultBranch = 'origin/main' } = {}) {
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 function main() {
-  const results = auditSecrets()
+  let results
+  try {
+    results = auditSecrets()
+  } catch (err) {
+    if (err instanceof ShallowHistoryError) {
+      console.error(`✗ ${err.message}`)
+      return 2
+    }
+    throw err
+  }
 
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(results, null, 2))
