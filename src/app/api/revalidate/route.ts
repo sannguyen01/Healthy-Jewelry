@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath, revalidateTag } from 'next/cache'
+import { PRODUCTS_TAG, collectionTag } from '@/lib/shopify/cacheTags'
+import { hjCollections } from '@/lib/data/hj-data'
 import { timingSafeEqual } from 'crypto'
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -26,15 +28,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     revalidatePath('/', 'page')
     revalidatePath('/shop', 'page')
-    revalidatePath('/shop/rings', 'page')
-    revalidatePath('/shop/necklaces', 'page')
-    revalidatePath('/shop/earrings', 'page')
-    revalidatePath('/shop/bracelets', 'page')
-    revalidatePath('/shop/charms', 'page')
     revalidatePath('/products/[handle]', 'page')
 
-    revalidateTag('products')
-    revalidateTag('collections')
+    // Derived, not five hardcoded paths. `hjCollections` is site structure — the same
+    // fixed set `/shop/[collection]` prerenders — so a sixth collection is covered here
+    // automatically instead of being silently skipped.
+    for (const collection of hjCollections) {
+      revalidatePath(`/shop/${collection.handle}`, 'page')
+    }
+
+    // Shared builders, never string literals.
+    //
+    // This route used to call `revalidateTag('collections')` — a tag **no fetch anywhere
+    // registers**, so the call did nothing. That orphan was removed from the webhook route
+    // in an earlier change, but this file was outside the contract test's reach (it read
+    // two named files), so the bug survived here. `'products'` was a literal too, correct
+    // only by coincidence.
+    revalidateTag(PRODUCTS_TAG)
+    for (const collection of hjCollections) {
+      revalidateTag(collectionTag(collection.handle))
+    }
 
     console.info('[revalidate/route] Revalidation triggered at', new Date().toISOString())
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { parseSource, callsTo, arrayPropertyValues } from '@/lib/analysis/tsAstScan'
 
 /**
@@ -30,6 +30,38 @@ import { parseSource, callsTo, arrayPropertyValues } from '@/lib/analysis/tsAstS
  */
 
 const ROOT = process.cwd()
+
+/**
+ * **Every** module, not two named files.
+ *
+ * The first version of this test read `src/lib/shopify/index.ts` and the webhook route by
+ * name — and therefore never saw `src/app/api/revalidate/route.ts`, a third revalidation
+ * surface which still called `revalidateTag('collections')`: the exact orphan this contract
+ * was written to eliminate, surviving the fix that eliminated it everywhere the test
+ * happened to be looking.
+ *
+ * **A contract test that names its participants can only check the participants someone
+ * remembered.** That is the second time a guardrail here was scoped narrower than the
+ * invariant it claimed to enforce (the first walked only `src/app` and missed a catalogue
+ * read in `src/components`), which is why the rule is now "scan everything and exempt
+ * explicitly" rather than "list what to scan". See docs/adr/007.
+ */
+function walkSources(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) {
+      if (entry === 'tests' || entry === 'node_modules') continue
+      out.push(...walkSources(full))
+    } else if (/\.tsx?$/.test(full)) {
+      out.push(full)
+    }
+  }
+  return out
+}
+
+const SOURCE_FILES = [join(ROOT, 'src/app'), join(ROOT, 'src/lib')].flatMap(walkSources)
+
 const FETCHER_SRC = readFileSync(join(ROOT, 'src/lib/shopify/index.ts'), 'utf-8')
 const WEBHOOK_SRC = readFileSync(
   join(ROOT, 'src/app/api/webhooks/shopify/route.ts'),
@@ -69,7 +101,10 @@ function resolveTagExpression(expr: string): string | null {
  */
 function registeredTags(filePath: string, source: string): Set<string> {
   const tags = new Set<string>()
-  for (const array of arrayPropertyValues(parseSource(filePath, source), 'tags')) {
+  // `requireSibling: 'revalidate'` identifies a Next cache-options object structurally.
+  // Matching `tags:` by name alone also matches the product `tags` field in hj-data.ts,
+  // which reported 'rings' and 'titanium' as cache tags the moment this scan widened.
+  for (const array of arrayPropertyValues(parseSource(filePath, source), 'tags', 'revalidate')) {
     for (const element of array) {
       const resolved = resolveTagExpression(element)
       if (resolved) tags.add(resolved)
@@ -95,15 +130,41 @@ function revalidatedTags(filePath: string, source: string): Set<string> {
 }
 
 describe('cache tag contract', () => {
-  const registered = registeredTags('src/lib/shopify/index.ts', FETCHER_SRC)
-  const revalidated = revalidatedTags('src/app/api/webhooks/shopify/route.ts', WEBHOOK_SRC)
+  // Scanned across every module, with the file recorded so a failure names the offender.
+  const registered = new Set<string>()
+  const revalidated = new Set<string>()
+  /** tag → files that revalidate it, for actionable failure messages. */
+  const revalidatedIn = new Map<string, string[]>()
 
-  it('finds tags on both sides', () => {
-    // A regex that silently stopped matching would make every assertion below
-    // vacuously pass — the same "covered-looking and worthless" failure
-    // secret-exposure.test.ts guards against by checking its graph is non-empty.
+  for (const file of SOURCE_FILES) {
+    const src = readFileSync(file, 'utf-8')
+    const rel = relative(ROOT, file)
+    for (const tag of registeredTags(file, src)) registered.add(tag)
+    for (const tag of revalidatedTags(file, src)) {
+      revalidated.add(tag)
+      revalidatedIn.set(tag, [...(revalidatedIn.get(tag) ?? []), rel])
+    }
+  }
+
+  const where = (tag: string) => (revalidatedIn.get(tag) ?? ['?']).join(', ')
+
+  it('scans a plausible number of modules and finds tags on both sides', () => {
+    // A walk that silently returned nothing would make every assertion below vacuously
+    // pass — the same "covered-looking and worthless" failure secret-exposure.test.ts
+    // guards by asserting its graph is non-empty.
+    expect(SOURCE_FILES.length).toBeGreaterThan(20)
     expect(registered.size).toBeGreaterThan(0)
     expect(revalidated.size).toBeGreaterThan(0)
+  })
+
+  it('covers every revalidation surface, not a hand-listed subset', () => {
+    // Pins the generalisation. If someone narrows this back to named files, the next
+    // orphan hides in whatever file they forgot — which is exactly how
+    // /api/revalidate kept `collections` alive through the fix that removed it.
+    const scanned = SOURCE_FILES.map((f) => relative(ROOT, f))
+    expect(scanned).toContain('src/app/api/webhooks/shopify/route.ts')
+    expect(scanned).toContain('src/app/api/revalidate/route.ts')
+    expect(scanned).toContain('src/lib/shopify/index.ts')
   })
 
   it('every tag the webhook revalidates is registered by some fetcher', () => {
@@ -115,7 +176,7 @@ describe('cache tag contract', () => {
       orphans,
       'These tags are revalidated but no fetch registers them, so revalidating\n' +
         'them does nothing at all:\n  ' +
-        orphans.join('\n  '),
+        orphans.map((t) => `${t}  (in ${where(t)})`).join('\n  '),
     ).toEqual([])
   })
 
@@ -193,8 +254,16 @@ describe('cache tag contract', () => {
     })
 
     it('flags a bare string literal as inline, so it cannot match the other side', () => {
-      const source = `const o = { tags: ['collections'] }`
+      const source = `const o = { revalidate: 3600, tags: ['collections'] }`
       expect([...registeredTags('x.ts', source)]).toEqual(['inline:collections'])
+    })
+
+    it('ignores a `tags` field that is not a cache-options object', () => {
+      // Product data in hj-data.ts carries its own `tags`. Widening this scan from two
+      // named files to every module made that collide, reporting 'rings' and 'titanium'
+      // as cache tags — a false positive created by broadening, not by the code.
+      const source = `const product = { handle: 'x', tags: ['rings', 'titanium'] }`
+      expect([...registeredTags('x.ts', source)]).toEqual([])
     })
   })
 })

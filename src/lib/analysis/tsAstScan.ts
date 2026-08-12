@@ -147,23 +147,42 @@ export function callsTo(sourceFile: ts.SourceFile, functionName: string): string
   return calls
 }
 
+function propertyKey(node: ts.PropertyAssignment): string | null {
+  return ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : null
+}
+
 /**
  * The elements of an array assigned to a named property, as source text.
  *
- * Used for the `tags: [...]` option on Shopify fetches. Returns one entry per occurrence,
- * so a file with several fetches yields several arrays.
+ * `requireSibling` narrows the match to arrays inside an object literal that *also* declares
+ * that sibling property. Without it, a property name alone is a poor identifier: scanning
+ * the whole tree for `tags: [...]` matches Next's fetch-cache options **and** the `tags`
+ * field on every product in `hj-data.ts`, which reported `rings`, `titanium` and
+ * `bestseller` as cache tags.
+ *
+ * That false positive appeared the moment the cache-tag contract widened from two named
+ * files to every module — a reminder that broadening a scan changes what "the same query"
+ * means. Requiring `revalidate` as a sibling identifies a Next cache-options object
+ * structurally rather than by hoping the name is unique.
  */
-export function arrayPropertyValues(sourceFile: ts.SourceFile, propertyName: string): string[][] {
+export function arrayPropertyValues(
+  sourceFile: ts.SourceFile,
+  propertyName: string,
+  requireSibling?: string,
+): string[][] {
   const found: string[][] = []
 
   walk(sourceFile, (node) => {
-    if (!ts.isPropertyAssignment(node)) return
+    if (!ts.isObjectLiteralExpression(node)) return
 
-    const key = ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : null
-    if (key !== propertyName) return
+    const assignments = node.properties.filter(ts.isPropertyAssignment)
+    if (requireSibling && !assignments.some((p) => propertyKey(p) === requireSibling)) return
 
-    if (ts.isArrayLiteralExpression(node.initializer)) {
-      found.push(node.initializer.elements.map((el) => el.getText(sourceFile)))
+    for (const property of assignments) {
+      if (propertyKey(property) !== propertyName) continue
+      if (ts.isArrayLiteralExpression(property.initializer)) {
+        found.push(property.initializer.elements.map((el) => el.getText(sourceFile)))
+      }
     }
   })
 
