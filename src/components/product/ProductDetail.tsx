@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import type { HJProduct } from '@/lib/shopify/types'
 import { ProductImage } from '@/components/product/ProductImage'
@@ -8,6 +8,7 @@ import { ProductBadge } from '@/components/product/ProductBadge'
 import { SizePicker } from '@/components/product/SizePicker'
 import { formatPrice } from '@/lib/utils/formatPrice'
 import { useCartStore } from '@/store/cart'
+import { track } from '@/lib/analytics'
 
 interface ProductDetailProps {
   product: HJProduct
@@ -26,6 +27,23 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const addItem = useCartStore((s) => s.addItem)
   const openCart = useCartStore((s) => s.openCart)
+
+  // One view per mount. The ref guards React's development double-invoke, which
+  // would otherwise double every page-view number and teach everyone to halve it.
+  const viewReported = useRef(false)
+  useEffect(() => {
+    if (viewReported.current) return
+    viewReported.current = true
+    track({
+      name: 'product_viewed',
+      handle: product.handle,
+      collection: product.collection,
+      material: product.material,
+      value: product.price,
+      currency: product.currencyCode,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.handle])
 
   /**
    * The image currently shown, or `undefined` when the product has no photography

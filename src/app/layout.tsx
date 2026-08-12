@@ -4,6 +4,7 @@ import './globals.css'
 import { CartProvider } from '@/store/cart'
 import { SITE_URL } from '@/config/site'
 import { buildStamp } from '@/config/build-info'
+import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
 const barlowCondensed = Barlow_Condensed({
   weight: ['400', '500'],
@@ -105,6 +106,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <CartProvider>{children}</CartProvider>
+        {/* Asks once, then never again. Nothing is measured until it is answered. */}
+        <ConsentBanner />
       </body>
     </html>
   )

@@ -8,6 +8,7 @@ import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import { hjCollections } from '@/lib/data/hj-data'
 import { getProductsByCollection } from '@/lib/shopify'
+import { TrackView } from '@/components/analytics/TrackView'
 import type { HJCollectionHandle } from '@/lib/shopify/types'
 
 const VALID_COLLECTIONS: HJCollectionHandle[] = [
@@ -85,6 +86,9 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
 
   return (
     <>
+      <TrackView
+        event={{ name: 'collection_viewed', collection: handle, productCount: products.length }}
+      />
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
       <main style={{ paddingTop: '64px' }}>
