@@ -10,6 +10,21 @@ import { productSeo } from '@/lib/seo/productSeo'
 // so it runs on the Node runtime instead. The cost is a slower cold start on a
 // route only crawlers hit; the alternative was a card that renders the wrong
 // product, which is what the edge version was doing.
+//
+// **That tradeoff has a budget: 2500ms, enforced against production by
+// `scripts/verify-production.mjs`.**
+//
+// A tradeoff accepted without a number is a tradeoff nobody can tell has gone
+// bad. Link crawlers give up somewhere around 3-5s, and a timed-out unfurl
+// renders *no* card at all — strictly worse than the wrong card this change
+// fixed. 2500ms sits under the low end with room for a slow Storefront
+// response on top of a cold start.
+//
+// Measured locally at 513ms cold, 54ms warm, 15KB. Treat that as a floor rather
+// than an estimate: locally the Shopify call fails fast against a placeholder
+// domain, so it skips the round-trip production actually makes. The number that
+// matters is the one the smoke run reports, and it is printed on every run —
+// passing or failing — so the trend is visible before it breaches.
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const alt = 'Healthy Jewelry product'

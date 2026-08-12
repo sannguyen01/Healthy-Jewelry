@@ -36,7 +36,31 @@
  * picture rather than only the first problem.
  */
 
+import { writeFileSync } from 'node:fs'
 import { buildProbeRequest, resolveStoreDomain } from './lib/webhook-signature.mjs'
+import {
+  i18nPremise,
+  collectionSetPremise,
+  specMetafieldPremise,
+  paymentsPremise,
+  formatPremises,
+} from './lib/premise-checks.mjs'
+
+/**
+ * Cold-start budget for the Open Graph image, in milliseconds.
+ *
+ * The route dropped `runtime = 'edge'` so it could read Shopify, which was the right call —
+ * the edge version rendered the wrong product — but the tradeoff was accepted with no
+ * number attached. A cold start that exceeds a crawler's unfurl timeout means the share
+ * card fails to render *at all*, which is worse than the wrong card the change fixed.
+ *
+ * 2500ms sits under the 3s low end of published unfurl timeouts (commonly cited as 3–5s),
+ * leaving room for a slow Storefront response on top of a Vercel cold start. Measured
+ * locally at 513ms cold and 54ms warm — but that is a floor, not an estimate, because the
+ * local Shopify call fails fast against a placeholder domain. Production is the only place
+ * this number means anything, which is why it is asserted here and not in a unit test.
+ */
+const OG_COLD_START_BUDGET_MS = 2500
 
 const API_VERSION = '2025-01'
 
@@ -72,6 +96,24 @@ export const SHOPIFY_ONLY_HANDLES = [
 // ── tiny check harness ──────────────────────────────────────────────────────
 
 const results = []
+/** Measurements worth reporting whether or not they breach a budget. */
+const timings = {}
+
+/**
+ * The collection handles `/shop/[collection]` will serve.
+ *
+ * Mirrors `hjCollections` in `src/lib/data/hj-data.ts`. Duplicated here only because this
+ * script is dependency-free `.mjs` and cannot import TypeScript; `premise-checks.test.ts`
+ * is not the guard for that, `collection-set drift` is — if these fall out of step with
+ * Shopify the check fires either way, which is the property that matters.
+ */
+const KNOWN_COLLECTIONS = [
+  { handle: 'rings' },
+  { handle: 'necklaces' },
+  { handle: 'earrings' },
+  { handle: 'bracelets' },
+  { handle: 'charms' },
+]
 
 async function check(name, fn) {
   try {
@@ -559,6 +601,100 @@ async function revalidateEndpointRejectsAnonymous() {
   return 'rejects unauthenticated requests with 401'
 }
 
+/**
+ * The Open Graph image renders within the budget a link crawler will wait.
+ *
+ * Timed on a **cache-busted** URL so this measures a real render rather than a CDN hit —
+ * the whole question is what happens on a cold path, which is exactly what a crawler
+ * unfurling a freshly-shared link encounters.
+ */
+async function openGraphRendersWithinBudget() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const handle = SHOPIFY_ONLY_HANDLES[0]
+  const url = new URL(`/products/${handle}/opengraph-image`, siteUrl)
+  url.searchParams.set('cachebust', String(Date.now()))
+
+  const started = Date.now()
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'facebookexternalhit/1.1' },
+    cache: 'no-store',
+  })
+  const bytes = (await res.arrayBuffer()).byteLength
+  const elapsed = Date.now() - started
+
+  // Recorded on the result either way, so the trend is visible in the job summary before
+  // it breaches rather than only at the moment it does.
+  timings.ogColdMs = elapsed
+
+  if (!res.ok) throw new Error(`OG image returned ${res.status} in ${elapsed}ms`)
+  if (bytes < 1000) throw new Error(`OG image is only ${bytes} bytes — likely a render failure`)
+
+  if (elapsed > OG_COLD_START_BUDGET_MS) {
+    throw new Error(
+      `OG image took ${elapsed}ms, over the ${OG_COLD_START_BUDGET_MS}ms budget.\n` +
+        '  Link crawlers time out around 3-5s, and a timed-out unfurl renders NO card at\n' +
+        '  all — worse than the wrong card that dropping the edge runtime fixed.\n' +
+        '  See the budget note in src/app/products/[handle]/opengraph-image.tsx.',
+    )
+  }
+
+  return `${elapsed}ms cold, ${(bytes / 1024).toFixed(0)}KB (budget ${OG_COLD_START_BUDGET_MS}ms)`
+}
+
+// ── premises ────────────────────────────────────────────────────────────────
+
+/**
+ * Premises are not checks. A drifted premise means a *decision* is stale, not that the
+ * storefront is broken — a Vietnamese locale appearing is an opportunity. They are
+ * collected and reported separately, and never fail the run. See ADR 008.
+ */
+async function collectPremises() {
+  const { shopLocales, collections, productsCount, ordersCount, orders } = await adminGraphql(
+    `query {
+       shopLocales { locale published }
+       collections(first: 50) { edges { node { handle } } }
+       productsCount { count }
+       ordersCount { count }
+       orders(first: 10) { edges { node { paymentGatewayNames } } }
+     }`,
+  )
+
+  const withSpec = await adminGraphql(
+    `query {
+       products(first: 250) {
+         edges { node { metafield(namespace: "custom", key: "spec") { value } } }
+       }
+     }`,
+  )
+  const specCount = withSpec.products.edges.filter((e) => e.node.metafield?.value?.trim()).length
+
+  return [
+    i18nPremise(shopLocales),
+    collectionSetPremise(collections.edges.map((e) => e.node), KNOWN_COLLECTIONS),
+    specMetafieldPremise(specCount, productsCount.count),
+    paymentsPremise(
+      ordersCount.count,
+      orders.edges.flatMap((e) => e.node.paymentGatewayNames ?? []),
+    ),
+  ]
+}
+
+/**
+ * Hand the drifted premises to the workflow.
+ *
+ * Written to a file rather than parsed out of stdout: a notification step that scrapes log
+ * text breaks the first time someone rewords a message, and this project has already been
+ * bitten by two things agreeing only by coincidence.
+ */
+function writeDriftFile(drifted) {
+  try {
+    writeFileSync('premise-drift.json', JSON.stringify(drifted, null, 2))
+  } catch {
+    // Reporting is best-effort. A drift file that cannot be written must never change the
+    // verdict of the checks above.
+  }
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -577,6 +713,34 @@ async function main() {
   await check('A signed webhook actually revalidates the cached page', webhookRevalidatesTheCachedPage)
   await check('Unknown URLs cannot be indexed', unknownUrlsAreNotIndexable)
   await check('Manual revalidation endpoint is locked', revalidateEndpointRejectsAnonymous)
+  await check('Open Graph image renders within the crawler budget', openGraphRendersWithinBudget)
+
+  // Premises last, and separately. A drifted premise means a decision is stale, not that
+  // the storefront is broken, so it is reported but never counted as a failure. See ADR 008.
+  let premises = []
+  try {
+    premises = await collectPremises()
+  } catch (err) {
+    console.log(`· premises could not be evaluated: ${err.message}\n`)
+  }
+
+  if (premises.length > 0) {
+    const { lines, summary, drifted } = formatPremises(premises)
+    console.log('─'.repeat(70))
+    console.log('Premises behind recorded decisions\n')
+    for (const line of lines) console.log(`  ${line}`)
+    console.log(`\n  ${summary}`)
+    if (drifted.length > 0) {
+      console.log('\n  Drift is not failure — these are decisions worth revisiting, and are')
+      console.log('  reported to a separate premise-drift issue rather than turning this red.')
+    }
+    console.log('')
+    writeDriftFile(drifted)
+  }
+
+  if (timings.ogColdMs !== undefined) {
+    console.log(`Open Graph cold render: ${timings.ogColdMs}ms (budget ${OG_COLD_START_BUDGET_MS}ms)\n`)
+  }
 
   const failed = results.filter((r) => !r.ok)
   console.log('─'.repeat(70))
