@@ -20,7 +20,7 @@ That is also not the useful question. The useful one is what the suite is *for*,
 | Unit | `pnpm exec vitest run` | `src/lib`, `src/store`, `src/config`, design tokens, and component behaviour under jsdom | ~12 s |
 | Build | `pnpm build` | Prerender of all 45 routes | ~40 s |
 | E2E | `pnpm e2e` | The rendered application in a real browser, desktop + mobile | ~3-5 min |
-| Production smoke | `pnpm verify:production` · `pnpm verify:webhook` | The **real** store and the **live** deployment | ~10 s |
+| Production smoke | `pnpm verify:production` · `pnpm verify:webhook` | The **real** store and the **live** deployment, plus the premise tier below | ~10 s |
 
 `vitest.config.ts` scopes **coverage** to the business-logic layer on purpose, with the comment *"UI
 components are verified via E2E"*. That single line is the whole argument: with coverage thresholds
@@ -65,7 +65,38 @@ become a merge freeze.
 **What it still cannot tell you:** whether a payment provider is active. Admin GraphQL's
 `PaymentSettings` exposes only `supportedDigitalWallets` — there is no field for enabled providers, and
 the alternative (`paymentGatewayNames` on an order) needs an order to exist. That one is human-only;
-see `docs/go-live-runbook.md`.
+see `docs/go-live-runbook.md`. It does not stay human-only — see the premise tier below.
+
+### The premise tier, and why it is deliberately non-blocking
+
+Every layer above asserts **"the code still does X."** None asserted **"the premise behind X still
+holds."** Five decisions were found resting on premises with no detector at all — the English-only
+choice, the payments blocker, the Open Graph runtime tradeoff, the empty spec metafield, and a
+collection-set assumption introduced by the change that fixed the soft-404. Full reasoning in
+[ADR 008](adr/008-decisions-need-premise-detectors.md).
+
+`scripts/lib/premise-checks.mjs` holds the evaluators; `scripts/verify-production.mjs` fetches the live
+data and reports them in a section of their own.
+
+**They never turn the run red.** A `vi` locale appearing is an opportunity, not an outage, and failing
+on opportunity is how a suite becomes noise nobody reads. Drift writes `premise-drift.json`, and the
+workflow opens or updates a **`premise-drift`** labelled issue — distinct from the `production-smoke`
+failure issue — which closes again once every premise holds. Severity lives in the message: a premise
+marked `blocking` (`COLLECTION-SET-DRIFT`, where customers are getting hard 404s) reads differently
+from one marked `opportunity`.
+
+Two properties are worth copying into any premise check added later:
+
+- **Pure evaluator, network at the caller.** The drifted branch never runs locally, so it is the branch
+  most likely to be wrong the day it fires — the same lesson as the completed-order cart path.
+  `src/tests/unit/premise-checks.test.ts` exercises **both** states of every premise, 18 tests, with
+  the false-positive cases (`frontpage`, `en-GB`) pinned explicitly.
+- **A check may expire itself.** `SHOPIFY-PAYMENTS` is unverifiable only while `ordersCount` is 0;
+  the first order makes `paymentGatewayNames` readable and the reminder becomes a real assertion.
+  Human once, then automatic — better than a deadline nobody agreed to.
+
+The tier ships **unproven against production**, like everything else in the production tier, because
+`production-smoke` has still never executed.
 
 ### The source-analysis guardrails parse; they do not match
 

@@ -46,4 +46,19 @@ regardless of UI language.
   and above all **checkout error copy**, which is the text a confused customer reads at the
   moment of highest abandonment risk.
 
-Referenced by: `STATE.md`, `src/lib/utils/formatPrice.ts`.
+## Re-check trigger
+
+Added 2026-08-12. This ADR recorded its prerequisite and left nobody watching for it to be
+met — the decision would have stayed "correct on 2026-08-08 evidence" indefinitely while
+the evidence changed underneath it.
+
+**`ADR-005-english-only` in `scripts/lib/premise-checks.mjs`** queries `shopLocales` on
+every production-smoke run and reports drift the moment a non-`en` locale appears. A
+regional English locale (`en-GB`) is not translated content and does not count.
+
+Drift here is an **opportunity, not a failure**: it does not turn the run red, it opens a
+`premise-drift` issue saying this decision is now due for revisit, because the content half
+finally exists to surface. See [ADR 008](008-decisions-need-premise-detectors.md).
+
+Referenced by: `STATE.md`, `src/lib/utils/formatPrice.ts`,
+`scripts/lib/premise-checks.mjs`.

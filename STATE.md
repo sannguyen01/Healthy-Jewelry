@@ -51,6 +51,21 @@ copy.
 | 7 | `VISUAL-QA-LIVE` | A real phone | Mobile checkout hand-off by hand |
 | 8 | `SHOPIFY-SPEC-METAFIELD` | Shopify Admin | Enter real measurements — content, not code; must not be invented |
 
+**Three of these now watch themselves.** As of 2026-08-12 the production-smoke run evaluates
+the premises these items rest on (`scripts/lib/premise-checks.mjs`), so drift opens a
+`premise-drift` issue instead of waiting to be noticed:
+
+| Item | What is watched | On drift |
+|---|---|---|
+| 2 `SHOPIFY-PAYMENTS` | `ordersCount`; once ≥ 1, `paymentGatewayNames` directly | Reminder **upgrades to a real assertion** the moment the first order exists |
+| 8 `SHOPIFY-SPEC-METAFIELD` | Products with `custom.spec` set | Says the line is rendering and the item can close |
+| — `COLLECTION-SET-DRIFT` | Shopify's collections ⊆ `hjCollections` | **Blocking** — those URLs hard-404 today (Watch List below) |
+| — [ADR 005](docs/adr/005-english-only-storefront.md) | `shopLocales` is `en`-only | Opportunity — the prerequisite for revisiting has been met |
+
+Items 1, 4, 5, 6 are settings-console state the API here cannot read; item 7 needs a human
+with a phone. Those are human-only by nature, not by omission — see
+[ADR 008](docs/adr/008-decisions-need-premise-detectors.md).
+
 Two standing caveats that are not items because nothing can close them from here:
 
 - **`production-smoke` has never executed.** Everything built to verify production is
@@ -90,6 +105,13 @@ Two standing caveats that are not items because nothing can close them from here
   (`acceptedCardBrands` / `shopifyPaymentsAccountId` are rejected as
   non-existent), and the alternative — `paymentGatewayNames` on an order —
   needs an order to exist, which is the thing this unblocks.
+  **2026-08-12 — the human-only window now has an end.** `paymentsPremise` in
+  `scripts/lib/premise-checks.mjs` reads `ordersCount` on every smoke run. While it is 0
+  the check reports the premise as still accurate; the moment one order exists
+  `paymentGatewayNames` becomes readable and the check starts asserting the gateway by
+  name — and reports drift if orders exist naming *no* gateway, which is money not being
+  taken. Human once, then automatic. No invented deadline, which is what a
+  `TODO(2026-Q3)` here would have been.
   Loop action: report only, never propose enabling a payment provider yourself
   Human decision: pending
 - [ ] SHOPIFY-WEBHOOK-SECRET — **no longer requires an order to test.** Which of
@@ -224,6 +246,10 @@ Two standing caveats that are not items because nothing can close them from here
   Values remain deliberately unpopulated: specs are physical measurements and
   inventing them would put fabricated product claims on a store. The detail page
   hides the line when empty rather than rendering a blank one.
+  **2026-08-12**: `specMetafieldPremise` now counts products with `custom.spec` set on
+  every smoke run, so the day real measurements are entered the item reports itself ready
+  to close rather than staying open because nobody re-checked. The hidden-when-empty
+  rendering is exactly what makes this invisible otherwise.
   Loop action: report only; never invent spec values
   Human decision: pending (enter real measurements in Admin when known)
 
@@ -242,6 +268,24 @@ Two standing caveats that are not items because nothing can close them from here
 
 ## Watch List
 
+- **COLLECTION-SET-DRIFT — opened 2026-08-12, holds today.** Round 5 set
+  `dynamicParams = false` on `/shop/[collection]` so an unknown handle returns a true 404
+  instead of an empty-but-200 page. That is correct **only while Shopify's collection set is
+  a subset of `hjCollections`**. Create a sixth collection in Shopify Admin and its URL
+  hard-404s — strictly worse than the soft-404 that change was made to fix, and silent.
+  The risk was written into a code comment and given no detector, which is the exact
+  omission [ADR 008](docs/adr/008-decisions-need-premise-detectors.md) is about; it was
+  introduced by the round that fixed the soft-404 and found by scanning for the *shape* of
+  items 8–10, not by anyone reviewing that change.
+  Live as of 2026-08-08: Shopify has `rings, necklaces, earrings, bracelets, charms` plus
+  the built-in `frontpage`; `hjCollections` has the same five. **Matches.** `frontpage` is
+  exempted explicitly in `collectionSetPremise`, or the check would false-positive on day
+  one — and a new detector that cries wolf immediately loses its reader.
+  Not an open item: there is nothing to do while it holds. On drift the smoke run marks it
+  `blocking` and opens a `premise-drift` issue naming the handles that are 404ing.
+  Loop action: add the handle to `src/lib/data/hj-data.ts` and deploy, or remove the
+  collection in Shopify — never widen `dynamicParams` back, which would restore the
+  soft-404.
 - **`integrate/shopify-transactions` — resolved as absent, 2026-08-08.** Checked
   again after a report that it risked reverting PR #16's `pendingCheckoutCartId`
   discriminator and the secret-exposure split: the branch exists in **neither the
@@ -410,6 +454,19 @@ duplicate those files.
   `secret-exposure.test.ts` walks the real client import graph instead, and
   asserts the graph is non-empty first so a broken resolver cannot make it
   vacuously green.
+- **2026-08-12**: Every guardrail here asserts *the code still does X*; none asserted *the
+  premise behind X still holds*. Five decisions were resting on unwatched premises at once —
+  English-only, the payments blocker, the Open Graph runtime tradeoff, the empty spec
+  metafield, and `dynamicParams = false`, which **Round 5 introduced while fixing the
+  soft-404 and nobody caught in review**. Each was recorded honestly, with evidence, and
+  none recorded when to look again. **An assumption in prose expires silently; an
+  assumption as a check expires loudly.** `scripts/lib/premise-checks.mjs` evaluates them on
+  every smoke run and reports drift as an *opportunity*, never a red build — failing on
+  opportunity is how the 24-minute E2E suite became noise nobody read. The evaluators are
+  pure so the **drifted** branch is testable, which is the `pendingCheckoutCartId` lesson:
+  the branch that never runs locally is the one that breaks. Ninth guardrail in the family,
+  and the first about decisions rather than code. See
+  `docs/adr/008-decisions-need-premise-detectors.md`.
 - **2026-08-10**: A control whose benefit depends on manual setup must fail loudly
   without it. `environment: production-readonly` read as hardening in the YAML and two
   docs while providing nothing: GitHub auto-creates the environment empty, and a job with
