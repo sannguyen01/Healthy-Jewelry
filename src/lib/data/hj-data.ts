@@ -36,31 +36,26 @@ export const hjCollections: HJCollection[] = [
     handle: 'rings',
     title: 'Rings',
     description: 'Architectural forms for everyday wear',
-    count: 4,
   },
   {
     handle: 'necklaces',
     title: 'Necklaces',
     description: 'Pendants and chains in pure titanium',
-    count: 4,
   },
   {
     handle: 'earrings',
     title: 'Earrings',
     description: 'Studs, hoops and drops — nickel-free',
-    count: 4,
   },
   {
     handle: 'bracelets',
     title: 'Bracelets',
     description: 'Cuffs and bangles. No tarnish. Ever.',
-    count: 3,
   },
   {
     handle: 'charms',
     title: 'Charms',
     description: 'Stackable titanium charms — build your own piece',
-    count: 2,
   },
 ]
 

@@ -782,6 +782,115 @@ async function photographedProductsShowTheirPhotograph() {
   return `${sample.length}/${sample.length} sampled photographed products render their image (${withPhoto.length} have media)`
 }
 
+/**
+ * Every tag namespace the store uses is one the code reads.
+ *
+ * Tags are the only channel Shopify gives this project for "which metal is this"
+ * and "which illustration", so the store's vocabulary and the code's have to
+ * agree. They already disagreed once, expensively: `material:steel` matched
+ * nothing, and all 22 products silently reported Grade 23 Titanium — on a brand
+ * whose entire promise is knowing which metal touches your skin.
+ *
+ * That failure is invisible from the store's side. A merchant writes a tag,
+ * Shopify accepts it, and nothing anywhere says the site does not read it. Five
+ * products currently carry `collection:spectrum` — a tag that does nothing at
+ * all, because collections come from real Shopify collection membership, not
+ * from tags.
+ *
+ * Reported as an **opportunity**, not a failure: an unread tag is a
+ * misunderstanding to resolve, not an outage. Failing on it would make a red
+ * build out of someone tidying their Shopify Admin.
+ */
+/** Tag namespaces `src/lib/shopify/tags.ts` parses. Anything else reaches no code path. */
+export const READ_TAG_NAMESPACES = ['material', 'svg']
+
+/** Bare tags `mapShopifyProduct` reads directly, for badges. */
+export const READ_BARE_TAGS = ['bestseller', 'new', 'sale']
+
+/**
+ * Which tags in a catalogue reach no code. Pure, so it can be tested against tag
+ * arrays captured from the real store rather than only observed saying "fine".
+ *
+ * @param {{ tags?: string[] }[]} products
+ * @returns {Map<string, number>} unread tag → how many products carry it
+ */
+export function unreadTags(products) {
+  const unread = new Map()
+  for (const product of products) {
+    for (const tag of product.tags ?? []) {
+      const value = tag.toLowerCase().trim()
+      if (!value) continue
+      const namespace = value.includes(':') ? value.slice(0, value.indexOf(':')) : null
+
+      if (namespace ? READ_TAG_NAMESPACES.includes(namespace) : READ_BARE_TAGS.includes(value)) {
+        continue
+      }
+      unread.set(value, (unread.get(value) ?? 0) + 1)
+    }
+  }
+  return unread
+}
+
+async function tagNamespacesAreAllRead() {
+  const data = await adminGraphql(
+    `query { products(first: 250) { edges { node { handle tags } } } }`,
+  )
+
+  const unread = unreadTags(data.products.edges.map((e) => e.node))
+  if (unread.size === 0) return 'Every tag in the store maps to something the code reads.'
+
+  const listed = [...unread.entries()].map(([tag, n]) => `${tag} (${n})`).join(', ')
+  return (
+    `${unread.size} tag(s) are read by nothing: ${listed}. ` +
+    'Harmless, but a tag that looks meaningful and does nothing is how the ' +
+    'material:steel mismatch survived. Either wire it up or remove it.'
+  )
+}
+
+/**
+ * The homepage strips have enough products to be strips.
+ *
+ * `GET_BESTSELLERS` and `GET_NEW_ARRIVALS` are `tag:bestseller` / `tag:new`
+ * queries, so the size of each homepage row is a **merchandising** fact set in
+ * Shopify Admin, not a code one. Exactly one product currently carries
+ * `bestseller`, which makes "BESTSELLING" a horizontal-scroll strip containing a
+ * single tile — not broken, just wrong-looking, and nothing on the site can
+ * report it.
+ *
+ * Never a failure. A thin strip is a tagging decision, and turning someone's
+ * merchandising into a red build is how a signal becomes noise.
+ */
+async function homepageStripsHaveEnoughProducts() {
+  const MIN_TILES = 3
+
+  const data = await adminGraphql(
+    `query {
+       bestsellers: products(first: 20, query: "tag:bestseller") { edges { node { handle } } }
+       newArrivals: products(first: 20, query: "tag:new") { edges { node { handle } } }
+     }`,
+  )
+
+  const strips = [
+    { label: 'BESTSELLING', tag: 'bestseller', count: data.bestsellers.edges.length },
+    { label: 'NEW ARRIVALS', tag: 'new', count: data.newArrivals.edges.length },
+  ]
+
+  const thin = strips.filter((s) => s.count < MIN_TILES)
+  if (thin.length === 0) {
+    return strips.map((s) => `${s.label}: ${s.count}`).join(', ')
+  }
+
+  return (
+    thin
+      .map(
+        (s) =>
+          `${s.label} has ${s.count} product(s) — a scroll strip with fewer than ${MIN_TILES} ` +
+          `tiles reads as broken. Tag more products \`${s.tag}\` in Shopify Admin.`,
+      )
+      .join(' ') + ` (Full counts: ${strips.map((s) => `${s.label}=${s.count}`).join(', ')})`
+  )
+}
+
 // ── premises ────────────────────────────────────────────────────────────────
 
 /**
@@ -864,6 +973,29 @@ async function main() {
   await check('Unknown URLs cannot be indexed', unknownUrlsAreNotIndexable)
   await check('Manual revalidation endpoint is locked', revalidateEndpointRejectsAnonymous)
   await check('Open Graph image renders within the crawler budget', openGraphRendersWithinBudget)
+
+  // Observations about the *store*, not the code. Neither of these can fail the run:
+  // a tag nobody reads and a thin homepage strip are merchandising decisions made in
+  // Shopify Admin, and turning someone tidying their catalogue into a red build is
+  // exactly how the 24-minute E2E suite became noise nobody read. They are reported
+  // because nothing else can see them — the site renders happily either way.
+  const observations = []
+  for (const [label, fn] of [
+    ['Tag namespaces', tagNamespacesAreAllRead],
+    ['Homepage strips', homepageStripsHaveEnoughProducts],
+  ]) {
+    try {
+      observations.push(`${label}: ${await fn()}`)
+    } catch (err) {
+      observations.push(`${label}: could not be evaluated — ${err.message}`)
+    }
+  }
+  if (observations.length > 0) {
+    console.log('─'.repeat(70))
+    console.log('Store observations (never failures)\n')
+    for (const line of observations) console.log(`  · ${line}`)
+    console.log('')
+  }
 
   // Premises last, and separately. A drifted premise means a decision is stale, not that
   // the storefront is broken, so it is reported but never counted as a failure. See ADR 008.

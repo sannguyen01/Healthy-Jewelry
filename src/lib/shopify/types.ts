@@ -216,7 +216,6 @@ export interface HJCollection {
   handle: HJCollectionHandle
   title: string
   description: string
-  count: number
 }
 
 export interface HJMaterial {

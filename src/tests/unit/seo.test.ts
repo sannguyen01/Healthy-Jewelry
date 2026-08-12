@@ -30,7 +30,6 @@ const mockCollection: HJCollection = {
   handle: 'rings',
   title: 'Rings',
   description: 'Architectural forms for everyday wear',
-  count: 4,
 }
 
 // ── generateProductMetadata ────────────────────────────────────────────────
