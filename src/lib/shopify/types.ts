@@ -137,7 +137,29 @@ export type HJSvgType = (typeof HJ_SVG_TYPES)[number]
 
 export type HJMaterialHandle = 'titanium' | 'niobium' | 'surgical-steel'
 
-export type HJCollectionHandle = 'rings' | 'necklaces' | 'earrings' | 'bracelets' | 'charms'
+/**
+ * The five collections the site serves, as a runtime array.
+ *
+ * A runtime array rather than a bare type union, for the same reason
+ * `HJ_SVG_TYPES` is one: a union cannot be enumerated by a test, so nothing can
+ * check that the set the parser can produce is the same set the router will
+ * serve. That gap is not hypothetical here —
+ * **`/shop/[collection]` sets `dynamicParams = false`**, so a handle outside this
+ * list is a hard 404 *before rendering*, and a product mapped onto one renders a
+ * breadcrumb linking straight to it.
+ *
+ * `collection-handle-contract.test.ts` compares this against the router's own
+ * `VALID_COLLECTIONS` in both directions.
+ */
+export const HJ_COLLECTION_HANDLES = [
+  'rings',
+  'necklaces',
+  'earrings',
+  'bracelets',
+  'charms',
+] as const
+
+export type HJCollectionHandle = (typeof HJ_COLLECTION_HANDLES)[number]
 
 export interface HJProduct {
   id: string

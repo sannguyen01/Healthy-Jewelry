@@ -28,12 +28,35 @@ silently defaults to `ring-arc` — the wrong illustration renders with no error
 A `console.warn` fires server-side (`[shopify] product missing svg: tag`), but nothing
 surfaces to Shopify Admin. Tag every product explicitly; don't rely on the fallback.
 
-## Collection tag
+## Collection
 
 Every product needs a Shopify collection matching one of the five `HJCollectionHandle`
 values: `rings`, `necklaces`, `earrings`, `bracelets`, `charms`. A product in none of
-these defaults to `rings` with a `console.warn` — same silent-failure shape as the SVG
-tag.
+these defaults to `rings` with a `console.warn` naming the collections it could not use —
+same silent-failure shape as the SVG tag.
+
+**A product may sit in more than one collection, and order does not matter.**
+`parseCollection` takes the first handle that is genuinely one of the five and ignores
+everything else, so `frontpage` + `rings` resolves to `rings`.
+
+> This paragraph described the intended behaviour for months before the code did it.
+> `mapShopifyProduct` used to take Shopify's **first** collection and cast it —
+> `edges[0].node.handle as HJCollectionHandle` — with no check that the value was one of
+> the five. `arc-band-titanium` is in Shopify's built-in `frontpage` collection as well as
+> `rings`, and Shopify returns `frontpage` first, so its `product.collection` became
+> `'frontpage'`: a breadcrumb reading `frontpage`, linked to `/shop/frontpage`, which
+> `dynamicParams = false` answers with a **hard 404** — on the site's only `bestseller`.
+> The `warn` fired only when a product had *zero* collections, which never happens.
+
+**Do not put a product only in `frontpage`.** Shopify's built-ins are skipped deliberately
+(nobody chose to put the product there), so a product with no other collection falls back
+to `rings` regardless of what it is.
+
+### `collection:` tags do nothing
+
+Five products carry a `collection:spectrum` tag. Nothing reads it — collections come from
+Shopify's real collection membership, not from tags. It is harmless, but it is also not
+doing what its name suggests. Either create a real collection or drop the tag.
 
 ## Material tag
 

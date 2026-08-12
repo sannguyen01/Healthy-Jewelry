@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseMaterial, parseSvgType, isHJSvgType } from '@/lib/shopify/tags'
+import {
+  parseMaterial,
+  parseSvgType,
+  isHJSvgType,
+  parseCollection,
+  isHJCollectionHandle,
+} from '@/lib/shopify/tags'
 import type { HJCollectionHandle } from '@/lib/shopify/types'
 
 /**
@@ -24,13 +30,17 @@ import type { HJCollectionHandle } from '@/lib/shopify/types'
 /** Verbatim from the connected store: handle, tags, collection. */
 const LIVE_CATALOG: {
   handle: string
+  /** The raw `collections` array Shopify returns, in Shopify's order. */
+  collections: string[]
   tags: string[]
+  /** What `parseCollection` must resolve `collections` to. */
   collection: HJCollectionHandle
   expectedMaterial: string
   expectedSvg: string
 }[] = [
   {
     handle: 'arc-band-titanium',
+    collections: ['frontpage', 'rings'],
     tags: ['bestseller', 'material:titanium', 'svg:ring-arc'],
     collection: 'rings',
     expectedMaterial: 'titanium',
@@ -38,6 +48,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'orbit-pendant-necklace',
+    collections: ['necklaces'],
     tags: ['material:niobium', 'svg:necklace-disc'],
     collection: 'necklaces',
     expectedMaterial: 'niobium',
@@ -45,6 +56,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'halo-stud-earrings',
+    collections: ['earrings'],
     tags: ['material:steel', 'svg:earring-stud'],
     collection: 'earrings',
     expectedMaterial: 'surgical-steel',
@@ -52,6 +64,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'halo-band-titanium',
+    collections: ['rings'],
     tags: ['material:titanium', 'svg:ring-halo'],
     collection: 'rings',
     expectedMaterial: 'titanium',
@@ -59,6 +72,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'facet-ring-niobium',
+    collections: ['rings'],
     tags: ['material:niobium', 'svg:ring-facet'],
     collection: 'rings',
     expectedMaterial: 'niobium',
@@ -66,6 +80,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'threader-earrings-steel',
+    collections: ['earrings'],
     tags: ['material:steel', 'svg:earring-threader'],
     collection: 'earrings',
     expectedMaterial: 'surgical-steel',
@@ -73,6 +88,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'chain-bracelet-titanium',
+    collections: ['bracelets'],
     tags: ['material:titanium', 'svg:bracelet-chain'],
     collection: 'bracelets',
     expectedMaterial: 'titanium',
@@ -80,6 +96,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'bead-bracelet-niobium',
+    collections: ['bracelets'],
     tags: ['material:niobium', 'svg:bracelet-bead'],
     collection: 'bracelets',
     expectedMaterial: 'niobium',
@@ -87,6 +104,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'anchor-charm-niobium',
+    collections: ['charms'],
     tags: ['material:niobium', 'svg:charm-anchor'],
     collection: 'charms',
     expectedMaterial: 'niobium',
@@ -94,6 +112,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'star-charm-titanium',
+    collections: ['charms'],
     tags: ['material:titanium', 'svg:charm-star'],
     collection: 'charms',
     expectedMaterial: 'titanium',
@@ -101,6 +120,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'disc-charm-steel',
+    collections: ['charms'],
     tags: ['material:steel', 'svg:charm-disc'],
     collection: 'charms',
     expectedMaterial: 'surgical-steel',
@@ -108,6 +128,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'heart-charm-titanium',
+    collections: ['charms'],
     tags: ['material:titanium', 'svg:charm-heart'],
     collection: 'charms',
     expectedMaterial: 'titanium',
@@ -115,6 +136,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'meridian-cuff',
+    collections: ['bracelets'],
     tags: ['collection:spectrum', 'material:titanium', 'new', 'svg:bracelet-cuff'],
     collection: 'bracelets',
     expectedMaterial: 'titanium',
@@ -122,6 +144,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'tectonic-ring',
+    collections: ['rings'],
     tags: ['collection:spectrum', 'material:niobium', 'new', 'svg:ring-facet'],
     collection: 'rings',
     expectedMaterial: 'niobium',
@@ -129,6 +152,7 @@ const LIVE_CATALOG: {
   },
   {
     handle: 'terra-bangle',
+    collections: ['bracelets'],
     tags: ['collection:spectrum', 'material:steel', 'new', 'svg:bracelet-cuff'],
     collection: 'bracelets',
     expectedMaterial: 'surgical-steel',
@@ -168,6 +192,54 @@ describe('the live catalog maps correctly', () => {
   it('covers all three materials — a fixture set of one metal proves nothing', () => {
     const materials = new Set(LIVE_CATALOG.map(({ tags }) => parseMaterial(tags).material))
     expect([...materials].sort()).toEqual(['niobium', 'surgical-steel', 'titanium'])
+  })
+
+  /**
+   * ## The `collection` field above used to be the answer, not the question.
+   *
+   * Every other field in this fixture is raw Shopify output run through the parser.
+   * `collection` was written as `'rings'` — hand-resolved by whoever captured the data,
+   * from a product whose real `collections` array is `['frontpage', 'rings']`. So the
+   * fixture recorded what the mapper *should* produce while the mapper produced
+   * `'frontpage'`, and nothing compared the two.
+   *
+   * Same failure as `material:steel`, one field over: the fixture agreed with the
+   * intent instead of exercising the code path. `collections` is now the input and
+   * `collection` the assertion, which is the only arrangement that could have caught it.
+   */
+  it.each(LIVE_CATALOG)('$handle resolves its collection', ({ collections, collection }) => {
+    const result = parseCollection(collections)
+    expect(result.matched).toBe(true)
+    expect(result.collection).toBe(collection)
+  })
+
+  it('no live product maps into a collection the router will not serve', () => {
+    // `/shop/[collection]` sets `dynamicParams = false`, so a handle outside the
+    // served set is a hard 404 — reached from the breadcrumb the product page
+    // renders, and published as structured data by breadcrumbJsonLd.
+    const unserved = LIVE_CATALOG.filter(
+      ({ collections }) => !isHJCollectionHandle(parseCollection(collections).collection)
+    )
+    expect(unserved.map((p) => p.handle)).toEqual([])
+  })
+
+  it('at least one fixture product is in a Shopify built-in — otherwise this proves nothing', () => {
+    // The discriminator has to keep discriminating. If the store ever stops putting
+    // a product in `frontpage`, this suite would go on passing while testing a case
+    // that no longer exists — the `production-smoke-handles` lesson.
+    const withBuiltin = LIVE_CATALOG.filter(({ collections }) => collections.includes('frontpage'))
+    expect(withBuiltin.map((p) => p.handle)).toEqual(['arc-band-titanium'])
+  })
+
+  /**
+   * `arc-band-titanium` is the only product tagged `bestseller`, so it is the homepage
+   * BESTSELLING strip — the most-linked product on the site, and the one the old cast
+   * broke. Pinned so the coincidence is visible if the tagging changes.
+   */
+  it('the affected product is the one the homepage links to most', () => {
+    const bestsellers = LIVE_CATALOG.filter(({ tags }) => tags.includes('bestseller'))
+    expect(bestsellers.map((p) => p.handle)).toEqual(['arc-band-titanium'])
+    expect(parseCollection(['frontpage', 'rings']).collection).toBe('rings')
   })
 })
 
