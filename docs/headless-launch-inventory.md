@@ -93,7 +93,7 @@ Gmail address; a customer replying to their order confirmation replies to it.
 | **Deployment identity** | **Added this round** | `/api/version`, a `<meta name="hj-build">` stamp, and `pnpm diagnose:deployment` |
 | **Product imagery pipeline** | **Added this round** | Photos appear the moment they are uploaded — no code change |
 | **Analytics** | **Added this round** | Consent-gated, first-party, seven typed events ([analytics.md](analytics.md)) |
-| **Customer accounts** | **Missing** | No `/account`. Shopify's Customer Account API. Not required to sell. |
+| **Customer accounts** | **Added this round, unconfigured** | `/account` exists and explains itself. Set the three `SHOPIFY_CUSTOMER_ACCOUNT_*` vars to switch it on — see `.env.local.example`. Not required to sell. |
 | Contact form | **Present** | Resend, with a mailto fallback |
 | Legal pages | **Present** | `/privacy`, `/terms`, `/legal`, `/shipping`, `/faq` |
 
@@ -153,9 +153,16 @@ that is a Hydrogen sales-channel concept this store does not use, and Shopify's 
 Privacy API — which would leave two consent mechanisms that can disagree. See
 [analytics.md](analytics.md).
 
-**Customer accounts.** With `ordersCount: 0` this ships as an empty state, and its empty
-state is the only thing testable until a real order exists. Not required to sell, and a
-reason to build it *before* launch rather than after.
+**Customer accounts — built, not switched on.** `/account`, the OAuth flow, an encrypted
+session cookie and order history all exist. They stay dormant until three env vars are
+set, because the client ID and secret come from **Shopify Admin → Headless → Customer
+Account API settings**, and the callback URL has to be registered there (which is what
+stops the redirect being open). Choose the **Confidential** client type: this app has a
+server-side session, so the refresh token never reaches a browser.
+
+With `ordersCount: 0` it would ship as an empty state anyway, and that empty state is the
+only branch testable until a real order exists — a reason to have it in place *before*
+launch rather than after.
 
 **Checkout branding.** A checkout profile is published but carries Shopify defaults. It
 is the one page in the purchase journey this repository does not control, and the
