@@ -200,6 +200,90 @@ jobs:
               })
             }
 
+      # Premise drift is reported separately from failure, and never as failure.
+      #
+      # A drifted premise means a recorded decision has gone stale — a Vietnamese locale
+      # appearing, a collection added in Shopify — not that the storefront is broken. Some
+      # of it is opportunity. Turning the run red for opportunity is how the 24-minute E2E
+      # suite became noise nobody read, so this gets its own label and its own issue.
+      #
+      # `if: always()` because drift is worth knowing about even on a run that failed for
+      # unrelated reasons, and `continue-on-error` so a notification problem can never
+      # manufacture or mask a smoke result.
+      - name: Report premise drift
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const label = 'premise-drift'
+            let drifted = []
+            try {
+              drifted = JSON.parse(fs.readFileSync('premise-drift.json', 'utf-8'))
+            } catch {
+              // No file means premises could not be evaluated — the run's own failure
+              // reporting covers that; do not invent a drift issue from its absence.
+              return
+            }
+
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            if (drifted.length === 0) {
+              for (const issue of open) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `All premises hold again.\n\nRun: ${runUrl}`,
+                })
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                })
+              }
+              return
+            }
+
+            const body = [
+              'A premise behind a recorded decision no longer holds.',
+              '',
+              '**This is not an outage.** These are decisions worth revisiting, or',
+              'assumptions that have expired — see `docs/adr/008-decisions-need-premise-detectors.md`.',
+              '',
+              ...drifted.map((d) => `- **${d.id}** (${d.kind}) — ${d.detail}\n  _Decision: ${d.decision}_`),
+              '',
+              `Run: ${runUrl}`,
+            ].join('\n')
+
+            if (open.length > 0) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open[0].number,
+                body,
+              })
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'Premise drift: a recorded decision has gone stale',
+                body,
+                labels: [label],
+              })
+            }
+
       # Closing on recovery is what keeps the issue meaningful. An alert that
       # only ever opens becomes a list nobody reads.
       - name: Close the failure issue on recovery
