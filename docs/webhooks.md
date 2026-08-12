@@ -59,8 +59,9 @@ branch revalidated a bare `'collections'` string that **no fetch anywhere regist
 collection pages never invalidated and sat stale for the full 3600s — while the tag they
 *did* register (`collection:<handle>`) was never revalidated by anything. The test that
 should have caught it asserted `revalidateTag` was called with `'collections'`: the same
-wrong string the route used. `src/tests/unit/cache-tag-contract.test.ts` now compares the
-two files against each other, in both directions.
+wrong string the route used. `src/tests/unit/cache-tag-contract.test.ts` now walks **every
+module** under `src/app` and `src/lib`, in both directions — it originally compared two
+files by name, and therefore missed the same orphan surviving in `/api/revalidate` below.
 
 `collections/*` deliberately does **not** sweep `PRODUCTS_TAG` — that is every product
 cache in the store, and a collection changing does not invalidate the products themselves.
@@ -71,6 +72,35 @@ The status code is the point. A `200` would claim work that never happened, lyin
 Shopify's delivery log; a non-2xx would make Shopify retry a topic that will never be
 handled. `202` says *received and authenticated, deliberately not acted on* — which is
 the truth.
+
+## The manual counterpart: `POST /api/revalidate`
+
+Purges the cache without waiting for a Shopify event or the 3600s window. Useful when the
+static fallback data changes, or when a Shopify change did not produce a webhook.
+
+```bash
+curl -X POST https://healthyjewellery.com/api/revalidate \
+  -H "x-revalidate-secret: $SHOPIFY_REVALIDATION_SECRET"
+```
+
+| Response | Meaning |
+|---|---|
+| `200 {revalidated:true}` | Every product and collection tag invalidated |
+| `401` | Wrong or missing secret |
+| `503` | `SHOPIFY_REVALIDATION_SECRET` is unset in that deployment |
+
+The secret is **header-only** — never a query parameter, because query strings land in
+access logs and `Referer` headers — and compared with `timingSafeEqual` behind a length
+guard, since that function throws on mismatched lengths rather than returning false.
+
+> **This route was undocumented until 2026-08-12, and it showed.** Nothing called it, it had
+> no tests, and it still contained `revalidateTag('collections')` — a tag no fetch anywhere
+> registers, so the call did nothing — months after that orphan was removed from the webhook
+> route above. `cache-tag-contract.test.ts` read two files by name and this was not one of
+> them. It now uses the shared builders in `src/lib/shopify/cacheTags.ts`, derives its
+> collection paths from `hjCollections` rather than hardcoding five, and has its own test
+> file. See [ADR 007](adr/007-regex-guardrails-have-unknown-coverage.md) for the general
+> pattern.
 
 ## Order events
 

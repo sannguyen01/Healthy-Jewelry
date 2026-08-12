@@ -48,6 +48,35 @@ Each converted guardrail keeps one test that feeds the **old regex** its evading
 shows it missed — so the reason for the parser survives the next person who finds it
 verbose.
 
+## The pattern this belongs to
+
+A second instance appeared immediately after this ADR was written, and it was not about
+regex at all.
+
+`cache-tag-contract.test.ts` read **two files by name**. It therefore never saw
+`src/app/api/revalidate/route.ts`, a third revalidation surface still calling
+`revalidateTag('collections')` — the exact orphan the contract existed to eliminate,
+surviving the fix that removed it everywhere the test happened to look.
+
+The parser was not the issue there; the **scope** was:
+
+> **A guardrail scoped narrower than its invariant reports success about the part it
+> examined, in the voice of the whole.**
+
+Both failures are that sentence. The metadata guardrail walked only `src/app` and missed a
+catalogue read in `src/components`. The tag contract named two participants and missed the
+third. Neither was wrong about what it checked; both were read as checking more.
+
+The operational rule: **scan everything and exempt explicitly.** An exemption list states a
+reason and shows up in review. A narrow scan states nothing and looks identical to full
+coverage.
+
+Widening has a cost worth expecting — it changes what a query means. Broadening the tag
+scan to every module immediately matched the product `tags` field in `hj-data.ts`,
+reporting `rings` and `titanium` as cache tags. The fix was to identify a Next cache-options
+object *structurally* (by its `revalidate` sibling) rather than by hoping a property name is
+unique, which is the same move as parsing instead of matching.
+
 ## Consequences
 
 - Coverage is now enumerable: the node types handled are listed in one file.

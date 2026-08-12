@@ -1,7 +1,7 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-08-10
+Last refreshed by hand: 2026-08-12
 
 ## Live verification — 2026-08-08
 
@@ -32,6 +32,33 @@ sandboxed sessions have **no public-web egress** (Shopify Admin API works;
 `healthyjewellery.com` is blocked by the proxy), which is why live checks belong
 in CI runners; and `storefrontAccessTokenCreate` is **refused by the MCP safety
 policy**, so the existing Vercel token must be copied rather than a second minted.
+
+## Open items at a glance
+
+**Every one of these is blocked on account access, not on engineering.** There is no
+outstanding code work — eight items, all needing a credential, a console, or a phone.
+Detail for each is in the sections below; this table is an index, deliberately not a second
+copy.
+
+| # | Item | Blocked on | Next action |
+|---|---|---|---|
+| 1 | [`VERCEL-TOKEN-ORPHAN`](#high-priority-loop-is-acting-or-waiting-on-human) | Vercel + GitHub settings | **Revoke the token**, delete the repo secret. Highest value: it reaches every other secret |
+| 2 | `SHOPIFY-PAYMENTS` | Shopify Admin | Confirm an active provider — head of the commerce chain, blocks 3 |
+| 3 | `SHOPIFY-WEBHOOK-SECRET` | Shopify Admin | `pnpm verify:webhook <url>`, then set whichever of the two secrets it names |
+| 4 | `PRODUCTION-SMOKE-SECRETS` | GitHub settings | Put 5 secrets **on** the `production-readonly` environment + `SMOKE_SECRETS_SOURCE=environment` |
+| 5 | `UPSTASH-REDIS` | Vercel | Two vars, Production **and** Preview; confirm with `curl /api/health` |
+| 6 | `VERCEL-ENV` | Vercel | Remaining env vars |
+| 7 | `VISUAL-QA-LIVE` | A real phone | Mobile checkout hand-off by hand |
+| 8 | `SHOPIFY-SPEC-METAFIELD` | Shopify Admin | Enter real measurements — content, not code; must not be invented |
+
+Two standing caveats that are not items because nothing can close them from here:
+
+- **`production-smoke` has never executed.** Everything built to verify production is
+  itself unverified against production until items 2–4 land and PR #17 merges — scheduled
+  and `workflow_dispatch` triggers only fire from the default branch.
+- **The credential inventory is inferred from git history**, not read from settings. The
+  agent proxy blocks `/actions/secrets`, so `docs/credential-inventory.md` is a checklist
+  to run against the UI, never a statement of what is configured.
 
 ## High Priority (loop is acting or waiting on human)
 

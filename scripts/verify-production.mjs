@@ -528,6 +528,37 @@ async function unknownUrlsAreNotIndexable() {
   return 'unknown product noindexed, unknown collection 404s, real product indexable'
 }
 
+/**
+ * The manual revalidation endpoint is public and authenticated. Until 2026-08-12 nothing
+ * called it, nothing tested it and no doc mentioned it, while its secret sat deployed —
+ * an endpoint with no owner is exactly the shape that rots unnoticed.
+ *
+ * Checked without the secret on purpose: this asserts the door is locked, and needs no
+ * credential to do so.
+ */
+async function revalidateEndpointRejectsAnonymous() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const res = await fetch(new URL('/api/revalidate', siteUrl), { method: 'POST' })
+
+  if (res.status === 200) {
+    throw new Error(
+      'POST /api/revalidate returned 200 with NO secret. Anyone can purge the cache,\n' +
+        '  which is a free way to force full regeneration of every page on demand.',
+    )
+  }
+  if (res.status === 503) {
+    throw new Error(
+      'POST /api/revalidate returned 503 — SHOPIFY_REVALIDATION_SECRET is unset in this\n' +
+        '  deployment, so manual cache purges are unavailable.',
+    )
+  }
+  if (res.status !== 401) {
+    throw new Error(`POST /api/revalidate returned ${res.status}, expected 401.`)
+  }
+
+  return 'rejects unauthenticated requests with 401'
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -545,6 +576,7 @@ async function main() {
   await check('Rate limiting is distributed, not per-instance', rateLimitingIsDistributed)
   await check('A signed webhook actually revalidates the cached page', webhookRevalidatesTheCachedPage)
   await check('Unknown URLs cannot be indexed', unknownUrlsAreNotIndexable)
+  await check('Manual revalidation endpoint is locked', revalidateEndpointRejectsAnonymous)
 
   const failed = results.filter((r) => !r.ok)
   console.log('─'.repeat(70))
