@@ -147,6 +147,44 @@ export function callsTo(sourceFile: ts.SourceFile, functionName: string): string
   return calls
 }
 
+/**
+ * Every environment variable read by name.
+ *
+ * Recognises `process.env.NAME` and `process.env['NAME']`, and deliberately **not**
+ * `process.env[someVariable]` — a computed key has no statically knowable name, and
+ * inventing one would be a guess reported as a fact. `/api/version/route.ts` reads
+ * exactly that way on purpose (to dodge Next's build-time inliner), and it is right
+ * that this returns nothing for it.
+ *
+ * The regex version of this scan read `process.env.NEXT_PUBLIC_FOO` out of a *code
+ * comment explaining the inliner* and reported it as an undocumented variable. That is
+ * the same false positive ADR 007 was written about, in a third guardrail the ADR did
+ * not convert — comments are never nodes, so through the parser it cannot happen.
+ */
+export function envReads(sourceFile: ts.SourceFile): string[] {
+  const names: string[] = []
+
+  const isProcessEnv = (node: ts.Expression): boolean =>
+    ts.isPropertyAccessExpression(node) &&
+    node.name.text === 'env' &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 'process'
+
+  walk(sourceFile, (node) => {
+    if (ts.isPropertyAccessExpression(node) && isProcessEnv(node.expression)) {
+      names.push(node.name.text)
+    } else if (
+      ts.isElementAccessExpression(node) &&
+      isProcessEnv(node.expression) &&
+      ts.isStringLiteral(node.argumentExpression)
+    ) {
+      names.push(node.argumentExpression.text)
+    }
+  })
+
+  return names
+}
+
 function propertyKey(node: ts.PropertyAssignment): string | null {
   return ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : null
 }
