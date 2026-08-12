@@ -93,6 +93,50 @@ test.describe('Analytics consent', () => {
     await expect(page.getByRole('dialog', { name: /analytics consent/i })).toHaveCount(0)
   })
 
+  /**
+   * **The banner must not sit on top of anything a customer came to click.**
+   *
+   * This started as a Checkout-button-only check, and `hero-legibility.spec.ts`
+   * promptly caught the banner covering both hero CTAs at 1024px — reporting
+   * 1.00:1 contrast, because the pixels behind "Shop Collection" *were* the
+   * banner. Guarding one button and not the others is how a class of bug survives
+   * being fixed, so this asserts the property across the widths the hero is known
+   * to change shape at.
+   */
+  for (const width of [1440, 1024, 900, 390]) {
+    test(`the banner clears the hero CTAs at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/')
+
+      const banner = page.getByRole('dialog', { name: /analytics consent/i })
+      await expect(banner).toBeVisible()
+      const bannerBox = await banner.boundingBox()
+      expect(bannerBox).not.toBeNull()
+
+      const ctas = page.locator('main a').filter({ hasText: /shop collection|our story/i })
+      const count = await ctas.count()
+      // A hero with no CTAs would make the loop vacuous — the shape of green that
+      // proves nothing.
+      expect(count).toBeGreaterThan(0)
+
+      for (let i = 0; i < count; i++) {
+        const cta = ctas.nth(i)
+        const box = await cta.boundingBox()
+        if (!box) continue
+
+        const overlaps =
+          box.x < bannerBox!.x + bannerBox!.width &&
+          box.x + box.width > bannerBox!.x &&
+          box.y < bannerBox!.y + bannerBox!.height &&
+          box.y + box.height > bannerBox!.y
+
+        expect(overlaps, `consent banner overlaps "${await cta.innerText()}" at ${width}px`).toBe(
+          false
+        )
+      }
+    })
+  }
+
   test('the banner never covers the checkout button in the bag', async ({ page }) => {
     // Both are fixed to the bottom of the viewport. A consent banner sitting over
     // Checkout would be a conversion bug caused by a compliance control.

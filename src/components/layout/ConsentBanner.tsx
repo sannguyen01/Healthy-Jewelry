@@ -49,20 +49,37 @@ export function ConsentBanner() {
       role="dialog"
       aria-label="Analytics consent"
       style={{
+        /*
+          Anchored bottom-**right**, and narrow.
+
+          It was a centred 620px bar, and `hero-legibility.spec.ts` caught it
+          sitting directly on top of both hero CTAs at 1024px — reporting 1.00:1
+          contrast, because the pixels behind "Shop Collection" were the banner's
+          own `--bg`. A consent notice covering the two primary calls to action on
+          the landing page is a conversion bug caused by a compliance control, and
+          it is the exact failure `analytics.spec.ts` already guards for the
+          Checkout button. Guarding one and not the other is how a class of bug
+          survives being fixed.
+
+          Right-hand side because the hero is a split at ≥901px: copy and CTAs
+          left, photograph right. Overlapping part of a photograph is a cost worth
+          paying; overlapping the buttons is not.
+        */
         position: 'fixed',
-        left: 'var(--space-gutter, clamp(20px,4vw,64px))',
         right: 'var(--space-gutter, clamp(20px,4vw,64px))',
+        // `left` only below the split, where the hero stacks and full width reads
+        // better than a floating card.
+        left: 'auto',
         bottom: 'clamp(16px, 3vw, 32px)',
         zIndex: 94,
-        maxWidth: '620px',
-        marginInline: 'auto',
+        width: 'min(380px, calc(100vw - 2 * var(--space-gutter, 24px)))',
         backgroundColor: 'var(--bg)',
         border: '1px solid var(--ash)',
         padding: 'clamp(18px, 3vw, 24px)',
         display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        gap: '16px',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: '14px',
         boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
         animation: 'hjSlideUp 0.5s var(--ease) both',
       }}
@@ -75,7 +92,6 @@ export function ConsentBanner() {
           lineHeight: 1.65,
           color: 'var(--ink)',
           margin: 0,
-          flex: '1 1 260px',
         }}
       >
         We count anonymous page views and add-to-bag events to understand what people
