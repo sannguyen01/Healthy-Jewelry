@@ -2,15 +2,31 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { hjCollections, getProductsByCollection } from '@/lib/data/hj-data'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
+import type { HJSvgType } from '@/lib/shopify/types'
 
 const COLLECTION_PHOTOS: Partial<Record<string, string>> = {
   charms: '/images/collections/charms.jpg',
   earrings: '/images/collections/earrings.jpg',
 }
 
-export function CollectionGrid() {
+/**
+ * One tile, resolved by the server before this component renders.
+ *
+ * `svgType` used to be read here via `getProductsByCollection` from the
+ * *static* catalogue — a catalogue lookup in a `'use client'` component, which
+ * can never see a Shopify product, so tiles were illustrated by whatever the
+ * bundled fixture happened to contain. A client component cannot await
+ * Shopify, so the resolved value arrives as a prop instead.
+ */
+export interface CollectionTile {
+  handle: string
+  title: string
+  /** Illustration for collections with no photograph yet. Null renders no mark. */
+  svgType: HJSvgType | null
+}
+
+export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
   return (
     <section
       style={{
@@ -32,8 +48,8 @@ export function CollectionGrid() {
 
       {/* 4-column horizontal bar */}
       <div className="hj-coll-grid" style={{ gap: '2px' }}>
-        {hjCollections.map((collection) => {
-          const firstProduct = getProductsByCollection(collection.handle)[0]
+        {tiles.map((collection) => {
+          const svgType = collection.svgType
           return (
             <Link
               key={collection.handle}
@@ -64,7 +80,7 @@ export function CollectionGrid() {
                   style={{ objectFit: 'cover' }}
                 />
               ) : (
-                firstProduct && (
+                svgType && (
                   <div
                     aria-hidden="true"
                     style={{
@@ -78,7 +94,7 @@ export function CollectionGrid() {
                     }}
                   >
                     <JewelrySVG
-                      type={firstProduct.svgType}
+                      type={svgType}
                       className="w-2/3 h-2/3"
                       style={{ opacity: 0.45 }}
                     />

@@ -1,7 +1,79 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-08-01
+Last refreshed by hand: 2026-08-12
+
+## Live verification — 2026-08-08
+
+First session with live Shopify Admin API access. Everything below was **checked
+against the store**, not inferred from the diff:
+
+| Claim | Result |
+|---|---|
+| Store identity | ✅ `y0k9ve-q1.myshopify.com`, VND, Basic, Vietnam |
+| Money format | ✅ `{{amount_no_decimals_with_comma_separator}}₫` → `1.450.000₫` |
+| Headless publish fix held | ✅ 22/22 on `Publication/193327071310` |
+| Inventory fix held | ✅ all `tracksInventory: false`, all `ACTIVE` |
+| Collections | ✅ 5 real (5+4+4+5+4 = 22) + `frontpage`, all published |
+| App-owned webhooks | 0 — consistent with Admin-UI webhooks, **not** evidence of absence |
+| **Orders placed, ever** | **0** (`ordersCount: 0`) |
+
+**The remaining work is a chain, not a checklist:**
+
+```
+payment provider ──> an order can exist ──> a webhook can fire ──> the secret can be tested
+```
+
+Doing these out of order spends the first real transaction discovering something
+the earlier steps would have reported for free. See `docs/go-live-runbook.md`.
+
+Two constraints found this session, worth recording so they are not rediscovered:
+sandboxed sessions have **no public-web egress** (Shopify Admin API works;
+`healthyjewellery.com` is blocked by the proxy), which is why live checks belong
+in CI runners; and `storefrontAccessTokenCreate` is **refused by the MCP safety
+policy**, so the existing Vercel token must be copied rather than a second minted.
+
+## Open items at a glance
+
+**Every one of these is blocked on account access, not on engineering.** There is no
+outstanding code work — eight items, all needing a credential, a console, or a phone.
+Detail for each is in the sections below; this table is an index, deliberately not a second
+copy.
+
+| # | Item | Blocked on | Next action |
+|---|---|---|---|
+| 1 | [`VERCEL-TOKEN-ORPHAN`](#high-priority-loop-is-acting-or-waiting-on-human) | Vercel + GitHub settings | **Revoke the token**, delete the repo secret. Highest value: it reaches every other secret |
+| 2 | `SHOPIFY-PAYMENTS` | Shopify Admin | Confirm an active provider — head of the commerce chain, blocks 3 |
+| 3 | `SHOPIFY-WEBHOOK-SECRET` | Shopify Admin | `pnpm verify:webhook <url>`, then set whichever of the two secrets it names |
+| 4 | `PRODUCTION-SMOKE-SECRETS` | GitHub settings | Put 5 secrets **on** the `production-readonly` environment + `SMOKE_SECRETS_SOURCE=environment` |
+| 5 | `UPSTASH-REDIS` | Vercel | Two vars, Production **and** Preview; confirm with `curl /api/health` |
+| 6 | `VERCEL-ENV` | Vercel | Remaining env vars |
+| 7 | `VISUAL-QA-LIVE` | A real phone | Mobile checkout hand-off by hand |
+| 8 | `SHOPIFY-SPEC-METAFIELD` | Shopify Admin | Enter real measurements — content, not code; must not be invented |
+
+**Three of these now watch themselves.** As of 2026-08-12 the production-smoke run evaluates
+the premises these items rest on (`scripts/lib/premise-checks.mjs`), so drift opens a
+`premise-drift` issue instead of waiting to be noticed:
+
+| Item | What is watched | On drift |
+|---|---|---|
+| 2 `SHOPIFY-PAYMENTS` | `ordersCount`; once ≥ 1, `paymentGatewayNames` directly | Reminder **upgrades to a real assertion** the moment the first order exists |
+| 8 `SHOPIFY-SPEC-METAFIELD` | Products with `custom.spec` set | Says the line is rendering and the item can close |
+| — `COLLECTION-SET-DRIFT` | Shopify's collections ⊆ `hjCollections` | **Blocking** — those URLs hard-404 today (Watch List below) |
+| — [ADR 005](docs/adr/005-english-only-storefront.md) | `shopLocales` is `en`-only | Opportunity — the prerequisite for revisiting has been met |
+
+Items 1, 4, 5, 6 are settings-console state the API here cannot read; item 7 needs a human
+with a phone. Those are human-only by nature, not by omission — see
+[ADR 008](docs/adr/008-decisions-need-premise-detectors.md).
+
+Two standing caveats that are not items because nothing can close them from here:
+
+- **`production-smoke` has never executed.** Everything built to verify production is
+  itself unverified against production until items 2–4 land and PR #17 merges — scheduled
+  and `workflow_dispatch` triggers only fire from the default branch.
+- **The credential inventory is inferred from git history**, not read from settings. The
+  agent proxy blocks `/actions/secrets`, so `docs/credential-inventory.md` is a checklist
+  to run against the UI, never a statement of what is configured.
 
 ## High Priority (loop is acting or waiting on human)
 
@@ -18,21 +90,99 @@ Last refreshed by hand: 2026-08-01
   the only Shopify-owned record is the `checkout` CNAME to
   `shops.myshopify.com`, which is the expected shape for this headless
   architecture, not a conflict.
-- [ ] SHOPIFY-WEBHOOK-SECRET — the user reports the webhooks are registered.
-  **This cannot be confirmed by API and their absence is not evidence:** the
-  Admin `webhookSubscriptions` query returns only webhooks *owned by the
-  querying app*, so webhooks created in Settings → Notifications are invisible
-  to it. What matters instead is which of **two different secrets** is set as
-  `SHOPIFY_WEBHOOK_SECRET`: an app-created webhook signs with the app client
-  secret; an Admin-UI webhook signs with the signing secret shown on the
-  Notifications page. The wrong one 401s every delivery, silently and forever.
-  Since the Admin API shows no app-owned subscriptions, these are almost
-  certainly Admin-UI webhooks and need that page's secret.
-  Verify by placing one order and checking Vercel function logs for
-  `[webhooks/shopify] order event`. On a mismatch the route now logs the trap
-  by name (2026-08-07).
+- [ ] SHOPIFY-PAYMENTS — **the head of the chain, and therefore the real
+  blocker.** `shop.paymentSettings.supportedDigitalWallets` is empty on
+  `y0k9ve-q1.myshopify.com`. That alone means only that no wallets are enabled,
+  which is independent of whether a card or manual provider is — so it is not
+  evidence either way. Confirm an actual provider is active in Settings →
+  Payments **before** the first real order: a store with none accepts a checkout
+  and then cannot take money, so the order is never created, so the webhook never
+  fires, so SHOPIFY-WEBHOOK-SECRET below cannot be tested at all.
+  Shopify Payments does not serve Vietnam — expect a manual method or a
+  third-party gateway; do not assume it is configured.
+  **Not machine-verifiable, confirmed against the live schema 2026-08-08**:
+  Admin GraphQL's `PaymentSettings` exposes *only* `supportedDigitalWallets`
+  (`acceptedCardBrands` / `shopifyPaymentsAccountId` are rejected as
+  non-existent), and the alternative — `paymentGatewayNames` on an order —
+  needs an order to exist, which is the thing this unblocks.
+  **2026-08-12 — the human-only window now has an end.** `paymentsPremise` in
+  `scripts/lib/premise-checks.mjs` reads `ordersCount` on every smoke run. While it is 0
+  the check reports the premise as still accurate; the moment one order exists
+  `paymentGatewayNames` becomes readable and the check starts asserting the gateway by
+  name — and reports drift if orders exist naming *no* gateway, which is money not being
+  taken. Human once, then automatic. No invented deadline, which is what a
+  `TODO(2026-Q3)` here would have been.
+  Loop action: report only, never propose enabling a payment provider yourself
+  Human decision: pending
+- [ ] SHOPIFY-WEBHOOK-SECRET — **no longer requires an order to test.** Which of
+  **two different secrets** is set as `SHOPIFY_WEBHOOK_SECRET` decides everything:
+  an app-created webhook signs with the app client secret; an Admin-UI webhook
+  signs with the signing secret shown on the Notifications page. The wrong one
+  401s every delivery, silently and forever.
+  As of 2026-08-08 this is answerable for free and repeatably:
+  `SHOPIFY_WEBHOOK_SECRET=... pnpm verify:webhook https://healthyjewellery.com`
+  signs a synthetic `products/update` payload and reads the route's own contract
+  back (200 correct · 202 correct-but-unhandled · 401 wrong secret · 503 unset).
+  The old instruction — place an order and watch Vercel logs — was one-shot, cost
+  money, and produced an ephemeral signal.
+  **The Admin API still cannot tell you whether webhooks exist**: the
+  `webhookSubscriptions` query returns only webhooks *owned by the querying app*,
+  so Settings → Notifications webhooks are invisible to it and an empty result is
+  not evidence of absence. Zero app-owned subscriptions were confirmed again on
+  2026-08-08, which makes Admin-UI webhooks (and that page's secret) the likely
+  configuration.
   Loop action: report only
   Human decision: pending
+- [x] REPO-VISIBILITY-DOC — **resolved 2026-08-08.** `docs/testing-strategy.md` stated
+  "The repository is **private**, so Actions minutes are billed." Both halves were wrong:
+  verified via the GitHub API, `private: false`, `visibility: "public"`,
+  `allow_forking: true`. The billing half was harmless; the privacy half was not — PR #17
+  added five CI secrets, and anyone reasoning about their exposure from that sentence
+  reached the opposite of the truth. Corrected in place *with the evidence* rather than
+  silently edited. Smoke-test secrets moved to a `production-readonly` GitHub Environment;
+  schedule raised to every 6h since public-repo Actions minutes are free.
+  **Superseded 2026-08-10**: this entry originally said "you must create the Environment —
+  a job naming one that does not exist fails at dispatch." That is false. GitHub
+  auto-creates it, empty, so the environment key alone provides nothing. See
+  PRODUCTION-SMOKE-SECRETS below and `docs/adr/006-controls-must-fail-loudly.md`.
+- [ ] VERCEL-TOKEN-ORPHAN — **new 2026-08-10, highest-priority credential item.**
+  `deploy-production.yml` used `secrets.VERCEL_TOKEN`; it was reduced to that single
+  secret on 2026-06-08 (`bc53f5d`) and the workflow was **deleted** on 2026-06-29
+  (`88ef686`, "remove redundant deploy workflow"). **Deleting a workflow does not delete
+  its secrets** — so the token has most likely sat in this *public* repo's settings for
+  ~2.5 months, unrotated, and mentioned in zero documents until now.
+  Not an ordinary credential: that workflow ran `vercel pull --environment=production`,
+  which downloads **every** production env var — the Storefront token, the revalidation
+  secret, the webhook secret, and Upstash/Resend once set. It is a master key to every
+  other secret here, and it can deploy.
+  Severity stated honestly: fork PRs never receive repository secrets, and this repo has
+  exactly **one collaborator** (`sannguyen01`, admin), so there is no present attacker.
+  The risk is a non-expiring high-privilege credential nobody owns or rotates.
+  **Action: revoke in Vercel → Account Settings → Tokens, then delete the repository
+  secret.** Zero functional cost — Vercel's Git integration deploys on its own, which is
+  why the workflow was called redundant. `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` are
+  orphaned too but are identifiers, not credentials, and already public.
+  Reproduce any time: `pnpm audit:secrets`. See `docs/credential-inventory.md`.
+  Loop action: report only, never touch credentials
+  Human decision: pending
+- [x] SOFT-404 — **resolved 2026-08-11, and it was broader than recorded.**
+  `/shop/<unknown-collection>` answered 200 as well, which the original note missed.
+  **Mechanism, measured:** `notFound()` returns **200 for streamed responses** and 404 only
+  for non-streamed ones, so by the time either page discovers the param is unknown the
+  status line is already on the wire. Not a defect in our routes and not fixable inside
+  them.
+  Split by whether the param set is closed:
+  · **collections** — `dynamicParams = false`. Five fixed handles, so unknown params are
+    rejected *before rendering begins*: `/shop/not-a-collection` now returns a genuine
+    **404** (verified against a production build), `/shop/rings` still 200.
+  · **products** — set is open, so locking it would 404 any product added in Shopify until
+    the next redeploy. They emit `robots: noindex, nofollow` instead (`NOT_FOUND_SEO` in
+    `src/lib/seo/productSeo.ts`) — Google's remedy for a soft 404 that cannot be
+    status-coded, and stronger than a robots.txt disallow, which does not prevent indexing.
+  Guarded by `e2e/metadata.spec.ts` in both directions — including that a **real** product
+  is *not* noindex, since a leak there would deindex the catalogue — and by
+  `verify-production.mjs` against the live deployment.
+  Expect a lag: Google drops already-indexed junk URLs on the next crawl, not immediately.
 - [ ] UPSTASH-REDIS — `/api/shopify` is now rate-limited (2026-08-07), sharing
   `src/lib/utils/rateLimit.ts` with `/api/contact`. It is only durable across
   serverless invocations if `UPSTASH_REDIS_REST_URL` and
@@ -40,31 +190,120 @@ Last refreshed by hand: 2026-08-01
   in-memory map that counts per Lambda instance — the same single-instance
   weakness the 2026-06-30 security audit already corrected once for the contact
   route.
+  **Now checkable rather than invisible (2026-08-08)**: `GET /api/health` returns
+  `{ rateLimitDistributed, redis, healthy }` and answers **503** when degraded.
+  It does not merely report whether the env vars are set — it spends one real
+  round-trip against Redis, because a typo'd URL, a revoked token or a paused
+  database all leave the flag `true` while every limit check fails open.
+  `production-smoke` asserts it on a schedule.
+  Set both vars in Vercel **Production and Preview** — scoping them to Production
+  alone is the way this gets "fixed" and stays broken.
+  Loop action: report only, never propose setting these yourself
+  Human decision: pending
+- [ ] PRODUCTION-SMOKE-SECRETS — `.github/workflows/production-smoke.yml` exists
+  as of 2026-08-08 but cannot run until a `production-readonly` **GitHub
+  Environment** exists (Settings → Environments) carrying five secrets:
+  `PRODUCTION_SITE_URL`, `SHOPIFY_STORE_DOMAIN`,
+  `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_ADMIN_ACCESS_TOKEN`,
+  `SHOPIFY_WEBHOOK_SECRET`. Copy the Storefront token already working in Vercel
+  rather than minting a second one — `storefrontAccessTokenCreate` is refused by
+  the MCP safety policy, and a second credential is a second thing to rotate.
+  Environment-scoped, not repository-scoped: this repo is **public and forkable**
+  (see REPO-VISIBILITY-DOC), and repository secrets are readable by every workflow
+  and everyone with write access.
+  **Two corrections, 2026-08-10.** (1) An earlier note here said the workflow "fails at
+  dispatch" without the environment. **Wrong, and wrong in the dangerous direction**:
+  GitHub *auto-creates* a named environment with no protection rules and no secrets, and
+  a job with an `environment:` key still receives *repository* secrets — so skipping the
+  setup produces a **green run with zero isolation**. `scripts/preflight-secrets.mjs` now
+  asserts a `SMOKE_SECRETS_SOURCE=environment` marker so the difference is observable;
+  see `docs/adr/006-controls-must-fail-loudly.md`. (2) The workflow **cannot run at all
+  until PR #17 merges** — scheduled and `workflow_dispatch` triggers fire only from the
+  default branch, and the Actions API currently returns 404 for it. Nothing is failing;
+  nothing is scheduled.
+  On failure it now opens a `production-smoke` issue and closes it on recovery, because a
+  non-blocking scheduled job nobody watches will rot silently.
+  Loop action: report only, never propose setting these yourself
+  Human decision: pending
+- [ ] VISUAL-QA-LIVE — visual QA still needs a human with a browser. The checkout
+  redirect *is* now machine-checked (`verify-production.mjs` asserts a real
+  `cartCreate` yields a real `checkoutUrl`), but no test has opinions about
+  whether the site looks right. Sandboxed sessions have no public-web egress, so
+  this cannot move into an agent loop — only into CI or a human.
+  **Do the mobile hand-off specifically, not desktop-and-assume-parity.** Both
+  mobile-only defects this project has had — the hero crop and the invisible
+  collection tiles — passed every desktop check, which is why
+  `hero-legibility.spec.ts` samples six widths.
   Loop action: report only
   Human decision: pending
-- [ ] VISUAL-QA-LIVE — visual QA and the checkout redirect to a real Shopify URL
-  still need checking against the deployed Vercel URL from a normal browser.
-  Automated coverage now exists for the rest (see Testing baseline), but the
-  sandboxed sessions that produced it cannot reach the Vercel hosts.
-  Loop action: report only
-  Human decision: pending
-- [ ] SHOPIFY-PAYMENTS — `shop.paymentSettings.supportedDigitalWallets` is empty
-  on `y0k9ve-q1.myshopify.com`. That may only mean no wallets are enabled, but
-  confirm an actual payment provider is active in Settings → Payments before
-  the first real order: a store with none accepts a checkout and then cannot
-  take money.
-  Loop action: report only
-  Human decision: pending
-- [ ] SHOPIFY-SPEC-METAFIELD — product specs ("2 mm · 1.8 g") now read from the
-  `custom.spec` metafield, which no product has set. The detail page hides the
-  line when empty rather than rendering a blank one, so this is cosmetic, not
-  broken. Deliberately not auto-populated: specs are physical measurements and
-  inventing them would put fabricated product claims on a store.
-  Loop action: report only
-  Human decision: pending
+- [ ] SHOPIFY-SPEC-METAFIELD — **downgraded 2026-08-08: the code path now works,
+  it is simply unpopulated.** The store previously had *zero metafield
+  definitions of any kind*, and the Storefront API cannot read an undefined
+  metafield — so `custom.spec` was structurally unreadable, not merely unset, and
+  D5's read path could never have returned anything. The definition now exists
+  (`gid://shopify/MetafieldDefinition/236811976782`, `custom.spec`,
+  `single_line_text_field`, `storefront: PUBLIC_READ`, pinned).
+  Values remain deliberately unpopulated: specs are physical measurements and
+  inventing them would put fabricated product claims on a store. The detail page
+  hides the line when empty rather than rendering a blank one.
+  **2026-08-12**: `specMetafieldPremise` now counts products with `custom.spec` set on
+  every smoke run, so the day real measurements are entered the item reports itself ready
+  to close rather than staying open because nobody re-checked. The hidden-when-empty
+  rendering is exactly what makes this invisible otherwise.
+  Loop action: report only; never invent spec values
+  Human decision: pending (enter real measurements in Admin when known)
+
+## Decided against
+
+- **I18N-VIETNAMESE — decided 2026-08-08, English-only.** Raised as a conversion gap: a
+  Vietnam-based, VND-priced store with an entirely English UI. Checked live before
+  deciding — `shopLocales` returns **`en` only** (primary, published), no unpublished
+  locale exists, and the "Vietnam" market has `webPresence: null`. So the cheap path
+  commonly suggested (surface existing translations via `translatableResources`) **has
+  nothing to read**: this is creating content, not exposing it.
+  Currency formatting is separate and already correct — `formatPrice` writes `1.450.000₫`
+  the way Shopify's checkout does. Prerequisite if revisited: publish a `vi` locale and
+  translate 22 products in Shopify Admin *first*; product copy must not be fabricated, the
+  same rule that keeps `custom.spec` empty. See `docs/adr/005-english-only-storefront.md`.
 
 ## Watch List
 
+- **COLLECTION-SET-DRIFT — opened 2026-08-12, holds today.** Round 5 set
+  `dynamicParams = false` on `/shop/[collection]` so an unknown handle returns a true 404
+  instead of an empty-but-200 page. That is correct **only while Shopify's collection set is
+  a subset of `hjCollections`**. Create a sixth collection in Shopify Admin and its URL
+  hard-404s — strictly worse than the soft-404 that change was made to fix, and silent.
+  The risk was written into a code comment and given no detector, which is the exact
+  omission [ADR 008](docs/adr/008-decisions-need-premise-detectors.md) is about; it was
+  introduced by the round that fixed the soft-404 and found by scanning for the *shape* of
+  items 8–10, not by anyone reviewing that change.
+  Live as of 2026-08-08: Shopify has `rings, necklaces, earrings, bracelets, charms` plus
+  the built-in `frontpage`; `hjCollections` has the same five. **Matches.** `frontpage` is
+  exempted explicitly in `collectionSetPremise`, or the check would false-positive on day
+  one — and a new detector that cries wolf immediately loses its reader.
+  Not an open item: there is nothing to do while it holds. On drift the smoke run marks it
+  `blocking` and opens a `premise-drift` issue naming the handles that are 404ing.
+  Loop action: add the handle to `src/lib/data/hj-data.ts` and deploy, or remove the
+  collection in Shopify — never widen `dynamicParams` back, which would restore the
+  soft-404.
+- **`integrate/shopify-transactions` — resolved as absent, 2026-08-08.** Checked
+  again after a report that it risked reverting PR #16's `pendingCheckoutCartId`
+  discriminator and the secret-exposure split: the branch exists in **neither the
+  local clone nor origin** (only `main` and the two `claude/*` branches). There is
+  nothing to gate.
+  Recording the process point in case it resurfaces, because the proposed gate
+  was *weaker* than what already runs: `secret-exposure.test.ts` and
+  `checkout-journey.test.ts` are both part of `pnpm exec vitest run`, which the
+  `verify` job runs on every PR. Treating those two files as the merge gate would
+  narrow the check, not tighten it. The merge result is already gated on both,
+  plus 666 other tests.
+- **Stale entry, 2026-08-08**: the `integrate/shopify-transactions` note below
+  describes a branch and worktree that **do not exist in this clone** — only
+  `main` and the current working branch are present, and PR #14 has long since
+  merged. Either the work landed, was abandoned, or lives only on another
+  machine. Left in place rather than deleted because "a branch I cannot see" is
+  not the same as "a branch that is gone", and deleting the warning would lose
+  the conflict detail if it resurfaces. Confirm and remove.
 - **Branch coordination (2026-08-05)**: `integrate/shopify-transactions`
   (worktree `.claude/worktrees/agent-ab8803cce02d5162f`) is mid-merge with 28
   unresolved conflicts as of this note — active work, not touched here. It
@@ -149,12 +388,17 @@ Last refreshed by hand: 2026-08-01
 
 ## Testing baseline
 
-As of 2026-08-07: **643 unit tests** across 34 files, **296 E2E tests** in 11
+As of 2026-08-08: **661 unit tests** across 36 files, **296 E2E tests** in 11
 spec files (homepage, navigation, legal-pages, shop, product-detail, cart,
 contact, checkout, a11y, visual-assets, hero-legibility). E2E runs in ~3 min
 against a production build across two projects (chromium + mobile).
 
 Report a *shrinking* count as a finding; a growing one is not itself news.
+
+**Both suites run entirely against `mock.myshopify.com`.** That is deliberate —
+the merge gate must be hermetic — but it means neither number says anything about
+the real store. Production reality is a third, non-blocking tier
+(`.github/workflows/production-smoke.yml`); see `docs/testing-strategy.md`.
 
 ## Architecture / design decisions
 
@@ -210,6 +454,89 @@ duplicate those files.
   `secret-exposure.test.ts` walks the real client import graph instead, and
   asserts the graph is non-empty first so a broken resolver cannot make it
   vacuously green.
+- **2026-08-12**: Every guardrail here asserts *the code still does X*; none asserted *the
+  premise behind X still holds*. Five decisions were resting on unwatched premises at once —
+  English-only, the payments blocker, the Open Graph runtime tradeoff, the empty spec
+  metafield, and `dynamicParams = false`, which **Round 5 introduced while fixing the
+  soft-404 and nobody caught in review**. Each was recorded honestly, with evidence, and
+  none recorded when to look again. **An assumption in prose expires silently; an
+  assumption as a check expires loudly.** `scripts/lib/premise-checks.mjs` evaluates them on
+  every smoke run and reports drift as an *opportunity*, never a red build — failing on
+  opportunity is how the 24-minute E2E suite became noise nobody read. The evaluators are
+  pure so the **drifted** branch is testable, which is the `pendingCheckoutCartId` lesson:
+  the branch that never runs locally is the one that breaks. Ninth guardrail in the family,
+  and the first about decisions rather than code. See
+  `docs/adr/008-decisions-need-premise-detectors.md`.
+- **2026-08-10**: A control whose benefit depends on manual setup must fail loudly
+  without it. `environment: production-readonly` read as hardening in the YAML and two
+  docs while providing nothing: GitHub auto-creates the environment empty, and a job with
+  an `environment:` key still gets repository secrets, so the intended failure never
+  happens and a green run is read as evidence. Second time this project shipped something
+  that *looked* verified and was not — the first was a suite running entirely against
+  `mock.myshopify.com`. Same shape: the artefact meant to provide confidence was
+  structurally incapable of producing it, and looked identical either way.
+  The test for every future control: *if the setup step never happens, does anything go
+  red?* See `docs/adr/006-controls-must-fail-loudly.md`.
+- **2026-08-10**: Deleting a workflow does not delete its secrets, and nothing in GitHub
+  marks a secret unused. `pnpm audit:secrets` walks every version of every workflow in git
+  history and classifies each reference live / pending / orphan. It guards the *false
+  positive* rather than the false negative: the first grep-based pass reported a secret
+  named `X` that came from a comment documenting an anti-pattern, and a tool that reports
+  phantoms teaches its reader to skim. Eighth guardrail in the family.
+- **2026-08-08**: Cache tags are a contract with two sides and nothing joining them.
+  `getProductsByCollection` registered `collection:<handle>`; the webhook revalidated
+  `collections`, which **no fetch anywhere registered**. Both failure modes at once — an
+  orphan (revalidating a tag nothing registers) and a widow (registering a tag nothing
+  revalidates) — so collection pages never invalidated and sat stale for the full 3600s.
+  The existing test asserted `revalidateTag` was called with `'collections'`: the same
+  wrong string the route used, which is why it passed throughout. A test that restates the
+  implementation cannot see the implementation is wrong.
+  `src/lib/shopify/cacheTags.ts` makes the drift inexpressible and
+  `cache-tag-contract.test.ts` compares the two files against each other in both
+  directions. Seventh guardrail in the family.
+- **2026-08-08**: The catalogue guardrail only covered `src/app/`. It therefore could not
+  see `components/home/CollectionGrid.tsx` reading `getProductsByCollection` out of the
+  static catalogue — the exact bug it was written to prevent, one directory outside its
+  reach. **A guardrail that covers most of the surface area is one you trust more than it
+  deserves.** Extended to all of `src/`; `CollectionGrid` now takes resolved tiles as props
+  from the server parent, because a `'use client'` component cannot await Shopify.
+- **2026-08-08**: The SEO/social layer had never migrated to Shopify. The product
+  page read Shopify in its body and static `hj-data` in its `generateMetadata`,
+  and the two catalogues are nearly disjoint — so 20 of the 22 live products
+  served `title: 'Product Not Found'` from a page that rendered perfectly. The OG
+  image, `generateStaticParams` and `/search` had the same split; site search
+  could not find a single product actually for sale.
+  The general lesson, and the reason nothing caught it: **a fallback that is
+  indistinguishable from the real thing in every test environment is
+  indistinguishable from a bug.** Both suites run without Shopify credentials,
+  which is precisely the condition under which both sources return the same data.
+  `metadata-data-source.test.ts` now forbids reaching past `@/lib/shopify` for
+  catalogue data anywhere under `src/app/`; static data is the fallback, and it is
+  reachable only from behind that door. Sixth guardrail in the family.
+- **2026-08-08**: `searchProducts` was the only fetcher that returned `[]` on a
+  failed Shopify call instead of degrading to the static catalogue. Empty renders
+  as a confident `No results for "titanium"` — telling a customer the product does
+  not exist when the truth is that Shopify did not answer. Nothing noticed because
+  nothing called it: the function was fully implemented, tested, and unreferenced
+  until `/search` was migrated onto it.
+- **2026-08-08**: A third test tier, because the first two run against a fiction.
+  `ci.yml` points every unit and E2E test at `mock.myshopify.com`, so until now no
+  automated test had ever touched the real store — and all three commerce outages
+  this project has had (0 products on the headless publication, 38 unsellable
+  variants, USD prices on a VND store) lived in exactly that blind spot. None were
+  code defects a mock could catch; all three were visible from the live `/shop`
+  page. `verify-production.mjs` looks at it. The discrimination is what matters:
+  the static and Shopify catalogues turn out to be nearly disjoint, so
+  `dome-ring-titanium` on the live page proves fallback and `meridian-cuff` proves
+  a real fetch — an invariant `production-smoke-handles.test.ts` now guards,
+  because a discriminator that stops discriminating keeps passing while testing
+  nothing. Fifth guardrail in the family.
+- **2026-08-08**: The webhook secret stopped needing a real order to test.
+  `verify-webhook-secret.mjs` signs a synthetic payload and reads the route's own
+  status contract back. Its test does not compare against a fixture — it feeds the
+  script's bytes into the real `POST` handler and lets the route judge, so the two
+  cannot drift. The old procedure (place an order, watch Vercel logs) was one-shot,
+  cost money, and left no repeatable artifact.
 - **2026-08-05**: Shopify tag parsing extracted to `src/lib/shopify/tags.ts`
   and tested against tag arrays captured verbatim from the live store. The
   general lesson, and the reason the previous tests could not have caught it:

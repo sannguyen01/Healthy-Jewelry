@@ -5,8 +5,10 @@ import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { HorizontalScroll } from '@/components/home/HorizontalScroll'
-import { getAllProducts, getProductByHandle, hjCollections } from '@/lib/data/hj-data'
-import { getProduct, getProductsByCollection } from '@/lib/shopify'
+import { hjCollections } from '@/lib/data/hj-data'
+import { getProduct, getProducts, getProductsByCollection } from '@/lib/shopify'
+import { SITE_URL } from '@/config/site'
+import { productSeo, NOT_FOUND_SEO } from '@/lib/seo/productSeo'
 import { JsonLd, productJsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 
@@ -14,19 +16,55 @@ interface ProductPageProps {
   params: Promise<{ handle: string }>
 }
 
-export function generateStaticParams() {
-  return getAllProducts().map((p) => ({ handle: p.handle }))
+export async function generateStaticParams() {
+  // Shopify, not the static fallback. Prerendering static handles built pages
+  // for 26 products that do not exist in Shopify — each one a build-time 404 —
+  // while prerendering none of the 20 that do.
+  //
+  // `getProducts` returns the static catalogue by itself when Shopify is
+  // unconfigured, so local builds and CI are unchanged.
+  const products = await getProducts()
+  return products.map((p) => ({ handle: p.handle }))
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { handle } = await params
-  const product = getProductByHandle(handle)
+  // Same source as the page body below. These were split — body from Shopify,
+  // metadata from the static catalogue — and because the two catalogues are
+  // nearly disjoint, 20 of the 22 live products returned 'Product Not Found'
+  // as their title while rendering a perfectly good page. That string was the
+  // browser tab, the search result, and the shared link.
+  const product = await getProduct(handle)
   if (!product) {
-    return { title: 'Product Not Found' }
+    // Carries `robots: noindex, nofollow`. The response is a soft 404 — HTTP 200 with
+    // not-found.tsx rendered — because Next returns 200 for streamed responses, and this
+    // route cannot use `dynamicParams = false` without 404ing products newly added in
+    // Shopify. noindex keeps the junk URL out of the index anyway. See NOT_FOUND_SEO.
+    return NOT_FOUND_SEO
   }
+
+  // Shared, pure derivation — the same one the OG image and JSON-LD use, so
+  // the tab, the share card and the structured data cannot describe the
+  // product differently.
+  const { title, description } = productSeo(product)
+
   return {
-    title: product.title,
-    description: product.description,
+    title,
+    description,
+    // The route's own opengraph-image.tsx supplies the image; naming title and
+    // description here keeps the share card's text from falling back to the
+    // site-wide defaults.
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      url: `${SITE_URL}/products/${product.handle}`,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
   }
 }
 

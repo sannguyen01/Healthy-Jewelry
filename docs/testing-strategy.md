@@ -20,10 +20,149 @@ That is also not the useful question. The useful one is what the suite is *for*,
 | Unit | `pnpm exec vitest run` | `src/lib`, `src/store`, `src/config`, design tokens, and component behaviour under jsdom | ~12 s |
 | Build | `pnpm build` | Prerender of all 45 routes | ~40 s |
 | E2E | `pnpm e2e` | The rendered application in a real browser, desktop + mobile | ~3-5 min |
+| Production smoke | `pnpm verify:production` · `pnpm verify:webhook` | The **real** store and the **live** deployment, plus the premise tier below | ~10 s |
 
 `vitest.config.ts` scopes **coverage** to the business-logic layer on purpose, with the comment *"UI
 components are verified via E2E"*. That single line is the whole argument: with coverage thresholds
 deliberately not applied to the rendering layer, **E2E is the only automated coverage the UI has.**
+
+### The production tier, and why it had to exist
+
+Every layer above the last one runs against `mock.myshopify.com` (`ci.yml` declares the mock
+credentials once, for both jobs). That is the correct design for a merge gate — hermetic, fast, and
+impossible for someone else's outage to turn red — but it has a consequence worth stating plainly:
+
+> **Until 2026-08-08, no automated test had ever touched the real store.** The suite proved the code
+> was correct against a fiction.
+
+Every commerce outage this project has had lived in exactly that blind spot, and none of them were
+code defects the mock could have caught:
+
+- 22 products published to Online Store and **0** to the headless channel, so the Storefront token saw
+  an empty catalogue and every page silently served the static fallback;
+- all 38 variants `availableForSale: false`, so a fully-correct store would still have sold nothing;
+- prices rendered in USD by a store that charges VND.
+
+`scripts/verify-production.mjs` closes that gap from the outside: it loads the live `/shop` page and
+asserts it is serving Shopify rather than the fallback, that every product is still published to the
+headless publication, and that a real `cartCreate` yields a real `checkoutUrl`.
+
+The fallback/live discrimination is the load-bearing idea. The two catalogues are almost entirely
+disjoint, so `dome-ring-titanium` on the live page is *proof of fallback* and `meridian-cuff` is *proof
+of a real Storefront fetch*. That only holds while the lists stay disjoint —
+`src/tests/unit/production-smoke-handles.test.ts` asserts the invariant against `hj-data.ts`, because a
+discriminator that stops discriminating keeps passing while testing nothing.
+
+Publication scope is asserted as *every product, no exceptions*, never as a count of 22. The way this
+regresses is a new product added and not published, which a hardcoded number would happily pass once
+the total moved on.
+
+**It is deliberately not a merge gate.** `.github/workflows/production-smoke.yml` is a separate
+workflow on a schedule plus `workflow_dispatch`, and branch protection must never require it: it is
+*meant* to fail for reasons unrelated to the commit under review, and a Shopify incident must not
+become a merge freeze.
+
+**What it still cannot tell you:** whether a payment provider is active. Admin GraphQL's
+`PaymentSettings` exposes only `supportedDigitalWallets` — there is no field for enabled providers, and
+the alternative (`paymentGatewayNames` on an order) needs an order to exist. That one is human-only;
+see `docs/go-live-runbook.md`. It does not stay human-only — see the premise tier below.
+
+### The premise tier, and why it is deliberately non-blocking
+
+Every layer above asserts **"the code still does X."** None asserted **"the premise behind X still
+holds."** Five decisions were found resting on premises with no detector at all — the English-only
+choice, the payments blocker, the Open Graph runtime tradeoff, the empty spec metafield, and a
+collection-set assumption introduced by the change that fixed the soft-404. Full reasoning in
+[ADR 008](adr/008-decisions-need-premise-detectors.md).
+
+`scripts/lib/premise-checks.mjs` holds the evaluators; `scripts/verify-production.mjs` fetches the live
+data and reports them in a section of their own.
+
+**They never turn the run red.** A `vi` locale appearing is an opportunity, not an outage, and failing
+on opportunity is how a suite becomes noise nobody reads. Drift writes `premise-drift.json`, and the
+workflow opens or updates a **`premise-drift`** labelled issue — distinct from the `production-smoke`
+failure issue — which closes again once every premise holds. Severity lives in the message: a premise
+marked `blocking` (`COLLECTION-SET-DRIFT`, where customers are getting hard 404s) reads differently
+from one marked `opportunity`.
+
+Two properties are worth copying into any premise check added later:
+
+- **Pure evaluator, network at the caller.** The drifted branch never runs locally, so it is the branch
+  most likely to be wrong the day it fires — the same lesson as the completed-order cart path.
+  `src/tests/unit/premise-checks.test.ts` exercises **both** states of every premise, 18 tests, with
+  the false-positive cases (`frontpage`, `en-GB`) pinned explicitly.
+- **A check may expire itself.** `SHOPIFY-PAYMENTS` is unverifiable only while `ordersCount` is 0;
+  the first order makes `paymentGatewayNames` readable and the reminder becomes a real assertion.
+  Human once, then automatic — better than a deadline nobody agreed to.
+
+The tier ships **unproven against production**, like everything else in the production tier, because
+`production-smoke` has still never executed.
+
+### The source-analysis guardrails parse; they do not match
+
+`metadata-data-source.test.ts`, `cache-tag-contract.test.ts` and
+`homepage-fetch-budget.test.ts` all read application source to enforce a rule. They use the
+**TypeScript compiler API** through `src/lib/analysis/tsAstScan.ts`, not regular
+expressions.
+
+That was not an aesthetic preference. The first two started as regex, were reviewed as
+fragile with three specific evasions predicted, and when each was measured **two of the
+three predictions were wrong and two real gaps had gone unnamed**: comments produced false
+positives, `import * as hj` was invisible, and a second import of the same module in one
+file was skipped because the code used `.match` rather than `.matchAll`.
+
+The lesson is not that regex is fragile. It is that **nobody could say what those
+guardrails covered** — confident predictions were wrong in both directions. A guardrail
+whose coverage is unknowable makes a green run mean something unknown. `typescript` is
+already a devDependency, so parsing cost no new packages. See
+[ADR 007](adr/007-regex-guardrails-have-unknown-coverage.md).
+
+Text matching is still right for non-code inputs: `audit-workflow-secrets.mjs` scans YAML
+and strips comments by hand, which is correct — the argument is about parsing a language we
+already ship a parser for.
+
+### The homepage fetch budget
+
+`homepage-fetch-budget.test.ts` pins the homepage at **four** Shopify fetches and asserts
+no per-collection query. It previously issued eight — five of them one full collection
+query per collection, to read five `svgType` values — so a sixth collection meant a ninth
+query.
+
+Worth being precise about the stakes, because the obvious reading is wrong twice over. The
+homepage is **`○` Static**, prerendered with `revalidate: 3600`, so those queries run at
+build and hourly revalidation, **never per request**. And server components call the
+Storefront API directly, not through the rate-limited `/api/shopify` proxy — whose only
+caller is `src/store/cart.tsx`. Homepage rendering therefore cannot consume the 60/min
+per-IP budget. The guardrail exists because the *pattern* silently grows with the
+catalogue, not because there is a live ceiling to hit.
+
+### A fallback indistinguishable from the real thing is indistinguishable from a bug
+
+The static catalogue exists so the site builds and serves without Shopify. That is load-bearing, and
+`src/lib/shopify/env-check.ts` warns rather than throws specifically to protect it.
+
+But it has a cost that took a second outage to see. The product page read Shopify in its body and
+static `hj-data` in its `generateMetadata`, and because the two catalogues are nearly disjoint, 20 of
+the 22 live products served `<title>Product Not Found</title>` from a page that rendered perfectly.
+The Open Graph image, `generateStaticParams` and `/search` had the same split.
+
+**No hermetic test could have caught any of it.** Unit tests run with no Shopify credentials; E2E runs
+against `placeholder.myshopify.com`. Both are exactly the conditions under which the two data sources
+return *the same thing*. The bug is only observable where the catalogues differ, which is production.
+
+Two responses, and the second is the general one:
+
+- `src/tests/unit/metadata-data-source.test.ts` forbids any route under `src/app/` from importing a
+  product lookup out of `@/lib/data/hj-data`. Static data is the fallback, reachable only from behind
+  `@/lib/shopify` — which already degrades on its own. A route reaching past that door is not "using
+  the fallback", it is bypassing Shopify permanently.
+- `scripts/verify-production.mjs` asserts the same properties against a **Shopify-only handle** on the
+  live deployment, because that is the only place the two sources can disagree.
+
+The same reasoning explains why `searchProducts` shipped broken in a subtler way: it returned `[]`
+rather than the static catalogue when a Shopify call failed, alone among the fetchers. Empty renders
+as a confident `No results` — a wrong answer that looks like a right one. It went unnoticed because
+nothing called the function at all until `/search` was migrated onto it.
 
 Removing it would not break the site. It would remove the only thing standing between a rendering
 regression and production — which is exactly how the two defects below reached production in the first
@@ -56,14 +195,41 @@ satisfied does not protect anything.
 If E2E is ever red and the change is genuinely urgent, merging is still possible: nothing in GitHub
 prevents it. That should be a decision someone makes deliberately, not the default state.
 
-### Cost
+### Cost, and a correction with security consequences
 
-The repository is **private**, so Actions minutes are billed.
+> **This section previously stated "The repository is private, so Actions minutes are billed."
+> That was wrong in both halves.** Verified against the GitHub API on 2026-08-08:
+> `private: false`, `visibility: "public"`, `allow_forking: true`.
+
+Two things follow, and the second matters more than the first.
+
+**Actions minutes are free.** GitHub does not bill Actions for public repositories, so the
+numbers below are wall-clock time and developer-latency, not money. They are still worth
+keeping — a 24-minute gate is a gate people learn to ignore — but no cost argument should
+be made from them. The `production-smoke` tier runs every 6 hours precisely because that
+costs nothing.
+
+**The repository is public, so secret handling is a real constraint, not a formality.**
+Repository secrets are readable by every workflow in the repo and by anyone with write
+access, and the repo is forkable. GitHub withholds secrets from `pull_request` runs
+triggered by forks, but `push`, `schedule` and `workflow_dispatch` runs get them in full.
+`production-smoke.yml` therefore uses an **environment** (`production-readonly`) rather
+than bare repository secrets, so the credential set carries a boundary that can hold
+required reviewers and a branch allowlist. **That key is not a control on its own**:
+GitHub auto-creates a named environment with no protection rules, and a job with an
+`environment:` key still receives repository secrets, so a misconfiguration goes green
+silently. `scripts/preflight-secrets.mjs` is what makes the difference observable — see
+[ADR 006](adr/006-controls-must-fail-loudly.md). Its secrets are read-only by design: a
+Storefront token (public-safe by construction, the same class already shipped to browsers),
+a read-scoped Admin token used only for a publication count, and the webhook signing secret.
+
+Anyone reasoning about exposure from the old sentence would have concluded the opposite of
+the truth. That is the reason this correction is recorded rather than silently edited.
 
 | | Before | After |
 |---|---|---|
 | E2E wall time | 24.2 min | ~3-5 min |
-| Billable minutes per push | ~27 | ~7 |
+| Runner minutes per push | ~27 | ~7 |
 | Superseded runs | ran to completion | cancelled |
 
 Measured breakdown of a green run, so the next person optimising has real numbers rather than

@@ -9,6 +9,7 @@ import {
   GET_NEW_ARRIVALS,
   SEARCH_PRODUCTS,
 } from './queries/products'
+import { PRODUCTS_TAG, productTag, collectionTag } from './cacheTags'
 import { parseMaterial, parseSvgType } from './tags'
 import type { HJProduct, HJCollection, HJCollectionHandle, Product } from './types'
 import {
@@ -176,7 +177,7 @@ export async function getProduct(handle: string): Promise<HJProduct | null> {
     const response = await shopifyFetch<{ product: Product | null }>(
       GET_PRODUCT_BY_HANDLE,
       { handle },
-      { revalidate: 3600, tags: ['products', `product:${handle}`] }
+      { revalidate: 3600, tags: [PRODUCTS_TAG, productTag(handle)] }
     )
     if (!response.data?.product) {
       reportFallback('getProduct', 'empty-response', handle)
@@ -213,7 +214,7 @@ export async function getProducts(maxItems = 250): Promise<HJProduct[]> {
         await shopifyFetch<ProductsPage>(
           GET_PRODUCTS,
           { first: 50, after: cursor },
-          { revalidate: 3600, tags: ['products'] }
+          { revalidate: 3600, tags: [PRODUCTS_TAG] }
         )
       ).data
       const { edges, pageInfo } = page.products
@@ -246,7 +247,7 @@ export async function getProductsByCollection(
     }>(
       GET_PRODUCTS_BY_COLLECTION,
       { handle: collectionHandle, first },
-      { revalidate: 3600, tags: ['products', `collection:${collectionHandle}`] }
+      { revalidate: 3600, tags: [PRODUCTS_TAG, collectionTag(collectionHandle)] }
     )
     const edges = response.data?.collection?.products?.edges ?? []
     if (edges.length === 0) {
@@ -262,17 +263,22 @@ export async function getProductsByCollection(
   }
 }
 
+/** Static-catalogue search, used whenever Shopify cannot answer. */
+function staticSearch(q: string): HJProduct[] {
+  return staticGetAllProducts().filter(
+    (p) =>
+      p.title.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.material.toLowerCase().includes(q) ||
+      p.tags.some((t) => t.toLowerCase().includes(q))
+  )
+}
+
 export async function searchProducts(query: string, first = 20): Promise<HJProduct[]> {
   const q = query.toLowerCase().trim()
   if (!isShopifyConfigured() || !q) {
     if (!isShopifyConfigured()) reportFallback('searchProducts', 'not-configured', q)
-    return staticGetAllProducts().filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.material.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q))
-    )
+    return staticSearch(q)
   }
   try {
     const response = await shopifyFetch<{
@@ -280,10 +286,17 @@ export async function searchProducts(query: string, first = 20): Promise<HJProdu
     }>(SEARCH_PRODUCTS, { query, first }, { revalidate: 0 })
     return (response.data?.search?.edges ?? []).map((e) => mapShopifyProduct(e.node))
   } catch (e) {
+    // Degrade to the static catalogue, like every other fetcher in this module.
+    // This alone returned `[]` on failure, which renders as a confident
+    // `No results for "titanium"` — telling the customer the product does not
+    // exist when the truth is that Shopify did not answer. Every sibling
+    // (`getProduct`, `getProducts`, `getProductsByCollection`, `getBestsellers`,
+    // `getNewArrivals`) already falls back; search was the odd one out, and
+    // nothing noticed because nothing called it.
     if (e instanceof ShopifyFetchError) {
-      console.warn('[shopify] searchProducts fallback:', e.message)
+      reportFallback('searchProducts', 'fetch-failed', e.message)
     }
-    return []
+    return staticSearch(q)
   }
 }
 
@@ -296,7 +309,7 @@ export async function getBestsellers(first = 8): Promise<HJProduct[]> {
     const response = await shopifyFetch<{ products: { edges: { node: Product }[] } }>(
       GET_BESTSELLERS,
       { first },
-      { revalidate: 3600, tags: ['products'] }
+      { revalidate: 3600, tags: [PRODUCTS_TAG] }
     )
     const edges = response.data?.products?.edges ?? []
     if (edges.length === 0) reportFallback('getBestsellers', 'empty-response')
@@ -318,7 +331,7 @@ export async function getNewArrivals(first = 8): Promise<HJProduct[]> {
     const response = await shopifyFetch<{ products: { edges: { node: Product }[] } }>(
       GET_NEW_ARRIVALS,
       { first },
-      { revalidate: 3600, tags: ['products'] }
+      { revalidate: 3600, tags: [PRODUCTS_TAG] }
     )
     const edges = response.data?.products?.edges ?? []
     if (edges.length === 0) reportFallback('getNewArrivals', 'empty-response')

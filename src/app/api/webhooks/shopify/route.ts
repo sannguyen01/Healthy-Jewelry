@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { shopifyConfig } from '@/config/shopify'
+import { PRODUCTS_TAG, productTag, collectionTag } from '@/lib/shopify/cacheTags'
 
 /**
  * Topics this endpoint is built to handle.
@@ -40,6 +41,31 @@ function explainSignatureFailure(hmacHeader: string): string {
     'Notifications) are signed with the signing secret shown on that page, while webhooks ' +
     'created by an app are signed with the app client secret. They are not interchangeable.'
   )
+}
+
+/**
+ * The `handle` from a webhook payload, or undefined.
+ *
+ * Both the products and collections branches need exactly this, and both had their own
+ * copy of the parse plus an identically-worded `try/catch`. Two copies of one idea is how
+ * the collections cache tag drifted in the first place — one branch was corrected and the
+ * other was not — so the idea now exists once.
+ *
+ * Swallowing the parse error is deliberate and unchanged: payload shape varies by topic and
+ * API version, and Shopify retries on a non-2xx. A body that cannot be parsed will not
+ * parse on the retry either, so failing the delivery would trade a scoped invalidation for
+ * an infinite redelivery loop. The broad invalidation each branch already performed stands.
+ *
+ * `orders/*` keeps its own parse: it reads a different shape for a different purpose, and
+ * folding it in here would couple two things that only look alike.
+ */
+function readHandle(rawBody: Buffer): string | undefined {
+  try {
+    const payload = JSON.parse(rawBody.toString('utf-8')) as { handle?: unknown }
+    return typeof payload.handle === 'string' && payload.handle ? payload.handle : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -96,27 +122,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // the product that changed instead of every generated product page.
     revalidatePath('/', 'page')
     revalidatePath('/shop', 'page')
-    revalidateTag('products')
+    revalidateTag(PRODUCTS_TAG)
 
-    let handle: string | undefined
-    try {
-      const payload = JSON.parse(rawBody.toString('utf-8')) as { handle?: unknown }
-      if (typeof payload.handle === 'string' && payload.handle) {
-        handle = payload.handle
-      }
-    } catch {
-      // Payload shape varies by topic / Shopify API version — fall back to
-      // the broad 'products' tag above rather than failing the webhook.
-    }
-
+    const handle = readHandle(rawBody)
     if (handle) {
-      revalidateTag(`product:${handle}`)
+      revalidateTag(productTag(handle))
     }
   }
 
   if (topic.startsWith('collections/')) {
     revalidatePath('/shop/[collection]', 'page')
-    revalidateTag('collections')
+    // Collection listings are fetched with `collectionTag(handle)`. This branch
+    // used to revalidate a bare 'collections' string that no fetch ever
+    // registered, so the call did nothing at all and collection pages stayed
+    // stale for the full 3600s regardless of what changed in Shopify Admin.
+    // `cache-tag-contract.test.ts` now fails on any tag only one side knows.
+    //
+    // Deliberately not PRODUCTS_TAG: that is every product cache in the store,
+    // and a collection changing does not invalidate the products themselves.
+    // Scoping was an explicit decision the previous tests already guarded.
+    const handle = readHandle(rawBody)
+    if (handle) {
+      revalidateTag(collectionTag(handle))
+    }
   }
 
   // Orders. The site takes no part in payment — Shopify's hosted checkout
