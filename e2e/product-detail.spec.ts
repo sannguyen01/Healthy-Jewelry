@@ -220,7 +220,11 @@ test.describe('Product detail — breadcrumb navigation', () => {
       expect(hrefs.length).toBeGreaterThan(0)
 
       for (const href of hrefs) {
-        const response = await request.get(href)
+        // An explicit, generous timeout. This fires N extra requests per test
+        // while 374 others run in parallel against one `next start`, and it
+        // flaked once under exactly that load — a slow response is not a dead
+        // link, and a check that reports one as the other is worse than no check.
+        const response = await request.get(href, { timeout: 30_000 })
         expect(response.status(), `breadcrumb link ${href} is a dead end`).toBeLessThan(400)
       }
     })
