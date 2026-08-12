@@ -43,8 +43,10 @@ import {
   collectionSetPremise,
   specMetafieldPremise,
   paymentsPremise,
+  apiVersionPremise,
   formatPremises,
 } from './lib/premise-checks.mjs'
+import { SHOPIFY_API_VERSION, compareServedApiVersion } from './lib/api-version.mjs'
 
 /**
  * Cold-start budget for the Open Graph image, in milliseconds.
@@ -62,7 +64,13 @@ import {
  */
 const OG_COLD_START_BUDGET_MS = 2500
 
-const API_VERSION = '2025-01'
+/**
+ * Imported, never re-declared. This literal used to be spelled out here *and* in
+ * `src/config/shopify-public.ts`, and both said `2025-01` for months after Shopify
+ * stopped serving it — two copies agreeing with each other is not the same as either
+ * being right. See ADR 009 and `src/tests/unit/api-version-contract.test.ts`.
+ */
+const API_VERSION = SHOPIFY_API_VERSION
 
 /** The publication the Storefront token reads from. Found by name, not by a
  *  hardcoded gid, so recreating the channel does not silently pass. */
@@ -641,6 +649,61 @@ async function openGraphRendersWithinBudget() {
   return `${elapsed}ms cold, ${(bytes / 1024).toFixed(0)}KB (budget ${OG_COLD_START_BUDGET_MS}ms)`
 }
 
+/**
+ * Shopify is serving the API version this code targets.
+ *
+ * ## The check that would have caught seven months of drift
+ *
+ * A retired API version does not error. Shopify **falls forward** — the request is
+ * answered by the oldest accessible stable version, HTTP 200, nothing in the body to
+ * say so. This project pinned `2025-01` from launch and kept pinning it long after
+ * Shopify stopped serving it; every check in this file passed throughout, because
+ * every check asked about *data* and none asked which API produced it.
+ *
+ * The evidence was on every single response the whole time. `X-Shopify-API-Version`
+ * names the version Shopify actually used. Nothing read it.
+ *
+ * Blocking, unlike the matching premise: a version still accessible but nearing
+ * retirement is a decision worth revisiting (that is `apiVersionPremise`), while a
+ * version already falling forward means the storefront is running against an API
+ * nobody tested it against — which is breakage, whether or not it has surfaced yet.
+ *
+ * Both surfaces are checked. The Storefront API is what customers hit; the Admin API
+ * is what this script's own conclusions rest on, and a fall-forward there would make
+ * every other check in this file a report about a different API than it claims.
+ */
+async function shopifyServesThePinnedApiVersion() {
+  const domain = resolveStoreDomain()
+
+  /** @param {string} label @param {string} url @param {Record<string,string>} headers */
+  async function servedVersion(label, url, headers) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      // The cheapest legal query on both APIs. The response body is irrelevant —
+      // the header is the measurement, and it is present even on an error.
+      body: JSON.stringify({ query: '{ shop { name } }' }),
+    })
+    return { label, ...compareServedApiVersion(res.headers.get('x-shopify-api-version')) }
+  }
+
+  const surfaces = [
+    await servedVersion('Storefront', `https://${domain}/api/${API_VERSION}/graphql.json`, {
+      'X-Shopify-Storefront-Access-Token': required('SHOPIFY_STOREFRONT_ACCESS_TOKEN'),
+    }),
+    await servedVersion('Admin', `https://${domain}/admin/api/${API_VERSION}/graphql.json`, {
+      'X-Shopify-Access-Token': required('SHOPIFY_ADMIN_ACCESS_TOKEN'),
+    }),
+  ]
+
+  const drifted = surfaces.filter((s) => !s.matches)
+  if (drifted.length > 0) {
+    throw new Error(drifted.map((s) => `${s.label} API: ${s.reason}`).join('\n  '))
+  }
+
+  return `Both surfaces served ${API_VERSION}, as pinned`
+}
+
 // ── premises ────────────────────────────────────────────────────────────────
 
 /**
@@ -669,6 +732,7 @@ async function collectPremises() {
   const specCount = withSpec.products.edges.filter((e) => e.node.metafield?.value?.trim()).length
 
   return [
+    apiVersionPremise(),
     i18nPremise(shopLocales),
     collectionSetPremise(collections.edges.map((e) => e.node), KNOWN_COLLECTIONS),
     specMetafieldPremise(specCount, productsCount.count),
@@ -700,6 +764,10 @@ function writeDriftFile(drifted) {
 async function main() {
   console.log('Production reality checks\n')
 
+  // First, because every check below reports on whatever API Shopify decided to answer
+  // with. If that is not the pinned version, the rest of this run describes a different
+  // API than the one the storefront was written against.
+  await check('Shopify serves the pinned API version', shopifyServesThePinnedApiVersion)
   await check('Live site serves Shopify data, not the static fallback', liveSiteServesShopifyData)
   await check(
     'Every product is published to the headless publication',

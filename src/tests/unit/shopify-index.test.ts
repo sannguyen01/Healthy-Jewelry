@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { shopifyPublicConfig } from '@/config/shopify-public'
 
 const VALID_DOMAIN = 'test-store.myshopify.com'
 const VALID_TOKEN = 'test-token-abc123'
@@ -41,8 +42,20 @@ function shopifyProductNode(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-function mockJsonResponse(body: unknown) {
-  return { ok: true, status: 200, json: async () => body }
+/**
+ * Headers included on purpose. Real Shopify responses always carry
+ * `X-Shopify-API-Version`, and `shopifyFetch` reads it to detect a fall-forward
+ * (ADR 009). A mock without it is not a smaller version of a Shopify response —
+ * it is a different shape, and this project has already been burned by fixtures
+ * that agreed with the code rather than with the store.
+ */
+function mockJsonResponse(body: unknown, apiVersion: string = shopifyPublicConfig.apiVersion) {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ 'x-shopify-api-version': apiVersion }),
+    json: async () => body,
+  }
 }
 
 let warnSpy: ReturnType<typeof vi.spyOn>

@@ -27,7 +27,22 @@
  * 24-minute E2E suite became noise nobody read.
  */
 
-/** Shopify creates this automatically; it is not one of ours and never will be. */
+import { SHOPIFY_API_VERSION, apiVersionStatus } from './api-version.mjs'
+
+/**
+ * Shopify creates this automatically; it is not one of ours and never will be.
+ *
+ * **This exemption is itself an assumption, and it was wrong once.** Exempting `frontpage`
+ * is correct for the question `collectionSetPremise` asks — *has the collection set
+ * drifted* — because a built-in collection appearing is not drift. It is not correct as a
+ * general statement that `frontpage` is harmless: `mapShopifyProduct` used to read a
+ * product's first collection unvalidated, so a product sitting in `frontpage` was mapped
+ * *into* it and rendered a breadcrumb linking to a hard 404. The one detector that ever
+ * looked at `frontpage` had concluded it did not matter.
+ *
+ * `parseCollection` in `src/lib/shopify/tags.ts` now skips built-ins on the way in, so the
+ * exemption here and the parser there agree by construction rather than by luck.
+ */
 const SHOPIFY_BUILTIN_COLLECTIONS = new Set(['frontpage'])
 
 /**
@@ -167,6 +182,52 @@ export function paymentsPremise(ordersCount, paymentGatewayNames) {
           'The human-only premise has expired — this is asserted automatically from here.'
         : `${ordersCount} order(s) exist but none names a payment gateway. Either they were ` +
           'created without payment, or the provider was removed after they were placed.',
+  }
+}
+
+/**
+ * The pinned Shopify API version is still accessible.
+ *
+ * The one premise in this module with a **published expiry date**, which makes it the
+ * clearest case for the whole idea. Shopify's schedule states exactly when
+ * {@link SHOPIFY_API_VERSION} stops being served, and on that date every request silently
+ * falls forward to a different API. Nothing breaks visibly; the version just quietly stops
+ * being the one in the code.
+ *
+ * That already happened once here, undetected for roughly seven months. See ADR 009.
+ *
+ * `opportunity`, not `blocking`, and deliberately so: while the version is still accessible
+ * nothing is wrong, and there is a scheduled window in which to migrate calmly. The moment
+ * it stops being accessible is not this premise's job — `served version === pinned version`
+ * is a hard check in `verify-production.mjs`, because by then it is breakage rather than
+ * a decision worth revisiting.
+ *
+ * @param {Date} [now]
+ * @returns {Premise}
+ */
+export function apiVersionPremise(now = new Date()) {
+  const { version, accessibleUntil, daysRemaining, state } = apiVersionStatus(now)
+  const deadline = accessibleUntil.slice(0, 10)
+
+  const detail = {
+    ok: `Shopify API ${version} is accessible until ${deadline} (${daysRemaining} days). No action.`,
+    expiring:
+      `Shopify API ${version} stops being served on ${deadline} — ${daysRemaining} days away. ` +
+      'After that every request falls forward to the oldest accessible version, silently. ' +
+      'Migrate deliberately now: bump SHOPIFY_API_VERSION in scripts/lib/api-version.mjs and ' +
+      'apiVersion in src/config/shopify-public.ts, then audit the queries.',
+    expired:
+      `Shopify API ${version} stopped being served on ${deadline}, ${Math.abs(daysRemaining)} ` +
+      'days ago. Every request is now being answered by a different API version than the one ' +
+      'this code targets. This is the exact condition ADR 009 exists to prevent recurring.',
+  }[state]
+
+  return {
+    id: 'SHOPIFY-API-VERSION',
+    decision: 'docs/adr/009-api-version-must-be-asserted-not-declared.md',
+    kind: 'opportunity',
+    holds: state === 'ok',
+    detail,
   }
 }
 

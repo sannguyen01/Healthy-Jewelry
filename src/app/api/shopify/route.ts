@@ -7,6 +7,7 @@ import {
   REMOVE_FROM_CART,
 } from '@/lib/shopify/mutations/cart'
 import { GET_CART } from '@/lib/shopify/queries/cart'
+import { reportApiVersionDrift } from '@/lib/shopify/api-version'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 
 // Persisted queries: the browser sends an operation key, never GraphQL text.
@@ -100,7 +101,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Shopify integration is not configured' }, { status: 503 })
   }
 
-  // Use shared apiVersion from config (2025-01) to stay in sync
+  // Shared apiVersion from config, never a literal — see ADR 009. The response's
+  // own X-Shopify-API-Version is checked below, because naming a version and
+  // being served it are different facts.
   const endpoint = `https://${storeDomain}/api/${shopifyConfig.apiVersion}/graphql.json`
 
   let shopifyResponse: Response
@@ -117,6 +120,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error('[shopify/route] Network error reaching Shopify:', err)
     return NextResponse.json({ error: 'Failed to reach Shopify API' }, { status: 502 })
   }
+
+  // This route bypasses `shopifyFetch` and talks to Shopify itself, so it needs
+  // its own version check — and it is the surface that most wants one. Cart
+  // mutations are where a fall-forward turns into a failed checkout rather than
+  // a slightly different product payload.
+  reportApiVersionDrift(shopifyResponse.headers, `shopify/route:${operation}`)
 
   if (!shopifyResponse.ok) {
     console.error('[shopify/route] Shopify returned non-OK status:', shopifyResponse.status)

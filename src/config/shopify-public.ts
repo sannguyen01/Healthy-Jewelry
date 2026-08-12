@@ -23,7 +23,21 @@ export const shopifyPublicConfig = {
   get storeDomain(): string {
     return process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ?? ''
   },
-  apiVersion: '2025-01' as const,
+  /**
+   * The Shopify API version every request names.
+   *
+   * Kept in step with `SHOPIFY_API_VERSION` in `scripts/lib/api-version.mjs` —
+   * which carries the retirement date and the reasoning — by
+   * `src/tests/unit/api-version-contract.test.ts`. Two copies of a string that
+   * must agree, with nothing joining them, is the shape `cacheTags.ts` exists
+   * to make inexpressible; this one could not import across the TS/`.mjs`
+   * boundary, so it is asserted instead.
+   *
+   * Was `2025-01`, which Shopify retired around 2026-01. Nothing errored: a
+   * retired version *falls forward* to the oldest accessible one, silently.
+   * See `docs/adr/009-api-version-must-be-asserted-not-declared.md`.
+   */
+  apiVersion: '2026-07' as const,
 } as const
 
 export type ShopifyPublicConfig = typeof shopifyPublicConfig

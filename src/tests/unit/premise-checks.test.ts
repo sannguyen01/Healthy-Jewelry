@@ -5,8 +5,13 @@ const {
   collectionSetPremise,
   specMetafieldPremise,
   paymentsPremise,
+  apiVersionPremise,
   formatPremises,
 } = await import('../../../scripts/lib/premise-checks.mjs')
+
+const { API_VERSION_ACCESSIBLE_UNTIL, MIGRATION_LEAD_DAYS, SHOPIFY_API_VERSION } = await import(
+  '../../../scripts/lib/api-version.mjs'
+)
 
 /**
  * **Both states, every premise.**
@@ -112,6 +117,58 @@ describe('spec metafield premise', () => {
     const p = specMetafieldPremise(3, 22) as Premise
     expect(p.holds).toBe(false)
     expect(p.detail).toContain('3/22')
+  })
+})
+
+/**
+ * The premise with a **date on it**, which makes it the clearest case for the whole idea.
+ *
+ * Shopify publishes exactly when an API version stops being served, and on that day every
+ * request falls forward to a different API with a 200 and no signal. That already happened
+ * here — `2025-01` was pinned for roughly seven months past its retirement and nothing went
+ * red. See ADR 009.
+ *
+ * The clock is injected so all three branches run in CI today. The `expiring` and `expired`
+ * branches are, by construction, ones that can never be observed locally otherwise.
+ */
+describe('API version premise (ADR 009)', () => {
+  const deadline = new Date(API_VERSION_ACCESSIBLE_UNTIL)
+  const daysBefore = (n: number) => new Date(deadline.getTime() - n * 86_400_000)
+
+  it('holds while the pinned version is comfortably accessible', () => {
+    const p = apiVersionPremise(daysBefore(MIGRATION_LEAD_DAYS + 60)) as Premise
+    expect(p.holds).toBe(true)
+    expect(p.id).toBe('SHOPIFY-API-VERSION')
+    expect(p.detail).toContain(SHOPIFY_API_VERSION)
+  })
+
+  it('drifts inside the migration lead time, before anything is broken', () => {
+    const p = apiVersionPremise(daysBefore(MIGRATION_LEAD_DAYS - 10)) as Premise
+    expect(p.holds).toBe(false)
+    expect(p.detail).toContain('Migrate')
+  })
+
+  it('drifts once the version has retired, and says how long ago', () => {
+    const p = apiVersionPremise(new Date(deadline.getTime() + 45 * 86_400_000)) as Premise
+    expect(p.holds).toBe(false)
+    expect(p.detail).toContain('45')
+    expect(p.detail).toContain('stopped being served')
+  })
+
+  /**
+   * `opportunity`, not `blocking`, and the distinction is load-bearing. While the version
+   * is still accessible there is a scheduled window to migrate calmly, and turning the run
+   * red over a future date is how a signal becomes noise. The *breakage* case — Shopify
+   * already serving something else — is a hard check in verify-production.mjs instead.
+   */
+  it('is an opportunity, never a red build', () => {
+    for (const at of [daysBefore(365), daysBefore(1), new Date(deadline.getTime() + 86_400_000)]) {
+      expect((apiVersionPremise(at) as Premise).kind).toBe('opportunity')
+    }
+  })
+
+  it('points at the ADR that records the decision', () => {
+    expect((apiVersionPremise() as Premise).decision).toContain('009')
   })
 })
 
