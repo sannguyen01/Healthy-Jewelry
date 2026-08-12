@@ -407,6 +407,46 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-12**: **A pinned version is a claim about someone else's system.** `2025-01`
+  was written in two files and believed for roughly seven months after Shopify stopped
+  serving it. Nothing errored, because a retired version *falls forward* — answered by the
+  oldest accessible one, HTTP 200, with nothing in the body to say a substitution happened.
+  Every check in `verify-production.mjs` passed throughout, and all of them were about
+  *data*; none asked which API produced it. The evidence was on every single response the
+  whole time (`X-Shopify-API-Version`) and nothing read it. Tenth guardrail in the family,
+  and the first that expires on a published date rather than on someone noticing. See
+  `docs/adr/009-api-version-must-be-asserted-not-declared.md`.
+- **2026-08-12**: **An exemption is an assumption.** `premise-checks.mjs` exempts
+  `frontpage` from the collection-set drift premise, and a test pins that exemption as
+  correct. It *is* correct for the question that premise asks. It was being read as the
+  broader claim that `frontpage` is harmless — while `mapShopifyProduct` cast Shopify's
+  first collection handle unvalidated and mapped `arc-band-titanium` straight into it,
+  producing a breadcrumb linking to `/shop/frontpage`: a hard 404 under
+  `dynamicParams = false`, on the site's only `bestseller`. The one detector that ever
+  looked at `frontpage` had concluded it did not matter. `collection` was also the last of
+  the three mapped fields still using a cast rather than a parser; `material` and `svgType`
+  were fixed in 2026-08-05 and nobody asked what else was cast.
+- **2026-08-12**: **A deployment that cannot identify itself makes every diagnosis a
+  guess.** Three failures recurred across this project's whole history — a cached build
+  reusing stale inlined `NEXT_PUBLIC_*` values, per-environment variables, and an orphaned
+  preview alias — and each was warned about *in prose*, in `env-check.ts`, the runbook and
+  this file, without any of those warnings making anything observable. The fix is the
+  ADR 008 move applied to deployments: `build-info.ts` fingerprints the inlined config, and
+  `/api/version` recomputes the same fingerprint at request time. **The two disagreeing is
+  the stale-cache detector**, and nothing else in a deployment reveals it.
+- **2026-08-12**: **Half-built plumbing is a tell.** `next.config.ts` allowlisted
+  `cdn.shopify.com` and `CART_FRAGMENT` already fetched `images`, while `PRODUCT_FRAGMENT`
+  requested no image field and `HJProduct` had nowhere to put one — so the bag could show a
+  photograph the product page structurally could not, and a fully photographed store would
+  have rendered zero photos. When two halves of a mechanism exist and the middle does not,
+  the middle was never finished, not deliberately omitted.
+- **2026-08-12**: **The most valuable thing found in the live store was not code.**
+  `shop.name` is "My Store 2" — Shopify's default — and that is what a customer sees at the
+  hosted checkout, the one page in the purchase journey this repository does not control.
+  No test could ever have caught it: the storefront never reads `shop.name`, so no page
+  renders it. Third-tier verification exists for exactly this class, and it took querying
+  the live store rather than reading the repository to see it.
+
 - **2026-07-28**: PR split — one session's work was split because bundling it
   violated this scaffold's own `maxFiles: 10` / one-fix-per-run rule:
   `euro-summer-visual-assets` (PR #4, merged) and

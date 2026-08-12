@@ -891,6 +891,57 @@ async function homepageStripsHaveEnoughProducts() {
   )
 }
 
+/**
+ * The store presents itself as the brand, not as a Shopify placeholder.
+ *
+ * `shop.name` is the store's identity everywhere Shopify renders it for a
+ * customer — most importantly the **hosted checkout**, which is the one page in
+ * the purchase journey this codebase does not control. A customer who has spent
+ * the whole session on *Healthy Jewellery* clicks Checkout and lands on a page
+ * belonging to whatever this field says.
+ *
+ * It currently says **"My Store 2"**, the name Shopify assigns by default. That
+ * is a one-field fix nothing in this repository could ever have noticed: the
+ * storefront never reads `shop.name`, so no page renders it and no test could
+ * see it. The gap is structural, which is exactly what this tier is for.
+ *
+ * Also checks the contact email, which is where a customer's reply to their order
+ * confirmation goes.
+ *
+ * An observation rather than a failing check, deliberately: the smoke workflow
+ * opens a GitHub issue when a check fails, and this would hold one open until a
+ * human changed a setting. It is listed as a launch blocker in
+ * docs/headless-launch-inventory.md, which is the right place for "you must do
+ * this" as opposed to "the system is malfunctioning".
+ */
+async function storeIdentifiesItselfAsTheBrand() {
+  const { shop } = await adminGraphql(`query { shop { name contactEmail } }`)
+
+  // Shopify's default is "My Store", numbered when the account has several.
+  const isPlaceholder = /^my store(\s+\d+)?$/i.test(shop.name.trim())
+  const notes = []
+
+  if (isPlaceholder) {
+    notes.push(
+      `shop.name is "${shop.name}" — Shopify's default placeholder, shown to customers ` +
+        'at the hosted checkout. Set it in Settings → Store details.',
+    )
+  }
+
+  // Not a rule about which provider is acceptable — plenty of real businesses run
+  // on one. It is about a *personal* mailbox appearing on transactional mail from
+  // a brand, which is the kind of detail that costs a first-time customer's trust.
+  if (/@(gmail|yahoo|hotmail|outlook|icloud)\./i.test(shop.contactEmail ?? '')) {
+    notes.push(
+      `contactEmail is a personal mailbox (${shop.contactEmail}). Customers replying to ` +
+        'their order confirmation reply to it; the site itself uses hello@ on the brand domain.',
+    )
+  }
+
+  if (notes.length === 0) return `Store presents as "${shop.name}" <${shop.contactEmail}>.`
+  return notes.join(' ')
+}
+
 // ── premises ────────────────────────────────────────────────────────────────
 
 /**
@@ -981,6 +1032,7 @@ async function main() {
   // because nothing else can see them — the site renders happily either way.
   const observations = []
   for (const [label, fn] of [
+    ['Store identity', storeIdentifiesItselfAsTheBrand],
     ['Tag namespaces', tagNamespacesAreAllRead],
     ['Homepage strips', homepageStripsHaveEnoughProducts],
   ]) {
