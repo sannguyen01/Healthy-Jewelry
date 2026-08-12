@@ -21,6 +21,8 @@ const mockProduct: HJProduct = {
   description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 
@@ -28,7 +30,6 @@ const mockCollection: HJCollection = {
   handle: 'rings',
   title: 'Rings',
   description: 'Architectural forms for everyday wear',
-  count: 4,
 }
 
 // ── generateProductMetadata ────────────────────────────────────────────────

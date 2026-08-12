@@ -6,6 +6,8 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 // server-only token getters into the client bundle. See
 // src/tests/unit/secret-exposure.test.ts.
 import { shopifyPublicConfig } from '@/config/shopify-public'
+import { track } from '@/lib/analytics'
+import { cartCurrencyCode } from '@/lib/utils/formatPrice'
 import { isPlaceholderVariantId } from '@/lib/shopify/variant-id'
 import type { HJProduct } from '@/lib/shopify/types'
 
@@ -242,7 +244,9 @@ async function syncExistingCart(cartId: string, lines: SyncLine[]): Promise<Sync
     console.warn('[HJ] cartLinesAdd returned userErrors:', added.userErrors)
     return { kind: 'failed', error: 'shopify-error' }
   }
-  return added?.cart ? { kind: 'cart', cart: added.cart } : { kind: 'failed', error: 'shopify-error' }
+  return added?.cart
+    ? { kind: 'cart', cart: added.cart }
+    : { kind: 'failed', error: 'shopify-error' }
 }
 
 async function createShopifyCart(lines: SyncLine[]): Promise<SyncOutcome> {
@@ -345,6 +349,12 @@ export interface CartState {
   // Mutations
   addItem: (product: HJProduct, quantity?: number, variantId?: string) => void
   removeItem: (productId: string) => void
+  /**
+   * Set a checkout error *and* count it. Internal: the five refusal paths call
+   * this instead of `set({ checkoutError })`, so a failure can never be shown to
+   * a customer without also being reportable.
+   */
+  failCheckout: (reason: CheckoutError) => void
   updateQuantity: (productId: string, quantity: number) => void
   clearCart: () => void
 
@@ -387,6 +397,22 @@ export const useCartStore = create<CartState>()(
 
       setHasHydrated: (value) => set({ hasHydrated: value }),
 
+      /**
+       * Record a checkout failure, and count it.
+       *
+       * Not exported on the store's public interface — it exists so the five
+       * places that can refuse a checkout cannot set the error without also
+       * reporting it. Until now the only evidence a customer had hit
+       * "Online checkout is temporarily unavailable" was them emailing to say so,
+       * and `not-configured` (this deployment cannot sell anything) reads
+       * identically to `lines-unavailable` (one piece sold out) on screen while
+       * being a completely different problem.
+       */
+      failCheckout: (reason: CheckoutError) => {
+        set({ checkoutError: reason })
+        track({ name: 'checkout_failed', reason, itemCount: get().items.length })
+      },
+
       addItem: (product, quantity = 1, variantId) => {
         const resolvedVariantId = variantId ?? product.defaultVariantId
         set((state) => {
@@ -420,9 +446,32 @@ export const useCartStore = create<CartState>()(
             justCompleted: false,
           }
         })
+
+        // After the set, so a throw inside the reducer can never be misreported
+        // as a successful add — and outside it, because `set` reducers must stay
+        // pure.
+        track({
+          name: 'add_to_bag',
+          handle: product.handle,
+          collection: product.collection,
+          material: product.material,
+          value: product.price,
+          currency: product.currencyCode,
+          quantity,
+        })
       },
 
       removeItem: (productId) => {
+        // Read before the filter: after it, there is nothing left to describe.
+        const removed = get().items.find((item) => item.product.id === productId)?.product
+        if (removed) {
+          track({
+            name: 'remove_from_bag',
+            handle: removed.handle,
+            collection: removed.collection,
+            material: removed.material,
+          })
+        }
         set((state) => ({
           items: state.items.filter((item) => item.product.id !== productId),
           checkoutUrl: null,
@@ -466,7 +515,7 @@ export const useCartStore = create<CartState>()(
           // empty value here means it was absent when this deployment was
           // built — setting it in the dashboard afterwards changes nothing
           // until a rebuild.
-          set({ checkoutError: 'not-configured' })
+          get().failCheckout('not-configured')
           return
         }
 
@@ -479,7 +528,7 @@ export const useCartStore = create<CartState>()(
         // Shopify does not know these ids. Failing here names the cause;
         // sending the request would return an opaque userError instead.
         if (items.some((item) => isPlaceholderVariantId(item.variantId))) {
-          set({ checkoutError: 'placeholder-catalog' })
+          get().failCheckout('placeholder-catalog')
           return
         }
 
@@ -524,9 +573,7 @@ export const useCartStore = create<CartState>()(
           if (outcome.kind !== 'cart') {
             // 'failed', or a freshly-created cart that came back gone too —
             // both leave nothing to hand the customer.
-            set({
-              checkoutError: outcome.kind === 'failed' ? outcome.error : 'shopify-error',
-            })
+            get().failCheckout(outcome.kind === 'failed' ? outcome.error : 'shopify-error')
             return
           }
 
@@ -540,7 +587,7 @@ export const useCartStore = create<CartState>()(
           const missing = sentVariantIds.filter((id) => !truth.returnedVariantIds.includes(id))
           if (missing.length > 0 && truth.returnedVariantIds.length > 0) {
             console.warn('[HJ] Shopify dropped cart lines:', missing)
-            set({ checkoutError: 'lines-unavailable' })
+            get().failCheckout('lines-unavailable')
             return
           }
 
@@ -565,14 +612,20 @@ export const useCartStore = create<CartState>()(
           }))
         } catch (err) {
           console.warn('[HJ] Shopify cart sync failed — local cart still active', err)
-          set({ checkoutError: 'network' })
+          get().failCheckout('network')
         } finally {
           set({ isLoading: false })
         }
       },
 
       beginCheckout: () => {
-        const { shopifyCartId } = get()
+        const { shopifyCartId, items } = get()
+        track({
+          name: 'checkout_started',
+          itemCount: items.length,
+          value: String(get().totalPrice()),
+          currency: cartCurrencyCode(items),
+        })
         if (shopifyCartId) {
           set({ pendingCheckoutCartId: shopifyCartId })
         }

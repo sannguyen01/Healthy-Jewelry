@@ -105,6 +105,8 @@ describe('Nav', () => {
               description: 'Test',
               spec: '2mm',
               svgType: 'ring-arc',
+              featuredImage: null,
+              images: [],
               variants: [],
             },
             quantity: 3,

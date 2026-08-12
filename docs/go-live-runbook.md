@@ -6,14 +6,59 @@ The ordered path from "architecturally operational" to "verified operational."
 chain, not a checklist:
 
 ```
-payment provider ──> a real order can exist ──> a webhook can fire ──> the secret can be tested
+know which deployment you are looking at
+   └─> payment provider ──> a real order can exist ──> a webhook can fire ──> the secret can be tested
 ```
+
+Step 0 sits outside the chain because it is not a step *towards* anything — it is
+the precondition for any of the others meaning what you think they mean.
 
 Each step removes a way the next one could fail for an uninteresting reason. Done
 out of order, step 3 spends a real transaction discovering something steps 1–2
 would have told you for free.
 
 ---
+
+## Step 0 — Confirm which deployment you are looking at
+
+```bash
+pnpm diagnose:deployment https://healthyjewellery.com --expect-production
+```
+
+**Do this before every other step, including the ones you have run before.** Every
+step below draws a conclusion from a page. If that page came from a different
+commit, a different Vercel environment, or a build carrying stale inlined
+variables, the conclusion is about something else entirely — and nothing on the
+page says so.
+
+This has cost real time repeatedly. A session once diagnosed a checkout failure at
+length from a screenshot of a `.vercel.app` alias, reasoning about code that alias
+had never been built from.
+
+One command answers all of it:
+
+| Verdict | Means |
+|---|---|
+| `Production deployment` | These are the Production environment variables. A Preview alias has its own, and can be unconfigured while Production is fine. |
+| `Serving the tip of the default branch` | The merge you are checking is actually live here. |
+| `Frozen alias` | This URL is stuck on a commit that predates the branch tip and **will never update**. A branch-preview alias after its branch merged: it renders, the cart works, and it is a snapshot of an app that no longer exists. |
+| `This build carries stale inlined NEXT_PUBLIC_* values` | The `NEXT_PUBLIC_*` values compiled into the JavaScript differ from the ones the environment now holds. A redeploy reused the build cache. **Redeploy with "Use existing Build Cache" unchecked** — setting the variable again and redeploying normally will not fix it. |
+| `The store domain is NOT in the served JavaScript` | `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` was absent when this bundle was built. The cart cannot sync and Checkout can never produce a `checkoutUrl`, whatever the variable is set to now. |
+| `The page is serving the static fallback catalogue` | The page is rendering `src/lib/data/hj-data.ts` — "Dome Ring" and friends, products that have never existed in Shopify. Nothing on it can be bought. |
+
+Exits non-zero on any of the failure verdicts, so it can gate a script.
+
+**Always test the production domain, or the canonical project alias — never a
+hashed preview alias.** A preview alias is the single most reliable way to spend an
+afternoon debugging a snapshot.
+
+Two facts are also readable without any tooling, which matters on the phone that
+step 5 requires:
+
+- **`view-source:` → `<meta name="hj-build">`** carries the commit, environment,
+  build time and config fingerprint of the page in front of you.
+- **`/api/version`** returns the same, plus `bundleIsStale` and whether Shopify is
+  configured at all on this deployment.
 
 ## Step 1 — Confirm a payment provider is active
 

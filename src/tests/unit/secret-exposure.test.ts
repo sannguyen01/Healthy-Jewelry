@@ -180,3 +180,40 @@ describe('the removed legacy aliases stay removed', () => {
     }
   })
 })
+
+/**
+ * The customer-account credentials are the newest secrets in the tree, and the
+ * two worst to leak: the client secret mints access tokens, and the session
+ * secret decrypts every signed-in customer's cookie.
+ *
+ * The graph walk above already covers them — but *only because* the regex happens
+ * to match their names. That is coverage by coincidence, which is the thing this
+ * repo keeps getting caught by, so it is asserted directly.
+ */
+describe('customer-account secrets are inside the pattern, not beside it', () => {
+  const CUSTOMER_SECRETS = [
+    'SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID',
+    'SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET',
+    'SHOPIFY_CUSTOMER_ACCOUNT_SESSION_SECRET',
+  ]
+
+  it('the secret pattern recognises each of them', () => {
+    for (const name of CUSTOMER_SECRETS) {
+      // Fresh regex per call: SECRET_ENV is /g and carries lastIndex.
+      expect(
+        new RegExp(SECRET_ENV.source).test(`process.env.${name}`),
+        `${name} is not matched by the secret pattern, so the graph walk cannot protect it`
+      ).toBe(true)
+    }
+  })
+
+  it('the modules holding them are not client modules', () => {
+    // A `'use client'` directive added to either of these would put a client
+    // secret in the browser bundle, and the graph walk starts *from* client
+    // modules — so the file becoming one is the failure it cannot see.
+    for (const file of ['lib/shopify/customer/config.ts', 'lib/shopify/customer/session.ts']) {
+      const source = readFileSync(path.join(SRC, file), 'utf8')
+      expect(isClientModule(source), `${file} must never be a client module`).toBe(false)
+    }
+  })
+})

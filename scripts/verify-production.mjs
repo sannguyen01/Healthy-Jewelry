@@ -43,8 +43,10 @@ import {
   collectionSetPremise,
   specMetafieldPremise,
   paymentsPremise,
+  apiVersionPremise,
   formatPremises,
 } from './lib/premise-checks.mjs'
+import { SHOPIFY_API_VERSION, compareServedApiVersion } from './lib/api-version.mjs'
 
 /**
  * Cold-start budget for the Open Graph image, in milliseconds.
@@ -62,7 +64,13 @@ import {
  */
 const OG_COLD_START_BUDGET_MS = 2500
 
-const API_VERSION = '2025-01'
+/**
+ * Imported, never re-declared. This literal used to be spelled out here *and* in
+ * `src/config/shopify-public.ts`, and both said `2025-01` for months after Shopify
+ * stopped serving it — two copies agreeing with each other is not the same as either
+ * being right. See ADR 009 and `src/tests/unit/api-version-contract.test.ts`.
+ */
+const API_VERSION = SHOPIFY_API_VERSION
 
 /** The publication the Storefront token reads from. Found by name, not by a
  *  hardcoded gid, so recreating the channel does not silently pass. */
@@ -641,6 +649,299 @@ async function openGraphRendersWithinBudget() {
   return `${elapsed}ms cold, ${(bytes / 1024).toFixed(0)}KB (budget ${OG_COLD_START_BUDGET_MS}ms)`
 }
 
+/**
+ * Shopify is serving the API version this code targets.
+ *
+ * ## The check that would have caught seven months of drift
+ *
+ * A retired API version does not error. Shopify **falls forward** — the request is
+ * answered by the oldest accessible stable version, HTTP 200, nothing in the body to
+ * say so. This project pinned `2025-01` from launch and kept pinning it long after
+ * Shopify stopped serving it; every check in this file passed throughout, because
+ * every check asked about *data* and none asked which API produced it.
+ *
+ * The evidence was on every single response the whole time. `X-Shopify-API-Version`
+ * names the version Shopify actually used. Nothing read it.
+ *
+ * Blocking, unlike the matching premise: a version still accessible but nearing
+ * retirement is a decision worth revisiting (that is `apiVersionPremise`), while a
+ * version already falling forward means the storefront is running against an API
+ * nobody tested it against — which is breakage, whether or not it has surfaced yet.
+ *
+ * Both surfaces are checked. The Storefront API is what customers hit; the Admin API
+ * is what this script's own conclusions rest on, and a fall-forward there would make
+ * every other check in this file a report about a different API than it claims.
+ */
+async function shopifyServesThePinnedApiVersion() {
+  const domain = resolveStoreDomain()
+
+  /** @param {string} label @param {string} url @param {Record<string,string>} headers */
+  async function servedVersion(label, url, headers) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      // The cheapest legal query on both APIs. The response body is irrelevant —
+      // the header is the measurement, and it is present even on an error.
+      body: JSON.stringify({ query: '{ shop { name } }' }),
+    })
+    return { label, ...compareServedApiVersion(res.headers.get('x-shopify-api-version')) }
+  }
+
+  const surfaces = [
+    await servedVersion('Storefront', `https://${domain}/api/${API_VERSION}/graphql.json`, {
+      'X-Shopify-Storefront-Access-Token': required('SHOPIFY_STOREFRONT_ACCESS_TOKEN'),
+    }),
+    await servedVersion('Admin', `https://${domain}/admin/api/${API_VERSION}/graphql.json`, {
+      'X-Shopify-Access-Token': required('SHOPIFY_ADMIN_ACCESS_TOKEN'),
+    }),
+  ]
+
+  const drifted = surfaces.filter((s) => !s.matches)
+  if (drifted.length > 0) {
+    throw new Error(drifted.map((s) => `${s.label} API: ${s.reason}`).join('\n  '))
+  }
+
+  return `Both surfaces served ${API_VERSION}, as pinned`
+}
+
+/**
+ * A product photographed in Shopify is actually shown on its page.
+ *
+ * ## The direction that will really fail
+ *
+ * The storefront had no image field at all until recently: `PRODUCT_FRAGMENT`
+ * requested none, `HJProduct` had nowhere to put one, and every surface hardcoded
+ * the illustration. A fully photographed store would have rendered zero photos.
+ *
+ * That is fixed, and the fix is invisible while the store has no media — which it
+ * currently does not, on all 22 products. So the failure this guards is the one
+ * that arrives *later*: somebody uploads a photo in Shopify Admin, the page keeps
+ * drawing a line illustration, and nothing anywhere says so. "No photo yet" and
+ * "photo present, pipeline broken" look identical from the outside, which is the
+ * same indistinguishability that let the static fallback hide for months
+ * (ADR 004).
+ *
+ * Passing while no product has media is correct, not a hole — there is genuinely
+ * nothing to render. It says so explicitly rather than reporting a silent tick,
+ * because a check whose reason for passing is invisible is one nobody can reason
+ * about.
+ */
+async function photographedProductsShowTheirPhotograph() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+
+  const data = await adminGraphql(
+    `query {
+       products(first: 250) {
+         edges { node { handle featuredMedia { preview { image { url } } } } }
+       }
+     }`,
+  )
+
+  const withPhoto = data.products.edges
+    .map((e) => e.node)
+    .filter((p) => p.featuredMedia?.preview?.image?.url)
+
+  if (withPhoto.length === 0) {
+    return (
+      'No product in Shopify has media yet, so every page correctly renders the ' +
+      'JewelrySVG illustration. This check starts asserting the moment a photo is uploaded.'
+    )
+  }
+
+  // A sample, not all of them: each check is a full page load, and the pipeline is
+  // one shared component — if it works for three products it works for all of them.
+  // The failure this catches is systemic, never per-product.
+  const sample = withPhoto.slice(0, 3)
+  const missing = []
+
+  for (const product of sample) {
+    const res = await fetch(new URL(`/products/${product.handle}`, siteUrl), {
+      headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+    })
+    if (!res.ok) {
+      missing.push(`${product.handle} (page returned ${res.status})`)
+      continue
+    }
+    const html = await res.text()
+    // next/image rewrites the src through /_next/image?url=<encoded>, so the CDN
+    // host appears percent-encoded. Checking the decoded HTML covers both forms.
+    if (!decodeURIComponent(html).includes('cdn.shopify.com')) {
+      missing.push(product.handle)
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.length} of ${sample.length} sampled products have a photo in Shopify ` +
+        `but no cdn.shopify.com image on their page: ${missing.join(', ')}\n` +
+        '  The page is falling back to the JewelrySVG illustration while real\n' +
+        '  photography exists — silently, because a product with no photo looks the same.',
+    )
+  }
+
+  return `${sample.length}/${sample.length} sampled photographed products render their image (${withPhoto.length} have media)`
+}
+
+/**
+ * Every tag namespace the store uses is one the code reads.
+ *
+ * Tags are the only channel Shopify gives this project for "which metal is this"
+ * and "which illustration", so the store's vocabulary and the code's have to
+ * agree. They already disagreed once, expensively: `material:steel` matched
+ * nothing, and all 22 products silently reported Grade 23 Titanium — on a brand
+ * whose entire promise is knowing which metal touches your skin.
+ *
+ * That failure is invisible from the store's side. A merchant writes a tag,
+ * Shopify accepts it, and nothing anywhere says the site does not read it. Five
+ * products currently carry `collection:spectrum` — a tag that does nothing at
+ * all, because collections come from real Shopify collection membership, not
+ * from tags.
+ *
+ * Reported as an **opportunity**, not a failure: an unread tag is a
+ * misunderstanding to resolve, not an outage. Failing on it would make a red
+ * build out of someone tidying their Shopify Admin.
+ */
+/** Tag namespaces `src/lib/shopify/tags.ts` parses. Anything else reaches no code path. */
+export const READ_TAG_NAMESPACES = ['material', 'svg']
+
+/** Bare tags `mapShopifyProduct` reads directly, for badges. */
+export const READ_BARE_TAGS = ['bestseller', 'new', 'sale']
+
+/**
+ * Which tags in a catalogue reach no code. Pure, so it can be tested against tag
+ * arrays captured from the real store rather than only observed saying "fine".
+ *
+ * @param {{ tags?: string[] }[]} products
+ * @returns {Map<string, number>} unread tag → how many products carry it
+ */
+export function unreadTags(products) {
+  const unread = new Map()
+  for (const product of products) {
+    for (const tag of product.tags ?? []) {
+      const value = tag.toLowerCase().trim()
+      if (!value) continue
+      const namespace = value.includes(':') ? value.slice(0, value.indexOf(':')) : null
+
+      if (namespace ? READ_TAG_NAMESPACES.includes(namespace) : READ_BARE_TAGS.includes(value)) {
+        continue
+      }
+      unread.set(value, (unread.get(value) ?? 0) + 1)
+    }
+  }
+  return unread
+}
+
+async function tagNamespacesAreAllRead() {
+  const data = await adminGraphql(
+    `query { products(first: 250) { edges { node { handle tags } } } }`,
+  )
+
+  const unread = unreadTags(data.products.edges.map((e) => e.node))
+  if (unread.size === 0) return 'Every tag in the store maps to something the code reads.'
+
+  const listed = [...unread.entries()].map(([tag, n]) => `${tag} (${n})`).join(', ')
+  return (
+    `${unread.size} tag(s) are read by nothing: ${listed}. ` +
+    'Harmless, but a tag that looks meaningful and does nothing is how the ' +
+    'material:steel mismatch survived. Either wire it up or remove it.'
+  )
+}
+
+/**
+ * The homepage strips have enough products to be strips.
+ *
+ * `GET_BESTSELLERS` and `GET_NEW_ARRIVALS` are `tag:bestseller` / `tag:new`
+ * queries, so the size of each homepage row is a **merchandising** fact set in
+ * Shopify Admin, not a code one. Exactly one product currently carries
+ * `bestseller`, which makes "BESTSELLING" a horizontal-scroll strip containing a
+ * single tile — not broken, just wrong-looking, and nothing on the site can
+ * report it.
+ *
+ * Never a failure. A thin strip is a tagging decision, and turning someone's
+ * merchandising into a red build is how a signal becomes noise.
+ */
+async function homepageStripsHaveEnoughProducts() {
+  const MIN_TILES = 3
+
+  const data = await adminGraphql(
+    `query {
+       bestsellers: products(first: 20, query: "tag:bestseller") { edges { node { handle } } }
+       newArrivals: products(first: 20, query: "tag:new") { edges { node { handle } } }
+     }`,
+  )
+
+  const strips = [
+    { label: 'BESTSELLING', tag: 'bestseller', count: data.bestsellers.edges.length },
+    { label: 'NEW ARRIVALS', tag: 'new', count: data.newArrivals.edges.length },
+  ]
+
+  const thin = strips.filter((s) => s.count < MIN_TILES)
+  if (thin.length === 0) {
+    return strips.map((s) => `${s.label}: ${s.count}`).join(', ')
+  }
+
+  return (
+    thin
+      .map(
+        (s) =>
+          `${s.label} has ${s.count} product(s) — a scroll strip with fewer than ${MIN_TILES} ` +
+          `tiles reads as broken. Tag more products \`${s.tag}\` in Shopify Admin.`,
+      )
+      .join(' ') + ` (Full counts: ${strips.map((s) => `${s.label}=${s.count}`).join(', ')})`
+  )
+}
+
+/**
+ * The store presents itself as the brand, not as a Shopify placeholder.
+ *
+ * `shop.name` is the store's identity everywhere Shopify renders it for a
+ * customer — most importantly the **hosted checkout**, which is the one page in
+ * the purchase journey this codebase does not control. A customer who has spent
+ * the whole session on *Healthy Jewellery* clicks Checkout and lands on a page
+ * belonging to whatever this field says.
+ *
+ * It currently says **"My Store 2"**, the name Shopify assigns by default. That
+ * is a one-field fix nothing in this repository could ever have noticed: the
+ * storefront never reads `shop.name`, so no page renders it and no test could
+ * see it. The gap is structural, which is exactly what this tier is for.
+ *
+ * Also checks the contact email, which is where a customer's reply to their order
+ * confirmation goes.
+ *
+ * An observation rather than a failing check, deliberately: the smoke workflow
+ * opens a GitHub issue when a check fails, and this would hold one open until a
+ * human changed a setting. It is listed as a launch blocker in
+ * docs/headless-launch-inventory.md, which is the right place for "you must do
+ * this" as opposed to "the system is malfunctioning".
+ */
+async function storeIdentifiesItselfAsTheBrand() {
+  const { shop } = await adminGraphql(`query { shop { name contactEmail } }`)
+
+  // Shopify's default is "My Store", numbered when the account has several.
+  const isPlaceholder = /^my store(\s+\d+)?$/i.test(shop.name.trim())
+  const notes = []
+
+  if (isPlaceholder) {
+    notes.push(
+      `shop.name is "${shop.name}" — Shopify's default placeholder, shown to customers ` +
+        'at the hosted checkout. Set it in Settings → Store details.',
+    )
+  }
+
+  // Not a rule about which provider is acceptable — plenty of real businesses run
+  // on one. It is about a *personal* mailbox appearing on transactional mail from
+  // a brand, which is the kind of detail that costs a first-time customer's trust.
+  if (/@(gmail|yahoo|hotmail|outlook|icloud)\./i.test(shop.contactEmail ?? '')) {
+    notes.push(
+      `contactEmail is a personal mailbox (${shop.contactEmail}). Customers replying to ` +
+        'their order confirmation reply to it; the site itself uses hello@ on the brand domain.',
+    )
+  }
+
+  if (notes.length === 0) return `Store presents as "${shop.name}" <${shop.contactEmail}>.`
+  return notes.join(' ')
+}
+
 // ── premises ────────────────────────────────────────────────────────────────
 
 /**
@@ -669,6 +970,7 @@ async function collectPremises() {
   const specCount = withSpec.products.edges.filter((e) => e.node.metafield?.value?.trim()).length
 
   return [
+    apiVersionPremise(),
     i18nPremise(shopLocales),
     collectionSetPremise(collections.edges.map((e) => e.node), KNOWN_COLLECTIONS),
     specMetafieldPremise(specCount, productsCount.count),
@@ -700,6 +1002,10 @@ function writeDriftFile(drifted) {
 async function main() {
   console.log('Production reality checks\n')
 
+  // First, because every check below reports on whatever API Shopify decided to answer
+  // with. If that is not the pinned version, the rest of this run describes a different
+  // API than the one the storefront was written against.
+  await check('Shopify serves the pinned API version', shopifyServesThePinnedApiVersion)
   await check('Live site serves Shopify data, not the static fallback', liveSiteServesShopifyData)
   await check(
     'Every product is published to the headless publication',
@@ -709,11 +1015,39 @@ async function main() {
   await check('Product metadata names the product, not "Not Found"', productMetadataNamesTheProduct)
   await check('The Open Graph image renders a real PNG', openGraphImageRenders)
   await check('Site search finds Shopify products', searchFindsShopifyProducts)
+  await check(
+    'A photographed product actually shows its photograph',
+    photographedProductsShowTheirPhotograph,
+  )
   await check('Rate limiting is distributed, not per-instance', rateLimitingIsDistributed)
   await check('A signed webhook actually revalidates the cached page', webhookRevalidatesTheCachedPage)
   await check('Unknown URLs cannot be indexed', unknownUrlsAreNotIndexable)
   await check('Manual revalidation endpoint is locked', revalidateEndpointRejectsAnonymous)
   await check('Open Graph image renders within the crawler budget', openGraphRendersWithinBudget)
+
+  // Observations about the *store*, not the code. Neither of these can fail the run:
+  // a tag nobody reads and a thin homepage strip are merchandising decisions made in
+  // Shopify Admin, and turning someone tidying their catalogue into a red build is
+  // exactly how the 24-minute E2E suite became noise nobody read. They are reported
+  // because nothing else can see them — the site renders happily either way.
+  const observations = []
+  for (const [label, fn] of [
+    ['Store identity', storeIdentifiesItselfAsTheBrand],
+    ['Tag namespaces', tagNamespacesAreAllRead],
+    ['Homepage strips', homepageStripsHaveEnoughProducts],
+  ]) {
+    try {
+      observations.push(`${label}: ${await fn()}`)
+    } catch (err) {
+      observations.push(`${label}: could not be evaluated — ${err.message}`)
+    }
+  }
+  if (observations.length > 0) {
+    console.log('─'.repeat(70))
+    console.log('Store observations (never failures)\n')
+    for (const line of observations) console.log(`  · ${line}`)
+    console.log('')
+  }
 
   // Premises last, and separately. A drifted premise means a decision is stale, not that
   // the storefront is broken, so it is reported but never counted as a failure. See ADR 008.

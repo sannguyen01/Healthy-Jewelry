@@ -20,7 +20,7 @@
 // indistinguishable from a tag that is absent. Parsing lives here, in one
 // place, so it can be tested against fixtures captured from the real store.
 
-import { HJ_SVG_TYPES } from './types'
+import { HJ_SVG_TYPES, HJ_COLLECTION_HANDLES } from './types'
 import type { HJCollectionHandle, HJMaterialHandle, HJSvgType } from './types'
 
 // ── Materials ──────────────────────────────────────────────────────────────
@@ -71,6 +71,94 @@ export function parseMaterial(tags: readonly string[]): MaterialParse {
     if (material) return { material, matched: true }
   }
   return { material: 'titanium', matched: false }
+}
+
+// ── Collections ────────────────────────────────────────────────────────────
+
+export function isHJCollectionHandle(value: string): value is HJCollectionHandle {
+  return (HJ_COLLECTION_HANDLES as readonly string[]).includes(value)
+}
+
+/**
+ * Collections Shopify creates and manages itself. A product can sit in one
+ * without anybody putting it there, and none of them is a category this site
+ * serves.
+ *
+ * `frontpage` is the one that matters, and it is live: `arc-band-titanium` is in
+ * `frontpage` *and* `rings`, and Shopify returns `frontpage` first.
+ */
+const SHOPIFY_BUILTIN_COLLECTIONS: ReadonlySet<string> = new Set(['frontpage'])
+
+export interface CollectionParse {
+  collection: HJCollectionHandle
+  /** False when nothing matched and the default was used. */
+  matched: boolean
+  /** Handles that were present but are not ones this site serves — for logging. */
+  ignored: string[]
+}
+
+/**
+ * Which of this site's five collections a product belongs to.
+ *
+ * ## The bug this replaces
+ *
+ * `mapShopifyProduct` used to take the *first* handle Shopify returned and cast
+ * it:
+ *
+ * ```ts
+ * const collection = (edges[0]?.node?.handle as HJCollectionHandle) ?? 'rings'
+ * ```
+ *
+ * `material` and `svgType` were both moved out of casts and into validating
+ * parsers here, precisely because a cast is a claim the compiler believes and
+ * nothing checks. `collection` was the one left behind, and the live store has a
+ * product that lands on it: `arc-band-titanium` returns
+ * `collections: [frontpage, rings]`, built-in first.
+ *
+ * So `product.collection` became `'frontpage'` — a value its own type says is
+ * impossible — and from there:
+ *
+ *   - the breadcrumb rendered the literal `frontpage` and linked to
+ *     `/shop/frontpage`, which `dynamicParams = false` turns into a **hard 404**,
+ *     reached from a link the site renders on its only `bestseller` product;
+ *   - `breadcrumbJsonLd` published that 404 as structured data;
+ *   - `collectionTag('frontpage')` was registered by the related-products fetch
+ *     and revalidated by nothing — a widow tag, the exact failure class
+ *     `cacheTags.ts` exists to make inexpressible.
+ *
+ * ## Why no detector saw it
+ *
+ * `scripts/lib/premise-checks.mjs` exempts `frontpage` from the collection-set
+ * drift premise, and a test pins that exemption as correct. It *is* correct for
+ * the question that premise asks — a built-in appearing is not drift. It was
+ * being read as the broader claim that `frontpage` is harmless. **An exemption is
+ * an assumption, and it needs a detector like any other.**
+ *
+ * ## The rule
+ *
+ * Return the first handle that is genuinely one of ours, ignoring built-ins and
+ * anything unrecognised. Order within the valid ones is Shopify's; order between
+ * valid and invalid is no longer. A product in `frontpage` + `rings` resolves to
+ * `rings` — which is what `docs/catalog-conventions.md` has claimed all along.
+ */
+export function parseCollection(
+  collectionHandles: readonly string[],
+  handle = ''
+): CollectionParse {
+  const ignored: string[] = []
+
+  for (const raw of collectionHandles) {
+    const value = raw.toLowerCase().trim()
+    if (isHJCollectionHandle(value)) return { collection: value, matched: true, ignored }
+    // Built-ins are expected and uninteresting; anything else is a real
+    // collection somebody made that the site cannot serve, and worth naming.
+    if (!SHOPIFY_BUILTIN_COLLECTIONS.has(value)) ignored.push(value)
+  }
+
+  // `handle` is accepted so callers pass it uniformly with parseSvgType; it is
+  // the caller that logs, so that every warning in the mapper reads the same.
+  void handle
+  return { collection: 'rings', matched: false, ignored }
 }
 
 // ── SVG illustration types ─────────────────────────────────────────────────

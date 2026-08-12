@@ -4,6 +4,49 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-08-12 — PR #19: The triangle, decoded
+
+A full-scope diagnostic of GitHub → Vercel → Shopify, run against the **live
+store** through the Admin API rather than reasoned from the codebase, plus fixes
+for everything it found.
+
+- **The pinned Shopify API version had been retired for ~7 months.** `2025-01`
+  stopped being served around 2026-01, and Shopify does not reject a retired
+  version — it *falls forward*, answering with the oldest accessible one, HTTP
+  200, with nothing in the body to say so. Every check in `verify-production.mjs`
+  passed throughout, because every check asked about *data* and none asked which
+  API produced it. The evidence was on every response the whole time:
+  `X-Shopify-API-Version`, read by nothing. Now `2026-07`, asserted rather than
+  declared ([ADR 009](docs/adr/009-api-version-must-be-asserted-not-declared.md)).
+- **A live product was mapped into a collection that hard-404s.**
+  `mapShopifyProduct` cast Shopify's first collection handle without validating
+  it; `arc-band-titanium` sits in the built-in `frontpage` collection, returned
+  first, so its breadcrumb linked to `/shop/frontpage` — a real 404 under
+  `dynamicParams = false`, on the site's only `bestseller`. The project's own
+  premise detector exempted `frontpage` as harmless, which is true for "has the
+  collection set drifted" and false for "can a product be mapped into it".
+- **The storefront could not render a product photograph at all.** No image field
+  in the GraphQL fragment, none on `HJProduct`, `<JewelrySVG>` hardcoded at all
+  five surfaces — a fully photographed store would have shown zero photos. Photos
+  now appear the moment they are uploaded to Shopify, with the illustration as the
+  fallback.
+- **A deployment can now say what it is.** `/api/version`, a `<meta name="hj-build">`
+  stamp, and `pnpm diagnose:deployment <url>` answer the three questions that have
+  recurred across this project's entire history and were invisible from outside:
+  is this a cached build with stale inlined `NEXT_PUBLIC_*` values, which Vercel
+  environment is answering, and is this a frozen preview alias.
+- **Analytics, consent-gated and first-party.** Seven typed events. Headless is why
+  it matters: Shopify's own analytics sees the hosted checkout only, so conversion
+  rate was uncomputable. `checkout_failed` carries the typed `CheckoutError`, so
+  the banner this project keeps rediscovering is finally a number.
+- Removed a dead, stale `hjCollections[].count`; reported tags no code reads
+  (`collection:spectrum`, on five products); reported homepage strips with too few
+  products to be strips.
+- **[docs/headless-launch-inventory.md](docs/headless-launch-inventory.md)** — every
+  component of a headless launch marked present / missing / unknown, with evidence
+  from the live store. Six things stand between this store and a sale; only two
+  were code, and both are now done.
+
 ## 2026-08-02 — PR #12: Checkout actually reaches Shopify
 
 Placing an order produced nothing — no confirmation, no payment step. Six

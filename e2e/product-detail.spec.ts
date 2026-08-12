@@ -188,4 +188,45 @@ test.describe('Product detail — breadcrumb navigation', () => {
     await collectionLink.click()
     await expect(page).toHaveURL('/shop/rings')
   })
+
+  /**
+   * **No breadcrumb may link to a 404, on any product.**
+   *
+   * The three tests above check `arc-band-titanium` specifically, and would have
+   * passed while the bug was live — locally `arc-band-titanium` resolves from the
+   * static catalogue, where its collection is `rings` by construction. Against the
+   * real store it is in Shopify's built-in `frontpage` collection as well, returned
+   * first, and the old unvalidated cast put `frontpage` into the breadcrumb — a link
+   * to `/shop/frontpage`, which `dynamicParams = false` answers with a hard 404.
+   *
+   * So this asserts the property rather than the instance: every breadcrumb href on
+   * every product page must resolve. That holds whatever Shopify returns, and it does
+   * not depend on anybody remembering which collection is the awkward one.
+   *
+   * `dynamicParams = false` is what makes this cheap to check — an unserved collection
+   * is a real 404 status, not a soft one, so `response.status()` is the whole test.
+   */
+  for (const handle of [RING_HANDLE, EARRING_HANDLE, BRACELET_HANDLE]) {
+    test(`every breadcrumb link on /products/${handle} resolves`, async ({ page, request }) => {
+      await page.goto(`/products/${handle}`)
+
+      const hrefs = await page
+        .getByRole('navigation', { name: /breadcrumb/i })
+        .getByRole('link')
+        .evaluateAll((links) => links.map((l) => l.getAttribute('href') ?? ''))
+
+      // A breadcrumb with no links at all would make the loop below vacuous — the
+      // shape of green that proves nothing.
+      expect(hrefs.length).toBeGreaterThan(0)
+
+      for (const href of hrefs) {
+        // An explicit, generous timeout. This fires N extra requests per test
+        // while 374 others run in parallel against one `next start`, and it
+        // flaked once under exactly that load — a slow response is not a dead
+        // link, and a check that reports one as the other is worse than no check.
+        const response = await request.get(href, { timeout: 30_000 })
+        expect(response.status(), `breadcrumb link ${href} is a dead end`).toBeLessThan(400)
+      }
+    })
+  }
 })

@@ -17,6 +17,8 @@ const mockProduct: HJProduct = {
   description: 'Test',
   spec: '2mm',
   svgType: 'ring-arc',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 
@@ -35,6 +37,8 @@ const mockProduct2: HJProduct = {
   description: 'Dome ring',
   spec: '4mm',
   svgType: 'ring-dome',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 

@@ -37,6 +37,8 @@ const mockProduct: HJProduct = {
   description: 'Grade 23 titanium.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 
@@ -55,6 +57,8 @@ const mockProduct2: HJProduct = {
   description: 'Dome profile.',
   spec: '4 mm · 2.4 g',
   svgType: 'ring-dome',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 

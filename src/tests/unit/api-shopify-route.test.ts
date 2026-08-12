@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import { shopifyPublicConfig } from '@/config/shopify-public'
 
 // next/cache is server-only; mock it before importing the route
 vi.mock('next/cache', () => ({
@@ -32,6 +33,14 @@ const ALLOWED_BODY = { operation: 'GetCart', variables: { cartId: 'gid://shopify
 
 // Shopify returns this shape on success
 const SHOPIFY_SUCCESS = { data: { cart: null } }
+
+/**
+ * Shopify stamps every response with the version that served it, and this route
+ * reads it to detect a fall-forward (ADR 009). Without it these mocks provoke a
+ * real "API VERSION MISMATCH" error on a passing test — and a warning that fires
+ * when nothing is wrong is how a reader learns to skip the one that matters.
+ */
+const SHOPIFY_VERSION_HEADER = { 'X-Shopify-API-Version': shopifyPublicConfig.apiVersion }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
@@ -116,7 +125,7 @@ describe('POST /api/shopify', () => {
         sentBody = init?.body as string
         return new Response(JSON.stringify(SHOPIFY_SUCCESS), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...SHOPIFY_VERSION_HEADER },
         })
       })
       const req = makeReq({
@@ -144,7 +153,7 @@ describe('POST /api/shopify', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(JSON.stringify(SHOPIFY_SUCCESS), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...SHOPIFY_VERSION_HEADER },
         })
       )
     })
@@ -187,7 +196,11 @@ describe('POST /api/shopify', () => {
     it('propagates non-OK Shopify status code', async () => {
       vi.stubEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', 'test.myshopify.com')
       vi.stubEnv('SHOPIFY_STOREFRONT_ACCESS_TOKEN', 'token')
-      vi.mocked(fetch).mockResolvedValue(new Response('Unauthorized', { status: 401 }))
+      // Version header present even on the 401: Shopify stamps every response, and
+      // a rejected credential is not a reason to also report a phantom version drift.
+      vi.mocked(fetch).mockResolvedValue(
+        new Response('Unauthorized', { status: 401, headers: SHOPIFY_VERSION_HEADER })
+      )
       const req = makeReq(ALLOWED_BODY)
       const res = await POST(req)
       expect(res.status).toBe(401)
@@ -199,7 +212,7 @@ describe('POST /api/shopify', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response('not-json', {
           status: 200,
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'text/plain', ...SHOPIFY_VERSION_HEADER },
         })
       )
       const req = makeReq(ALLOWED_BODY)
@@ -213,7 +226,7 @@ describe('POST /api/shopify', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(JSON.stringify(SHOPIFY_SUCCESS), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...SHOPIFY_VERSION_HEADER },
         })
       )
       const req = makeReq(ALLOWED_BODY)
@@ -229,7 +242,7 @@ describe('POST /api/shopify', () => {
       vi.mocked(fetch).mockResolvedValue(
         new Response(JSON.stringify(SHOPIFY_SUCCESS), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...SHOPIFY_VERSION_HEADER },
         })
       )
       const req = makeReq(ALLOWED_BODY)

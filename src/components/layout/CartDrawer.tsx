@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { useCartStore } from '@/store/cart'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
+import { ProductImage } from '@/components/product/ProductImage'
 import {
   checkoutMessage,
   supportMailto,
@@ -230,9 +231,10 @@ export function CartDrawer() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      position: 'relative',
                     }}
                   >
-                    <JewelrySVG type={product.svgType} className="w-4/5 h-4/5" />
+                    <ProductImage product={product} svgScale="80%" sizes="64px" />
                   </div>
 
                   {/* Info */}

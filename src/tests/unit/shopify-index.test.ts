@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { shopifyPublicConfig } from '@/config/shopify-public'
 
 const VALID_DOMAIN = 'test-store.myshopify.com'
 const VALID_TOKEN = 'test-token-abc123'
@@ -41,8 +42,20 @@ function shopifyProductNode(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-function mockJsonResponse(body: unknown) {
-  return { ok: true, status: 200, json: async () => body }
+/**
+ * Headers included on purpose. Real Shopify responses always carry
+ * `X-Shopify-API-Version`, and `shopifyFetch` reads it to detect a fall-forward
+ * (ADR 009). A mock without it is not a smaller version of a Shopify response —
+ * it is a different shape, and this project has already been burned by fixtures
+ * that agreed with the code rather than with the store.
+ */
+function mockJsonResponse(body: unknown, apiVersion: string = shopifyPublicConfig.apiVersion) {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ 'x-shopify-api-version': apiVersion }),
+    json: async () => body,
+  }
 }
 
 let warnSpy: ReturnType<typeof vi.spyOn>
@@ -306,8 +319,71 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     const product = await getProduct('arc-band-titanium')
     expect(product?.collection).toBe('rings')
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('missing collection'),
-      expect.objectContaining({ handle: 'arc-band-titanium' })
+      expect.stringContaining('no recognised collection'),
+      expect.objectContaining({ handle: 'arc-band-titanium', ignored: [] })
+    )
+  })
+
+  /**
+   * The live case, through the whole mapper rather than the parser alone.
+   *
+   * `arc-band-titanium` really is in `['frontpage', 'rings']`, built-in first, and the
+   * old `edges[0] as HJCollectionHandle` cast produced `'frontpage'` — a value the type
+   * says cannot exist, which the product page then linked to as `/shop/frontpage`, a
+   * hard 404 under `dynamicParams = false`.
+   */
+  it('maps a product in Shopify\'s built-in frontpage collection to its real one', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        mockJsonResponse({
+          data: {
+            product: shopifyProductNode({
+              collections: {
+                edges: [
+                  { node: { handle: 'frontpage', title: 'Home page' } },
+                  { node: { handle: 'rings', title: 'Rings' } },
+                ],
+              },
+            }),
+          },
+        })
+      )
+    )
+    const { getProduct } = await import('@/lib/shopify')
+    const product = await getProduct('arc-band-titanium')
+
+    expect(product?.collection).toBe('rings')
+    // Silently, too: a built-in is expected, and warning about it every render is
+    // how the one warning that matters gets filtered out.
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('no recognised collection'),
+      expect.anything()
+    )
+  })
+
+  it('names an unservable collection rather than only reporting the fallback', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        mockJsonResponse({
+          data: {
+            product: shopifyProductNode({
+              collections: { edges: [{ node: { handle: 'spectrum', title: 'Spectrum' } }] },
+            }),
+          },
+        })
+      )
+    )
+    const { getProduct } = await import('@/lib/shopify')
+    const product = await getProduct('arc-band-titanium')
+
+    expect(product?.collection).toBe('rings')
+    // "Defaulted to rings" and "defaulted to rings because this product lives in a
+    // collection with no page" call for different responses from whoever reads the log.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('no recognised collection'),
+      expect.objectContaining({ ignored: ['spectrum'] })
     )
   })
 

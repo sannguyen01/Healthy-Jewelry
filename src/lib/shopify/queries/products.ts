@@ -53,6 +53,36 @@ export const PRODUCT_FRAGMENT = /* GraphQL */ `
         }
       }
     }
+    # Photography, when the merchant has uploaded any.
+    #
+    # This fragment carried no image field at all until now, so the storefront was
+    # structurally incapable of showing a product photograph — a jewellery site
+    # that could not render jewellery. The plumbing had been half-built around it
+    # for months: next.config.ts already allowlists cdn.shopify.com, and
+    # CART_FRAGMENT already fetches images, so the bag could show a photo the
+    # product page could not.
+    #
+    # Null when the product has no media, which is currently every product on the
+    # connected store. ProductImage falls back to the JewelrySVG illustration,
+    # so uploading a photo in Shopify Admin is the only step needed to see it.
+    featuredImage {
+      url
+      altText
+      width
+      height
+    }
+    # Six is the gallery cap on the detail page. Listing surfaces use
+    # featuredImage alone and never pay for these.
+    images(first: 6) {
+      edges {
+        node {
+          url
+          altText
+          width
+          height
+        }
+      }
+    }
     # Physical spec ("2 mm · 1.8 g"). Optional: Shopify has no native field for
     # it, so it lives in a metafield and resolves to null when unset — the
     # detail page hides the line rather than rendering an empty one.

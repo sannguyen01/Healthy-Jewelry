@@ -10,7 +10,7 @@ import {
   SEARCH_PRODUCTS,
 } from './queries/products'
 import { PRODUCTS_TAG, productTag, collectionTag } from './cacheTags'
-import { parseMaterial, parseSvgType } from './tags'
+import { parseMaterial, parseSvgType, parseCollection } from './tags'
 import type { HJProduct, HJCollection, HJCollectionHandle, Product } from './types'
 import {
   getAllProducts as staticGetAllProducts,
@@ -98,14 +98,30 @@ function mapShopifyProduct(node: Product): HJProduct {
 
   const handle = node.handle ?? ''
 
+  // Validated, never cast — the last of the three mapped fields to get this
+  // treatment, and the one the live store was already tripping over.
+  // `arc-band-titanium` sits in Shopify's built-in `frontpage` collection as well
+  // as `rings`, and Shopify returns `frontpage` first, so the old
+  // `edges[0] as HJCollectionHandle` produced a handle no route serves: the
+  // product page then rendered a breadcrumb linking to `/shop/frontpage`, which
+  // `dynamicParams = false` answers with a hard 404. See `parseCollection`.
   const collectionsEdges = node.collections?.edges ?? []
-  const hasCollectionTag = collectionsEdges.length > 0
-  const collection: HJCollectionHandle =
-    (collectionsEdges[0]?.node?.handle as HJCollectionHandle | undefined) ?? 'rings'
-  if (!hasCollectionTag) {
-    console.warn('[shopify] product missing collection, defaulting to "rings":', {
+  const {
+    collection,
+    matched: collectionMatched,
+    ignored: ignoredCollections,
+  } = parseCollection(
+    collectionsEdges.map((e) => e.node?.handle ?? ''),
+    handle
+  )
+  if (!collectionMatched) {
+    console.warn('[shopify] no recognised collection, defaulting to "rings":', {
       handle,
       id: node.id,
+      // Named rather than counted: "this product is in a collection you have not
+      // built a page for" is actionable, and `[]` versus `['spectrum']` is the
+      // difference between an untagged product and a mis-tagged one.
+      ignored: ignoredCollections,
     })
   }
 
@@ -164,6 +180,12 @@ function mapShopifyProduct(node: Product): HJProduct {
     // Optional by design: Shopify has no native field for a physical spec, so
     // it lives in `custom.spec`. Absent means the detail page hides the line.
     spec: node.spec?.value?.trim() ?? '',
+    // Null rather than a synthesised placeholder. `<ProductImage>` needs to be
+    // able to tell "no photo exists" from "a photo exists and failed to load" —
+    // the first draws the illustration, the second is a bug, and a fabricated
+    // URL would make them look identical.
+    featuredImage: node.featuredImage ?? null,
+    images: (node.images?.edges ?? []).map((e) => e.node),
     variants,
   }
 }

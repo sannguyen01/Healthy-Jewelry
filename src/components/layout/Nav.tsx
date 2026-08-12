@@ -150,6 +150,27 @@ export function Nav({ cartCount }: NavProps) {
             </svg>
           </button>
 
+          {/* Account — a link, not a button: it is a navigation, and it has to
+              work before any JavaScript runs. `/account` decides for itself
+              whether to show the signed-in or signed-out state, so the nav does
+              not need to know and cannot get it wrong. */}
+          <Link
+            href="/account"
+            aria-label="Your account"
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: '0.68rem',
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--ink)',
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            Account
+          </Link>
+
           {/* BAG button */}
           <button
             aria-label={`Open bag — ${count} item${count !== 1 ? 's' : ''}`}

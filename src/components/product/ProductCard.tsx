@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { HJProduct } from '@/lib/shopify/types'
-import { JewelrySVG } from '@/components/svg/JewelrySVG'
+import { ProductImage } from '@/components/product/ProductImage'
 import { ProductBadge } from '@/components/product/ProductBadge'
 import { formatPrice } from '@/lib/utils/formatPrice'
 
@@ -44,7 +44,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           if (spec) spec.style.opacity = '0'
         }}
       >
-        {/* SVG area */}
+        {/* Photograph when Shopify has one, illustration when not — see ProductImage. */}
         <div
           style={{
             height: '280px',
@@ -55,7 +55,12 @@ export function ProductCard({ product, className }: ProductCardProps) {
             position: 'relative',
           }}
         >
-          <JewelrySVG type={product.svgType} className="" style={{ width: '65%', height: '65%' }} />
+          <ProductImage
+            product={product}
+            svgScale="65%"
+            // Grid is 1 / 2 / 3 columns at the ProductGrid breakpoints.
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
 
           {/* Spec overlay — revealed on hover */}
           <p

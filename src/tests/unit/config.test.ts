@@ -9,6 +9,7 @@ import {
   collectionsNav,
 } from '@/config/navigation'
 import { shopifyConfig, REVALIDATE } from '@/config/shopify'
+import { shopifyPublicConfig } from '@/config/shopify-public'
 import {
   SITE_NAME,
   SITE_URL,
@@ -113,8 +114,22 @@ describe('collectionsNav', () => {
 // ── shopify.ts ─────────────────────────────────────────────────────────────
 
 describe('shopifyConfig', () => {
-  it('has apiVersion 2025-01', () => {
-    expect(shopifyConfig.apiVersion).toBe('2025-01')
+  /**
+   * Deliberately *not* `toBe('<some literal>')`.
+   *
+   * This assertion used to hardcode `'2025-01'`, which made it a **third copy** of a
+   * string that already existed in two places — and it passed happily for the seven
+   * months that version spent retired. A test that restates the implementation cannot
+   * see the implementation is wrong; it just has to be edited alongside it.
+   *
+   * What is worth asserting here is the *delegation*: the server config must read the
+   * version from the browser-safe config rather than declaring its own. Whether that
+   * version is the right one is a question about Shopify, answered in
+   * `api-version-contract.test.ts` (agreement) and by
+   * `shopifyServesThePinnedApiVersion` in `verify-production.mjs` (correctness).
+   */
+  it('takes its apiVersion from the public config rather than declaring one', () => {
+    expect(shopifyConfig.apiVersion).toBe(shopifyPublicConfig.apiVersion)
   })
   it('has all required keys', () => {
     expect(shopifyConfig).toHaveProperty('storeDomain')

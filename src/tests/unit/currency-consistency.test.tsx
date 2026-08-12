@@ -47,6 +47,8 @@ const vndProduct: HJProduct = {
   description: 'Grade 23 titanium.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 

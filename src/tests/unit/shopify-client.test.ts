@@ -1,8 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ShopifyFetchError } from '@/lib/shopify/client'
+import { shopifyPublicConfig } from '@/config/shopify-public'
 
 // shopifyFetch is imported inside each test after env stubs are set
 // to ensure getEnv() picks up the mocked values.
+
+/**
+ * What Shopify actually puts on a response, including the error ones.
+ *
+ * `X-Shopify-API-Version` is present on every Shopify reply and is how a
+ * fall-forward is detected (ADR 009), so a mock omitting it is the wrong shape
+ * rather than a simpler one. It is on the failure mocks too, deliberately: a
+ * retired version can *cause* the error, so that is exactly when knowing which
+ * version answered matters most.
+ */
+function shopifyHeaders(apiVersion: string = shopifyPublicConfig.apiVersion): Headers {
+  return new Headers({ 'x-shopify-api-version': apiVersion })
+}
 
 describe('ShopifyFetchError', () => {
   it('is an instance of Error', () => {
@@ -84,6 +98,7 @@ describe('shopifyFetch', () => {
       ok: false,
       status: 500,
       statusText: 'Internal Server Error',
+      headers: shopifyHeaders(),
     })
     vi.stubGlobal('fetch', mockFetch)
 
@@ -101,6 +116,7 @@ describe('shopifyFetch', () => {
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
+      headers: shopifyHeaders(),
       json: async () => payload,
     })
     vi.stubGlobal('fetch', mockFetch)
@@ -119,6 +135,7 @@ describe('shopifyFetch', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
+      headers: shopifyHeaders(),
       json: async () => payload,
     })
     vi.stubGlobal('fetch', mockFetch)
@@ -137,6 +154,7 @@ describe('shopifyFetch', () => {
     const mockFetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
+      headers: shopifyHeaders(),
       json: async () => payload,
     })
     vi.stubGlobal('fetch', mockFetch)

@@ -178,6 +178,8 @@ const testProduct: HJProduct = {
   description: 'Titanium ring used for unit testing.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 

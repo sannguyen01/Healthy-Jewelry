@@ -4,6 +4,43 @@ Rules for adding or editing products in Shopify Admin so they render correctly o
 site. `src/lib/shopify/index.ts` (`mapShopifyProduct`) is the authoritative mapping —
 this doc explains what it expects and what happens when a product doesn't provide it.
 
+## Product photography
+
+**Upload photos in Shopify Admin and they appear. There is no code step.**
+
+`featuredImage` becomes the image on the card, the strip, the cart thumbnail and the
+detail page; `images` (first 6) becomes the detail-page gallery, whose thumbnail strip
+only renders when there is more than one. With no media, every surface draws the
+`svg:` illustration below instead — the same shape it draws today, because **all 22
+products on the connected store currently have zero media.**
+
+Everything routes through `<ProductImage>` (`src/components/product/ProductImage.tsx`),
+which is the single place that decides photo-or-illustration.
+
+> This was not always true, and the gap was invisible. `PRODUCT_FRAGMENT` requested no
+> image field and `HJProduct` had nowhere to put one, so **a fully photographed store
+> would still have rendered zero photographs** — every surface hardcoded `<JewelrySVG>`
+> as the only option, not as a fallback. The half-built plumbing around it is the tell:
+> `next.config.ts` already allowlists `cdn.shopify.com`, and `CART_FRAGMENT` already
+> fetched images, so the bag could show a photo the product page structurally could not.
+
+Practical notes:
+
+- **Alt text.** Set it in Shopify (Products → media → Alt text). When unset, the product
+  title is used — never an empty `alt`, which would tell a screen reader that the thing
+  the customer is buying is decorative.
+- **Framing.** Images are rendered `object-fit: contain`, so the whole piece is always
+  visible and nothing is cropped. Shoot on a light ground to sit well on `--nacre` tiles.
+- **The share card is still text-only.** `products/[handle]/opengraph-image.tsx` renders
+  the product name and price, not the photograph. Adding one means a CDN fetch inside a
+  route that has a hard **2500 ms cold-start budget** (a timed-out unfurl renders *no*
+  card at all, which is worse than a plain one). Worth doing once photos exist and the
+  budget can be re-measured against a real image — not before.
+- **A photo that does not appear is a bug, and it is checked.**
+  `verify-production.mjs` asserts that any product with media in Shopify serves a
+  `cdn.shopify.com` URL on its page, because "no photo yet" and "photo uploaded, pipeline
+  broken" are otherwise indistinguishable.
+
 ## `svg:` tag (illustration)
 
 The site has no product photography for most SKUs — it renders a hand-drawn SVG
@@ -28,12 +65,35 @@ silently defaults to `ring-arc` — the wrong illustration renders with no error
 A `console.warn` fires server-side (`[shopify] product missing svg: tag`), but nothing
 surfaces to Shopify Admin. Tag every product explicitly; don't rely on the fallback.
 
-## Collection tag
+## Collection
 
 Every product needs a Shopify collection matching one of the five `HJCollectionHandle`
 values: `rings`, `necklaces`, `earrings`, `bracelets`, `charms`. A product in none of
-these defaults to `rings` with a `console.warn` — same silent-failure shape as the SVG
-tag.
+these defaults to `rings` with a `console.warn` naming the collections it could not use —
+same silent-failure shape as the SVG tag.
+
+**A product may sit in more than one collection, and order does not matter.**
+`parseCollection` takes the first handle that is genuinely one of the five and ignores
+everything else, so `frontpage` + `rings` resolves to `rings`.
+
+> This paragraph described the intended behaviour for months before the code did it.
+> `mapShopifyProduct` used to take Shopify's **first** collection and cast it —
+> `edges[0].node.handle as HJCollectionHandle` — with no check that the value was one of
+> the five. `arc-band-titanium` is in Shopify's built-in `frontpage` collection as well as
+> `rings`, and Shopify returns `frontpage` first, so its `product.collection` became
+> `'frontpage'`: a breadcrumb reading `frontpage`, linked to `/shop/frontpage`, which
+> `dynamicParams = false` answers with a **hard 404** — on the site's only `bestseller`.
+> The `warn` fired only when a product had *zero* collections, which never happens.
+
+**Do not put a product only in `frontpage`.** Shopify's built-ins are skipped deliberately
+(nobody chose to put the product there), so a product with no other collection falls back
+to `rings` regardless of what it is.
+
+### `collection:` tags do nothing
+
+Five products carry a `collection:spectrum` tag. Nothing reads it — collections come from
+Shopify's real collection membership, not from tags. It is harmless, but it is also not
+doing what its name suggests. Either create a real collection or drop the tag.
 
 ## Material tag
 

@@ -1,4 +1,5 @@
 import { shopifyConfig } from '@/config/shopify'
+import { reportApiVersionDrift } from './api-version'
 import type { ShopifyResponse } from './types'
 
 // ── Environment validation ─────────────────────────────────────────────────
@@ -74,6 +75,13 @@ export async function shopifyFetch<T>(
       undefined
     )
   }
+
+  // Before the status check, deliberately. A fall-forward can *cause* the error
+  // being thrown below — a query valid in the pinned version and removed in the
+  // one actually serving it fails as a plain GraphQL error — so the version
+  // mismatch has to be in the log next to it, not skipped because the request
+  // failed.
+  reportApiVersionDrift(response.headers, 'shopifyFetch')
 
   if (!response.ok) {
     throw new ShopifyFetchError(

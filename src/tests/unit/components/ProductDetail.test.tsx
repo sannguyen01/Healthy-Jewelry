@@ -21,6 +21,8 @@ const ringProduct: HJProduct = {
   description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
   spec: '2 mm · 1.8 g',
   svgType: 'ring-arc',
+  featuredImage: null,
+  images: [],
   variants: ['5', '6', '7', '8', '9', '10', '11', '12'].map((size) => ({
     id: `gid://shopify/ProductVariant/hj-001-size-${size}`,
     title: size,
@@ -47,6 +49,8 @@ const earringProduct: HJProduct = {
   description: 'Flat disc studs on implant-grade titanium posts.',
   spec: 'Disc 8 mm · post 6 mm',
   svgType: 'earring-stud',
+  featuredImage: null,
+  images: [],
   variants: [
     {
       id: 'gid://shopify/ProductVariant/hj-009-default',
@@ -74,6 +78,8 @@ const braceletProduct: HJProduct = {
   description: 'Twisted titanium cable cuff.',
   spec: '2.5 mm cable · 160 mm',
   svgType: 'bracelet-cuff',
+  featuredImage: null,
+  images: [],
   variants: ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)'].map((size) => ({
     id: `gid://shopify/ProductVariant/hj-013-size-${size.slice(0, size.indexOf(' '))}`,
     title: size,

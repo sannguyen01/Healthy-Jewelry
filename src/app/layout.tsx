@@ -3,6 +3,8 @@ import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
 import { CartProvider } from '@/store/cart'
 import { SITE_URL } from '@/config/site'
+import { buildStamp } from '@/config/build-info'
+import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
 const barlowCondensed = Barlow_Condensed({
   weight: ['400', '500'],
@@ -89,8 +91,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         } as React.CSSProperties
       }
     >
+      <head>
+        {/*
+          Which commit, which environment, when built, and a fingerprint of the
+          inlined NEXT_PUBLIC_* values — readable with "view source" on any
+          device, no tooling. `/api/version` carries the same facts plus the
+          stale-bundle comparison; this exists because runbook step 5 happens on
+          a real phone, where running a script is not an option.
+
+          Public by construction: the commit is in a public repo and the
+          fingerprint's inputs are already shipped to the browser in plain text.
+        */}
+        <meta name="hj-build" content={buildStamp()} />
+      </head>
       <body>
         <CartProvider>{children}</CartProvider>
+        {/* Asks once, then never again. Nothing is measured until it is answered. */}
+        <ConsentBanner />
       </body>
     </html>
   )
