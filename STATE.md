@@ -116,19 +116,24 @@ policy**, so the existing Vercel token must be copied rather than a second minte
   Reproduce any time: `pnpm audit:secrets`. See `docs/credential-inventory.md`.
   Loop action: report only, never touch credentials
   Human decision: pending
-- [ ] SOFT-404-PRODUCT — **new 2026-08-08.** `/products/<unknown-handle>` answers
-  **HTTP 200** while rendering `not-found.tsx`. A soft 404 lets search engines
-  index every mistyped or stale product URL as a real page, and the title they
-  index is `Product Not Found — Healthy Jewelry`.
-  Verified **identical on `HEAD`** before the metadata migration, so this is
-  pre-existing Next routing behaviour, not a catalogue-source bug — recorded
-  rather than half-fixed inside an unrelated change. `src/app/not-found.tsx`
-  exists and no route sets `dynamicParams`.
-  `e2e/metadata.spec.ts` asserts the *content* (a missing product must not render
-  as a product) rather than the status, so it does not encode the wrong
-  behaviour as correct while this is open.
-  Loop action: may fix — isolated to `src/app/products/[handle]/`
-  Human decision: pending
+- [x] SOFT-404 — **resolved 2026-08-11, and it was broader than recorded.**
+  `/shop/<unknown-collection>` answered 200 as well, which the original note missed.
+  **Mechanism, measured:** `notFound()` returns **200 for streamed responses** and 404 only
+  for non-streamed ones, so by the time either page discovers the param is unknown the
+  status line is already on the wire. Not a defect in our routes and not fixable inside
+  them.
+  Split by whether the param set is closed:
+  · **collections** — `dynamicParams = false`. Five fixed handles, so unknown params are
+    rejected *before rendering begins*: `/shop/not-a-collection` now returns a genuine
+    **404** (verified against a production build), `/shop/rings` still 200.
+  · **products** — set is open, so locking it would 404 any product added in Shopify until
+    the next redeploy. They emit `robots: noindex, nofollow` instead (`NOT_FOUND_SEO` in
+    `src/lib/seo/productSeo.ts`) — Google's remedy for a soft 404 that cannot be
+    status-coded, and stronger than a robots.txt disallow, which does not prevent indexing.
+  Guarded by `e2e/metadata.spec.ts` in both directions — including that a **real** product
+  is *not* noindex, since a leak there would deindex the catalogue — and by
+  `verify-production.mjs` against the live deployment.
+  Expect a lag: Google drops already-indexed junk URLs on the next crawl, not immediately.
 - [ ] UPSTASH-REDIS — `/api/shopify` is now rate-limited (2026-08-07), sharing
   `src/lib/utils/rateLimit.ts` with `/api/contact`. It is only durable across
   serverless invocations if `UPSTASH_REDIS_REST_URL` and

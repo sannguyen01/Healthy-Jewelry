@@ -33,6 +33,29 @@ export interface ProductSeo {
   fullTitle: string
 }
 
+/**
+ * Metadata for a product handle that does not resolve.
+ *
+ * `/products/<unknown>` answers **HTTP 200** while rendering `not-found.tsx`, and no code
+ * in the page can change that: Next returns 200 for streamed responses and 404 only for
+ * non-streamed ones, so the status line is already sent before the render discovers there
+ * is no product. Unlike `/shop/[collection]`, this route cannot use
+ * `dynamicParams = false` — the handle set is open, and locking it would 404 any product
+ * added in Shopify until the next redeploy.
+ *
+ * So the status stays wrong and the *harm* is addressed instead. `noindex` is Google's own
+ * remedy for a soft 404 that cannot be status-coded: it removes the URL from the index
+ * rather than merely discouraging the crawl, which is why it is the right tool here and a
+ * `robots.txt` disallow is not — a disallowed URL can still be indexed from links alone.
+ *
+ * `follow: false` as well: there is nothing on a not-found page worth passing link equity
+ * to.
+ */
+export const NOT_FOUND_SEO = {
+  title: 'Product Not Found',
+  robots: { index: false, follow: false },
+} as const
+
 export function productSeo(product: HJProduct): ProductSeo {
   // A Shopify product with an empty description is legitimate — it just must
   // not become an empty meta description, which reads to a crawler as a page

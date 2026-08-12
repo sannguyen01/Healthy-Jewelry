@@ -479,6 +479,55 @@ async function webhookRevalidatesTheCachedPage() {
   return `cache went HIT → ${after} after a signed products/update for ${handle}`
 }
 
+/**
+ * Soft-404 containment, checked on the live deployment.
+ *
+ * `/products/<unknown>` answers 200 while rendering not-found — Next returns 200 for
+ * streamed responses, and this route cannot lock its params without 404ing newly added
+ * products. `noindex` is what keeps those URLs out of the index, so it is the thing worth
+ * verifying in production; the status code is known-wrong by design.
+ */
+async function unknownUrlsAreNotIndexable() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+
+  const productRes = await fetch(new URL('/products/__no-such-product__', siteUrl), {
+    headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+  })
+  const html = await productRes.text()
+  if (!/<meta[^>]+name="robots"[^>]+noindex/i.test(html)) {
+    throw new Error(
+      'An unknown product URL is missing `noindex`. It answers HTTP 200 while rendering\n' +
+        '  not-found, so without that tag every mistyped or stale product URL is indexable\n' +
+        '  as a real page titled "Product Not Found".',
+    )
+  }
+
+  const collectionRes = await fetch(new URL('/shop/__no-such-collection__', siteUrl), {
+    headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+    redirect: 'manual',
+  })
+  if (collectionRes.status !== 404) {
+    throw new Error(
+      `An unknown collection returned ${collectionRes.status}, expected 404. Collections are\n` +
+        '  a closed set, so `dynamicParams = false` should reject them before rendering.',
+    )
+  }
+
+  // The damaging inverse: a noindex that escaped onto a real product would deindex the
+  // catalogue, and nothing else here would notice.
+  const realRes = await fetch(new URL(`/products/${SHOPIFY_ONLY_HANDLES[0]}`, siteUrl), {
+    headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+  })
+  if (/<meta[^>]+name="robots"[^>]+noindex/i.test(await realRes.text())) {
+    throw new Error(
+      `A REAL product (${SHOPIFY_ONLY_HANDLES[0]}) is marked noindex. This deindexes the\n` +
+        '  catalogue — far worse than the soft 404 the tag exists to contain.',
+    )
+  }
+
+  return 'unknown product noindexed, unknown collection 404s, real product indexable'
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -495,6 +544,7 @@ async function main() {
   await check('Site search finds Shopify products', searchFindsShopifyProducts)
   await check('Rate limiting is distributed, not per-instance', rateLimitingIsDistributed)
   await check('A signed webhook actually revalidates the cached page', webhookRevalidatesTheCachedPage)
+  await check('Unknown URLs cannot be indexed', unknownUrlsAreNotIndexable)
 
   const failed = results.filter((r) => !r.ok)
   console.log('─'.repeat(70))

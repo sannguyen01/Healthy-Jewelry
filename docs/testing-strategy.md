@@ -67,6 +67,44 @@ become a merge freeze.
 the alternative (`paymentGatewayNames` on an order) needs an order to exist. That one is human-only;
 see `docs/go-live-runbook.md`.
 
+### The source-analysis guardrails parse; they do not match
+
+`metadata-data-source.test.ts`, `cache-tag-contract.test.ts` and
+`homepage-fetch-budget.test.ts` all read application source to enforce a rule. They use the
+**TypeScript compiler API** through `src/lib/analysis/tsAstScan.ts`, not regular
+expressions.
+
+That was not an aesthetic preference. The first two started as regex, were reviewed as
+fragile with three specific evasions predicted, and when each was measured **two of the
+three predictions were wrong and two real gaps had gone unnamed**: comments produced false
+positives, `import * as hj` was invisible, and a second import of the same module in one
+file was skipped because the code used `.match` rather than `.matchAll`.
+
+The lesson is not that regex is fragile. It is that **nobody could say what those
+guardrails covered** — confident predictions were wrong in both directions. A guardrail
+whose coverage is unknowable makes a green run mean something unknown. `typescript` is
+already a devDependency, so parsing cost no new packages. See
+[ADR 007](adr/007-regex-guardrails-have-unknown-coverage.md).
+
+Text matching is still right for non-code inputs: `audit-workflow-secrets.mjs` scans YAML
+and strips comments by hand, which is correct — the argument is about parsing a language we
+already ship a parser for.
+
+### The homepage fetch budget
+
+`homepage-fetch-budget.test.ts` pins the homepage at **four** Shopify fetches and asserts
+no per-collection query. It previously issued eight — five of them one full collection
+query per collection, to read five `svgType` values — so a sixth collection meant a ninth
+query.
+
+Worth being precise about the stakes, because the obvious reading is wrong twice over. The
+homepage is **`○` Static**, prerendered with `revalidate: 3600`, so those queries run at
+build and hourly revalidation, **never per request**. And server components call the
+Storefront API directly, not through the rate-limited `/api/shopify` proxy — whose only
+caller is `src/store/cart.tsx`. Homepage rendering therefore cannot consume the 60/min
+per-IP budget. The guardrail exists because the *pattern* silently grows with the
+catalogue, not because there is a live ceiling to hit.
+
 ### A fallback indistinguishable from the real thing is indistinguishable from a bug
 
 The static catalogue exists so the site builds and serves without Shopify. That is load-bearing, and

@@ -26,6 +26,7 @@ pointer; the reasoning lives here once.
 | [004](004-static-fallback-is-not-a-data-source.md) | The static catalogue is a fallback, never a source | The lesson behind three separate outages and two guardrails |
 | [005](005-english-only-storefront.md) | The storefront stays English-only | A decision with live evidence, easily re-litigated without it |
 | [006](006-controls-must-fail-loudly.md) | A control that depends on manual setup must fail loudly without it | Spans the smoke workflow, the preflight, the inventory, and the runbook |
+| [007](007-regex-guardrails-have-unknown-coverage.md) | A guardrail that parses source with regex has unknown coverage | Spans three guardrails, the shared AST helper, and the testing strategy |
 
 ## Format
 

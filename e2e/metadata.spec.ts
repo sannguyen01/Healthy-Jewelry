@@ -63,14 +63,62 @@ test.describe('Product metadata', () => {
 
   test('a nonexistent product does not render as a product', async ({ page }) => {
     await page.goto('/products/this-product-does-not-exist')
-
-    // Asserts the *content*, not the status code. `/products/<unknown>` answers
-    // HTTP 200 while rendering not-found.tsx — a soft 404, which lets search
-    // engines index junk URLs as real pages. That predates this change
-    // (verified: identical on HEAD) and is a Next routing concern rather than a
-    // catalogue one, so it is recorded in STATE.md as SOFT-404-PRODUCT rather
-    // than silently half-fixed here.
     await expect(page.getByRole('heading', { level: 1 })).not.toContainText(/titanium/i)
+  })
+
+  test('a nonexistent product is noindex, so the junk URL cannot be indexed', async ({
+    page,
+  }) => {
+    // `/products/<unknown>` answers HTTP 200 while rendering not-found.tsx, and no code in
+    // the page can change that: Next returns 200 for streamed responses, and this route
+    // cannot use `dynamicParams = false` without 404ing products newly added in Shopify.
+    // So the harm is addressed instead of the status — noindex removes the URL from the
+    // index, which a robots.txt disallow would not.
+    await page.goto('/products/this-product-does-not-exist')
+
+    // Reads *every* robots tag, not the first. Next's not-found boundary emits its own
+    // alongside the one from generateMetadata, and a crawler obeys all of them — so
+    // asserting on a single element both breaks on ambiguity and checks less than the
+    // crawler sees.
+    const robots = await page.locator('meta[name="robots"]').evaluateAll((tags) =>
+      tags.map((t) => t.getAttribute('content') ?? ''),
+    )
+
+    expect(robots.length, 'no robots directive at all').toBeGreaterThan(0)
+    expect(robots.some((c) => /noindex/.test(c))).toBe(true)
+    expect(robots.some((c) => /nofollow/.test(c))).toBe(true)
+    // No contradicting directive. Google resolves a conflict to the most restrictive
+    // value, but an `index` here would mean two parts of the app disagree.
+    expect(robots.filter((c) => /\bindex\b/.test(c) && !/noindex/.test(c))).toEqual([])
+  })
+
+  test('a real product is NOT noindex', async ({ page }) => {
+    // The counterpart risk, and the more damaging direction: a noindex that leaked onto
+    // real products would quietly deindex the entire catalogue.
+    await page.goto(`/products/${HANDLE}`)
+
+    const robots = await page.locator('meta[name="robots"]').evaluateAll((tags) =>
+      tags.map((t) => t.getAttribute('content') ?? ''),
+    )
+
+    expect(robots.every((c) => !/noindex/.test(c)), `robots tags: ${robots.join(' | ')}`).toBe(
+      true,
+    )
+  })
+
+  test('an unknown collection is a real 404, not a soft one', async ({ page }) => {
+    // Collections are a closed set, so `dynamicParams = false` rejects unknown params
+    // before rendering begins — which is the one place the status is still ours to set.
+    const res = await page.goto('/shop/not-a-collection')
+    expect(res?.status()).toBe(404)
+  })
+
+  test('a real collection still renders', async ({ page }) => {
+    // dynamicParams = false is only safe while every real collection is in
+    // generateStaticParams. If one is ever missed, it 404s — and that looks like a routing
+    // bug rather than a missing entry.
+    const res = await page.goto('/shop/rings')
+    expect(res?.status()).toBe(200)
   })
 })
 

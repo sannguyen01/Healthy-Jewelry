@@ -30,6 +30,26 @@ export function generateStaticParams() {
   return VALID_COLLECTIONS.map((collection) => ({ collection }))
 }
 
+/**
+ * Unknown collections get a real 404, not a soft one.
+ *
+ * `notFound()` alone does not achieve this. Next returns **200 for streamed responses** and
+ * 404 only for non-streamed ones, so by the time the page discovers the collection does not
+ * exist the status line is already on the wire. `/shop/not-a-collection` answered 200 while
+ * rendering `not-found.tsx` — a soft 404, which lets search engines index every mistyped
+ * URL as a real page.
+ *
+ * `dynamicParams = false` rejects any param outside `generateStaticParams` **before
+ * rendering begins**, so the status is still ours to set.
+ *
+ * Only safe because this set is closed: five collections, fixed in `hjCollections`. A sixth
+ * one must be added there and deployed, or it will 404 — and that failure will look like a
+ * routing bug rather than a missing config. Products deliberately do NOT use this: their
+ * set is open, and locking it would 404 any product added in Shopify until the next
+ * redeploy. They use `robots: noindex` instead. See docs/adr/007.
+ */
+export const dynamicParams = false
+
 interface CollectionPageProps {
   params: Promise<{ collection: string }>
 }

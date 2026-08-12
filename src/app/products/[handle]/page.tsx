@@ -8,7 +8,7 @@ import { HorizontalScroll } from '@/components/home/HorizontalScroll'
 import { hjCollections } from '@/lib/data/hj-data'
 import { getProduct, getProducts, getProductsByCollection } from '@/lib/shopify'
 import { SITE_URL } from '@/config/site'
-import { productSeo } from '@/lib/seo/productSeo'
+import { productSeo, NOT_FOUND_SEO } from '@/lib/seo/productSeo'
 import { JsonLd, productJsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 
@@ -36,7 +36,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   // browser tab, the search result, and the shared link.
   const product = await getProduct(handle)
   if (!product) {
-    return { title: 'Product Not Found' }
+    // Carries `robots: noindex, nofollow`. The response is a soft 404 — HTTP 200 with
+    // not-found.tsx rendered — because Next returns 200 for streamed responses, and this
+    // route cannot use `dynamicParams = false` without 404ing products newly added in
+    // Shopify. noindex keeps the junk URL out of the index anyway. See NOT_FOUND_SEO.
+    return NOT_FOUND_SEO
   }
 
   // Shared, pure derivation — the same one the OG image and JSON-LD use, so

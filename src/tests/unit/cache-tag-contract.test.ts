@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { parseSource, callsTo, arrayPropertyValues } from '@/lib/analysis/tsAstScan'
 
 /**
  * A cache tag is a bare string on both sides of an invalidation:
@@ -38,15 +39,13 @@ const WEBHOOK_SRC = readFileSync(
 /**
  * Resolve a tag *expression* to the semantic tag it produces.
  *
- * Both sides are expected to name the shared builders from `cacheTags.ts`
- * rather than writing a string, so this reads identifiers and calls, not
- * literals. A raw string literal resolves to `inline:<value>` — which will
- * never match anything on the other side, so writing one is itself caught by
- * the orphan/widow assertions below rather than needing its own rule.
+ * Both sides name the shared builders from `cacheTags.ts` rather than writing a string, so
+ * this reads identifiers and calls. A raw string literal resolves to `inline:<value>`,
+ * which will never match the other side — so bypassing the builders is caught by the
+ * orphan/widow assertions without needing its own rule.
  *
- * Parameterised tags collapse to a `<param>` placeholder: the interpolated
- * variable is named `handle` on one side and `collectionHandle` on the other,
- * so only the prefix carries comparable meaning.
+ * Parameterised tags collapse to `<param>`: the interpolated variable is named `handle` on
+ * one side and `collectionHandle` on the other, so only the prefix is comparable.
  */
 function resolveTagExpression(expr: string): string | null {
   const token = expr.trim()
@@ -56,39 +55,48 @@ function resolveTagExpression(expr: string): string | null {
   if (/^productTag\(/.test(token)) return 'product:<param>'
   if (/^collectionTag\(/.test(token)) return 'collection:<param>'
 
-  // A bare string, i.e. someone bypassed the shared builders.
   const literal = token.match(/^[`'"](.*)[`'"]$/)
   if (literal) return `inline:${literal[1].replace(/\$\{[^}]+\}/g, '<param>')}`
 
   return `unknown:${token}`
 }
 
-/** Tags registered by fetches: `tags: [PRODUCTS_TAG, productTag(handle)]`. */
-function registeredTags(source: string): Set<string> {
+/**
+ * Tags registered by fetches, read from the AST rather than matched in text.
+ *
+ * `arrayPropertyValues` finds every `tags: [...]` property regardless of formatting, so a
+ * multi-line options object or a call split across lines reads identically.
+ */
+function registeredTags(filePath: string, source: string): Set<string> {
   const tags = new Set<string>()
-  for (const block of source.matchAll(/tags:\s*\[([^\]]*)\]/g)) {
-    // Split on commas that are not inside a call's parentheses.
-    for (const entry of block[1].split(/,(?![^(]*\))/)) {
-      const resolved = resolveTagExpression(entry)
+  for (const array of arrayPropertyValues(parseSource(filePath, source), 'tags')) {
+    for (const element of array) {
+      const resolved = resolveTagExpression(element)
       if (resolved) tags.add(resolved)
     }
   }
   return tags
 }
 
-/** Tags revalidated by the webhook: `revalidateTag(productTag(handle))`. */
-function revalidatedTags(source: string): Set<string> {
+/**
+ * Tags revalidated by the webhook, read from the AST.
+ *
+ * The regex this replaced required the closing paren at end of line, and counted a
+ * `revalidateTag(...)` written inside a comment as a real call. A `CallExpression` has
+ * neither problem: comments are not nodes, and formatting is irrelevant.
+ */
+function revalidatedTags(filePath: string, source: string): Set<string> {
   const tags = new Set<string>()
-  for (const call of source.matchAll(/revalidateTag\(\s*([^;]+?)\s*\)\s*$/gm)) {
-    const resolved = resolveTagExpression(call[1])
+  for (const args of callsTo(parseSource(filePath, source), 'revalidateTag')) {
+    const resolved = args[0] ? resolveTagExpression(args[0]) : null
     if (resolved) tags.add(resolved)
   }
   return tags
 }
 
 describe('cache tag contract', () => {
-  const registered = registeredTags(FETCHER_SRC)
-  const revalidated = revalidatedTags(WEBHOOK_SRC)
+  const registered = registeredTags('src/lib/shopify/index.ts', FETCHER_SRC)
+  const revalidated = revalidatedTags('src/app/api/webhooks/shopify/route.ts', WEBHOOK_SRC)
 
   it('finds tags on both sides', () => {
     // A regex that silently stopped matching would make every assertion below
@@ -149,5 +157,44 @@ describe('cache tag contract', () => {
     const { STATIC_TAGS } = await import('@/lib/shopify/cacheTags')
     expect(STATIC_TAGS).not.toContain('collections')
     expect(revalidated).not.toContain('collections')
+  })
+
+  describe('call forms the previous regex could not read', () => {
+    it('ignores a revalidateTag written inside a comment', () => {
+      // The old pattern counted this as a real revalidation, which would have masked a
+      // genuinely orphaned tag by making it look handled.
+      const source = `// revalidateTag(PRODUCTS_TAG)\nexport const x = 1`
+      const naive = /revalidateTag\(\s*([^;]+?)\s*\)\s*$/gm
+
+      expect([...source.matchAll(naive)].length, 'the old regex counted the comment').toBe(1)
+      expect(revalidatedTags('x.ts', source).size).toBe(0)
+    })
+
+    it('reads a call split across lines', () => {
+      const source = ['revalidateTag(', '  productTag(handle),', ')'].join('\n')
+      expect([...revalidatedTags('x.ts', source)]).toEqual(['product:<param>'])
+    })
+
+    it('reads tags from a multi-line options object', () => {
+      const source = [
+        'const o = {',
+        '  revalidate: 3600,',
+        '  tags: [',
+        '    PRODUCTS_TAG,',
+        '    collectionTag(h),',
+        '  ],',
+        '}',
+      ].join('\n')
+
+      expect([...registeredTags('x.ts', source)].sort()).toEqual([
+        'collection:<param>',
+        'products',
+      ])
+    })
+
+    it('flags a bare string literal as inline, so it cannot match the other side', () => {
+      const source = `const o = { tags: ['collections'] }`
+      expect([...registeredTags('x.ts', source)]).toEqual(['inline:collections'])
+    })
   })
 })

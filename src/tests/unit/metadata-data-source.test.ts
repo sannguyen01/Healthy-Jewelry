@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { parseSource, importsFrom } from '@/lib/analysis/tsAstScan'
 
 /**
  * The catalogue has exactly one entry point: `@/lib/shopify`.
@@ -71,14 +72,28 @@ function walk(dir: string): string[] {
   return out
 }
 
-/** Named imports pulled from `@/lib/data/hj-data` in one file, if any. */
-function hjDataImports(source: string): string[] {
-  const match = source.match(/import\s*\{([^}]+)\}\s*from\s*['"]@\/lib\/data\/hj-data['"]/)
-  if (!match) return []
-  return match[1]
-    .split(',')
-    .map((s) => s.trim().split(/\s+as\s+/)[0].trim())
-    .filter(Boolean)
+const HJ_DATA = '@/lib/data/hj-data'
+
+/**
+ * Every binding a file takes from `hj-data`, resolved through the TypeScript AST.
+ *
+ * This replaced a regex that was measurably incomplete. It handled named and aliased
+ * imports correctly, but `import * as hj from '@/lib/data/hj-data'` was invisible to it,
+ * and a file with two separate import statements from the module only had the first one
+ * read — it used `.match`, not `.matchAll`. Either was enough to walk a catalogue read
+ * straight past the guardrail. See docs/adr/007.
+ */
+function hjDataImports(filePath: string, source: string): string[] {
+  return importsFrom(parseSource(filePath, source), HJ_DATA).map((b) =>
+    // A namespace import reaches every export, so it is treated as importing all of them.
+    b.namespace ? '*' : b.imported,
+  )
+}
+
+/** A namespace import can reach any catalogue export, so it counts as importing all. */
+function catalogueBindings(imported: string[]): string[] {
+  if (imported.includes('*')) return [...CATALOGUE_EXPORTS]
+  return imported.filter((name) => CATALOGUE_EXPORTS.includes(name))
 }
 
 describe('catalogue data source', () => {
@@ -101,8 +116,8 @@ describe('catalogue data source', () => {
     const offenders: string[] = []
 
     for (const file of sourceFiles) {
-      const imported = hjDataImports(readFileSync(file, 'utf-8'))
-      const catalogue = imported.filter((name) => CATALOGUE_EXPORTS.includes(name))
+      const imported = hjDataImports(file, readFileSync(file, 'utf-8'))
+      const catalogue = catalogueBindings(imported)
       if (catalogue.length > 0) {
         offenders.push(`${relative(process.cwd(), file)} → ${catalogue.join(', ')}`)
       }
@@ -136,5 +151,57 @@ describe('catalogue data source', () => {
     // Prerendering static handles builds pages for products that do not exist
     // in Shopify, and skips every product that does.
     expect(body).not.toContain('getAllProducts(')
+  })
+
+  describe('import forms the previous regex could not see', () => {
+    // These are the reason this guardrail parses instead of matching. Each one is a real
+    // way to read the static catalogue while the old check reported nothing.
+    const NAIVE = /import\s*\{([^}]+)\}\s*from\s*['"]@\/lib\/data\/hj-data['"]/
+
+    it('sees a namespace import, which the regex missed entirely', () => {
+      const source = `import * as hj from '@/lib/data/hj-data'\nexport const x = hj.getAllProducts()`
+
+      expect(NAIVE.test(source), 'the old regex should miss this').toBe(false)
+      expect(catalogueBindings(hjDataImports('x.ts', source))).toContain('getAllProducts')
+    })
+
+    it('sees a second import statement from the same module', () => {
+      // `.match` returns only the first occurrence, so the catalogue read on line two was
+      // invisible while the innocuous line one satisfied the check.
+      const source = [
+        `import { hjCollections } from '@/lib/data/hj-data'`,
+        `import { getAllProducts } from '@/lib/data/hj-data'`,
+      ].join('\n')
+
+      const firstOnly = source.match(NAIVE)?.[1] ?? ''
+      expect(firstOnly).not.toContain('getAllProducts')
+      expect(catalogueBindings(hjDataImports('x.ts', source))).toContain('getAllProducts')
+    })
+
+    it('sees a re-export, which never looked like an import at all', () => {
+      const source = `export { getProductByHandle } from '@/lib/data/hj-data'`
+
+      expect(NAIVE.test(source)).toBe(false)
+      expect(catalogueBindings(hjDataImports('x.ts', source))).toContain('getProductByHandle')
+    })
+
+    it('resolves an alias to the name the module exports', () => {
+      const source = `import { getAllProducts as everything } from '@/lib/data/hj-data'`
+      expect(catalogueBindings(hjDataImports('x.ts', source))).toEqual(['getAllProducts'])
+    })
+
+    it('ignores a catalogue import written inside a comment', () => {
+      // The parser never emits comments as nodes, so this is impossible rather than
+      // filtered — the property the regex could only approximate.
+      const source = `// import { getAllProducts } from '@/lib/data/hj-data'\nexport const x = 1`
+
+      expect(NAIVE.test(source), 'the old regex saw this comment as an import').toBe(true)
+      expect(catalogueBindings(hjDataImports('x.ts', source))).toEqual([])
+    })
+
+    it('does not flag a legitimate site-structure import', () => {
+      const source = `import { hjCollections, hjMaterials } from '@/lib/data/hj-data'`
+      expect(catalogueBindings(hjDataImports('x.ts', source))).toEqual([])
+    })
   })
 })
