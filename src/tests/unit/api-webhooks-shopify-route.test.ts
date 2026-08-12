@@ -189,6 +189,30 @@ describe('POST /api/webhooks/shopify', () => {
       expect(revalidateTag).not.toHaveBeenCalledWith('collections')
     })
 
+    it('a malformed body still yields the broad invalidation on the products topic', async () => {
+      // What the duplicated try/catch was protecting, now that both branches share
+      // `readHandle`. Shopify retries on a non-2xx, and a body that will not parse now
+      // will not parse on the retry either — so failing the delivery would trade a scoped
+      // invalidation for an infinite redelivery loop.
+      const req = makeSignedReq('{not json', TEST_SECRET, 'products/update')
+      const res = await POST(req)
+
+      expect(res.status).toBe(200)
+      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidatePath).toHaveBeenCalledWith('/', 'page')
+    })
+
+    it('a malformed body is tolerated on the collections topic too', async () => {
+      // Both branches, because the whole point of the extraction is that they cannot
+      // diverge — and divergence between these two branches is the bug that started this.
+      const req = makeSignedReq('{not json', TEST_SECRET, 'collections/update')
+      const res = await POST(req)
+
+      expect(res.status).toBe(200)
+      expect(revalidatePath).toHaveBeenCalledWith('/shop/[collection]', 'page')
+      expect(revalidateTag).not.toHaveBeenCalled()
+    })
+
     it('falls back to path revalidation when the collection payload has no handle', async () => {
       // Payload shape varies by topic and API version. Without a handle there
       // is no scoped tag to invalidate, so the path revalidation above is the

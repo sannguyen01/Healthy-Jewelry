@@ -43,6 +43,31 @@ function explainSignatureFailure(hmacHeader: string): string {
   )
 }
 
+/**
+ * The `handle` from a webhook payload, or undefined.
+ *
+ * Both the products and collections branches need exactly this, and both had their own
+ * copy of the parse plus an identically-worded `try/catch`. Two copies of one idea is how
+ * the collections cache tag drifted in the first place — one branch was corrected and the
+ * other was not — so the idea now exists once.
+ *
+ * Swallowing the parse error is deliberate and unchanged: payload shape varies by topic and
+ * API version, and Shopify retries on a non-2xx. A body that cannot be parsed will not
+ * parse on the retry either, so failing the delivery would trade a scoped invalidation for
+ * an infinite redelivery loop. The broad invalidation each branch already performed stands.
+ *
+ * `orders/*` keeps its own parse: it reads a different shape for a different purpose, and
+ * folding it in here would couple two things that only look alike.
+ */
+function readHandle(rawBody: Buffer): string | undefined {
+  try {
+    const payload = JSON.parse(rawBody.toString('utf-8')) as { handle?: unknown }
+    return typeof payload.handle === 'string' && payload.handle ? payload.handle : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const rawBody = Buffer.from(await req.arrayBuffer())
   const hmacHeader = req.headers.get('x-shopify-hmac-sha256') ?? ''
@@ -99,17 +124,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     revalidatePath('/shop', 'page')
     revalidateTag(PRODUCTS_TAG)
 
-    let handle: string | undefined
-    try {
-      const payload = JSON.parse(rawBody.toString('utf-8')) as { handle?: unknown }
-      if (typeof payload.handle === 'string' && payload.handle) {
-        handle = payload.handle
-      }
-    } catch {
-      // Payload shape varies by topic / Shopify API version — fall back to
-      // the broad products tag above rather than failing the webhook.
-    }
-
+    const handle = readHandle(rawBody)
     if (handle) {
       revalidateTag(productTag(handle))
     }
@@ -126,17 +141,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Deliberately not PRODUCTS_TAG: that is every product cache in the store,
     // and a collection changing does not invalidate the products themselves.
     // Scoping was an explicit decision the previous tests already guarded.
-    let handle: string | undefined
-    try {
-      const payload = JSON.parse(rawBody.toString('utf-8')) as { handle?: unknown }
-      if (typeof payload.handle === 'string' && payload.handle) {
-        handle = payload.handle
-      }
-    } catch {
-      // Same tolerance as the products branch: a payload we cannot parse still
-      // gets the broad invalidation above rather than failing the delivery.
-    }
-
+    const handle = readHandle(rawBody)
     if (handle) {
       revalidateTag(collectionTag(handle))
     }

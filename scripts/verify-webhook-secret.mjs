@@ -32,156 +32,42 @@
  * Exit code is 0 only when the secret is confirmed correct.
  */
 
-import { createHmac } from 'node:crypto'
-
 /**
- * The topic this probe sends. Handled by the route, side-effect-free with
- * respect to orders and money.
+ * The signing and probe contract now lives in `scripts/lib/webhook-signature.mjs`, shared
+ * with `verify-production.mjs`. Re-exported here so this CLI's own public surface is
+ * unchanged and `webhook-signature-script.test.ts` keeps feeding *this script's* output
+ * into the real route handler rather than being quietly rerouted one level down.
  */
-export const WEBHOOK_PROBE_TOPIC = 'products/update'
+export {
+  WEBHOOK_PROBE_TOPIC,
+  WEBHOOK_PATH,
+  signWebhookBody,
+  buildProbeBody,
+  buildProbeRequest,
+  interpretStatus,
+  resolveStoreDomain,
+} from './lib/webhook-signature.mjs'
 
-export const WEBHOOK_PATH = '/api/webhooks/shopify'
-
-/**
- * Sign a raw webhook body exactly the way Shopify does, and therefore exactly
- * the way `src/app/api/webhooks/shopify/route.ts` recomputes it.
- *
- * Takes bytes rather than a string on purpose: Shopify signs the exact bytes it
- * sent, and the route reads them via `req.arrayBuffer()` without ever parsing
- * first. Anything that re-serialises JSON in between can change the bytes and
- * break a signature that was actually correct.
- *
- * @param {Uint8Array | Buffer} rawBody
- * @param {string} secret
- * @returns {string} base64 HMAC-SHA256, the value of `x-shopify-hmac-sha256`
- */
-export function signWebhookBody(rawBody, secret) {
-  return createHmac('sha256', secret).update(Buffer.from(rawBody)).digest('base64')
-}
-
-/**
- * A minimal, realistically-shaped `products/update` payload.
- *
- * `handle` is included because the route reads it to scope revalidation to a
- * single product (`revalidateTag('product:<handle>')`). The handle below is
- * deliberately not a real product: revalidating a tag nothing is registered
- * under is a no-op, so the probe cannot disturb a live product's cache.
- *
- * @returns {Buffer} the exact bytes to sign and send
- */
-export function buildProbeBody() {
-  return Buffer.from(
-    JSON.stringify({
-      id: 0,
-      handle: '__webhook-secret-probe__',
-      title: 'Webhook secret probe (not a real product)',
-    }),
-    'utf-8',
-  )
-}
-
-/**
- * Build the probe request. Returns the pieces rather than sending, so tests can
- * feed the identical bytes and headers straight into the real route handler.
- *
- * @param {{ siteUrl: string, secret: string, shopDomain?: string, topic?: string, body?: Buffer }} opts
- */
-export function buildProbeRequest({
-  siteUrl,
-  secret,
-  shopDomain,
-  topic = WEBHOOK_PROBE_TOPIC,
-  body = buildProbeBody(),
-}) {
-  /** @type {Record<string, string>} */
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-shopify-hmac-sha256': signWebhookBody(body, secret),
-    'x-shopify-topic': topic,
-  }
-  // Only sent when known. The route rejects a *mismatched* shop domain but
-  // ignores an absent one, so omitting it keeps the probe usable against a
-  // preview deployment that has no store configured.
-  if (shopDomain) {
-    headers['x-shopify-shop-domain'] = shopDomain
-  }
-
-  return {
-    url: new URL(WEBHOOK_PATH, siteUrl).toString(),
-    init: { method: 'POST', headers, body },
-  }
-}
-
-/**
- * Translate the route's status code into an operator-actionable verdict.
- *
- * The mapping is the route's own contract, not a guess:
- *   200 → handled topic, signature accepted
- *   202 → signature accepted, topic deliberately not handled
- *   401 → signature rejected (wrong secret, or wrong shop domain)
- *   503 → SHOPIFY_WEBHOOK_SECRET is unset in the deployed environment
- *
- * @param {number} status
- * @returns {{ ok: boolean, verdict: string, detail: string }}
- */
-export function interpretStatus(status) {
-  if (status === 200) {
-    return {
-      ok: true,
-      verdict: 'SECRET CORRECT',
-      detail:
-        'The deployment recomputed the same signature and handled the topic. ' +
-        'Order webhooks signed with this secret will be accepted.',
-    }
-  }
-  if (status === 202) {
-    return {
-      ok: true,
-      verdict: 'SECRET CORRECT (topic unhandled)',
-      detail:
-        'The signature was accepted but this topic is not in the handled ' +
-        'allowlist. The secret is right; the probe topic was not.',
-    }
-  }
-  if (status === 401) {
-    return {
-      ok: false,
-      verdict: 'WRONG SECRET',
-      detail:
-        'The deployment computed a different signature. SHOPIFY_WEBHOOK_SECRET is almost ' +
-        'certainly the wrong one of the two:\n' +
-        '  · webhooks created in Shopify Admin (Settings → Notifications) are signed with\n' +
-        '    the signing secret shown on that page;\n' +
-        '  · webhooks created by an app are signed with the app client secret.\n' +
-        'They are not interchangeable. (A mismatched x-shopify-shop-domain also 401s.)',
-    }
-  }
-  if (status === 503) {
-    return {
-      ok: false,
-      verdict: 'SECRET NOT SET',
-      detail:
-        'The deployment has no SHOPIFY_WEBHOOK_SECRET at all. Set it in the Vercel ' +
-        'environment for this deployment, then redeploy — env vars are read at runtime, ' +
-        'but the deployment must exist to read them.',
-    }
-  }
-  return {
-    ok: false,
-    verdict: `UNEXPECTED STATUS ${status}`,
-    detail:
-      'The webhook route did not answer with one of its documented statuses. ' +
-      'This usually means the request never reached the route — check the URL, ' +
-      'and that the deployment is live.',
-  }
-}
+import {
+  WEBHOOK_PROBE_TOPIC,
+  buildProbeRequest,
+  interpretStatus,
+  resolveStoreDomain,
+} from './lib/webhook-signature.mjs'
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   const siteUrl = process.argv[2] ?? process.env.PRODUCTION_SITE_URL
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET
-  const shopDomain = process.env.SHOPIFY_STORE_DOMAIN ?? process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
+  // Either variable; see resolveStoreDomain. Optional here — the route only rejects a
+  // *mismatched* shop domain, so a preview deployment with none configured still works.
+  let shopDomain
+  try {
+    shopDomain = resolveStoreDomain()
+  } catch {
+    shopDomain = undefined
+  }
 
   if (!siteUrl) {
     console.error(

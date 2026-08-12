@@ -36,7 +36,7 @@
  * picture rather than only the first problem.
  */
 
-import { buildProbeRequest } from './verify-webhook-secret.mjs'
+import { buildProbeRequest, resolveStoreDomain } from './lib/webhook-signature.mjs'
 
 const API_VERSION = '2025-01'
 
@@ -91,7 +91,7 @@ function required(varName) {
 }
 
 async function adminGraphql(query, variables = {}) {
-  const domain = required('SHOPIFY_STORE_DOMAIN')
+  const domain = resolveStoreDomain()
   const res = await fetch(`https://${domain}/admin/api/${API_VERSION}/graphql.json`, {
     method: 'POST',
     headers: {
@@ -106,7 +106,7 @@ async function adminGraphql(query, variables = {}) {
 }
 
 async function storefrontGraphql(query, variables = {}) {
-  const domain = required('SHOPIFY_STORE_DOMAIN')
+  const domain = resolveStoreDomain()
   const res = await fetch(`https://${domain}/api/${API_VERSION}/graphql.json`, {
     method: 'POST',
     headers: {
@@ -418,7 +418,7 @@ async function rateLimitingIsDistributed() {
 async function webhookRevalidatesTheCachedPage() {
   const siteUrl = required('PRODUCTION_SITE_URL')
   const secret = required('SHOPIFY_WEBHOOK_SECRET')
-  const shopDomain = required('SHOPIFY_STORE_DOMAIN')
+  const shopDomain = resolveStoreDomain()
   const handle = SHOPIFY_ONLY_HANDLES[0]
   const pageUrl = new URL(`/products/${handle}`, siteUrl)
 
