@@ -251,3 +251,110 @@ test.describe('Collection row layout', () => {
     expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(2)
   })
 })
+
+/**
+ * Product imagery, both ways round.
+ *
+ * The storefront could not show a product photograph at all until recently — no
+ * image field in the GraphQL fragment, none on `HJProduct`, and `<JewelrySVG>`
+ * hardcoded at every one of the five surfaces. Not as a fallback: as the only
+ * option. Every product now goes through `<ProductImage>`, which draws the
+ * photograph when Shopify has one and the illustration when it does not.
+ *
+ * Against `mock.myshopify.com` the suite always takes the illustration branch, so
+ * what is provable here is that **every product surface renders *something*
+ * visible** — the property that actually broke when the collection tiles shipped
+ * at `opacity: 0.12`. Whether a real photo reaches the page is a question about
+ * the live store, and `verify-production.mjs` asks it there.
+ */
+test.describe('Product imagery is visible on every surface', () => {
+  /**
+   * Effective opacity of the first product mark inside a container, walking every
+   * ancestor — the ghost-tile bug lived on a parent node, not on the artwork.
+   */
+  async function markVisibility(page: Page, containerSelector: string) {
+    return page.evaluate((selector) => {
+      const root = document.querySelector(selector)
+      const mark = root?.querySelector('img, svg')
+      if (!mark) return null
+
+      const box = mark.getBoundingClientRect()
+      let opacity = 1
+      let node: Element | null = mark
+      while (node) {
+        opacity *= parseFloat(getComputedStyle(node).opacity || '1')
+        node = node.parentElement
+      }
+      return { tag: mark.tagName.toLowerCase(), width: box.width, height: box.height, opacity }
+    }, containerSelector)
+  }
+
+  const SURFACES = [
+    { name: 'product card on /shop', url: '/shop', selector: '.card-tile' },
+    { name: 'homepage strip card', url: '/', selector: '.card-tile' },
+    {
+      name: 'product detail page',
+      url: '/products/arc-band-titanium',
+      selector: '.card-tile',
+    },
+  ]
+
+  for (const surface of SURFACES) {
+    test(`${surface.name} renders a visible product mark`, async ({ page }) => {
+      await page.goto(surface.url)
+      const container = page.locator(surface.selector).first()
+
+      // Scroll it in, then *poll* the effective opacity rather than asserting it
+      // once. `useReveal` starts its section at `opacity: 0` and transitions to 1
+      // over 0.7s on intersection — and the animating node is an ancestor of the
+      // card, so waiting on the card's own opacity proves nothing (it is 1 the
+      // whole time, inside a parent that is 0). Measuring once after `goto` reads
+      // a real zero and reports a completely false alarm.
+      await container.scrollIntoViewIfNeeded()
+      await container.waitFor({ state: 'visible' })
+
+      await expect
+        .poll(async () => (await markVisibility(page, surface.selector))?.opacity ?? 0, {
+          message: `product mark on ${surface.url} never reached a legible opacity`,
+        })
+        .toBeGreaterThanOrEqual(MIN_EFFECTIVE_OPACITY)
+
+      const mark = await markVisibility(page, surface.selector)
+
+      expect(mark, `no <img> or <svg> inside ${surface.selector} on ${surface.url}`).not.toBeNull()
+      // Presence is not visibility, and visibility is not legibility — the two
+      // lessons this whole spec exists for, applied to the new surface.
+      expect(mark!.width).toBeGreaterThan(0)
+      expect(mark!.height).toBeGreaterThan(0)
+    })
+  }
+
+  test('the cart thumbnail renders a visible mark too', async ({ page }) => {
+    // The cart is the one surface where an invisible thumbnail would be seen by a
+    // customer who has already decided to buy.
+    await page.goto('/products/arc-band-titanium')
+    // Arc Band is a ring: Add to Bag stays disabled until a size is chosen, and
+    // the accessible name is "Add — <price> to Bag", so an anchored /add to bag/
+    // never matches it. Same two steps every other spec takes.
+    await page.getByRole('button', { name: /ring size 7/i }).click()
+    await page.getByRole('button', { name: /add.*to bag/i }).click()
+
+    const drawer = page.getByRole('dialog', { name: /shopping bag/i })
+    await expect(drawer).toBeVisible()
+
+    const mark = drawer.locator('img, svg').first()
+    await expect(mark).toBeVisible()
+    const box = await mark.boundingBox()
+    expect(box?.width ?? 0).toBeGreaterThan(0)
+  })
+
+  /**
+   * A gallery of one is a row of one button that changes nothing — visual noise
+   * that reads as broken. With no Shopify media in the test environment there is
+   * never more than one image, so the thumbnail strip must be absent entirely.
+   */
+  test('no thumbnail strip is rendered when there is only one image', async ({ page }) => {
+    await page.goto('/products/arc-band-titanium')
+    await expect(page.getByRole('group', { name: /product images/i })).toHaveCount(0)
+  })
+})

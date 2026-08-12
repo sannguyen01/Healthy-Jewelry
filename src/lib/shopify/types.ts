@@ -50,6 +50,9 @@ export interface Product {
   }
   /** `custom.spec` metafield — null when the merchant has not set one. */
   spec?: { value: string } | null
+  /** Null when the product has no media in Shopify. */
+  featuredImage?: Image | null
+  images?: { edges: { node: Image }[] }
 }
 
 export interface Collection {
@@ -183,7 +186,26 @@ export interface HJProduct {
   badge: HJBadge
   description: string
   spec: string
+  /**
+   * The illustration drawn when there is no photograph.
+   *
+   * Not a placeholder in the apologetic sense — it is the site's whole visual
+   * language today, and every product on the connected store has zero media. It
+   * becomes a fallback the moment real photography exists, per `featuredImage`.
+   */
   svgType: HJSvgType
+  /**
+   * The product's main photograph, or `null` when it has none.
+   *
+   * Always `null` on the static catalogue: `hj-data.ts` describes products that
+   * have no photography, and saying so honestly is what makes both render paths
+   * testable. Every surface goes through `<ProductImage>`, which draws
+   * `svgType` when this is null — so a photo uploaded in Shopify Admin appears
+   * with no code change and no redeploy.
+   */
+  featuredImage: Image | null
+  /** Up to six images for the detail-page gallery. Empty when there are none. */
+  images: Image[]
   // Full variant list (sizes etc.) — the detail-page fetch requests every
   // variant; listing/card fetches request just the first so size selection
   // is only ever offered from the product detail page.

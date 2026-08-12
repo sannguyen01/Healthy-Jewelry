@@ -19,8 +19,15 @@ import type { CurrencyCode } from '@/lib/utils/formatPrice'
  */
 const FALLBACK_CURRENCY: CurrencyCode = 'USD'
 
-/** A catalog entry before variants and currency are derived from it. */
-type HJProductSeed = Omit<HJProduct, 'variants' | 'currencyCode'>
+/**
+ * A catalog entry before the fields the map below derives are added.
+ *
+ * `featuredImage` / `images` are omitted for a different reason than the others:
+ * they are not derived from the seed, they are constant. These products have
+ * never been photographed, so repeating `featuredImage: null` on all 17 entries
+ * would be 34 lines saying the same thing.
+ */
+type HJProductSeed = Omit<HJProduct, 'variants' | 'currencyCode' | 'featuredImage' | 'images'>
 
 // ── Collections ────────────────────────────────────────────────────────────
 
@@ -407,6 +414,15 @@ function buildVariants(product: HJProductSeed, currencyCode: CurrencyCode): Prod
 export const hjProducts: HJProduct[] = hjProductsRaw.map((product) => ({
   ...product,
   currencyCode: FALLBACK_CURRENCY,
+  // No photography, stated once and honestly rather than repeated on 17 entries.
+  //
+  // These products do not exist in Shopify and have never been photographed, so
+  // `null` is the truth. It is also what keeps the illustration path testable:
+  // if the fallback catalogue invented image URLs, no test could exercise the
+  // branch that draws `svgType`, and that branch is what every product on the
+  // connected store currently renders.
+  featuredImage: null,
+  images: [],
   variants: buildVariants(product, FALLBACK_CURRENCY),
 }))
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { HJProduct } from '@/lib/shopify/types'
-import { JewelrySVG } from '@/components/svg/JewelrySVG'
+import { ProductImage } from '@/components/product/ProductImage'
 import { Badge } from '@/components/ui/Badge'
 import { useReveal } from '@/lib/hooks/useReveal'
 import { formatPrice } from '@/lib/utils/formatPrice'
@@ -104,10 +104,13 @@ export function HorizontalScroll({ label, products, viewAllHref = '/shop' }: Hor
                 overflow: 'hidden',
               }}
             >
-              <JewelrySVG
-                type={product.svgType}
-                style={{ width: '60%', height: '60%' } as React.CSSProperties}
-                className="w-3/5 h-3/5"
+              <ProductImage
+                product={product}
+                svgScale="60%"
+                // The card is `clamp(220px, 260px, 280px)` wide — a fixed 260px, not a
+                // fluid grid cell — so the hint is a width, not a viewport fraction.
+                // 280px covers the clamp's ceiling if the card ever widens.
+                sizes="280px"
               />
               {product.badge && (
                 <div style={{ position: 'absolute', top: '12px', left: '12px' }}>

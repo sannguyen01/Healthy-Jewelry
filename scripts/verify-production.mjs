@@ -704,6 +704,84 @@ async function shopifyServesThePinnedApiVersion() {
   return `Both surfaces served ${API_VERSION}, as pinned`
 }
 
+/**
+ * A product photographed in Shopify is actually shown on its page.
+ *
+ * ## The direction that will really fail
+ *
+ * The storefront had no image field at all until recently: `PRODUCT_FRAGMENT`
+ * requested none, `HJProduct` had nowhere to put one, and every surface hardcoded
+ * the illustration. A fully photographed store would have rendered zero photos.
+ *
+ * That is fixed, and the fix is invisible while the store has no media — which it
+ * currently does not, on all 22 products. So the failure this guards is the one
+ * that arrives *later*: somebody uploads a photo in Shopify Admin, the page keeps
+ * drawing a line illustration, and nothing anywhere says so. "No photo yet" and
+ * "photo present, pipeline broken" look identical from the outside, which is the
+ * same indistinguishability that let the static fallback hide for months
+ * (ADR 004).
+ *
+ * Passing while no product has media is correct, not a hole — there is genuinely
+ * nothing to render. It says so explicitly rather than reporting a silent tick,
+ * because a check whose reason for passing is invisible is one nobody can reason
+ * about.
+ */
+async function photographedProductsShowTheirPhotograph() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+
+  const data = await adminGraphql(
+    `query {
+       products(first: 250) {
+         edges { node { handle featuredMedia { preview { image { url } } } } }
+       }
+     }`,
+  )
+
+  const withPhoto = data.products.edges
+    .map((e) => e.node)
+    .filter((p) => p.featuredMedia?.preview?.image?.url)
+
+  if (withPhoto.length === 0) {
+    return (
+      'No product in Shopify has media yet, so every page correctly renders the ' +
+      'JewelrySVG illustration. This check starts asserting the moment a photo is uploaded.'
+    )
+  }
+
+  // A sample, not all of them: each check is a full page load, and the pipeline is
+  // one shared component — if it works for three products it works for all of them.
+  // The failure this catches is systemic, never per-product.
+  const sample = withPhoto.slice(0, 3)
+  const missing = []
+
+  for (const product of sample) {
+    const res = await fetch(new URL(`/products/${product.handle}`, siteUrl), {
+      headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+    })
+    if (!res.ok) {
+      missing.push(`${product.handle} (page returned ${res.status})`)
+      continue
+    }
+    const html = await res.text()
+    // next/image rewrites the src through /_next/image?url=<encoded>, so the CDN
+    // host appears percent-encoded. Checking the decoded HTML covers both forms.
+    if (!decodeURIComponent(html).includes('cdn.shopify.com')) {
+      missing.push(product.handle)
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.length} of ${sample.length} sampled products have a photo in Shopify ` +
+        `but no cdn.shopify.com image on their page: ${missing.join(', ')}\n` +
+        '  The page is falling back to the JewelrySVG illustration while real\n' +
+        '  photography exists — silently, because a product with no photo looks the same.',
+    )
+  }
+
+  return `${sample.length}/${sample.length} sampled photographed products render their image (${withPhoto.length} have media)`
+}
+
 // ── premises ────────────────────────────────────────────────────────────────
 
 /**
@@ -777,6 +855,10 @@ async function main() {
   await check('Product metadata names the product, not "Not Found"', productMetadataNamesTheProduct)
   await check('The Open Graph image renders a real PNG', openGraphImageRenders)
   await check('Site search finds Shopify products', searchFindsShopifyProducts)
+  await check(
+    'A photographed product actually shows its photograph',
+    photographedProductsShowTheirPhotograph,
+  )
   await check('Rate limiting is distributed, not per-instance', rateLimitingIsDistributed)
   await check('A signed webhook actually revalidates the cached page', webhookRevalidatesTheCachedPage)
   await check('Unknown URLs cannot be indexed', unknownUrlsAreNotIndexable)

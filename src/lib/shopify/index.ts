@@ -180,6 +180,12 @@ function mapShopifyProduct(node: Product): HJProduct {
     // Optional by design: Shopify has no native field for a physical spec, so
     // it lives in `custom.spec`. Absent means the detail page hides the line.
     spec: node.spec?.value?.trim() ?? '',
+    // Null rather than a synthesised placeholder. `<ProductImage>` needs to be
+    // able to tell "no photo exists" from "a photo exists and failed to load" —
+    // the first draws the illustration, the second is a bug, and a fabricated
+    // URL would make them look identical.
+    featuredImage: node.featuredImage ?? null,
+    images: (node.images?.edges ?? []).map((e) => e.node),
     variants,
   }
 }

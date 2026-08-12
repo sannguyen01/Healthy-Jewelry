@@ -5,6 +5,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
+import { ProductImage } from '@/components/product/ProductImage'
 import { useCartStore } from '@/store/cart'
 import { formatPrice, cartCurrencyCode } from '@/lib/utils/formatPrice'
 
@@ -155,12 +156,10 @@ export default function CartPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        position: 'relative',
                       }}
                     >
-                      <JewelrySVG
-                        type={product.svgType}
-                        style={{ width: '60%', height: '60%' }}
-                      />
+                      <ProductImage product={product} svgScale="60%" sizes="80px" />
                     </div>
 
                     {/* Details */}

@@ -44,6 +44,8 @@ const product: HJProduct = {
   description: 'Test',
   spec: '2mm',
   svgType: 'ring-arc',
+  featuredImage: null,
+  images: [],
   variants: [],
 }
 
