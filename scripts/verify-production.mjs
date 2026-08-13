@@ -44,6 +44,7 @@ import {
   specMetafieldPremise,
   paymentsPremise,
   apiVersionPremise,
+  webhookDeliveryPremise,
   formatPremises,
 } from './lib/premise-checks.mjs'
 import { SHOPIFY_API_VERSION, compareServedApiVersion } from './lib/api-version.mjs'
@@ -1063,13 +1064,15 @@ async function shopPoliciesAreCompleteAndEdited() {
  * collected and reported separately, and never fail the run. See ADR 008.
  */
 async function collectPremises() {
-  const { shopLocales, collections, productsCount, ordersCount, orders } = await adminGraphql(
+  const { shopLocales, collections, productsCount, ordersCount, orders, webhookSubscriptions } =
+    await adminGraphql(
     `query {
        shopLocales { locale published }
        collections(first: 50) { edges { node { handle } } }
        productsCount { count }
        ordersCount { count }
        orders(first: 10) { edges { node { paymentGatewayNames } } }
+       webhookSubscriptions(first: 25) { edges { node { topic } } }
      }`,
   )
 
@@ -1091,6 +1094,10 @@ async function collectPremises() {
       ordersCount.count,
       orders.edges.flatMap((e) => e.node.paymentGatewayNames ?? []),
     ),
+    // `webhookSubscriptions` returns only the *querying app's* own subscriptions,
+    // so an empty list is not evidence of absence. The premise says so rather than
+    // pretending the number means more than it does.
+    webhookDeliveryPremise(ordersCount.count, webhookSubscriptions.edges.length),
   ]
 }
 

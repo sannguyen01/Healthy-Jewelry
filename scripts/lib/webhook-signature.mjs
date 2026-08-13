@@ -148,7 +148,11 @@ export function interpretStatus(status) {
       verdict: 'SECRET CORRECT',
       detail:
         'The deployment recomputed the same signature and handled the topic. ' +
-        'Order webhooks signed with this secret will be accepted.',
+        'Order webhooks signed with this secret will be accepted.\n' +
+        '  NOT proven: that Shopify is sending any. This probe is a request we signed ' +
+        'ourselves — it tests the route, not the subscription. A store with no webhook ' +
+        'configured in Settings → Notifications passes this exactly the same way. See ' +
+        'the SHOPIFY-WEBHOOK-DELIVERY premise.',
     }
   }
   if (status === 202) {
