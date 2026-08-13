@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-const { preflight, SOURCE_MARKER, EXPECTED_MARKER } = await import(
+const { preflight, writeStepOutputs, SOURCE_MARKER, EXPECTED_MARKER } = await import(
   '../../../scripts/preflight-secrets.mjs'
 )
 
@@ -111,5 +111,98 @@ describe('preflight-secrets', () => {
 
       expect(lines[0]).toMatch(/required secrets are not set/i)
     })
+  })
+})
+
+/**
+ * **Three states, not two.**
+ *
+ * Issue #18 is the reason. The `production-readonly` environment has never been
+ * created, so every scheduled run failed and appended a "Still failing" comment —
+ * every six hours, forever, about a setup step its owner already knew about. That
+ * is how the one channel that will later carry a real outage gets muted.
+ *
+ * But collapsing "nothing is set" and "some things are set" into one quiet state
+ * would be worse than the noise. A half-finished configuration is exactly what a
+ * botched setup looks like, and it is the state most easily mistaken for a working
+ * one — so the boundary between the two is what these tests are really pinning.
+ */
+describe('preflight states', () => {
+  const ALL = ['A', 'B', 'C']
+  const isolated = { [SOURCE_MARKER]: EXPECTED_MARKER }
+
+  it('is not-configured when every secret is absent', () => {
+    const result = preflight(ALL, {})
+    expect(result.state).toBe('not-configured')
+    expect(result.ok).toBe(false)
+  })
+
+  it('stays not-configured when neither secrets nor marker are set', () => {
+    // Nobody sets the marker before setting the secrets, so the quiet state has to
+    // be reachable without it.
+    expect(preflight(ALL, {}).state).toBe('not-configured')
+  })
+
+  /**
+   * The marker is evidence of intent. Somebody who set `SMOKE_SECRETS_SOURCE` has
+   * opened the environment and begun; secrets still absent means they stopped
+   * halfway, which is a real problem rather than an unstarted one.
+   */
+  it('is misconfigured when the marker is set but no secrets are', () => {
+    expect(preflight(ALL, { [SOURCE_MARKER]: EXPECTED_MARKER }).state).toBe('misconfigured')
+  })
+
+  /** The boundary. One secret set is a half-finished setup, not an unstarted one. */
+  it('becomes misconfigured the moment ONE secret is set', () => {
+    expect(preflight(ALL, { A: 'x' }).state).toBe('misconfigured')
+    expect(preflight(ALL, { A: 'x', B: 'y' }).state).toBe('misconfigured')
+  })
+
+  it('is misconfigured when all are set but not environment-scoped', () => {
+    // ADR 006: repo-scoped secrets give the job none of the isolation the
+    // environment key advertises, and this is the only thing that says so.
+    const result = preflight(ALL, { A: 'x', B: 'y', C: 'z' })
+    expect(result.state).toBe('misconfigured')
+    expect(result.ok).toBe(false)
+  })
+
+  it('is ready when everything is present and isolated', () => {
+    const result = preflight(ALL, { A: 'x', B: 'y', C: 'z', ...isolated })
+    expect(result.state).toBe('ready')
+    expect(result.ok).toBe(true)
+  })
+
+  it('explains how to switch it on, rather than just reporting absence', () => {
+    const { lines } = preflight(['PRODUCTION_SITE_URL'], {})
+    const text = lines.join('\n')
+    expect(text).toContain('production-readonly')
+    expect(text).toContain(SOURCE_MARKER)
+    // The half-configured trap, stated where someone about to configure will read it.
+    expect(text).toContain('fail loudly')
+  })
+
+  it('an empty required list is not "not-configured"', () => {
+    // Guarding the degenerate case: `missing.length === required.length` is also
+    // true when both are zero, which would report a workflow that asks for
+    // nothing as unconfigured rather than ready.
+    expect(preflight([], isolated).state).toBe('ready')
+  })
+})
+
+describe('writeStepOutputs', () => {
+  it('writes key=value lines the runner can parse', () => {
+    const written: string[] = []
+    writeStepOutputs({ appendFileSync: (_p: string, d: string) => void written.push(d) }, '/out', {
+      configured: 'false',
+      state: 'not-configured',
+    })
+    expect(written.join('')).toBe('configured=false\nstate=not-configured\n')
+  })
+
+  it('is a no-op outside Actions, so the script still runs by hand', () => {
+    const appendFileSync = () => {
+      throw new Error('should not be called')
+    }
+    expect(() => writeStepOutputs({ appendFileSync }, undefined, { a: 'b' })).not.toThrow()
   })
 })

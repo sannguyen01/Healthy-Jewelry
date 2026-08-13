@@ -41,6 +41,7 @@ function walk(dir: string): string[] {
 const EXEMPT = new Set([
   'NODE_ENV', // set by the runtime
   'CI', // set by the runner
+  'GITHUB_OUTPUT', // set by the Actions runner; the path a step writes outputs to
   'PORT', // set by the host
   'VERCEL_URL', // injected by Vercel
   'PLAYWRIGHT_SKIP_BUILD', // test harness plumbing

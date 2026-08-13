@@ -36,6 +36,8 @@
  *   node scripts/preflight-secrets.mjs VAR_ONE VAR_TWO ...
  */
 
+import fs from 'node:fs'
+
 /** Where each variable is configured, so the failure message is actionable. */
 const WHERE = {
   PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
@@ -49,16 +51,67 @@ export const SOURCE_MARKER = 'SMOKE_SECRETS_SOURCE'
 export const EXPECTED_MARKER = 'environment'
 
 /**
+ * The three states this can be in, which are not two.
+ *
+ * `not-configured` — **every** secret absent. Nobody has done the setup yet. That
+ * is a known state, not news, and reporting it as a failure every six hours
+ * trains the reader to mute the one channel that will later carry a real outage.
+ *
+ * `misconfigured` — *some* secrets present and some absent, or all present but
+ * not environment-scoped. Somebody started and stopped halfway, which is exactly
+ * what a botched setup looks like and must be loud.
+ *
+ * `ready` — run the real checks.
+ *
+ * The distinction between the first two is the load-bearing part. Collapsing them
+ * into "missing secrets" is what would make a half-finished configuration quiet.
+ *
+ * @typedef {'not-configured' | 'misconfigured' | 'ready'} PreflightState
+ */
+
+/**
  * @param {string[]} required
  * @param {Record<string, string | undefined>} env
- * @returns {{ ok: boolean, missing: string[], isolated: boolean, lines: string[] }}
+ * @returns {{ ok: boolean, state: PreflightState, missing: string[], isolated: boolean, lines: string[] }}
  */
 export function preflight(required, env) {
   const missing = required.filter((name) => !env[name])
   const isolated = env[SOURCE_MARKER] === EXPECTED_MARKER
   const lines = []
 
-  if (missing.length > 0) {
+  /**
+   * `not-configured` requires the marker to be absent too.
+   *
+   * Setting `SMOKE_SECRETS_SOURCE` is itself evidence that somebody opened the
+   * environment and started. Secrets absent *and* the marker set is a setup that
+   * was begun and abandoned — a half-finished configuration, which is loud.
+   */
+  const untouched = missing.length === required.length && required.length > 0 && !isolated
+
+  /** @type {PreflightState} */
+  const state = untouched ? 'not-configured' : missing.length > 0 || !isolated ? 'misconfigured' : 'ready'
+
+  if (state === 'not-configured') {
+    lines.push(
+      'None of the smoke secrets are set, so this deployment has never been configured for',
+      'live verification. Nothing is broken — this run has nothing to check.',
+      '',
+      'To switch it on, set these on the `production-readonly` environment:',
+      '  Settings → Environments → production-readonly → Environment secrets',
+      ...required.map((n) => `  · ${n}${WHERE[n] ? ` — ${WHERE[n]}` : ''}`),
+      '',
+      `plus the environment variable ${SOURCE_MARKER} = ${EXPECTED_MARKER}.`,
+      '',
+      'Not at repository scope. This repository is public and forkable; an environment',
+      'is the boundary that can carry required reviewers. See docs/credential-inventory.md.',
+      '',
+      'Until then this workflow reports "not configured" and files no issue. Set some but',
+      'not all of them and it will fail loudly — a half-finished setup is a real problem,',
+      'and the one most likely to be mistaken for a working one.',
+    )
+  }
+
+  if (missing.length > 0 && state !== 'not-configured') {
     lines.push(
       `${missing.length} of ${required.length} required secrets are not set for this job.`,
       '',
@@ -92,7 +145,30 @@ export function preflight(required, env) {
     )
   }
 
-  return { ok: missing.length === 0 && isolated, missing, isolated, lines }
+  return { ok: state === 'ready', state, missing, isolated, lines }
+}
+
+/**
+ * Tell the workflow what to do, via `$GITHUB_OUTPUT`.
+ *
+ * `configured` gates the two real check steps *and* the issue-filing step, so a
+ * store that has never been set up produces a quiet, honest run rather than a
+ * six-hourly alarm about a fact its owner already knows.
+ *
+ * Written through a function rather than inline so the file-append is testable
+ * and so a missing `GITHUB_OUTPUT` (running this by hand) is a no-op instead of
+ * a crash.
+ *
+ * @param {import('node:fs')} fs
+ * @param {string | undefined} outputPath
+ * @param {Record<string, string>} values
+ */
+export function writeStepOutputs(fs, outputPath, values) {
+  if (!outputPath) return
+  const body = Object.entries(values)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n')
+  fs.appendFileSync(outputPath, `${body}\n`)
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -104,10 +180,23 @@ function main() {
     return 2
   }
 
-  const { ok, missing, isolated, lines } = preflight(required, process.env)
+  const { ok, state, missing, lines } = preflight(required, process.env)
+
+  writeStepOutputs(fs, process.env.GITHUB_OUTPUT, {
+    configured: String(state !== 'not-configured'),
+    state,
+  })
 
   if (ok) {
     console.log(`✓ All ${required.length} secrets present, sourced from the environment.`)
+    return 0
+  }
+
+  if (state === 'not-configured') {
+    // Exit 0. Not a failure — a state. The workflow reads `configured=false` and
+    // skips the checks rather than reporting an outage it has not looked for.
+    console.log('· Not configured for live verification\n')
+    console.log(lines.join('\n'))
     return 0
   }
 

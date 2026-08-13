@@ -104,7 +104,15 @@ jobs:
       # It also asserts SMOKE_SECRETS_SOURCE, which is set only on the
       # environment — the marker that distinguishes "isolated" from "green but
       # sourced from repository scope".
+      #
+      # Three states, not two. `configured=false` means *nothing* is set — nobody
+      # has done the setup, which is a known fact rather than news, and filing an
+      # issue about it every six hours trains the reader to mute the one channel
+      # that will later carry a real outage. *Partial* configuration stays a hard
+      # failure: that is what a botched setup looks like, and it is the state most
+      # easily mistaken for a working one.
       - name: Preflight — secrets present and environment-scoped
+        id: preflight
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
@@ -118,13 +126,15 @@ jobs:
             SHOPIFY_STORE_DOMAIN \
             SHOPIFY_STOREFRONT_ACCESS_TOKEN \
             SHOPIFY_ADMIN_ACCESS_TOKEN \
-            SHOPIFY_WEBHOOK_SECRET
+            SHOPIFY_WEBHOOK_SECRET \
+            2>&1 | tee preflight.log
 
       # Catalogue, publishing scope, the real cart → checkoutUrl path, metadata,
       # search, rate-limit durability, and cache revalidation.
       # Runs every check even when one fails, so a run reports the whole picture.
       - name: Live store and storefront
         id: storefront
+        if: steps.preflight.outputs.configured == 'true'
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
@@ -138,7 +148,12 @@ jobs:
       # problem — that pairing is how the original outage stayed undiagnosed.
       - name: Webhook signing secret
         id: webhook
-        if: always()
+        # `always()` keeps the original intent — a catalogue failure must not hide
+        # a secret failure — while the two added clauses stop it running when
+        # there is nothing to verify or when the preflight itself already said
+        # what is wrong. Before this it ran with no secrets at all, printed a
+        # usage error, and (through the pipefail bug) reported success.
+        if: always() && steps.preflight.outcome == 'success' && steps.preflight.outputs.configured == 'true'
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
@@ -152,17 +167,31 @@ jobs:
           {
             echo "## Production smoke"
             echo ""
+            if [ "${{ steps.preflight.outputs.configured }}" != "true" ]; then
+              echo "**Not configured for live verification.** No secrets are set on the"
+              echo "\`production-readonly\` environment, so this run had nothing to check."
+              echo "It is not a failure and no issue was filed."
+              echo ""
+            fi
             echo "| Check | Result |"
             echo "|---|---|"
+            echo "| Secrets preflight | ${{ steps.preflight.outcome }} (${{ steps.preflight.outputs.state }}) |"
             echo "| Live store and storefront | ${{ steps.storefront.outcome }} |"
             echo "| Webhook signing secret | ${{ steps.webhook.outcome }} |"
             echo ""
-            echo "<details><summary>Storefront output</summary>"
-            echo ""
-            echo '```'
-            cat storefront.log 2>/dev/null || echo "(step did not run)"
-            echo '```'
-            echo "</details>"
+            # Every log, not just the storefront's. The run that prompted this had
+            # its whole answer in the preflight output and published none of it.
+            for log in preflight storefront webhook; do
+              if [ -s "$log.log" ]; then
+                echo "<details><summary>$log</summary>"
+                echo ""
+                echo '```'
+                cat "$log.log"
+                echo '```'
+                echo "</details>"
+                echo ""
+              fi
+            done
           } >> "$GITHUB_STEP_SUMMARY"
 
       # A non-blocking scheduled job that nobody watches will rot silently: it is
@@ -173,8 +202,13 @@ jobs:
       #
       # `continue-on-error` because a notification problem must never mask a
       # smoke result or manufacture one.
+      #
+      # Gated on `configured` so a store nobody has set up yet cannot generate a
+      # six-hourly "Still failing" comment about a fact its owner already knows.
+      # Partial configuration is still a failure and still files — that is the
+      # state most easily mistaken for a working one.
       - name: Report failure as an issue
-        if: failure()
+        if: failure() && steps.preflight.outputs.configured == 'true'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -308,8 +342,14 @@ jobs:
 
       # Closing on recovery is what keeps the issue meaningful. An alert that
       # only ever opens becomes a list nobody reads.
+      #
+      # `configured` is not optional here. A not-configured run *succeeds* — it has
+      # nothing to check — so without this gate it would close an open failure
+      # issue and comment "recovered" having verified precisely nothing. Combined
+      # with the pipefail bug (ADR 010) that is how a broken store would have
+      # retracted its own alarm.
       - name: Close the failure issue on recovery
-        if: success()
+        if: success() && steps.preflight.outputs.configured == 'true'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
