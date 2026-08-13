@@ -4,6 +4,40 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-08-13 — PR #20: The verifier that could not fail
+
+Investigating why production smoke was failing (#18) found something larger than
+the reported failure.
+
+- **The smoke workflow was incapable of failing.** Both real checks were piped
+  through `| tee`, and GitHub's default shell is `bash -e` with no `pipefail`, so
+  the step reported `tee`'s exit status. Run 31600442658 published
+  `| Webhook signing secret | success |` for a script that exited 2. The only step
+  that could go red was the unpiped preflight — and it fails only until the
+  secrets are configured, after which the workflow would have been permanently
+  green regardless of production, while its `if: success()` step *closed* the
+  failure issue. Fixed at workflow scope in both workflows, with the measurement
+  kept as executable assertions ([ADR 010](docs/adr/010-a-control-that-cannot-fail.md)).
+- **The alarm now says why.** #18 blamed "a Shopify incident, an expired
+  credential, or a configuration change" — it was five unset secrets, already
+  printed in the log the issue linked to. The issue body and follow-up comments
+  now embed the failing output.
+- **A known unconfigured state no longer alarms every six hours.** Three states —
+  unstarted, half-finished, ready — because collapsing the first two would make a
+  botched setup quiet.
+- **Shopify has one checkout policy of four, and it is a stock template** still
+  containing `{{ shop_name }}` (renders as "My Store 2") and `{{ email }}` (a
+  personal Gmail). No refund, terms, or shipping policy, on a store shipping to
+  fourteen EU countries. Now a blocking check; drafts reconciled from the site's
+  own pages are in `docs/shopify-policies/`.
+- **"SECRET CORRECT" was being read as "webhooks work".** The probe is a request
+  this project signs itself — it tests the route, not the subscription. Named as
+  the `SHOPIFY-WEBHOOK-DELIVERY` premise, which expires once an order exists.
+- **The credential auditor now runs.** `ci.yml` was cloning full history
+  specifically for it and never invoking it; it reports three orphaned secrets,
+  including the non-expiring `VERCEL_TOKEN`.
+- `/terms` said prices are in USD; the store charges VND.
+
 ## 2026-08-12 — PR #19: The triangle, decoded
 
 A full-scope diagnostic of GitHub → Vercel → Shopify, run against the **live

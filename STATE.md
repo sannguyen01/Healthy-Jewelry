@@ -407,6 +407,34 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-13**: **A control's own reporting path is part of the control.** Both real checks
+  in `production-smoke.yml` were piped through `| tee`, and GitHub's default shell is
+  `bash -e` with no `pipefail` — so the pipeline reported `tee`'s exit status and neither
+  check could fail. The entire third verification tier was a green tick incapable of going
+  red, wired to an `if: success()` step that would have *closed* the failure issue saying
+  "recovered". Run 31600442658 already published `| Webhook signing secret | success |` for
+  a script that exited 2. What hid it is the sharp part: the *unpiped* preflight step failed
+  for an unrelated reason, and **a workflow with one honest step and two mute ones is
+  indistinguishable from a working one** — right up until the honest step passes. Third
+  instance of ADR 006, and the first where the checks themselves were correct: what failed
+  was the four characters carrying the verdict. See ADR 010. Corollary worth asking of any
+  new control: *what would I see if this failed?* If the answer is "the same thing I see
+  now", it is decoration.
+- **2026-08-13**: **An alarm that does not say why sends its reader to the wrong place.**
+  Issue #18 offered "a Shopify incident, an expired credential, or a configuration change".
+  It was none of them — five secrets were unset and the preflight had printed exactly that,
+  in the log the issue linked to. Also: a *known* unconfigured state must not alarm on a
+  schedule. Three states now (unstarted / half-finished / ready), because collapsing the
+  first two would make a botched setup quiet, and a botched setup is the state most easily
+  mistaken for a working one.
+- **2026-08-13**: **Fixing the code does not fix the prose.** `/terms` stated "Prices are
+  displayed in US Dollars (USD)" while the store charges VND — the same defect the code
+  carried until `HJProduct.currencyCode` was threaded end to end, surviving in a sentence
+  because a sentence has no type checker. Related: Shopify's checkout had one policy of
+  four and it was an unedited template whose `{{ shop_name }}` renders as "My Store 2".
+  Both are the same shape — a customer-facing surface nobody re-read after the thing it
+  described changed.
+
 - **2026-08-12**: **A pinned version is a claim about someone else's system.** `2025-01`
   was written in two files and believed for roughly seven months after Shopify stopped
   serving it. Nothing errored, because a retired version *falls forward* — answered by the
