@@ -801,6 +801,68 @@ async function photographedProductsShowTheirPhotograph() {
  * misunderstanding to resolve, not an outage. Failing on it would make a red
  * build out of someone tidying their Shopify Admin.
  */
+/**
+ * The policies Shopify's hosted checkout links, and this store must therefore have.
+ *
+ * Not an arbitrary list. The checkout footer renders whichever of these exist, and
+ * this store ships to 29 countries — fourteen of them in the EU, where information
+ * about the right of withdrawal has to be given before the order is placed. A
+ * refund policy is not a nicety on that surface; it is the surface.
+ */
+export const REQUIRED_SHOP_POLICIES = [
+  'PRIVACY_POLICY',
+  'REFUND_POLICY',
+  'TERMS_OF_SERVICE',
+  'SHIPPING_POLICY',
+]
+
+/**
+ * Unrendered Liquid left in a policy body.
+ *
+ * Shopify's policy templates ship with `{{ shop_name }}`, `{{ email }}`,
+ * `{{ phone }}` and `{% if %}` blocks that the merchant is expected to replace or
+ * let Shopify interpolate. Interpolation is the trap: `{{ shop_name }}` renders,
+ * and on this store it renders as **"My Store 2"** — so a policy that exists,
+ * looks complete, and passes any presence check will publish the placeholder store
+ * name and the owner's personal Gmail to every customer who opens it.
+ *
+ * Presence alone would pass that. This is the half that catches it.
+ */
+const LIQUID = /\{\{[^}]*\}\}|\{%[^%]*%\}/
+
+/**
+ * Classify a store's policies. Pure, so it can be tested against the real
+ * `shopPolicies` response rather than only ever observed saying "fine".
+ *
+ * @param {{ type: string, body?: string | null }[]} policies
+ * @param {readonly string[]} [required]
+ * @returns {{ ok: boolean, missing: string[], templated: string[], present: string[] }}
+ */
+export function classifyShopPolicies(policies, required = REQUIRED_SHOP_POLICIES) {
+  const byType = new Map(
+    policies.filter((p) => p && typeof p.type === 'string').map((p) => [p.type, p]),
+  )
+
+  const missing = required.filter((type) => {
+    const policy = byType.get(type)
+    // An empty body is an absent policy wearing a heading. Shopify will render the
+    // link and the page, and the page will say nothing.
+    return !policy || !(policy.body ?? '').trim()
+  })
+
+  const templated = required.filter((type) => {
+    const policy = byType.get(type)
+    return !!policy && LIQUID.test(policy.body ?? '')
+  })
+
+  return {
+    ok: missing.length === 0 && templated.length === 0,
+    missing,
+    templated,
+    present: [...byType.keys()],
+  }
+}
+
 /** Tag namespaces `src/lib/shopify/tags.ts` parses. Anything else reaches no code path. */
 export const READ_TAG_NAMESPACES = ['material', 'svg']
 
@@ -942,6 +1004,57 @@ async function storeIdentifiesItselfAsTheBrand() {
   return notes.join(' ')
 }
 
+/**
+ * The policies Shopify's checkout links actually exist and actually say something.
+ *
+ * ## Why this is blocking rather than an observation
+ *
+ * The hosted checkout is the one page in the purchase journey this codebase does
+ * not control, and it renders whichever of these policies exist. This store ships
+ * to 29 countries, fourteen of them in the EU, where the customer has to be told
+ * about the right of withdrawal *before* placing the order.
+ *
+ * Today the store has exactly one policy — Privacy — and it is Shopify's unedited
+ * template. There is no refund policy, no terms of service, and no shipping
+ * policy, while `/shipping` on the site states real terms (30 days, unworn,
+ * prepaid label, refund in 5–7 business days). The site and the checkout disagree,
+ * and the checkout is the one the customer reads.
+ *
+ * ## The placeholder half
+ *
+ * A policy can exist and still be wrong in a way presence cannot see. Shopify
+ * interpolates `{{ shop_name }}` at render time, and on this store that renders
+ * **"My Store 2"**; `{{ email }}` renders the owner's personal Gmail, as the
+ * published data-controller contact. So "the policy exists" and "the policy is
+ * publishable" are different questions, and only the second one matters.
+ */
+async function shopPoliciesAreCompleteAndEdited() {
+  const { shop } = await adminGraphql(
+    `query { shop { shopPolicies { type body } } }`,
+  )
+
+  const { ok, missing, templated, present } = classifyShopPolicies(shop.shopPolicies ?? [])
+  if (ok) return `All ${REQUIRED_SHOP_POLICIES.length} required policies present and edited.`
+
+  const problems = []
+  if (missing.length > 0) {
+    problems.push(
+      `${missing.length} required policy/policies are MISSING or empty: ${missing.join(', ')}.\n` +
+        '  Shopify links these from the hosted checkout. Drafts derived from the site\'s own\n' +
+        '  pages are in docs/shopify-policies/ — paste them into Settings → Policies.',
+    )
+  }
+  if (templated.length > 0) {
+    problems.push(
+      `${templated.length} policy/policies still contain unrendered Liquid: ${templated.join(', ')}.\n` +
+        '  These are Shopify\'s stock templates. `{{ shop_name }}` will render as the store\n' +
+        '  name — currently "My Store 2" — and `{{ email }}` as the store contact address.',
+    )
+  }
+
+  throw new Error(`${problems.join('\n')}\n  Present: ${present.join(', ') || '(none)'}`)
+}
+
 // ── premises ────────────────────────────────────────────────────────────────
 
 /**
@@ -1015,6 +1128,7 @@ async function main() {
   await check('Product metadata names the product, not "Not Found"', productMetadataNamesTheProduct)
   await check('The Open Graph image renders a real PNG', openGraphImageRenders)
   await check('Site search finds Shopify products', searchFindsShopifyProducts)
+  await check('Checkout policies exist and are not stock templates', shopPoliciesAreCompleteAndEdited)
   await check(
     'A photographed product actually shows its photograph',
     photographedProductsShowTheirPhotograph,

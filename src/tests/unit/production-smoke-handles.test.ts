@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { getAllProducts } from '@/lib/data/hj-data'
 
-const { FALLBACK_ONLY_HANDLES, SHOPIFY_ONLY_HANDLES, unreadTags } = await import(
+const {
+  FALLBACK_ONLY_HANDLES,
+  SHOPIFY_ONLY_HANDLES,
+  unreadTags,
+  classifyShopPolicies,
+  REQUIRED_SHOP_POLICIES,
+} = await import(
   '../../../scripts/verify-production.mjs'
 )
 
@@ -113,5 +119,84 @@ describe('unreadTags', () => {
 
   it('handles a product with no tags at all', () => {
     expect(unreadTags([{}, { tags: [] }]).size).toBe(0)
+  })
+})
+
+/**
+ * Shopify's hosted checkout is the one page in the purchase journey this codebase
+ * does not control, and it links whichever of these policies exist. This store
+ * ships to 29 countries — fourteen in the EU, where the right of withdrawal has to
+ * be disclosed before the order is placed.
+ *
+ * As of 2026-08-13 the live store has **one** policy, Privacy, and it is Shopify's
+ * unedited template. The fixtures below are that real response, so this suite goes
+ * red today and green only once the drafts in `docs/shopify-policies/` have been
+ * pasted in.
+ */
+describe('classifyShopPolicies', () => {
+  const edited = (type: string) => ({ type, body: '<p>Real, human-written text.</p>' })
+
+  it('accepts a store with all four policies written', () => {
+    const result = classifyShopPolicies(REQUIRED_SHOP_POLICIES.map(edited))
+    expect(result.ok).toBe(true)
+    expect(result.missing).toEqual([])
+    expect(result.templated).toEqual([])
+  })
+
+  /** The live store, verbatim in shape: one policy of four. */
+  it('reports the three policies the live store does not have', () => {
+    const result = classifyShopPolicies([edited('PRIVACY_POLICY')])
+    expect(result.ok).toBe(false)
+    expect(result.missing).toEqual(['REFUND_POLICY', 'TERMS_OF_SERVICE', 'SHIPPING_POLICY'])
+  })
+
+  /**
+   * The half a presence check cannot see. Shopify *interpolates* these at render
+   * time, so the page looks finished — and publishes "My Store 2" and the store's
+   * contact address to every customer who opens it.
+   */
+  it.each([
+    ['shop name', '<p>{{ shop_name }} operates this store.</p>'],
+    ['contact email', '<p>Email us at {{ email }}.</p>'],
+    ['a conditional block', '<p>{% if selling_to_europe %}EEA text{% endif %}</p>'],
+  ])('flags a policy still carrying Shopify\'s %s placeholder', (_label, body) => {
+    const result = classifyShopPolicies([{ type: 'PRIVACY_POLICY', body }], ['PRIVACY_POLICY'])
+    expect(result.ok).toBe(false)
+    expect(result.templated).toEqual(['PRIVACY_POLICY'])
+    // Present, so not missing. The two failures are distinct and fixed differently.
+    expect(result.missing).toEqual([])
+  })
+
+  it('treats an empty body as absent — a heading with no text is not a policy', () => {
+    for (const body of ['', '   ', '\n']) {
+      expect(classifyShopPolicies([{ type: 'REFUND_POLICY', body }], ['REFUND_POLICY']).missing)
+        .toEqual(['REFUND_POLICY'])
+    }
+  })
+
+  it('treats a null body as absent', () => {
+    expect(
+      classifyShopPolicies([{ type: 'REFUND_POLICY', body: null }], ['REFUND_POLICY']).missing
+    ).toEqual(['REFUND_POLICY'])
+  })
+
+  it('does not flag ordinary braces in prose', () => {
+    // A false positive here would block a perfectly good policy, and the fix
+    // someone reaches for is to delete the check.
+    const body = '<p>Sizes {5, 6, 7} are stocked. 100% of orders ship free.</p>'
+    expect(classifyShopPolicies([{ type: 'REFUND_POLICY', body }], ['REFUND_POLICY']).ok).toBe(true)
+  })
+
+  it('reports what IS present, so the message is actionable', () => {
+    expect(classifyShopPolicies([edited('PRIVACY_POLICY')]).present).toEqual(['PRIVACY_POLICY'])
+  })
+
+  it('requires the four the checkout links, and says which', () => {
+    expect(REQUIRED_SHOP_POLICIES).toEqual([
+      'PRIVACY_POLICY',
+      'REFUND_POLICY',
+      'TERMS_OF_SERVICE',
+      'SHIPPING_POLICY',
+    ])
   })
 })
