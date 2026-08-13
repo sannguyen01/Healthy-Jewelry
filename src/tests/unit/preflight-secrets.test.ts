@@ -192,7 +192,7 @@ describe('preflight states', () => {
 describe('writeStepOutputs', () => {
   it('writes key=value lines the runner can parse', () => {
     const written: string[] = []
-    writeStepOutputs({ appendFileSync: (_p: string, d: string) => void written.push(d) }, '/out', {
+    writeStepOutputs({ appendFileSync: (_path: string, data: string) => void written.push(data) }, '/out', {
       configured: 'false',
       state: 'not-configured',
     })

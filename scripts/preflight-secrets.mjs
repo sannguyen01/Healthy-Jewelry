@@ -159,7 +159,12 @@ export function preflight(required, env) {
  * and so a missing `GITHUB_OUTPUT` (running this by hand) is a no-op instead of
  * a crash.
  *
- * @param {import('node:fs')} fs
+ * Typed by the one method it uses rather than by all of `node:fs`. Depending on
+ * the whole module would be over-specified — and it would force a test to
+ * construct a hundred-property stub to exercise two lines, which is the kind of
+ * friction that ends with the branch going untested.
+ *
+ * @param {{ appendFileSync: (path: string, data: string) => void }} fs
  * @param {string | undefined} outputPath
  * @param {Record<string, string>} values
  */
