@@ -42,6 +42,28 @@ permissions:
   contents: read
   issues: write
 
+# ─────────────────────────────────────────────────────────────────────────────
+# `shell: bash`, and the reason it is not cosmetic.
+#
+# GitHub's default shell on Linux is `bash -e {0}` — **no `pipefail`**. A
+# pipeline's exit status is its *last* command's, so `node script.mjs | tee x.log`
+# reports `tee`'s status, and `tee` always succeeds.
+#
+# Both real checks in this workflow are piped. Neither could fail. Run
+# 31600442658 printed `| Webhook signing secret | success |` for a script that
+# emitted a usage error and exited 2 — and once the secrets are configured the
+# preflight stops being the one step able to go red, at which point this workflow
+# would have been permanently green regardless of what production did, while its
+# `if: success()` step closed the failure issue saying "recovered".
+#
+# `shell: bash` is GitHub's own opt-in to `bash --noprofile --norc -eo pipefail`.
+# Declared here rather than on the two offending steps so that steps nobody has
+# written yet inherit it. See docs/adr/010-a-control-that-cannot-fail.md.
+# ─────────────────────────────────────────────────────────────────────────────
+defaults:
+  run:
+    shell: bash
+
 jobs:
   smoke:
     name: Verify the live store and deployment

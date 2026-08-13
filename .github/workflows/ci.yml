@@ -13,6 +13,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# GitHub's Linux default is `bash -e {0}`, which has **no `pipefail`** — so a
+# piped step reports the exit status of the last command in the pipe rather than
+# the one that matters. `production-smoke.yml` shipped two such steps and neither
+# could fail; this workflow has none today and is one `| tee` away from the same
+# hole. Declared at workflow scope so a future step inherits the fix instead of
+# rediscovering the bug. See docs/adr/010-a-control-that-cannot-fail.md.
+defaults:
+  run:
+    shell: bash
+
 env:
   # Mock credentials — CI never talks to a real Shopify store. Declared once so
   # the two jobs cannot drift apart.
