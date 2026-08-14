@@ -48,6 +48,8 @@ import {
   formatPremises,
 } from './lib/premise-checks.mjs'
 import { SHOPIFY_API_VERSION, compareServedApiVersion } from './lib/api-version.mjs'
+import { staleBundleVerdict, shopifyConfigVerdict } from './lib/deployment-verdict.mjs'
+import { describeFetchError, hintForFetchError } from './lib/fetch-error.mjs'
 
 /**
  * Cold-start budget for the Open Graph image, in milliseconds.
@@ -74,8 +76,16 @@ const OG_COLD_START_BUDGET_MS = 2500
 const API_VERSION = SHOPIFY_API_VERSION
 
 /** The publication the Storefront token reads from. Found by name, not by a
- *  hardcoded gid, so recreating the channel does not silently pass. */
-const HEADLESS_PUBLICATION_NAME = 'Healthy Jewellery Store'
+ *  hardcoded gid, so recreating the channel does not silently pass.
+ *
+ *  The name is the *channel's* name in Shopify Admin → Sales channels → Headless,
+ *  which is `Healthy Jewellery` — not the store's name, and not the brand plus the
+ *  word "Store". This read `Healthy Jewellery Store` until 2026-08-14, and because
+ *  the Admin token was simultaneously missing `read_publications`, the lookup never
+ *  got far enough to be wrong out loud. Granting the scope alone would have turned a
+ *  scope error into `No publication named "Healthy Jewellery Store"` — a confident
+ *  accusation about the merchant's catalogue, sourced from a typo here. */
+const HEADLESS_PUBLICATION_NAME = 'Healthy Jewellery'
 
 /**
  * Handles that exist **only** in `src/lib/data/hj-data.ts`.
@@ -178,6 +188,68 @@ async function storefrontGraphql(query, variables = {}) {
  * one asks what a customer's browser actually receives, which is the only place
  * the fallback bug was ever visible.
  */
+/**
+ * What is this run actually testing?
+ *
+ * Nothing else here asks, and for the life of this project that has been the missing
+ * variable. A stale branch alias, a build that reused its cache and kept old inlined
+ * values, and a storefront token Shopify rejects all produce the same visible site: the
+ * static fallback catalogue, rendering perfectly, refusing checkout. Eleven red checks
+ * describe the symptom eleven times and never separate the three.
+ *
+ * `/api/version` separates them in one request, and has since PR #19. The verdict logic
+ * is imported from `lib/deployment-verdict.mjs` rather than rewritten — it is pure,
+ * unit-tested against branches that can only occur on a broken deployment, and a second
+ * implementation here would be the third copy of a predicate this repo has already paid
+ * for duplicating twice (see `cacheTags.ts`, and the API-version literal in ADR 009).
+ *
+ * A 404 is itself a finding, and a decisive one: the endpoint has been on `main` since
+ * 2026-08-12, so a deployment without it *is* the stale-deployment case, proven rather
+ * than suspected.
+ */
+async function deploymentIdentifiesItself() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  let res
+  try {
+    res = await fetch(new URL('/api/version', siteUrl), {
+      headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+    })
+  } catch (err) {
+    const description = describeFetchError(err)
+    const hint = hintForFetchError(description)
+    throw new Error(
+      `Could not reach ${siteUrl} at all: ${description}` + (hint ? `\n  ${hint}` : ''),
+    )
+  }
+
+  if (res.status === 404) {
+    throw new Error(
+      'This deployment has no /api/version, so it predates 2026-08-12 and is NOT serving\n' +
+        '  current main. Every other failure in this run describes that old build, not the\n' +
+        '  code you are reading. Redeploy the production branch before diagnosing anything\n' +
+        '  else — and check whether this URL is a frozen branch alias rather than Production.',
+    )
+  }
+  if (!res.ok) throw new Error(`GET /api/version returned ${res.status}`)
+
+  const payload = await res.json()
+  const stale = staleBundleVerdict(payload)
+  const config = shopifyConfigVerdict(payload)
+  const env = payload.runtime?.vercelEnv ?? payload.build?.vercelEnv ?? 'unknown'
+  const commit = payload.build?.shortCommit || payload.build?.commit || 'unknown'
+  const identity = `commit ${commit}, env ${env}, built ${payload.build?.builtAt ?? 'unknown'}`
+
+  const failures = [stale, config].filter((v) => v.level === 'fail')
+  if (failures.length > 0) {
+    throw new Error(
+      `${identity}\n` +
+        failures.map((v) => `  ${v.title}\n    ${v.detail}\n    → ${v.action}`).join('\n'),
+    )
+  }
+
+  return identity
+}
+
 async function liveSiteServesShopifyData() {
   const siteUrl = required('PRODUCTION_SITE_URL')
   const res = await fetch(new URL('/shop', siteUrl), {
@@ -191,8 +263,20 @@ async function liveSiteServesShopifyData() {
     throw new Error(
       `The live /shop page is serving the STATIC FALLBACK catalogue, not Shopify.\n` +
         `  Found handles that exist only in src/lib/data/hj-data.ts: ${leaked.join(', ')}\n` +
-        `  Most likely cause: products are not published to the "${HEADLESS_PUBLICATION_NAME}"\n` +
-        `  publication, so the Storefront token sees an empty catalogue.`,
+        `\n` +
+        `  This symptom does NOT identify its cause, and guessing here has cost real time.\n` +
+        `  \`getProducts()\` falls back for three distinct reasons and renders the same page\n` +
+        `  for all three (see reportFallback in src/lib/shopify/index.ts). In the order they\n` +
+        `  are worth checking:\n` +
+        `    1. not-configured — the deployment has no store domain or no storefront token.\n` +
+        `       GET /api/version on this deployment answers this outright: shopify.configured.\n` +
+        `    2. fetch-failed — the token is set but Shopify rejects it. A Storefront token is\n` +
+        `       32 hex characters; an Admin token starts with "shpat_" and yields UNAUTHORIZED\n` +
+        `       with an empty message. Check "A real cart yields a real checkout URL" below.\n` +
+        `    3. empty-response — the token works but the catalogue it can see is empty.\n` +
+        `       That is the publication case; "Every product is published to the headless\n` +
+        `       publication" tests it directly and will say so.\n` +
+        `  Read those two checks before touching the store's publication settings.`,
     )
   }
 
@@ -558,9 +642,26 @@ async function unknownUrlsAreNotIndexable() {
     redirect: 'manual',
   })
   if (collectionRes.status !== 404) {
+    // Where it went is the whole diagnosis. A redirect here cannot come from this repo:
+    // `dynamicParams = false` is set on the route, there is no middleware, vercel.json has
+    // no rules, and the only next.config redirects are permanent (308) on /stones and
+    // /crystals. So a 3xx means something in front of the app answered — and a redirect to
+    // a Vercel SSO host (Deployment Protection), to a `www.` variant (a domain rule), and
+    // to the app's own not-found are three different problems that a bare status code
+    // renders identical. The first run to see this reported "307, expected 404" and left
+    // a session guessing between all three.
+    const location = collectionRes.headers.get('location')
+    const redirected = collectionRes.status >= 300 && collectionRes.status < 400
     throw new Error(
       `An unknown collection returned ${collectionRes.status}, expected 404. Collections are\n` +
-        '  a closed set, so `dynamicParams = false` should reject them before rendering.',
+        '  a closed set, so `dynamicParams = false` should reject them before rendering.' +
+        (redirected
+          ? `\n  It redirected to: ${location ?? '(no Location header)'}\n` +
+            '  Nothing in this repository can emit a redirect for /shop/*, so this came from in\n' +
+            '  front of the app — Vercel Deployment Protection, a domain rule, or an alias that\n' +
+            '  predates the commit adding `dynamicParams = false`. Run `pnpm diagnose:deployment`\n' +
+            '  against this URL to find out which.'
+          : ''),
     )
   }
 
@@ -1122,9 +1223,19 @@ function writeDriftFile(drifted) {
 async function main() {
   console.log('Production reality checks\n')
 
-  // First, because every check below reports on whatever API Shopify decided to answer
-  // with. If that is not the pinned version, the rest of this run describes a different
-  // API than the one the storefront was written against.
+  // Before anything else: establish *what* is being tested.
+  //
+  // Every check below describes a deployment, and none of them names it. The run on
+  // 2026-08-13 reported eleven failures, and the session that read them spent its effort
+  // deciding whether the deployment under test was even the merged code — a stale alias, a
+  // cache-reused build and a genuinely broken storefront produce overlapping symptoms, and
+  // nothing in the output separated them. `/api/version` answers it outright, and has
+  // since PR #19; nothing asked it. See docs/adr/010.
+  await check('The deployment identifies itself', deploymentIdentifiesItself)
+
+  // Then the API version, because every Shopify check below reports on whatever API
+  // Shopify decided to answer with. If that is not the pinned version, the rest of this
+  // run describes a different API than the one the storefront was written against.
   await check('Shopify serves the pinned API version', shopifyServesThePinnedApiVersion)
   await check('Live site serves Shopify data, not the static fallback', liveSiteServesShopifyData)
   await check(

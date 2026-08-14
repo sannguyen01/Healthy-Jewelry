@@ -88,3 +88,59 @@ describe('the check is wired into the build', () => {
     expect(config).toMatch(/from '\.\/src\/lib\/shopify\/env-check'/)
   })
 })
+
+/**
+ * A variable that is set to the wrong credential is invisible to every presence check,
+ * and this build log is the earliest place it can be caught. When it happened, the build
+ * printed nothing at all — because the variable was, strictly, set.
+ */
+describe('malformed configuration', () => {
+  it('flags an Admin token in the storefront slot, with nothing missing', () => {
+    const result = checkShopifyEnv({
+      ...CONFIGURED,
+      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+    })
+
+    expect(result.missing).toEqual([])
+    expect(result.malformed.map((r) => r.key)).toEqual(['SHOPIFY_STOREFRONT_ACCESS_TOKEN'])
+    expect(result.messages.join('\n')).toContain('wrong kind of value')
+    // Naming the fault without naming the fix is what made this expensive.
+    expect(result.messages.join('\n')).toContain('shpca_')
+  })
+
+  it('flags a store domain that carries a scheme', () => {
+    const result = checkShopifyEnv({
+      ...CONFIGURED,
+      NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: 'https://hj.myshopify.com',
+    })
+    expect(result.malformed.map((r) => r.key)).toEqual(['NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN'])
+  })
+
+  it('reports malformed before missing — it is the line most likely to be the only useful one', () => {
+    const result = checkShopifyEnv({
+      ...CONFIGURED,
+      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+      SHOPIFY_WEBHOOK_SECRET: undefined,
+    })
+    const text = result.messages.join('\n')
+    expect(text.indexOf('wrong kind of value')).toBeLessThan(text.indexOf('not fully configured'))
+  })
+
+  it('still carries the two deployment traps when only the shape is wrong', () => {
+    const result = checkShopifyEnv({
+      ...CONFIGURED,
+      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+    })
+    expect(result.messages.join('\n')).toContain('inlined into the client bundle')
+  })
+
+  it('warnIfShopifyUnconfigured returns true for a malformed value, not just a missing one', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(
+      warnIfShopifyUnconfigured({
+        ...CONFIGURED,
+        SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+      }),
+    ).toBe(true)
+  })
+})

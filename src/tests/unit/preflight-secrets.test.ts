@@ -206,3 +206,95 @@ describe('writeStepOutputs', () => {
     expect(() => writeStepOutputs({ appendFileSync }, undefined, { a: 'b' })).not.toThrow()
   })
 })
+
+/**
+ * The failure class presence checks are blind to: a secret that is set, non-empty, and
+ * holds a real credential — for a different API.
+ *
+ * `SHOPIFY_STOREFRONT_ACCESS_TOKEN` held an Admin token (`shpat_…`). Every presence check
+ * in this repo passed. The Storefront API answered with an empty-message UNAUTHORIZED,
+ * every fetcher fell back to `hj-data.ts`, and the live site served a static catalogue
+ * whose placeholder variant IDs made checkout refuse. Six of fourteen live checks went
+ * red and not one of them named the cause.
+ *
+ * These rules are inverse tests on purpose — they fire only on a value that is definitely
+ * wrong. Rejecting an unfamiliar-but-working credential would be the worse failure.
+ */
+describe('malformed secrets', () => {
+  const SHAPED = [
+    'PRODUCTION_SITE_URL',
+    'SHOPIFY_STORE_DOMAIN',
+    'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
+    'SHOPIFY_ADMIN_ACCESS_TOKEN',
+  ]
+  const goodShapes = {
+    PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
+    SHOPIFY_STORE_DOMAIN: 'y0k9ve-q1.myshopify.com',
+    SHOPIFY_STOREFRONT_ACCESS_TOKEN: '0123456789abcdef0123456789abcdef',
+    SHOPIFY_ADMIN_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+    [SOURCE_MARKER]: EXPECTED_MARKER,
+  }
+
+  it('passes a correctly shaped set', () => {
+    const { ok, malformed } = preflight(SHAPED, goodShapes)
+    expect(malformed).toEqual([])
+    expect(ok).toBe(true)
+  })
+
+  it('catches an Admin token in the storefront slot — the actual outage', () => {
+    const { ok, state, malformed, lines } = preflight(SHAPED, {
+      ...goodShapes,
+      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+    })
+
+    expect(malformed).toEqual(['SHOPIFY_STOREFRONT_ACCESS_TOKEN'])
+    expect(state).toBe('misconfigured')
+    expect(ok).toBe(false)
+    // The message has to name the fix, not just the fault.
+    expect(lines.join('\n')).toContain('Headless')
+  })
+
+  it('catches the same swap in the other direction', () => {
+    const { malformed } = preflight(SHAPED, {
+      ...goodShapes,
+      SHOPIFY_ADMIN_ACCESS_TOKEN: '0123456789abcdef0123456789abcdef',
+    })
+    expect(malformed).toEqual(['SHOPIFY_ADMIN_ACCESS_TOKEN'])
+  })
+
+  it('rejects a store domain carrying a scheme, which builds an unresolvable URL', () => {
+    const { malformed } = preflight(SHAPED, {
+      ...goodShapes,
+      SHOPIFY_STORE_DOMAIN: 'https://y0k9ve-q1.myshopify.com',
+    })
+    expect(malformed).toEqual(['SHOPIFY_STORE_DOMAIN'])
+  })
+
+  it('rejects a site URL with no scheme, which surfaces only as "fetch failed"', () => {
+    const { malformed } = preflight(SHAPED, {
+      ...goodShapes,
+      PRODUCTION_SITE_URL: 'healthyjewellery.com',
+    })
+    expect(malformed).toEqual(['PRODUCTION_SITE_URL'])
+  })
+
+  it('stays quiet about shape when the variable is absent — that is the missing case', () => {
+    const { missing, malformed } = preflight(SHAPED, {
+      ...goodShapes,
+      SHOPIFY_STOREFRONT_ACCESS_TOKEN: undefined,
+    })
+    expect(missing).toEqual(['SHOPIFY_STOREFRONT_ACCESS_TOKEN'])
+    expect(malformed).toEqual([])
+  })
+
+  it('still reports isolation alongside a malformed value, rather than one at a time', () => {
+    const { lines } = preflight(SHAPED, {
+      ...goodShapes,
+      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+      [SOURCE_MARKER]: undefined,
+    })
+    const text = lines.join('\n')
+    expect(text).toContain('wrong kind')
+    expect(text).toContain(SOURCE_MARKER)
+  })
+})
