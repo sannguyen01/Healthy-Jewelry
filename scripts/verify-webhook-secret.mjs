@@ -54,6 +54,7 @@ import {
   interpretStatus,
   resolveStoreDomain,
 } from './lib/webhook-signature.mjs'
+import { describeFetchError, hintForFetchError } from './lib/fetch-error.mjs'
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,12 @@ async function main() {
   try {
     res = await fetch(url, init)
   } catch (err) {
-    console.error(`\n✗ Request failed before reaching the route: ${err.message}`)
+    // `err.message` here is always the literal string "fetch failed" — see
+    // scripts/lib/fetch-error.mjs for what that cost once.
+    const description = describeFetchError(err)
+    const hint = hintForFetchError(description)
+    console.error(`\n✗ Request failed before reaching the route: ${description}`)
+    if (hint) console.error(`  ${hint}`)
     process.exit(1)
   }
 

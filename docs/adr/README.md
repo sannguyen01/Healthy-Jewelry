@@ -29,6 +29,7 @@ pointer; the reasoning lives here once.
 | [007](007-regex-guardrails-have-unknown-coverage.md) | A guardrail that parses source with regex has unknown coverage | Spans three guardrails, the shared AST helper, and the testing strategy |
 | [008](008-decisions-need-premise-detectors.md) | A decision needs a detector for the premise it rests on | One rule behind five separate decisions, two ADRs, `STATE.md` and the smoke workflow |
 | [009](009-api-version-must-be-asserted-not-declared.md) | A pinned API version must be asserted against Shopify, not declared | Spans the public config, the client, the cart proxy, the smoke script and a premise |
+| [010](010-a-control-that-cannot-fail.md) | A control's reporting path is part of the control | Third instance of the ADR 006 pattern; spans both workflows, a guardrail, and the runbook |
 
 ## Format
 

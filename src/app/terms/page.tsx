@@ -102,8 +102,17 @@ export default function TermsPage() {
               best of our knowledge.
             </p>
             <p style={bodyStyle}>
-              Prices are displayed in US Dollars (USD). We reserve the right to change prices at any
-              time without notice. The price shown at the time of your order confirmation is the
+              {/*
+                Not a named currency. This paragraph said "US Dollars (USD)" while the
+                store charges VND — the same defect the code carried until
+                `HJProduct.currencyCode` was threaded end to end, surviving in prose
+                because a sentence has no type checker. Naming a currency here means
+                re-editing legal copy whenever Shopify's changes, and forgetting is
+                exactly what happened.
+              */}
+              Prices are displayed in the currency shown at checkout, which is the currency
+              you will be charged in. We reserve the right to change prices at any time
+              without notice. The price shown at the time of your order confirmation is the
               price you will pay.
             </p>
             <p style={bodyStyle}>

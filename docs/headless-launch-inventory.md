@@ -16,8 +16,8 @@ every commerce outage this project has had lived in the gap between the two.
 
 ## The short version
 
-Six things stand between this store and a customer completing a purchase. Only two of
-them are code, and both are now done.
+Seven things stand between this store and a customer completing a purchase. Two were
+code, and both are done.
 
 | # | Blocker | Whose |
 |---|---|---|
@@ -26,7 +26,8 @@ them are code, and both are now done.
 | 3 | **No product photography.** 0 images on all 22 products. The code is now ready for them. | Yours, an upload |
 | 4 | **Upstash unset**, so rate limits count per Lambda instance. | Yours, two env vars |
 | 5 | **No order has ever been placed**, so the webhook path is unproven end to end. | Yours, one real order |
-| 6 | **Shopify's own storefront analytics not wired.** | A deliberate, separate decision |
+| 6 | **Shopify has 1 of 4 checkout policies**, and it is a stock template. Drafts ready to paste. | Yours, in Shopify Admin |
+| 7 | **Shopify's own storefront analytics not wired.** | A deliberate, separate decision |
 
 Everything else is present and verified.
 
@@ -50,8 +51,9 @@ Everything else is present and verified.
 | `custom.spec` metafield | **Missing (by choice)** | 0/22 set. The detail page correctly hides the line. Tracked as a premise. |
 | **Payment provider** | **Unknown** | Not exposed by the Admin API at all — see below |
 | Orders ever | **0** | `ordersCount: 0` |
-| Webhooks | **Unknown** | `webhookSubscriptions: []`, which proves nothing: that query only returns webhooks owned by the querying app. Admin-UI webhooks are invisible to it by design. |
+| Webhooks | **Unverifiable, now named** | `webhookSubscriptions: []` proves nothing — the query returns only the *querying app's* own. And `verify:webhook` tests the route, not the subscription: a store with no webhook passes it identically. Tracked as the `SHOPIFY-WEBHOOK-DELIVERY` premise, which expires once an order exists. |
 | Currencies | **Single** | `enabledPresentmentCurrencies: ["VND"]` — a German customer sees dong |
+| **Shop policies** | **Missing — 1 of 4** | Only `PRIVACY_POLICY` exists, and it is Shopify's **unedited template**, still carrying `{{ shop_name }}` and `{{ email }}`. No refund, no terms of service, no shipping policy. See below. |
 
 ### Why the payment provider cannot be checked for you
 
@@ -65,6 +67,31 @@ So: **Shopify Admin → Settings → Payments**, and do not proceed to a test or
 shows an active provider. Expect a manual method (bank transfer / COD) or a third-party
 gateway. `paymentsPremise` upgrades itself from a reminder into a real assertion the
 moment the first order exists.
+
+### The checkout has one policy, and it is a stock template
+
+Shopify's hosted checkout links whichever policies the store has. This store has
+`PRIVACY_POLICY` and nothing else — no refund policy, no terms of service, no shipping
+policy — while `/shipping` on the site states real terms (30 days, unworn, prepaid label,
+refund in 5–7 business days). **The checkout is the surface the customer reads**, and it
+is the one page in the purchase journey this codebase does not control.
+
+The policy that does exist is Shopify's template, unedited. `{{ shop_name }}` and
+`{{ email }}` interpolate at render time, so the published page currently names the
+business **"My Store 2"** and gives the owner's personal Gmail as the data-controller
+contact. Presence checks pass that; it looks finished.
+
+You ship to fourteen EU countries, where information about the right of withdrawal has to
+be given before the order is placed.
+
+**Drafts are in [`docs/shopify-policies/`](shopify-policies/)** — reconciled from the
+site's own pages, not invented — for you to review and paste into **Settings → Policies**.
+Two items are left as explicit `[ ]` rather than guessed: the business identity and postal
+address EU terms require, and the governing-law jurisdiction (the site currently says
+"applicable law", which is not a choice of law).
+
+`pnpm verify:production` now fails when any of the four is absent *or* still contains
+Liquid.
 
 ### "My Store 2" is a launch blocker, not a cosmetic issue
 
@@ -168,11 +195,9 @@ launch rather than after.
 is the one page in the purchase journey this repository does not control, and the
 "My Store 2" fix above is the highest-value part of it.
 
-**Shop policies.** Refund / privacy / terms / shipping policies are rendered by Shopify
-at checkout from Shopify's own fields — a *different surface* from this site's
-`/privacy`, `/terms` and `/shipping` pages. Not readable through the API surface
-available here, so unverified rather than absent: check
-**Settings → Policies** and make sure they say what the site's pages say.
+**Shop policies — now measured, and the answer was worse than "unverified".** They are
+readable after all, via `shopPolicies`. One of four exists and it is a stock template. See
+the Shopify section above; drafts are in [`docs/shopify-policies/`](shopify-policies/).
 
 ---
 

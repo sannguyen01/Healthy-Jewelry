@@ -232,6 +232,81 @@ export function apiVersionPremise(now = new Date()) {
 }
 
 /**
+ * Shopify is actually *sending* webhooks — which nothing here can currently prove.
+ *
+ * ## The false confidence this replaces
+ *
+ * `verify-webhook-secret.mjs` reports "SECRET CORRECT" and the runbook reads as
+ * though that means webhooks work. It does not. That check POSTs a request this
+ * project signed itself and confirms the **route accepts it**. It says nothing
+ * about whether Shopify has a webhook subscription pointing at the site at all.
+ *
+ * And the obvious way to check — `webhookSubscriptions` on the Admin API — cannot
+ * help: it returns only the subscriptions owned by the *querying app*. Webhooks
+ * created in Settings → Notifications are invisible to it by design, so an empty
+ * list is indistinguishable from a correctly configured store. Confirmed against
+ * the live store: `[]`, with no way to tell which case it is.
+ *
+ * So the Shopify → Vercel direction can be entirely green while Shopify sends
+ * nothing. That is not a check that needs fixing; it is a **gap that needs
+ * naming**, which is what ADR 008 is for.
+ *
+ * ## Why it expires by itself
+ *
+ * Like `paymentsPremise`. The premise is "delivery is unverifiable", and it stops
+ * being true the moment a real order exists: an order means Shopify had something
+ * to deliver, so the question becomes answerable by looking at whether anything
+ * arrived. Human once, then automatic.
+ *
+ * @param {number} ordersCount
+ * @param {number} appOwnedWebhooks Subscriptions visible to the querying app.
+ * @returns {Premise}
+ */
+export function webhookDeliveryPremise(ordersCount, appOwnedWebhooks) {
+  if (ordersCount === 0) {
+    return {
+      id: 'SHOPIFY-WEBHOOK-DELIVERY',
+      decision: 'docs/go-live-runbook.md step 4',
+      kind: 'blocking',
+      // Holds in the sense the premise is accurate: delivery genuinely cannot be
+      // verified yet. The blocker itself lives in the launch inventory.
+      holds: true,
+      detail:
+        'No orders yet, so webhook DELIVERY is unproven. `verify:webhook` confirms the ' +
+        'route accepts a correctly-signed request — it does not confirm Shopify sends ' +
+        'one. Admin-UI webhooks are invisible to webhookSubscriptions (it returns only ' +
+        'the querying app\'s own), so an empty list proves nothing either way. This ' +
+        'upgrades itself into a real assertion once the first order exists.',
+    }
+  }
+
+  if (appOwnedWebhooks > 0) {
+    return {
+      id: 'SHOPIFY-WEBHOOK-DELIVERY',
+      decision: 'docs/go-live-runbook.md step 4',
+      kind: 'blocking',
+      holds: true,
+      detail:
+        `${appOwnedWebhooks} app-owned webhook subscription(s) are visible and ${ordersCount} ` +
+        'order(s) exist, so delivery is now directly checkable rather than inferred.',
+    }
+  }
+
+  return {
+    id: 'SHOPIFY-WEBHOOK-DELIVERY',
+    decision: 'docs/go-live-runbook.md step 4',
+    kind: 'blocking',
+    holds: false,
+    detail:
+      `${ordersCount} order(s) exist, so the "unverifiable" premise has expired — there ` +
+      'was something to deliver. No app-owned subscription is visible, which means the ' +
+      'webhooks are either configured in Settings → Notifications (fine, but still ' +
+      'invisible here) or not configured at all. Check Shopify Admin → Settings → ' +
+      'Notifications → Webhooks, and confirm a recent delivery succeeded.',
+  }
+}
+
+/**
  * Format for the console and the job summary.
  *
  * @param {Premise[]} premises

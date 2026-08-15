@@ -6,6 +6,7 @@ const {
   specMetafieldPremise,
   paymentsPremise,
   apiVersionPremise,
+  webhookDeliveryPremise,
   formatPremises,
 } = await import('../../../scripts/lib/premise-checks.mjs')
 
@@ -236,5 +237,69 @@ describe('formatPremises', () => {
 
     expect(lines[0].startsWith('·')).toBe(true)
     expect(lines[1].startsWith('!')).toBe(true)
+  })
+})
+
+/**
+ * **The gap this names is the one nothing could see.**
+ *
+ * `verify-webhook-secret.mjs` reports "SECRET CORRECT" and the runbook read as though
+ * that meant webhooks work. It does not: the probe is a request this project signed
+ * itself, so it tests the *route*, not the *subscription*. A store with no webhook
+ * configured at all passes it identically.
+ *
+ * And the obvious cross-check does not work either — `webhookSubscriptions` returns only
+ * the querying app's own, so Admin-UI webhooks are invisible to it by design. Confirmed
+ * against the live store: `[]`, with no way to distinguish "none configured" from
+ * "configured in the Admin UI".
+ *
+ * So this is not a check to fix, it is an unknown to name — and one that expires by
+ * itself, exactly like `paymentsPremise`.
+ */
+describe('webhook delivery premise', () => {
+  it('holds while no order exists, because delivery is genuinely unverifiable', () => {
+    const p = webhookDeliveryPremise(0, 0) as Premise
+    expect(p.holds).toBe(true)
+    expect(p.id).toBe('SHOPIFY-WEBHOOK-DELIVERY')
+  })
+
+  it('states what verify:webhook does NOT prove', () => {
+    // The sentence that stops the next reader trusting a green tick too far.
+    const { detail } = webhookDeliveryPremise(0, 0) as Premise
+    expect(detail).toMatch(/does not confirm Shopify sends/i)
+  })
+
+  it('explains why an empty subscription list proves nothing', () => {
+    const { detail } = webhookDeliveryPremise(0, 0) as Premise
+    expect(detail).toMatch(/invisible to webhookSubscriptions/i)
+  })
+
+  /** The expiry. An order means there was something to deliver. */
+  it('drifts once orders exist with no visible subscription', () => {
+    const p = webhookDeliveryPremise(3, 0) as Premise
+    expect(p.holds).toBe(false)
+    expect(p.detail).toContain('3 order(s)')
+    expect(p.detail).toMatch(/Notifications/)
+  })
+
+  it('holds again when orders exist and a subscription is visible', () => {
+    const p = webhookDeliveryPremise(3, 2) as Premise
+    expect(p.holds).toBe(true)
+    expect(p.detail).toContain('2 app-owned')
+  })
+
+  /**
+   * Blocking, not opportunity: an order placed with no working webhook means the
+   * cached catalogue never revalidates and nothing records the sale downstream.
+   * That is broken now, not a decision worth revisiting.
+   */
+  it('is blocking in every state', () => {
+    for (const [orders, subs] of [
+      [0, 0],
+      [3, 0],
+      [3, 2],
+    ]) {
+      expect((webhookDeliveryPremise(orders, subs) as Premise).kind).toBe('blocking')
+    }
   })
 })

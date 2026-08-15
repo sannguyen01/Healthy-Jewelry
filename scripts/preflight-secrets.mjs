@@ -36,6 +36,8 @@
  *   node scripts/preflight-secrets.mjs VAR_ONE VAR_TWO ...
  */
 
+import fs from 'node:fs'
+
 /** Where each variable is configured, so the failure message is actionable. */
 const WHERE = {
   PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
@@ -49,16 +51,133 @@ export const SOURCE_MARKER = 'SMOKE_SECRETS_SOURCE'
 export const EXPECTED_MARKER = 'environment'
 
 /**
+ * Shape rules for secrets that are easy to set to a *valid credential of the wrong kind*.
+ *
+ * Presence checks cannot see this class of mistake at all, and it is the one that actually
+ * happened. Shopify issues two tokens from the same admin area with similar names, and
+ * `SHOPIFY_STOREFRONT_ACCESS_TOKEN` was holding the Admin one (`shpat_…`). The Storefront
+ * API's response to that is `{"message":"","extensions":{"code":"UNAUTHORIZED"}}` — an
+ * error with no message — so every fetcher fell back to the static catalogue, the site
+ * served "Dome Ring" to customers, and checkout refused on placeholder variant IDs. Six
+ * of the fourteen live checks went red, none of them naming the cause.
+ *
+ * Every rule below is an *inverse* test: it fires only on a value that is definitely wrong,
+ * never on one that is merely unfamiliar. Shopify has changed token formats before, and a
+ * preflight that rejects a working credential because it did not recognise it would be a
+ * worse failure than the one it prevents.
+ *
+ * @type {Record<string, { wrong: (v: string) => boolean, explain: string }>}
+ */
+export const SHAPE_RULES = {
+  SHOPIFY_STOREFRONT_ACCESS_TOKEN: {
+    wrong: (v) => v.startsWith('shpat_'),
+    explain:
+      'starts with "shpat_", which is Shopify\'s ADMIN API token format. A Storefront\n' +
+      '    token is 32 hex characters (headless channel / Online Store) or starts with\n' +
+      '    "shpca_" (a custom app\'s private delegate token). The Storefront API rejects an\n' +
+      '    Admin token with an empty-message UNAUTHORIZED, which reads as an outage.\n' +
+      '    Get the right one: Admin → Sales channels → Headless → Storefront API access token.',
+  },
+  SHOPIFY_ADMIN_ACCESS_TOKEN: {
+    wrong: (v) => !v.startsWith('shpat_'),
+    explain:
+      'does not start with "shpat_". Admin API tokens always do. This is the same swap as\n' +
+      '    above in the other direction — likely a Storefront token in the Admin slot.',
+  },
+  SHOPIFY_STORE_DOMAIN: {
+    wrong: (v) => v.includes('/') || v.includes(':') || !v.endsWith('.myshopify.com'),
+    explain:
+      'is not a bare *.myshopify.com host. It is interpolated straight into\n' +
+      '    `https://${domain}/api/…`, so a scheme or a trailing path produces a URL that\n' +
+      '    fails to resolve rather than a readable configuration error.',
+  },
+  PRODUCTION_SITE_URL: {
+    wrong: (v) => !/^https?:\/\/[^/]/.test(v),
+    explain:
+      'is not an absolute http(s) URL. Every probe builds paths with `new URL(path, this)`,\n' +
+      '    which throws on a bare hostname — surfacing as an unexplained "fetch failed".',
+  },
+}
+
+/**
  * @param {string[]} required
  * @param {Record<string, string | undefined>} env
- * @returns {{ ok: boolean, missing: string[], isolated: boolean, lines: string[] }}
+ * @returns {string[]} names of present-but-wrong-shaped variables
+ */
+export function malformedSecrets(required, env) {
+  return required.filter((name) => {
+    const value = env[name]
+    return !!value && !!SHAPE_RULES[name] && SHAPE_RULES[name].wrong(value)
+  })
+}
+
+/**
+ * The three states this can be in, which are not two.
+ *
+ * `not-configured` — **every** secret absent. Nobody has done the setup yet. That
+ * is a known state, not news, and reporting it as a failure every six hours
+ * trains the reader to mute the one channel that will later carry a real outage.
+ *
+ * `misconfigured` — *some* secrets present and some absent, or all present but
+ * not environment-scoped. Somebody started and stopped halfway, which is exactly
+ * what a botched setup looks like and must be loud.
+ *
+ * `ready` — run the real checks.
+ *
+ * The distinction between the first two is the load-bearing part. Collapsing them
+ * into "missing secrets" is what would make a half-finished configuration quiet.
+ *
+ * @typedef {'not-configured' | 'misconfigured' | 'ready'} PreflightState
+ */
+
+/**
+ * @param {string[]} required
+ * @param {Record<string, string | undefined>} env
+ * @returns {{ ok: boolean, state: PreflightState, missing: string[], malformed: string[], isolated: boolean, lines: string[] }}
  */
 export function preflight(required, env) {
   const missing = required.filter((name) => !env[name])
+  const malformed = malformedSecrets(required, env)
   const isolated = env[SOURCE_MARKER] === EXPECTED_MARKER
   const lines = []
 
-  if (missing.length > 0) {
+  /**
+   * `not-configured` requires the marker to be absent too.
+   *
+   * Setting `SMOKE_SECRETS_SOURCE` is itself evidence that somebody opened the
+   * environment and started. Secrets absent *and* the marker set is a setup that
+   * was begun and abandoned — a half-finished configuration, which is loud.
+   */
+  const untouched = missing.length === required.length && required.length > 0 && !isolated
+
+  /** @type {PreflightState} */
+  const state = untouched
+    ? 'not-configured'
+    : missing.length > 0 || malformed.length > 0 || !isolated
+      ? 'misconfigured'
+      : 'ready'
+
+  if (state === 'not-configured') {
+    lines.push(
+      'None of the smoke secrets are set, so this deployment has never been configured for',
+      'live verification. Nothing is broken — this run has nothing to check.',
+      '',
+      'To switch it on, set these on the `production-readonly` environment:',
+      '  Settings → Environments → production-readonly → Environment secrets',
+      ...required.map((n) => `  · ${n}${WHERE[n] ? ` — ${WHERE[n]}` : ''}`),
+      '',
+      `plus the environment variable ${SOURCE_MARKER} = ${EXPECTED_MARKER}.`,
+      '',
+      'Not at repository scope. This repository is public and forkable; an environment',
+      'is the boundary that can carry required reviewers. See docs/credential-inventory.md.',
+      '',
+      'Until then this workflow reports "not configured" and files no issue. Set some but',
+      'not all of them and it will fail loudly — a half-finished setup is a real problem,',
+      'and the one most likely to be mistaken for a working one.',
+    )
+  }
+
+  if (missing.length > 0 && state !== 'not-configured') {
     lines.push(
       `${missing.length} of ${required.length} required secrets are not set for this job.`,
       '',
@@ -73,6 +192,25 @@ export function preflight(required, env) {
     )
   }
 
+  if (malformed.length > 0) {
+    lines.push(
+      `${malformed.length} secret${malformed.length === 1 ? ' is' : 's are'} set to a value of the wrong kind.`,
+      '',
+      'These are present, so every presence check passes. They are still wrong, and the',
+      'API that receives them reports it in a way that reads as an outage rather than a',
+      'configuration error:',
+      '',
+      ...malformed.flatMap((n) => [`  · ${n} ${SHAPE_RULES[n].explain}`, '']),
+      'Fix the value, then redeploy. For NEXT_PUBLIC_* variables in Vercel, redeploy with',
+      '"Use existing Build Cache" UNCHECKED — they are inlined at build time.',
+    )
+  }
+
+  // Deliberately not suppressed when `malformed` is non-empty, unlike the `missing` case.
+  // Missing secrets mean setup is still in progress, so the isolation marker not being
+  // set yet is expected noise. A malformed secret means setup finished and landed wrong —
+  // isolation is then an independent fact worth reporting in the same run rather than
+  // making someone fix the shape, re-dispatch, and discover a second problem.
   if (!isolated && missing.length === 0) {
     lines.push(
       `Every secret is present, but ${SOURCE_MARKER} is not set to "${EXPECTED_MARKER}".`,
@@ -92,7 +230,35 @@ export function preflight(required, env) {
     )
   }
 
-  return { ok: missing.length === 0 && isolated, missing, isolated, lines }
+  return { ok: state === 'ready', state, missing, malformed, isolated, lines }
+}
+
+/**
+ * Tell the workflow what to do, via `$GITHUB_OUTPUT`.
+ *
+ * `configured` gates the two real check steps *and* the issue-filing step, so a
+ * store that has never been set up produces a quiet, honest run rather than a
+ * six-hourly alarm about a fact its owner already knows.
+ *
+ * Written through a function rather than inline so the file-append is testable
+ * and so a missing `GITHUB_OUTPUT` (running this by hand) is a no-op instead of
+ * a crash.
+ *
+ * Typed by the one method it uses rather than by all of `node:fs`. Depending on
+ * the whole module would be over-specified — and it would force a test to
+ * construct a hundred-property stub to exercise two lines, which is the kind of
+ * friction that ends with the branch going untested.
+ *
+ * @param {{ appendFileSync: (path: string, data: string) => void }} fs
+ * @param {string | undefined} outputPath
+ * @param {Record<string, string>} values
+ */
+export function writeStepOutputs(fs, outputPath, values) {
+  if (!outputPath) return
+  const body = Object.entries(values)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n')
+  fs.appendFileSync(outputPath, `${body}\n`)
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -104,14 +270,33 @@ function main() {
     return 2
   }
 
-  const { ok, missing, isolated, lines } = preflight(required, process.env)
+  const { ok, state, missing, malformed, lines } = preflight(required, process.env)
+
+  writeStepOutputs(fs, process.env.GITHUB_OUTPUT, {
+    configured: String(state !== 'not-configured'),
+    state,
+  })
 
   if (ok) {
     console.log(`✓ All ${required.length} secrets present, sourced from the environment.`)
     return 0
   }
 
-  console.error(missing.length > 0 ? '✗ Missing secrets\n' : '✗ Secrets are not isolated\n')
+  if (state === 'not-configured') {
+    // Exit 0. Not a failure — a state. The workflow reads `configured=false` and
+    // skips the checks rather than reporting an outage it has not looked for.
+    console.log('· Not configured for live verification\n')
+    console.log(lines.join('\n'))
+    return 0
+  }
+
+  console.error(
+    missing.length > 0
+      ? '✗ Missing secrets\n'
+      : malformed.length > 0
+        ? '✗ Secrets set to the wrong kind of value\n'
+        : '✗ Secrets are not isolated\n',
+  )
   console.error(lines.join('\n'))
   return 1
 }

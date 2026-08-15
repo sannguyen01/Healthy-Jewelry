@@ -13,6 +13,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# GitHub's Linux default is `bash -e {0}`, which has **no `pipefail`** — so a
+# piped step reports the exit status of the last command in the pipe rather than
+# the one that matters. `production-smoke.yml` shipped two such steps and neither
+# could fail; this workflow has none today and is one `| tee` away from the same
+# hole. Declared at workflow scope so a future step inherits the fix instead of
+# rediscovering the bug. See docs/adr/010-a-control-that-cannot-fail.md.
+defaults:
+  run:
+    shell: bash
+
 env:
   # Mock credentials — CI never talks to a real Shopify store. Declared once so
   # the two jobs cannot drift apart.
@@ -69,6 +79,43 @@ jobs:
 
       - name: Type-check
         run: pnpm type-check
+
+      # The tool this job's `fetch-depth: 0` exists for.
+      #
+      # It was never invoked. Every CI run has been paying for a full-history clone —
+      # with a comment above explaining that the auditor requires it — for a script
+      # that ran nowhere, leaving the orphaned-credential audit to a line in
+      # docs/credential-inventory.md reading "Last reconciled by hand".
+      #
+      # `continue-on-error`, deliberately. It exits 1 when orphans exist, and there
+      # are three right now (VERCEL_TOKEN and its two identifiers), so a blocking
+      # step would freeze every merge on a hygiene finding nobody can fix from a
+      # pull request. Same trade as premise drift (ADR 008): report prominently,
+      # never block. The findings go to the job summary so they are visible without
+      # opening a log — a step whose output only lives in logs is a step nobody reads.
+      - name: Audit workflow credentials
+        id: secret-audit
+        continue-on-error: true
+        run: node scripts/audit-workflow-secrets.mjs 2>&1 | tee secret-audit.log
+
+      - name: Credential audit summary
+        if: always()
+        run: |
+          {
+            echo "## Workflow credential audit"
+            echo ""
+            if [ "${{ steps.secret-audit.outcome }}" = "success" ]; then
+              echo "No orphaned secrets."
+            else
+              echo "**Orphaned secrets found.** Deleting a workflow does not delete its"
+              echo "secrets — they stay in repository settings with no expiry and nothing"
+              echo "marking them unused. See \`docs/credential-inventory.md\`."
+            fi
+            echo ""
+            echo '```'
+            cat secret-audit.log 2>/dev/null || echo "(audit did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Unit tests
         run: pnpm exec vitest run

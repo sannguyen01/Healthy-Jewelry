@@ -101,6 +101,21 @@ one of:
 | `✗ WRONG SECRET` | You have the wrong one of the two. See below. |
 | `✗ SECRET NOT SET` | The deployment has no `SHOPIFY_WEBHOOK_SECRET` at all. |
 
+> **What this does not prove: that Shopify sends any.**
+>
+> The probe is a request *this project signed itself* and POSTed at the route. It
+> confirms the deployment recomputes the same signature — nothing more. A store with
+> **no webhook configured at all** passes it identically, because the probe never
+> involves Shopify.
+>
+> There is no way to close that from here. `webhookSubscriptions` returns only the
+> *querying app's* own subscriptions, so an Admin-UI webhook is invisible to it and an
+> empty list is not evidence of absence. Delivery becomes checkable only once a real
+> order exists, which is Step 4.
+>
+> Tracked as the `SHOPIFY-WEBHOOK-DELIVERY` premise, which expires by itself the moment
+> `ordersCount > 0` — the same shape as the payments blocker.
+
 **The two-secret trap.** There are two different signing secrets and they are not
 interchangeable:
 

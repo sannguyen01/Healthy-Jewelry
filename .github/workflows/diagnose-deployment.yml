@@ -1,0 +1,112 @@
+# Healthy Jewelry — interrogate a specific deployment, on demand
+#
+# ## Why this exists as a workflow rather than a local command
+#
+# `pnpm diagnose:deployment` has existed since PR #19 and answers, in one request,
+# every question a deployment can be wrong about: which commit it is serving, which
+# Vercel environment answered, whether it is a frozen branch alias, and whether the
+# build reused a cache and kept stale `NEXT_PUBLIC_*` values. It is the instrument
+# built specifically for the recurring failure class in this project's history.
+#
+# Nothing ran it. `production-smoke.yml` never calls it, and the runbook lists it as
+# Step 0 — a manual precondition, which means in practice it is the step that gets
+# skipped. So on 2026-08-13 a smoke run reported eleven failures against a deployment
+# nobody had established the identity of, and the session that read those failures
+# spent its time theorising about stale aliases and cached builds. Every one of those
+# theories was answerable by one GET, and the tool to make it was already in the repo.
+#
+# It is also the only way to run this at all from an environment with no outbound
+# access to the site — which is the normal case for an agent session.
+#
+# ## Why it takes a URL rather than reading a secret
+#
+# The whole point is to interrogate a deployment you are *suspicious of*: a preview
+# alias, a branch URL, the apex domain, a specific `.vercel.app` hash. Pinning it to
+# `PRODUCTION_SITE_URL` would answer only for the deployment nobody was worried about.
+#
+# No secret is needed. `/api/version` exposes nothing confidential by construction
+# (see src/config/build-info.ts), and the store domain used for the bundle scan is
+# public — it ships inside the JavaScript this job downloads.
+
+name: Diagnose a deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Deployment URL to interrogate'
+        required: true
+        default: 'https://healthy-jewellery.vercel.app/'
+      expect_production:
+        description: 'Fail if this is not a Production deployment'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: diagnose-deployment-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# `bash` rather than the default `bash -e {0}`, which has `-e` but NOT `-o pipefail`,
+# so a script's exit code is lost the moment it is piped. That is the defect
+# `production-smoke.yml` shipped with; see docs/adr/010-a-control-that-cannot-fail.md.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  diagnose:
+    name: Diagnose a deployment
+    runs-on: ubuntu-latest
+    steps:
+      # Full history. `readDefaultBranchTip()` resolves `origin/main` to decide
+      # whether the served commit is behind the default branch; on the shallow,
+      # single-branch clone actions/checkout does by default that ref does not
+      # exist, and the freshness verdict would silently report "could not decide"
+      # — the one answer this job is dispatched to get.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No `pnpm install`: the script is dependency-free, on Node 22's global
+      # fetch. Same reasoning as production-smoke.yml — a dependency change the
+      # merge gate has not seen cannot break this.
+      - name: Diagnose
+        id: diagnose
+        env:
+          # Public by construction — it is readable in the bundle this job downloads.
+          # Read from a repository variable so a fork or a fresh clone still runs,
+          # falling back to the known store rather than skipping the bundle scan.
+          SHOPIFY_STORE_DOMAIN: ${{ vars.SHOPIFY_STORE_DOMAIN || 'y0k9ve-q1.myshopify.com' }}
+        run: |
+          node scripts/diagnose-deployment.mjs \
+            "${{ inputs.url }}" \
+            ${{ inputs.expect_production && '--expect-production' || '' }} \
+            2>&1 | tee diagnose.log
+
+      # `always()`: a failing diagnosis is the case where the output matters most,
+      # and burying it in a red step's log is how the last one went unread.
+      - name: Publish the diagnosis
+        if: always()
+        run: |
+          {
+            echo "## Deployment diagnosis"
+            echo ""
+            echo "**URL:** \`${{ inputs.url }}\`"
+            echo ""
+            if [ -s diagnose.log ]; then
+              echo '```'
+              cat diagnose.log
+              echo '```'
+            else
+              echo "The script produced no output — it failed before reaching the deployment."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

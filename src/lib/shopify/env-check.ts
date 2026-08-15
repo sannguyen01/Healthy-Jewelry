@@ -51,9 +51,49 @@ const REQUIRED: RequiredVar[] = [
   },
 ]
 
+/**
+ * A variable that is *present* but holds the wrong kind of value.
+ *
+ * Absence is the easy half. The expensive failure on this project was a variable that
+ * was set, non-empty, and satisfied every presence check in the repo — and was the wrong
+ * credential. `SHOPIFY_STOREFRONT_ACCESS_TOKEN` held an Admin API token (`shpat_…`),
+ * because Shopify issues both from the same admin area under similar names. The Storefront
+ * API answers that with `{"message":"","extensions":{"code":"UNAUTHORIZED"}}` — an error
+ * carrying no message — so `getProducts()` caught it, fell back to `hj-data.ts`, and the
+ * production site served a static catalogue whose placeholder variant IDs made checkout
+ * refuse. Nothing anywhere said "wrong token". The build log said nothing at all, because
+ * the variable was set.
+ *
+ * Each rule is an *inverse* test — it fires only on a value that is definitely wrong, never
+ * one that is merely unrecognised. Shopify has changed token formats before, and refusing a
+ * working credential would be a worse failure than the one being prevented.
+ */
+interface ShapeRule {
+  key: string
+  wrong: (value: string) => boolean
+  explain: string
+}
+
+const SHAPE_RULES: ShapeRule[] = [
+  {
+    key: 'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
+    wrong: (value) => value.startsWith('shpat_'),
+    explain:
+      'starts with "shpat_", which is the Admin API token format. A Storefront token is 32 hex characters, or starts with "shpca_" for a custom app delegate token. Shopify Admin → Sales channels → Headless → Storefront API access token.',
+  },
+  {
+    key: 'NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN',
+    wrong: (value) => value.includes('/') || value.includes(':') || !value.endsWith('.myshopify.com'),
+    explain:
+      'is not a bare *.myshopify.com host. It is interpolated directly into `https://${domain}/api/…`, so a scheme or a path yields a URL that fails to resolve instead of a readable error.',
+  },
+]
+
 export interface EnvCheckResult {
   missing: RequiredVar[]
-  /** Lines to print, most important first. Empty when nothing is missing. */
+  /** Present, but holding a value of the wrong kind. */
+  malformed: ShapeRule[]
+  /** Lines to print, most important first. Empty when nothing is wrong. */
   messages: string[]
 }
 
@@ -69,22 +109,42 @@ const TRAPS = [
 
 export function checkShopifyEnv(env: EnvLike = process.env): EnvCheckResult {
   const missing = REQUIRED.filter(({ key }) => !env[key])
-  if (missing.length === 0) return { missing, messages: [] }
+  const malformed = SHAPE_RULES.filter((rule) => {
+    const value = env[rule.key]
+    return !!value && rule.wrong(value)
+  })
+  if (missing.length === 0 && malformed.length === 0) return { missing, malformed, messages: [] }
 
-  const messages = [
-    `[HJ] Shopify is not fully configured — ${missing.length} of ${REQUIRED.length} variables are missing.`,
-    '     The site will build and serve the static fallback catalog, but customers cannot complete a purchase.',
-    ...missing.map(({ key, inlined }) => `     · ${key}${inlined ? '  (inlined at build time)' : ''}`),
-    ...missing.map(({ key, impact }) => `     ${key}: ${impact}`),
-    ...TRAPS.map((trap) => `     ! ${trap}`),
-  ]
+  const messages: string[] = []
 
-  return { missing, messages }
+  // Malformed first. A missing variable is a job half-done and reads as one; a variable
+  // set to the wrong credential reads as "configured" to every other check in the repo,
+  // so it is the line most likely to be the only useful thing in the log.
+  if (malformed.length > 0) {
+    messages.push(
+      `[HJ] ${malformed.length} Shopify variable${malformed.length === 1 ? ' is' : 's are'} set to the wrong kind of value.`,
+      '     These are present, so nothing else in this build will object. They are still wrong.',
+      ...malformed.map(({ key, explain }) => `     · ${key} ${explain}`),
+    )
+  }
+
+  if (missing.length > 0) {
+    messages.push(
+      `[HJ] Shopify is not fully configured — ${missing.length} of ${REQUIRED.length} variables are missing.`,
+      '     The site will build and serve the static fallback catalog, but customers cannot complete a purchase.',
+      ...missing.map(({ key, inlined }) => `     · ${key}${inlined ? '  (inlined at build time)' : ''}`),
+      ...missing.map(({ key, impact }) => `     ${key}: ${impact}`),
+    )
+  }
+
+  messages.push(...TRAPS.map((trap) => `     ! ${trap}`))
+
+  return { missing, malformed, messages }
 }
 
-/** Print the diagnostic. Returns whether anything was missing. */
+/** Print the diagnostic. Returns whether anything was wrong — missing or malformed. */
 export function warnIfShopifyUnconfigured(env: EnvLike = process.env): boolean {
-  const { missing, messages } = checkShopifyEnv(env)
+  const { missing, malformed, messages } = checkShopifyEnv(env)
   for (const message of messages) console.warn(message)
-  return missing.length > 0
+  return missing.length > 0 || malformed.length > 0
 }
