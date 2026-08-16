@@ -1,7 +1,37 @@
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { ImageResponse } from 'next/og'
 import { getProduct } from '@/lib/shopify'
 import { formatPrice } from '@/lib/utils/formatPrice'
 import { productSeo } from '@/lib/seo/productSeo'
+
+// `next/og`'s automatic font loader fetches Google Fonts per glyph range at
+// request time, keyed off a font-name heuristic it does not document. For the
+// ₫ (U+20AB DONG SIGN) in a VND price it returned 400 in production — 23
+// failures across 18 users, logged as "Failed to load dynamic font for ₫" —
+// while every other character on the card rendered fine, so the failure only
+// ever showed up on the one currency this store actually charges in.
+//
+// Bundling the font removes the request-time dependency entirely: Satori gets
+// bytes it already has, for glyphs confirmed present (`fontTools.ttLib`
+// cmap-checked both weights for U+20AB before these files were committed).
+// Noto Sans, not the brand's DM Sans, because pan-Unicode currency coverage is
+// what this card needs and DM Sans's coverage of U+20AB was not verified.
+const FONT_FILES = {
+  regular: path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf'),
+  bold: path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf'),
+} as const
+
+async function loadCardFonts() {
+  const [regular, bold] = await Promise.all([
+    readFile(FONT_FILES.regular),
+    readFile(FONT_FILES.bold),
+  ])
+  return [
+    { name: 'Noto Sans', data: regular, weight: 400 as const, style: 'normal' as const },
+    { name: 'Noto Sans', data: bold, weight: 700 as const, style: 'normal' as const },
+  ]
+}
 
 // Deliberately NOT `runtime = 'edge'`.
 //
@@ -52,27 +82,82 @@ export default async function Image({ params }: Props) {
   // beside a store that charges "1.450.000₫" — the fourth time this project
   // shipped a price no formatter had seen.
   const price = product ? formatPrice(product.price, product.currencyCode) : ''
+  const fonts = await loadCardFonts()
 
   return new ImageResponse(
-    (
-      <div style={{ background: '#F7F5F1', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '80px', justifyContent: 'space-between', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: '#9DA7AF', display: 'flex' }} />
-        <div style={{ fontSize: 14, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#9DA7AF', display: 'flex' }}>HEALTHY JEWELRY</div>
-        {/* Satori has no block layout: a div with more than one child must
+    <div
+      style={{
+        background: '#F7F5F1',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '80px',
+        justifyContent: 'space-between',
+        position: 'relative',
+        fontFamily: 'Noto Sans',
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 4,
+          background: '#9DA7AF',
+          display: 'flex',
+        }}
+      />
+      <div
+        style={{
+          fontSize: 14,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: '#9DA7AF',
+          display: 'flex',
+        }}
+      >
+        HEALTHY JEWELRY
+      </div>
+      {/* Satori has no block layout: a div with more than one child must
             declare display explicitly or rendering throws at request time. */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: 72, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 1.0, marginBottom: 28, display: 'flex' }}>
-            {title}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div
+          style={{
+            fontSize: 72,
+            fontWeight: 700,
+            letterSpacing: '0.03em',
+            textTransform: 'uppercase',
+            color: '#1A1714',
+            lineHeight: 1.0,
+            marginBottom: 28,
+            display: 'flex',
+          }}
+        >
+          {title}
+        </div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <div
+            style={{
+              border: '1px solid #D8D3CB',
+              padding: '8px 16px',
+              fontSize: 12,
+              letterSpacing: '0.12em',
+              color: '#6B6762',
+              display: 'flex',
+            }}
+          >
+            {material}
           </div>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <div style={{ border: '1px solid #D8D3CB', padding: '8px 16px', fontSize: 12, letterSpacing: '0.12em', color: '#6B6762', display: 'flex' }}>
-              {material}
+          {price && (
+            <div style={{ fontSize: 20, color: '#1A1714', fontWeight: 400, display: 'flex' }}>
+              {price}
             </div>
-            {price && <div style={{ fontSize: 20, color: '#1A1714', fontWeight: 400, display: 'flex' }}>{price}</div>}
-          </div>
+          )}
         </div>
       </div>
-    ),
-    { ...size }
+    </div>,
+    { ...size, fonts }
   )
 }
