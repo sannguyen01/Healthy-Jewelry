@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { useCartStore } from '@/store/cart'
+import { useCartStore, cartItemVariantLabel } from '@/store/cart'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { ProductImage } from '@/components/product/ProductImage'
 import {
@@ -210,143 +210,158 @@ export function CartDrawer() {
             </div>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: '16px 0' }}>
-              {items.map(({ product, quantity }) => (
-                <li
-                  key={product.id}
-                  style={{
-                    display: 'flex',
-                    gap: '16px',
-                    padding: '16px 0',
-                    borderBottom: '1px solid var(--nacre)',
-                    alignItems: 'center',
-                  }}
-                >
-                  {/* SVG preview */}
-                  <div
+              {items.map(({ product, quantity, variantId }) => {
+                const variantLabel = cartItemVariantLabel({ product, variantId })
+                return (
+                  <li
+                    key={variantId}
                     style={{
-                      width: '64px',
-                      height: '64px',
-                      flexShrink: 0,
-                      backgroundColor: 'var(--nacre)',
                       display: 'flex',
+                      gap: '16px',
+                      padding: '16px 0',
+                      borderBottom: '1px solid var(--nacre)',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
                     }}
                   >
-                    <ProductImage product={product} svgScale="80%" sizes="64px" />
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p
-                      style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: '0.88rem',
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        color: 'var(--ink)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {product.title}
-                    </p>
-                    <p
-                      style={{
-                        fontFamily: 'var(--font-body)',
-                        fontSize: '0.75rem',
-                        color: 'var(--graphite)',
-                        marginTop: '2px',
-                        fontWeight: 300,
-                      }}
-                    >
-                      {formatPrice(product.price, product.currencyCode)}
-                    </p>
-
-                    {/* Quantity controls */}
+                    {/* SVG preview */}
                     <div
                       style={{
+                        width: '64px',
+                        height: '64px',
+                        flexShrink: 0,
+                        backgroundColor: 'var(--nacre)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
-                        marginTop: '8px',
+                        justifyContent: 'center',
+                        position: 'relative',
                       }}
                     >
-                      <button
-                        onClick={() => updateQuantity(product.id, quantity - 1)}
-                        aria-label="Decrease quantity"
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          border: '1px solid var(--ash)',
-                          background: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'var(--font-body)',
-                          fontSize: '0.9rem',
-                          color: 'var(--ink)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        −
-                      </button>
-                      <span
-                        data-testid="qty-display"
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '0.72rem',
-                          letterSpacing: '0.1em',
-                          color: 'var(--ink)',
-                          minWidth: '16px',
-                          textAlign: 'center',
-                        }}
-                      >
-                        {quantity}
-                      </span>
-                      <button
-                        onClick={() => updateQuantity(product.id, quantity + 1)}
-                        aria-label="Increase quantity"
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          border: '1px solid var(--ash)',
-                          background: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'var(--font-body)',
-                          fontSize: '0.9rem',
-                          color: 'var(--ink)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        +
-                      </button>
-                      <button
-                        onClick={() => removeItem(product.id)}
-                        aria-label={`Remove ${product.title}`}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '0.62rem',
-                          letterSpacing: '0.12em',
-                          textTransform: 'uppercase',
-                          color: 'var(--graphite)',
-                          marginLeft: 'auto',
-                          padding: '2px 0',
-                        }}
-                      >
-                        Remove
-                      </button>
+                      <ProductImage product={product} svgScale="80%" sizes="64px" />
                     </div>
-                  </div>
-                </li>
-              ))}
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: '0.88rem',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          color: 'var(--ink)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {product.title}
+                      </p>
+                      {variantLabel && (
+                        <p
+                          style={{
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: '0.72rem',
+                            color: 'var(--titanium-text)',
+                            marginTop: '2px',
+                          }}
+                        >
+                          {variantLabel}
+                        </p>
+                      )}
+                      <p
+                        style={{
+                          fontFamily: 'var(--font-body)',
+                          fontSize: '0.75rem',
+                          color: 'var(--graphite)',
+                          marginTop: '2px',
+                          fontWeight: 300,
+                        }}
+                      >
+                        {formatPrice(product.price, product.currencyCode)}
+                      </p>
+
+                      {/* Quantity controls */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          marginTop: '8px',
+                        }}
+                      >
+                        <button
+                          onClick={() => updateQuantity(variantId, quantity - 1)}
+                          aria-label="Decrease quantity"
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            border: '1px solid var(--ash)',
+                            background: 'none',
+                            cursor: 'pointer',
+                            fontFamily: 'var(--font-body)',
+                            fontSize: '0.9rem',
+                            color: 'var(--ink)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          −
+                        </button>
+                        <span
+                          data-testid="qty-display"
+                          style={{
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: '0.72rem',
+                            letterSpacing: '0.1em',
+                            color: 'var(--ink)',
+                            minWidth: '16px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          {quantity}
+                        </span>
+                        <button
+                          onClick={() => updateQuantity(variantId, quantity + 1)}
+                          aria-label="Increase quantity"
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            border: '1px solid var(--ash)',
+                            background: 'none',
+                            cursor: 'pointer',
+                            fontFamily: 'var(--font-body)',
+                            fontSize: '0.9rem',
+                            color: 'var(--ink)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          +
+                        </button>
+                        <button
+                          onClick={() => removeItem(variantId)}
+                          aria-label={`Remove ${product.title}`}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: '0.62rem',
+                            letterSpacing: '0.12em',
+                            textTransform: 'uppercase',
+                            color: 'var(--graphite)',
+                            marginLeft: 'auto',
+                            padding: '2px 0',
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
@@ -424,7 +439,12 @@ export function CartDrawer() {
                   {checkoutMessage(checkoutError).body}{' '}
                   <a
                     href={supportMailto(
-                      items.map((i) => `${i.quantity} × ${i.product.title}`).join('\n')
+                      items
+                        .map((i) => {
+                          const label = cartItemVariantLabel(i)
+                          return `${i.quantity} × ${i.product.title}${label ? ` (${label})` : ''}`
+                        })
+                        .join('\n')
                     )}
                     style={{ color: 'var(--ink)', textDecoration: 'underline' }}
                   >
@@ -437,11 +457,7 @@ export function CartDrawer() {
             <button
               onClick={async () => {
                 await syncWithShopify()
-                const {
-                  checkoutUrl,
-                  checkoutError: err,
-                  beginCheckout,
-                } = useCartStore.getState()
+                const { checkoutUrl, checkoutError: err, beginCheckout } = useCartStore.getState()
                 if (checkoutUrl) {
                   // Record which cart we are sending them to pay for. Shopify
                   // deletes a cart once an order is created from it, so this id

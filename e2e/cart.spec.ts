@@ -126,3 +126,62 @@ test.describe('Cart — with items', () => {
     await expect(dialog.getByText(/\$\d+\.\d{2}/).first()).toBeVisible()
   })
 })
+
+// Two sizes of the same ring used to collide on productId, merging into one
+// line: the quantity went up, the size silently did not, and the customer
+// received the wrong ring. Cart lines are now keyed by variantId — these
+// tests are the regression guard for that collapse.
+test.describe('Cart — two sizes of the same product', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/products/arc-band-titanium')
+    await page.getByRole('button', { name: /ring size 7/i }).click()
+    await page.getByRole('button', { name: /add.*to bag/i }).click()
+    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
+    await expect(dialog).toBeVisible()
+    // Close the drawer to reach the size picker for a second, different size.
+    await page.mouse.click(100, 300)
+    await expect(dialog).not.toBeVisible()
+
+    await page.getByRole('button', { name: /ring size 9/i }).click()
+    await page.getByRole('button', { name: /add.*to bag/i }).click()
+    await expect(dialog).toBeVisible()
+  })
+
+  test('creates two distinct lines, not one merged line', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
+    await expect(dialog.locator('[data-testid="qty-display"]')).toHaveCount(2)
+  })
+
+  test('each line shows which size it is', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
+    await expect(dialog.getByText('Size 7')).toBeVisible()
+    await expect(dialog.getByText('Size 9')).toBeVisible()
+  })
+
+  test('increasing quantity on one size leaves the other untouched', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
+    await dialog
+      .getByRole('button', { name: /increase quantity/i })
+      .first()
+      .click()
+    const values = await dialog.locator('[data-testid="qty-display"]').allTextContents()
+    expect(values.sort()).toEqual(['1', '2'])
+  })
+
+  test('removing one size leaves the other in the bag', async ({ page }) => {
+    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
+    await dialog
+      .getByRole('button', { name: /remove arc band/i })
+      .first()
+      .click()
+    await expect(dialog.locator('[data-testid="qty-display"]')).toHaveCount(1)
+    await expect(dialog.getByText(/your bag is empty/i)).not.toBeVisible()
+  })
+
+  test('the standalone /cart page also shows two distinct, labeled lines', async ({ page }) => {
+    await page.goto('/cart')
+    await expect(page.getByText('Size 7')).toBeVisible()
+    await expect(page.getByText('Size 9')).toBeVisible()
+    await expect(page.getByRole('button', { name: /increase quantity/i })).toHaveCount(2)
+  })
+})

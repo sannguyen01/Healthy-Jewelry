@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useCartStore } from '@/store/cart'
+import { useCartStore, cartItemVariantLabel } from '@/store/cart'
 import type { HJProduct } from '@/lib/shopify/types'
 
 const mockProduct: HJProduct = {
@@ -112,30 +112,40 @@ describe('addItem', () => {
 })
 
 describe('removeItem', () => {
-  it('removes the correct product by id', () => {
+  it('removes the correct line by variant id', () => {
     const { addItem, removeItem } = useCartStore.getState()
     addItem(mockProduct)
     addItem(mockProduct2)
-    removeItem('hj-001')
+    removeItem(mockProduct.defaultVariantId)
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(1)
     expect(items[0].product.id).toBe('hj-002')
   })
 
-  it('removing a non-existent id leaves cart unchanged', () => {
+  it('removing a non-existent variant id leaves cart unchanged', () => {
     const { addItem, removeItem } = useCartStore.getState()
     addItem(mockProduct)
     removeItem('does-not-exist')
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(1)
   })
+
+  it('removing one size of a product leaves the other size untouched', () => {
+    const { addItem, removeItem } = useCartStore.getState()
+    addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
+    addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-11')
+    removeItem('gid://shopify/ProductVariant/size-9')
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(1)
+    expect(items[0].variantId).toBe('gid://shopify/ProductVariant/size-11')
+  })
 })
 
 describe('updateQuantity', () => {
-  it('updates quantity for an existing item', () => {
+  it('updates quantity for an existing line', () => {
     const { addItem, updateQuantity } = useCartStore.getState()
     addItem(mockProduct)
-    updateQuantity('hj-001', 5)
+    updateQuantity(mockProduct.defaultVariantId, 5)
     const { items } = useCartStore.getState()
     expect(items[0].quantity).toBe(5)
   })
@@ -143,7 +153,7 @@ describe('updateQuantity', () => {
   it('removes the item when quantity is set to 0', () => {
     const { addItem, updateQuantity } = useCartStore.getState()
     addItem(mockProduct)
-    updateQuantity('hj-001', 0)
+    updateQuantity(mockProduct.defaultVariantId, 0)
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(0)
   })
@@ -151,9 +161,22 @@ describe('updateQuantity', () => {
   it('removes the item when quantity is negative', () => {
     const { addItem, updateQuantity } = useCartStore.getState()
     addItem(mockProduct)
-    updateQuantity('hj-001', -1)
+    updateQuantity(mockProduct.defaultVariantId, -1)
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(0)
+  })
+
+  it('updating one size of a product leaves the other size untouched', () => {
+    const { addItem, updateQuantity } = useCartStore.getState()
+    addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
+    addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-11')
+    updateQuantity('gid://shopify/ProductVariant/size-9', 5)
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(2)
+    const size9 = items.find((i) => i.variantId === 'gid://shopify/ProductVariant/size-9')
+    const size11 = items.find((i) => i.variantId === 'gid://shopify/ProductVariant/size-11')
+    expect(size9?.quantity).toBe(5)
+    expect(size11?.quantity).toBe(1)
   })
 })
 
@@ -174,7 +197,7 @@ describe('checkoutUrl invalidation on cart edits', () => {
 
   it('removeItem clears checkoutUrl but keeps shopifyCartId', () => {
     useCartStore.getState().addItem(mockProduct)
-    useCartStore.getState().removeItem('hj-001')
+    useCartStore.getState().removeItem(mockProduct.defaultVariantId)
     const { checkoutUrl, shopifyCartId } = useCartStore.getState()
     expect(checkoutUrl).toBeNull()
     expect(shopifyCartId).toBe('gid://shopify/Cart/123')
@@ -183,7 +206,7 @@ describe('checkoutUrl invalidation on cart edits', () => {
   it('updateQuantity clears checkoutUrl but keeps shopifyCartId', () => {
     useCartStore.getState().addItem(mockProduct)
     useCartStore.setState({ checkoutUrl: 'https://checkout.shopify.com/stale' })
-    useCartStore.getState().updateQuantity('hj-001', 5)
+    useCartStore.getState().updateQuantity(mockProduct.defaultVariantId, 5)
     const { checkoutUrl, shopifyCartId } = useCartStore.getState()
     expect(checkoutUrl).toBeNull()
     expect(shopifyCartId).toBe('gid://shopify/Cart/123')
@@ -203,9 +226,24 @@ describe('addItem — variant resolution', () => {
     expect(items[0].variantId).toBe(mockProduct.defaultVariantId)
   })
 
-  it('merging quantity on an existing line keeps the originally selected variant', () => {
+  it('adding two different sizes of the same product creates two separate lines', () => {
+    // The regression this guards: keying the merge check by product id
+    // collapsed size 9 and size 11 of the same ring into one line carrying
+    // whichever size was added first — the quantity went up, the size did
+    // not, and the customer received the wrong ring.
     useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
     useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-11')
+    const { items } = useCartStore.getState()
+    expect(items).toHaveLength(2)
+    expect(items.map((i) => i.variantId).sort()).toEqual(
+      ['gid://shopify/ProductVariant/size-11', 'gid://shopify/ProductVariant/size-9'].sort()
+    )
+    expect(items.every((i) => i.quantity === 1)).toBe(true)
+  })
+
+  it('adding the same size twice merges into one line with quantity 2', () => {
+    useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
+    useCartStore.getState().addItem(mockProduct, 1, 'gid://shopify/ProductVariant/size-9')
     const { items } = useCartStore.getState()
     expect(items).toHaveLength(1)
     expect(items[0].quantity).toBe(2)
@@ -285,5 +323,115 @@ describe('totalItems', () => {
     addItem(mockProduct, 3)
     addItem(mockProduct2, 2)
     expect(totalItems()).toBe(5)
+  })
+})
+
+describe('cartItemVariantLabel', () => {
+  const sizedProduct: HJProduct = {
+    ...mockProduct,
+    variants: [
+      {
+        id: 'gid://shopify/ProductVariant/size-9',
+        title: 'Size 9',
+        price: { amount: '89.00', currencyCode: 'USD' },
+        compareAtPrice: null,
+        availableForSale: true,
+        selectedOptions: [{ name: 'Size', value: '9' }],
+      },
+      {
+        id: 'gid://shopify/ProductVariant/size-11',
+        title: 'Size 11',
+        price: { amount: '89.00', currencyCode: 'USD' },
+        compareAtPrice: null,
+        availableForSale: true,
+        selectedOptions: [{ name: 'Size', value: '11' }],
+      },
+    ],
+  }
+
+  it('returns the matching variant title', () => {
+    expect(
+      cartItemVariantLabel({
+        product: sizedProduct,
+        variantId: 'gid://shopify/ProductVariant/size-9',
+      })
+    ).toBe('Size 9')
+  })
+
+  it('distinguishes two variants of the same product', () => {
+    const size9 = cartItemVariantLabel({
+      product: sizedProduct,
+      variantId: 'gid://shopify/ProductVariant/size-9',
+    })
+    const size11 = cartItemVariantLabel({
+      product: sizedProduct,
+      variantId: 'gid://shopify/ProductVariant/size-11',
+    })
+    expect(size9).not.toBe(size11)
+  })
+
+  it('returns null for a single-variant product (Shopify API sentinel)', () => {
+    const unsized: HJProduct = {
+      ...mockProduct,
+      variants: [
+        {
+          id: mockProduct.defaultVariantId,
+          title: 'Default Title',
+          price: { amount: '89.00', currencyCode: 'USD' },
+          compareAtPrice: null,
+          availableForSale: true,
+          selectedOptions: [],
+        },
+      ],
+    }
+    expect(
+      cartItemVariantLabel({ product: unsized, variantId: unsized.defaultVariantId })
+    ).toBeNull()
+  })
+
+  it('returns null for a single-variant product (static fallback catalog sentinel)', () => {
+    // src/lib/data/hj-data.ts buildVariants() titles the implicit single
+    // variant "Default", not Shopify's "Default Title" — both must be caught.
+    const unsized: HJProduct = {
+      ...mockProduct,
+      variants: [
+        {
+          id: mockProduct.defaultVariantId,
+          title: 'Default',
+          price: { amount: '89.00', currencyCode: 'USD' },
+          compareAtPrice: null,
+          availableForSale: true,
+          selectedOptions: [],
+        },
+      ],
+    }
+    expect(
+      cartItemVariantLabel({ product: unsized, variantId: unsized.defaultVariantId })
+    ).toBeNull()
+  })
+
+  it('formats a single selected option as "Name Value" (bare "9" would read as noise)', () => {
+    const ringVariant: HJProduct = {
+      ...mockProduct,
+      variants: [
+        {
+          id: 'hj-001-size-9',
+          title: '9',
+          price: { amount: '89.00', currencyCode: 'USD' },
+          compareAtPrice: null,
+          availableForSale: true,
+          selectedOptions: [{ name: 'Size', value: '9' }],
+        },
+      ],
+    }
+    expect(cartItemVariantLabel({ product: ringVariant, variantId: 'hj-001-size-9' })).toBe(
+      'Size 9'
+    )
+  })
+
+  it('returns null when the variant is not found (e.g. discontinued)', () => {
+    expect(
+      cartItemVariantLabel({ product: mockProduct, variantId: 'gid://shopify/ProductVariant/gone' })
+    ).toBeNull()
   })
 })

@@ -48,6 +48,30 @@ export interface CartItem {
   variantId: string
 }
 
+// Single-variant products get a synthetic title standing in for "no real
+// choice was made": Shopify's own API returns "Default Title"; the static
+// fallback catalog (src/lib/data/hj-data.ts) returns "Default". Either would
+// leak into the UI as a meaningless line if not filtered here.
+const NO_VARIANT_CHOICE = new Set(['Default Title', 'Default'])
+
+/**
+ * The label that tells two cart lines for the same product apart (e.g. "Size 9").
+ * Returns null for single-variant products, where there is no choice to label.
+ *
+ * Prefers `selectedOptions` over the raw variant title: a single-option ring
+ * variant's title is just the bare size ("9"), which reads as noise without
+ * its option name attached.
+ */
+export function cartItemVariantLabel(item: Pick<CartItem, 'product' | 'variantId'>): string | null {
+  const variant = item.product.variants.find((v) => v.id === item.variantId)
+  if (!variant || NO_VARIANT_CHOICE.has(variant.title)) return null
+
+  if (variant.selectedOptions.length > 0) {
+    return variant.selectedOptions.map((o) => `${o.name} ${o.value}`).join(' · ')
+  }
+  return variant.title
+}
+
 interface Money {
   amount: string
   currencyCode: string
@@ -348,14 +372,14 @@ export interface CartState {
 
   // Mutations
   addItem: (product: HJProduct, quantity?: number, variantId?: string) => void
-  removeItem: (productId: string) => void
+  removeItem: (variantId: string) => void
   /**
    * Set a checkout error *and* count it. Internal: the five refusal paths call
    * this instead of `set({ checkoutError })`, so a failure can never be shown to
    * a customer without also being reportable.
    */
   failCheckout: (reason: CheckoutError) => void
-  updateQuantity: (productId: string, quantity: number) => void
+  updateQuantity: (variantId: string, quantity: number) => void
   clearCart: () => void
 
   // Drawer controls
@@ -416,13 +440,17 @@ export const useCartStore = create<CartState>()(
       addItem: (product, quantity = 1, variantId) => {
         const resolvedVariantId = variantId ?? product.defaultVariantId
         set((state) => {
-          const existing = state.items.find((item) => item.product.id === product.id)
+          // Matched by variant, not product: size 7 and size 9 of the same
+          // ring are two different SKUs and must stay two separate lines.
+          // Matching by product id merged them into one line carrying
+          // whichever size was added first — the quantity went up, the size
+          // silently did not, and the customer received the wrong ring.
+          const existing = state.items.find((item) => item.variantId === resolvedVariantId)
           if (existing) {
-            // Same product already in the bag — merge quantity, keep the size
-            // originally selected rather than silently swapping it.
+            // Same variant already in the bag — merge quantity.
             return {
               items: state.items.map((item) =>
-                item.product.id === product.id
+                item.variantId === resolvedVariantId
                   ? { ...item, quantity: item.quantity + quantity }
                   : item
               ),
@@ -461,9 +489,9 @@ export const useCartStore = create<CartState>()(
         })
       },
 
-      removeItem: (productId) => {
+      removeItem: (variantId) => {
         // Read before the filter: after it, there is nothing left to describe.
-        const removed = get().items.find((item) => item.product.id === productId)?.product
+        const removed = get().items.find((item) => item.variantId === variantId)?.product
         if (removed) {
           track({
             name: 'remove_from_bag',
@@ -473,21 +501,21 @@ export const useCartStore = create<CartState>()(
           })
         }
         set((state) => ({
-          items: state.items.filter((item) => item.product.id !== productId),
+          items: state.items.filter((item) => item.variantId !== variantId),
           checkoutUrl: null,
           checkoutError: null,
           shopifyTotal: null,
         }))
       },
 
-      updateQuantity: (productId, quantity) => {
+      updateQuantity: (variantId, quantity) => {
         if (quantity <= 0) {
-          get().removeItem(productId)
+          get().removeItem(variantId)
           return
         }
         set((state) => ({
           items: state.items.map((item) =>
-            item.product.id === productId ? { ...item, quantity } : item
+            item.variantId === variantId ? { ...item, quantity } : item
           ),
           checkoutUrl: null,
           checkoutError: null,
