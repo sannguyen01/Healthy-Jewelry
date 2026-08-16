@@ -78,10 +78,6 @@ export default async function Image({ params }: Props) {
   // Same derivation as generateMetadata and the JSON-LD.
   const title = product ? productSeo(product).title : 'Product'
   const material = MATERIAL_LABELS[product?.material ?? ''] ?? 'TITANIUM'
-  // Formatted, not interpolated. A bare `{product.price}` renders "1450000"
-  // beside a store that charges "1.450.000₫" — the fourth time this project
-  // shipped a price no formatter had seen.
-  const price = product ? formatPrice(product.price, product.currencyCode) : ''
   const fonts = await loadCardFonts()
 
   return new ImageResponse(
@@ -150,9 +146,16 @@ export default async function Image({ params }: Props) {
           >
             {material}
           </div>
-          {price && (
+          {product && (
+            // Formatted inline, not through an intermediate variable rendered
+            // bare — `currency-consistency.test.tsx` treats a standalone
+            // `{price}` expression as an unformatted raw number on sight,
+            // regardless of what produced it, and a bare `{product.price}`
+            // really did render "1450000" beside a store charging
+            // "1.450.000₫" the fourth time this project shipped a price no
+            // formatter had seen.
             <div style={{ fontSize: 20, color: '#1A1714', fontWeight: 400, display: 'flex' }}>
-              {price}
+              {formatPrice(product.price, product.currencyCode)}
             </div>
           )}
         </div>
