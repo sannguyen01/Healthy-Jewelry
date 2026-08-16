@@ -7,31 +7,45 @@ import type { CartItem, CheckoutError } from '@/store/cart'
 export { useCartStore }
 
 /**
- * Returns the CartItem for a specific product ID, or undefined if not in cart.
+ * Returns the CartItem for a specific variant ID, or undefined if not in cart.
+ *
+ * Keyed by variant, not product: a product can have several lines in the bag
+ * at once (one per size), so "the" cart item for a product id is not a
+ * well-defined question — `find()` would silently return whichever line
+ * happened to be added first.
  */
-export function useCartItem(productId: string): CartItem | undefined {
-  return useCartStore((state) =>
-    state.items.find((item) => item.product.id === productId)
-  )
+export function useCartItem(variantId: string): CartItem | undefined {
+  return useCartStore((state) => state.items.find((item) => item.variantId === variantId))
 }
 
 /**
- * Returns whether a given product is currently in the cart.
+ * Returns whether a given variant is currently in the cart.
  */
-export function useIsInCart(productId: string): boolean {
-  return useCartStore((state) =>
-    state.items.some((item) => item.product.id === productId)
-  )
+export function useIsInCart(variantId: string): boolean {
+  return useCartStore((state) => state.items.some((item) => item.variantId === variantId))
 }
 
 /**
- * Returns the quantity of a given product in the cart (0 if not in cart).
+ * Returns the quantity of a given variant in the cart (0 if not in cart).
  */
-export function useCartItemQuantity(productId: string): number {
+export function useCartItemQuantity(variantId: string): number {
   return useCartStore((state) => {
-    const item = state.items.find((i) => i.product.id === productId)
+    const item = state.items.find((i) => i.variantId === variantId)
     return item?.quantity ?? 0
   })
+}
+
+/**
+ * Returns the total quantity of a product in the cart, summed across every
+ * variant (size) of it. For the one place that needs a product-level count
+ * with no size context — a product card, which shows no size picker.
+ */
+export function useProductQuantityInCart(productId: string): number {
+  return useCartStore((state) =>
+    state.items
+      .filter((item) => item.product.id === productId)
+      .reduce((sum, item) => sum + item.quantity, 0)
+  )
 }
 
 /**

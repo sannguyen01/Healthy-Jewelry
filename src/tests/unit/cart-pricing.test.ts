@@ -142,7 +142,7 @@ describe("Shopify's price wins over a stale local one", () => {
   it('a bag change discards the total, which was scoped to other lines', async () => {
     await useCartStore.getState().syncWithShopify()
     expect(useCartStore.getState().shopifyTotal).toBe(CURRENT_PRICE)
-    useCartStore.getState().updateQuantity(product.id, 3)
+    useCartStore.getState().updateQuantity(VARIANT, 3)
     expect(useCartStore.getState().shopifyTotal).toBeNull()
   })
 

@@ -189,7 +189,7 @@ describe('useCartItem', () => {
   })
 
   it('returns undefined when product is not in cart', () => {
-    const { result } = renderHook(() => useCartItem(testProduct.id))
+    const { result } = renderHook(() => useCartItem(testProduct.defaultVariantId))
     expect(result.current).toBeUndefined()
   })
 
@@ -197,7 +197,7 @@ describe('useCartItem', () => {
     act(() => {
       useCartStore.getState().addItem(testProduct)
     })
-    const { result } = renderHook(() => useCartItem(testProduct.id))
+    const { result } = renderHook(() => useCartItem(testProduct.defaultVariantId))
     expect(result.current).toBeDefined()
     expect(result.current?.product.id).toBe(testProduct.id)
   })
@@ -217,7 +217,7 @@ describe('useIsInCart', () => {
   })
 
   it('returns false when cart is empty', () => {
-    const { result } = renderHook(() => useIsInCart(testProduct.id))
+    const { result } = renderHook(() => useIsInCart(testProduct.defaultVariantId))
     expect(result.current).toBe(false)
   })
 
@@ -225,7 +225,7 @@ describe('useIsInCart', () => {
     act(() => {
       useCartStore.getState().addItem(testProduct)
     })
-    const { result } = renderHook(() => useIsInCart(testProduct.id))
+    const { result } = renderHook(() => useIsInCart(testProduct.defaultVariantId))
     expect(result.current).toBe(true)
   })
 
@@ -244,7 +244,7 @@ describe('useCartItemQuantity', () => {
   })
 
   it('returns 0 when product is not in cart', () => {
-    const { result } = renderHook(() => useCartItemQuantity(testProduct.id))
+    const { result } = renderHook(() => useCartItemQuantity(testProduct.defaultVariantId))
     expect(result.current).toBe(0)
   })
 
@@ -252,7 +252,7 @@ describe('useCartItemQuantity', () => {
     act(() => {
       useCartStore.getState().addItem(testProduct)
     })
-    const { result } = renderHook(() => useCartItemQuantity(testProduct.id))
+    const { result } = renderHook(() => useCartItemQuantity(testProduct.defaultVariantId))
     expect(result.current).toBe(1)
   })
 
@@ -260,7 +260,7 @@ describe('useCartItemQuantity', () => {
     act(() => {
       useCartStore.getState().addItem(testProduct, 3)
     })
-    const { result } = renderHook(() => useCartItemQuantity(testProduct.id))
+    const { result } = renderHook(() => useCartItemQuantity(testProduct.defaultVariantId))
     expect(result.current).toBe(3)
   })
 
