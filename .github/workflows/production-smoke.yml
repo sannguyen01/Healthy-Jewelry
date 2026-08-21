@@ -207,6 +207,22 @@ jobs:
       # six-hourly "Still failing" comment about a fact its owner already knows.
       # Partial configuration is still a failure and still files — that is the
       # state most easily mistaken for a working one.
+      #
+      # Dedup + escalate, not just comment (ADR 011).
+      #
+      # Issue #24 reached 24 byte-identical "Still failing" comments over six days —
+      # same secret, same wrong prefix, every six hours — because this step compared
+      # nothing: every failing run appended a comment regardless of whether the
+      # diagnosis had changed since the last one. A channel that says the same thing
+      # 24 times is a channel people mute, which is the exact failure ADR 006 and
+      # ADR 010 already named for other controls in this file.
+      #
+      # So: compare the new diagnosis to the last comment's. Unchanged → skip the
+      # comment and count the streak instead. At 3 unchanged in a row and not yet
+      # escalated → one escalation comment, a `human-required` label, and a title
+      # prefix, then silence until the diagnosis actually changes or it recovers.
+      # Changed (including the first failure) → comment as before, which also
+      # resets the streak implicitly since the new comment becomes the last one.
       - name: Report failure as an issue
         if: failure() && steps.preflight.outputs.configured == 'true'
         continue-on-error: true
@@ -215,6 +231,8 @@ jobs:
           script: |
             const fs = require('fs')
             const label = 'production-smoke'
+            const escalationLabel = 'human-required'
+            const escalationThreshold = 3
             const title = 'Production smoke is failing'
             const runUrl =
               `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
@@ -247,14 +265,21 @@ jobs:
               })
               .filter(Boolean)
 
+            // The part of the comment that identifies *why* it failed — everything
+            // except the run URL, which is different on every run by construction
+            // and must not defeat the comparison below.
+            const diagnosis =
+              logs.length > 0
+                ? ['**What failed:**', '', ...logs].join('\n')
+                : 'No step produced output — the run failed before the checks started.'
+
             const body = [
               'The scheduled production smoke run failed.',
               '',
               `Run: ${runUrl}`,
               '',
-              ...(logs.length > 0
-                ? ['**What failed:**', '', ...logs, '']
-                : ['No step produced output — the run failed before the checks started.', '']),
+              diagnosis,
+              '',
               'This checks the **live** store and deployment, so it can fail for reasons',
               'unrelated to any commit — a Shopify incident, an expired credential, or a',
               'configuration change. It is deliberately not part of branch protection.',
@@ -269,19 +294,7 @@ jobs:
               labels: label,
             })
 
-            if (open.length > 0) {
-              // Update rather than open a second one: a scheduled job that files a
-              // fresh issue every 6 hours is a job people mute.
-              // The output goes on the comment too. Two consecutive failures with
-              // different causes would otherwise be indistinguishable, and this
-              // issue is the only place anyone sees them side by side.
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: open[0].number,
-                body: [`Still failing.`, '', `Run: ${runUrl}`, '', ...logs].join('\n'),
-              })
-            } else {
+            if (open.length === 0) {
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -289,7 +302,78 @@ jobs:
                 body,
                 labels: [label],
               })
+              return
             }
+
+            const issue = open[0]
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100,
+            })
+
+            // Every "Still failing" comment this step has ever written carries its
+            // diagnosis after a blank line following the run URL — strip that
+            // prefix so two comments about the same cause compare equal regardless
+            // of which run produced them.
+            const diagnosisOf = (commentBody) =>
+              commentBody.replace(/^Still failing\.\n\nRun: [^\n]*\n\n/, '').trim()
+
+            const last = comments[comments.length - 1]
+            const unchanged = last && diagnosisOf(last.body) === diagnosis.trim()
+
+            if (!unchanged) {
+              // First failure, or the diagnosis moved — always worth a comment,
+              // and this becomes the new baseline the next run compares against.
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: [`Still failing.`, '', `Run: ${runUrl}`, '', diagnosis].join('\n'),
+              })
+              return
+            }
+
+            // Diagnosis unchanged. Count how many trailing comments already say the
+            // same thing, including this run, to decide whether to stay silent or
+            // escalate once.
+            let streak = 1
+            for (let i = comments.length - 2; i >= 0; i--) {
+              if (diagnosisOf(comments[i].body) === diagnosis.trim()) streak++
+              else break
+            }
+
+            const alreadyEscalated = issue.labels.some(
+              (l) => (typeof l === 'string' ? l : l.name) === escalationLabel,
+            )
+
+            if (streak < escalationThreshold || alreadyEscalated) {
+              return // same cause, already said or already escalated — stay quiet
+            }
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              title: `[escalated] ${issue.title.replace(/^\[escalated\]\s*/, '')}`,
+              labels: [...issue.labels.map((l) => (typeof l === 'string' ? l : l.name)), escalationLabel],
+            })
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: [
+                `Same diagnosis for ${streak} consecutive runs — escalating instead of`,
+                'repeating the comment. This is a console configuration problem, not',
+                'something a future run or a code change will resolve on its own. See the',
+                'diagnosis above and `docs/go-live-runbook.md`. This issue stays quiet now',
+                'until the diagnosis changes or the run recovers.',
+                '',
+                `Run: ${runUrl}`,
+              ].join('\n'),
+            })
 
       # Premise drift is reported separately from failure, and never as failure.
       #
