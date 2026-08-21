@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # GitHub's "npm" ecosystem covers package-lock.json, yarn.lock, and
+  # pnpm-lock.yaml alike — there is no separate "pnpm" ecosystem value.
+  # This repo uses pnpm exclusively (see loop-constraints.md).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      # Patch/minor bumps land as one low-noise weekly PR. Major bumps are
+      # excluded from the group so they surface individually — next, react,
+      # react-dom, and any @shopify/* major bump requires the written-rationale
+      # escalation in loop-constraints.md, and that only works if the PR isn't
+      # buried inside a bundle of unrelated patch updates.
+      routine-updates:
+        update-types:
+          - "minor"
+          - "patch"
