@@ -1,7 +1,7 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-08-21
+Last refreshed by hand: 2026-08-22
 
 ## Session note — 2026-08-21
 
@@ -334,6 +334,16 @@ Two standing caveats that are not items because nothing can close them from here
   machine. Left in place rather than deleted because "a branch I cannot see" is
   not the same as "a branch that is gone", and deleting the warning would lose
   the conflict detail if it resurfaces. Confirm and remove.
+- **RESEND-KEY-UNWATCHED — opened 2026-08-22.** PR #32 (see Resolved) makes a
+  missing `RESEND_API_KEY` fail honestly — 503 instead of a lying 200 — but
+  `scripts/preflight-secrets.mjs` still only asserts the five secrets item 4
+  (`PRODUCTION-SMOKE-SECRETS`) names, none of them Resend's. So the failure is
+  now correct but still invisible from outside the request path itself: the
+  first sign would be a real customer's message 503ing, not a smoke run. Not
+  urgent — PR #32 already closed the worse failure mode (silent data loss) —
+  but a shape-rule check (Resend keys start with `re_`, same pattern as the
+  `shpat_` detector `preflight-secrets.mjs` already runs) would close this the
+  same way.
 - **Branch coordination (2026-08-05)**: `integrate/shopify-transactions`
   (worktree `.claude/worktrees/agent-ab8803cce02d5162f`) is mid-merge with 28
   unresolved conflicts as of this note — active work, not touched here. It
@@ -348,6 +358,57 @@ Two standing caveats that are not items because nothing can close them from here
 
 ## Resolved
 
+- [x] SHOPIFY-PRODUCT-NULL-FALLBACK — resolved 2026-08-22, PR #30 (`8dc678b`).
+  `getProduct()` treated Shopify's authoritative `product: null` (a retired or
+  renamed handle) the same as an outage, serving the static fallback catalog —
+  a fully-rendered page with a fabricated GID that passes every visual check
+  until checkout, where `isPlaceholderVariantId` finally rejects it. Live-
+  observed as 75 fallback-catalog events for legacy handles (PR body). Fix is
+  scoped to `getProduct` alone: it now returns `null` on a well-formed empty
+  answer → a real 404. `not-configured` / `fetch-failed` still degrade to the
+  static catalog, since those are whole-site outages where every product falls
+  back consistently; `getProducts` / `getProductsByCollection` /
+  `getBestsellers` / `getNewArrivals` are unchanged, since an empty list is a
+  legitimate catalog state with no equivalent fabricated-entity risk. ADR 004
+  extended with this one exception. The old test asserted the static fallback
+  *was* served, for a handle the static catalog happens to contain — it could
+  not have caught this by construction. Replaced with one asserting `null`
+  wins and one guarding that the outage path is unchanged.
+- [x] SHOPIFY-COLLECTION-NOT-FOUND-LOGGING — resolved 2026-08-22, PR #31
+  (`5339509`), extends the same `FallbackReason` type and ADR 004 exception
+  PR #30 touched. `getProductsByCollection` collapsed `collection: null` (the
+  handle matches no Shopify collection — Admin renamed or deleted it under a
+  still-live route) and a real, empty collection into the same
+  `'empty-response'` log line via `?? []`. No behavioral change — both still
+  degrade to the static catalog, since an empty list carries no fabricated-
+  page risk (ADR 004) — but a permanent handle-drift bug was indistinguishable
+  in the fallback logs from an expected restocking gap. Adds
+  `'collection-not-found'` to `FallbackReason` so the two are observable
+  separately. New tests spy on `console.error` and assert the `reason` field
+  directly, because the *return value* is identical in both cases and cannot
+  itself prove the fix. Checked whether `getBestsellers` / `getNewArrivals`
+  need the same split (they query a top-level `products` connection directly,
+  not a nested collection-then-connection) — they don't; there is no `null`
+  case in that shape to collapse. **Not closed by this PR**: `collectionHandle
+  as HJCollectionHandle` on the fallback-lookup call is still a cast, not a
+  parse — `material` and `svgType` were fixed in 2026-08-05 and the product
+  mapper's `collection` field in 2026-08-12, but this is a second, separate
+  cast site the same pattern reaches.
+- [x] CONTACT-SILENT-DROP — resolved 2026-08-22, PR #32 (`ed7dafc`).
+  `POST /api/contact` returned `{ success: true }` (200) whenever
+  `RESEND_API_KEY` was unset — the message was never sent or queued, but the
+  customer was told it had arrived, with nothing prompting them to follow up
+  by email. Now returns 503 + `{ error }`, matching the shape already used
+  when Resend itself throws at send-time; `ContactForm` already renders an
+  "email us directly" fallback on any non-2xx response, so this costs nothing
+  in UX. Misconfiguration logging collapsed from `console.warn` +
+  `console.info` to a single `console.error`, still with no PII (the existing
+  GDPR data-minimisation comment is unchanged) — the test's GDPR spy target
+  was updated to match, and the success-path assertion inverted to expect
+  503/error. `RESEND_API_KEY` is still not asserted by
+  `scripts/preflight-secrets.mjs` (see PRODUCTION-SMOKE-SECRETS, item 4) — a
+  missing key now fails honestly at request time, but isn't yet visible from
+  outside before that.
 - [x] SHOPIFY-HEADLESS-PUBLISH — resolved 2026-08-05. **The blocker no code
   change or env var could work around.** The store had 22 products published to
   Online Store and **0 to the headless channel** ("Healthy Jewellery Store",
@@ -429,6 +490,19 @@ Report a *shrinking* count as a finding; a growing one is not itself news.
 the merge gate must be hermetic — but it means neither number says anything about
 the real store. Production reality is a third, non-blocking tier
 (`.github/workflows/production-smoke.yml`); see `docs/testing-strategy.md`.
+
+**2026-08-22 update, measured live rather than taken from a PR body**: **939**
+unit tests across **56** files (`pnpm exec vitest run`) — 933 passing, 6
+failing across `cache-tag-contract.test.ts`, `currency-consistency.test.tsx`,
+`secret-exposure.test.ts` and three assertions in `workflow-shell-contract.test.ts`,
+plus 5 files that fail to collect at all (`audit-workflow-secrets`,
+`preflight-secrets`, `production-smoke-handles`, `webhook-signature-contract`,
+`webhook-signature-script`). All of it is `\n`-anchored regex breaking on this
+Windows checkout's CRLF line endings — confirmed identical on a clean `main`
+before PRs #28–32, and green on GitHub's Linux CI. Not a real defect; do not
+fix it by editing the tests. **384** E2E tests across **14** spec files (up
+from 296/11 on 2026-08-08), confirmed via `playwright test --list`, not run in
+full this session.
 
 ## Architecture / design decisions
 
