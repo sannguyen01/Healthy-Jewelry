@@ -60,14 +60,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const messageError = validateMessage(message)
   if (messageError) return NextResponse.json({ error: messageError }, { status: 400 })
 
-  // 3. Send via Resend (graceful degradation if API key absent)
+  // 3. Send via Resend — a missing key is a misconfiguration, not a reason to
+  // tell the customer their message arrived. `{ success: true }` here used to
+  // mean "the form worked" while the message was silently dropped: nothing
+  // was sent, nothing was queued, and the customer had no way to know to
+  // follow up by email. ContactForm already renders a "try emailing us
+  // directly" fallback on any non-2xx response, so failing honestly costs
+  // nothing in UX and stops a customer inquiry from vanishing unnoticed.
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
-    console.warn('[contact] RESEND_API_KEY not set — inquiry received but not forwarded')
+    console.error('[contact] RESEND_API_KEY not set — inquiry could not be forwarded')
     // Do NOT log PII (email/name) here: GDPR data minimisation requires
     // personal data not to appear in logs accessible to all project members.
-    console.info('[contact] Inquiry received')
-    return NextResponse.json({ success: true })
+    return NextResponse.json(
+      { error: 'Failed to send message. Please email us directly.' },
+      { status: 503 }
+    )
   }
 
   try {
