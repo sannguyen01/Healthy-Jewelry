@@ -15,6 +15,19 @@
 - Never edit .env, .env.*, auth/, payments/, secrets/, credentials/
 - Never edit infrastructure configs without human approval
 
+## Credential check failures
+- Never set, read, propose, or guess a credential value — not even a plausible-looking
+  correction. `scripts/preflight-secrets.mjs` (`SHAPE_RULES`) already tells you exactly
+  which secret is wrong and why (missing vs. present-but-wrong-shape, e.g. a Storefront
+  token in the `SHOPIFY_ADMIN_ACCESS_TOKEN` slot, which must start with `shpat_`).
+- If a preflight/smoke check fails on a credential: name the secret, quote the tool's own
+  diagnosis, state which console it's fixed in (GitHub → Settings → Environments →
+  `production-readonly`, or the relevant Shopify/Vercel page), and stop. This is a human
+  console action, never a code change. See ADR 011 and `docs/go-live-runbook.md`.
+- If `production-smoke` has been failing with the *same* diagnosis for 3+ runs, don't add
+  another "still failing" comment — the workflow's own escalation step (ADR 011) already
+  did that once. Check whether it's escalated (`human-required` label) before commenting.
+
 ## Code
 - Always run tests before proposing a fix
 - Never disable tests to make CI green

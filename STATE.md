@@ -1,7 +1,37 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-08-12
+Last refreshed by hand: 2026-08-21
+
+## Session note — 2026-08-21
+
+Two things changed since the last hand-refresh; neither touches the eight open
+items below.
+
+**PRs #25–27 merged** (`7da26fb`, `a610503`, `8d5b488`) — a `workflow_dispatch`
+input fix, a VND-capable OG-image font, and keying cart lines by variant
+instead of product. None of the eight items were in scope; none closed.
+
+**Issue #24 (`SHOPIFY-ADMIN-TOKEN-SLOT`) confirmed still open**, live via
+`gh issue view 24`: created 2026-08-15, 24 comments as of this refresh, every
+one the same diagnosis — `SHOPIFY_ADMIN_ACCESS_TOKEN` does not start with
+`shpat_`. This is item 3 (`SHOPIFY-WEBHOOK-SECRET`)'s prerequisite becoming its
+own blocker: the token was rotated once (2026-08-15) and landed in the wrong
+credential slot rather than the right one — same swap `preflight-secrets.mjs`
+already names, in the direction the shape rule is built to catch.
+
+Nothing here is a code fix. The comment spam itself was: `production-smoke.yml`
+was posting a new byte-identical comment every 6 hours with no comparison to
+the last one. That's fixed (dedup + escalate-after-3, `human-required` label,
+see [ADR 011](docs/adr/011-repeated-identical-failures-must-escalate.md)) —
+the diagnosis and the fix were never the problem, the channel repeating itself
+forever was.
+
+**Still requires a human in the Shopify Admin console**: Apps and sales
+channels → your custom app → API credentials → copy the token that begins
+`shpat_` under **Admin API access token** (not Storefront) → GitHub → Settings
+→ Environments → `production-readonly` → update `SHOPIFY_ADMIN_ACCESS_TOKEN` →
+re-run `production-smoke.yml` via `workflow_dispatch` to confirm it closes.
 
 ## Live verification — 2026-08-08
 
