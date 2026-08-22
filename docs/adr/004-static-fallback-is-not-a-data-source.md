@@ -23,9 +23,21 @@ It also caused, or hid, every significant defect this project has shipped:
 ## Decision
 
 The static catalogue is reachable **only from behind `@/lib/shopify`**. Every fetcher there
-already degrades to it on `not-configured`, `empty-response` and `fetch-failed`, so nothing
-else ever needs to import it. A module reaching past that door is not "using the fallback";
-it is bypassing Shopify permanently, on every request, in production.
+degrades to it on `not-configured` and `fetch-failed`, so nothing else ever needs to import
+it. A module reaching past that door is not "using the fallback"; it is bypassing Shopify
+permanently, on every request, in production.
+
+`getProduct` is the one exception to `empty-response`, deliberately: a configured, reachable
+Shopify answering `product: null` for a single handle is not a platform failure, it is
+Shopify's authoritative statement that the handle does not exist. Falling back there would
+serve a fabricated, indexable product page — wrong title, wrong price, a GID Shopify never
+issued. `isPlaceholderVariantId` catches that id before checkout, so the harm is not a silent
+checkout failure; it is a customer or search engine trusting a page that lies.
+`getProducts`, `getProductsByCollection`, `getBestsellers` and `getNewArrivals` still degrade
+on `empty-response`, because an empty *list* is a legitimate catalog state (a collection
+between restocks, a quiet new-arrivals window) with no equivalent fabricated-page risk — there
+is no single wrong product being sold, only a thinner shelf. See the doc comment on
+`getProduct` in `src/lib/shopify/index.ts` for the full reasoning.
 
 `src/tests/unit/metadata-data-source.test.ts` enforces this across all of `src/`, exempting
 only `lib/data` (the fallback itself), `lib/shopify` (the legitimate consumer) and tests.

@@ -332,7 +332,7 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
    * says cannot exist, which the product page then linked to as `/shop/frontpage`, a
    * hard 404 under `dynamicParams = false`.
    */
-  it('maps a product in Shopify\'s built-in frontpage collection to its real one', async () => {
+  it("maps a product in Shopify's built-in frontpage collection to its real one", async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -387,8 +387,21 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     )
   })
 
-  it('falls back to static data when Shopify returns no product for the handle', async () => {
+  it('returns null — not the static fallback — when a configured Shopify answers with no product', async () => {
+    // A well-formed `data: { product: null }` is Shopify's authoritative "this handle
+    // does not exist", not a platform failure. Falling back here would serve a
+    // fabricated-GID static product that renders but cannot complete checkout — see the
+    // getProduct doc comment and docs/adr/004-static-fallback-is-not-a-data-source.md.
+    // `arc-band-titanium` is deliberately a handle the static catalogue *does* have, so
+    // this proves the null wins over the fallback rather than merely being untested.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockJsonResponse({ data: { product: null } })))
+    const { getProduct } = await import('@/lib/shopify')
+    const product = await getProduct('arc-band-titanium')
+    expect(product).toBeNull()
+  })
+
+  it('still falls back to static data when Shopify is unreachable, unlike a real null product', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
     const { getProduct } = await import('@/lib/shopify')
     const product = await getProduct('arc-band-titanium')
     expect(product?.handle).toBe('arc-band-titanium')

@@ -137,11 +137,7 @@ function mapShopifyProduct(node: Product): HJProduct {
   // Validated, never cast. `svg:ring-halo` is a legal tag to write in Shopify
   // Admin and was not a legal HJSvgType — the old cast let it through and
   // JewelrySVG rendered nothing at all for nine products.
-  const {
-    svgType,
-    matched: svgMatched,
-    unknownTag,
-  } = parseSvgType(tags, collection, handle)
+  const { svgType, matched: svgMatched, unknownTag } = parseSvgType(tags, collection, handle)
   if (!svgMatched) {
     console.warn('[shopify] svg type unresolved, using collection fallback:', {
       handle,
@@ -190,6 +186,23 @@ function mapShopifyProduct(node: Product): HJProduct {
   }
 }
 
+/**
+ * A configured Shopify answering with `product: null` is not a platform
+ * failure — it is Shopify's authoritative statement that the handle does not
+ * exist. Falling back to the static catalogue here (as every other fetcher in
+ * this module correctly does on `not-configured` / `fetch-failed`) would hand
+ * the customer a fabricated, indexable product page — wrong title, wrong
+ * price, a GID Shopify never issued. `isPlaceholderVariantId` in
+ * `src/store/cart.tsx` catches that id before checkout and fails with
+ * `placeholder-catalog`, so the harm here is not a silent checkout failure —
+ * it is a wasted journey and a search result pointing at a page that lies.
+ *
+ * So `getProduct` alone treats a well-formed empty answer as a real absence
+ * — see docs/adr/004-static-fallback-is-not-a-data-source.md — while
+ * `not-configured` and `fetch-failed` still degrade to the static catalogue,
+ * because those are whole-site outages where every product falls back
+ * consistently, not a single stale link.
+ */
 export async function getProduct(handle: string): Promise<HJProduct | null> {
   if (!isShopifyConfigured()) {
     reportFallback('getProduct', 'not-configured', handle)
@@ -202,8 +215,7 @@ export async function getProduct(handle: string): Promise<HJProduct | null> {
       { revalidate: 3600, tags: [PRODUCTS_TAG, productTag(handle)] }
     )
     if (!response.data?.product) {
-      reportFallback('getProduct', 'empty-response', handle)
-      return staticGetProductByHandle(handle) ?? null
+      return null
     }
     return mapShopifyProduct(response.data.product)
   } catch (e) {
