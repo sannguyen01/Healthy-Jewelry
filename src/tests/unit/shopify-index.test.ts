@@ -473,6 +473,7 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
   })
 
   it('getProductsByCollection falls back to static when the collection has no products', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.stubGlobal(
       'fetch',
       vi
@@ -483,6 +484,35 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     const products = await getProductsByCollection('bracelets')
     expect(products.length).toBeGreaterThan(0)
     expect(products.every((p) => p.collection === 'bracelets')).toBe(true)
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ reason: 'empty-response' })
+    )
+    errorSpy.mockRestore()
+  })
+
+  it('getProductsByCollection falls back to static, reporting collection-not-found, when the handle matches no Shopify collection', async () => {
+    // `collection: null` (handle drift between the Next.js route and Shopify Admin)
+    // used to be indistinguishable from an empty-but-real collection — both hit the
+    // same `edges.length === 0` branch and logged identically as `empty-response`.
+    // The product list still degrades the same way (an empty list carries no
+    // fabricated-page risk, unlike getProduct's single-entity case), but the fallback
+    // reason must name the actual cause so handle drift doesn't hide in logs that are
+    // expected to be noisy during a normal restock gap.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(mockJsonResponse({ data: { collection: null } }))
+    )
+    const { getProductsByCollection } = await import('@/lib/shopify')
+    const products = await getProductsByCollection('bracelets')
+    expect(products.length).toBeGreaterThan(0)
+    expect(products.every((p) => p.collection === 'bracelets')).toBe(true)
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ reason: 'collection-not-found' })
+    )
+    errorSpy.mockRestore()
   })
 
   it('searchProducts maps live Shopify search results', async () => {

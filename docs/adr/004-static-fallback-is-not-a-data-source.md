@@ -39,6 +39,15 @@ between restocks, a quiet new-arrivals window) with no equivalent fabricated-pag
 is no single wrong product being sold, only a thinner shelf. See the doc comment on
 `getProduct` in `src/lib/shopify/index.ts` for the full reasoning.
 
+`getProductsByCollection` additionally distinguishes *why* the list is empty in its fallback
+report. `collection: null` (the handle matches no Shopify collection at all — Admin renamed
+or deleted it out from under a still-live Next.js route) and `collection: { products: {
+edges: [] } }` (a real collection, currently stocked with zero products) both degrade to the
+static catalogue the same way, but only the first is a `collection-not-found`: a routing bug
+that stays broken until someone reads the logs, as opposed to `empty-response`, which fixes
+itself the moment stock arrives. Collapsing both into one reason string, as the code did
+before, made a permanent handle-drift bug indistinguishable from an expected restocking gap.
+
 `src/tests/unit/metadata-data-source.test.ts` enforces this across all of `src/`, exempting
 only `lib/data` (the fallback itself), `lib/shopify` (the legitimate consumer) and tests.
 
