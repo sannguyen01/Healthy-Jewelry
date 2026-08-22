@@ -160,8 +160,8 @@ describe('POST /api/contact', () => {
     })
   })
 
-  describe('graceful degradation — no RESEND_API_KEY', () => {
-    it('returns 200 and logs when RESEND_API_KEY is not set', async () => {
+  describe('RESEND_API_KEY not set — honest failure, not a fabricated success', () => {
+    it('returns 503 with an actionable error instead of a fabricated success', async () => {
       vi.stubEnv('RESEND_API_KEY', '')
       const req = new NextRequest('http://localhost/api/contact', {
         method: 'POST',
@@ -169,18 +169,18 @@ describe('POST /api/contact', () => {
         body: JSON.stringify(VALID_BODY),
       })
       const res = await POST(req)
-      expect(res.status).toBe(200)
-      const json = (await res.json()) as { success: boolean }
-      expect(json.success).toBe(true)
+      expect(res.status).toBe(503)
+      const json = (await res.json()) as { error: string }
+      expect(json.error).toMatch(/failed to send/i)
     })
 
     it('does NOT include customer email in console output (GDPR data minimisation)', async () => {
       vi.stubEnv('RESEND_API_KEY', '')
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       await POST(makeReq(VALID_BODY))
-      const logged = infoSpy.mock.calls.flat().join(' ')
+      const logged = errorSpy.mock.calls.flat().join(' ')
       expect(logged).not.toContain(VALID_BODY.email)
-      infoSpy.mockRestore()
+      errorSpy.mockRestore()
     })
   })
 
