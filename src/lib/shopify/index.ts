@@ -58,7 +58,7 @@ function isShopifyConfigured(): boolean {
  * fetcher and the reason, because "products are static" and "this one product
  * 404'd in Shopify" need different responses.
  */
-type FallbackReason = 'not-configured' | 'empty-response' | 'fetch-failed'
+type FallbackReason = 'not-configured' | 'empty-response' | 'fetch-failed' | 'collection-not-found'
 
 function reportFallback(fetcher: string, reason: FallbackReason, detail?: string): void {
   console.error('[shopify] SERVING STATIC FALLBACK CATALOG', {
@@ -283,7 +283,21 @@ export async function getProductsByCollection(
       { handle: collectionHandle, first },
       { revalidate: 3600, tags: [PRODUCTS_TAG, collectionTag(collectionHandle)] }
     )
-    const edges = response.data?.collection?.products?.edges ?? []
+    // `collection: null` (the handle matches no Shopify collection — a route
+    // drifted out of sync with Shopify Admin) and `collection: { products: {
+    // edges: [] } }` (a real collection with zero products right now, a
+    // legitimate quiet shelf) both used to collapse into the same
+    // `edges.length === 0` branch. Both still degrade to the static
+    // catalogue — an empty list has no fabricated-page risk, per ADR 004 —
+    // but reported identically as `empty-response` they were indistinguishable
+    // in the fallback logs from an expected restocking gap. `collection-
+    // not-found` is a routing/handle-drift bug that stays broken until
+    // someone notices; `empty-response` fixes itself when stock arrives.
+    if (!response.data?.collection) {
+      reportFallback('getProductsByCollection', 'collection-not-found', collectionHandle)
+      return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
+    }
+    const edges = response.data.collection.products?.edges ?? []
     if (edges.length === 0) {
       reportFallback('getProductsByCollection', 'empty-response', collectionHandle)
       return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
