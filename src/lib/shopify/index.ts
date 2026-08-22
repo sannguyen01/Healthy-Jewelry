@@ -10,8 +10,8 @@ import {
   SEARCH_PRODUCTS,
 } from './queries/products'
 import { PRODUCTS_TAG, productTag, collectionTag } from './cacheTags'
-import { parseMaterial, parseSvgType, parseCollection } from './tags'
-import type { HJProduct, HJCollection, HJCollectionHandle, Product } from './types'
+import { parseMaterial, parseSvgType, parseCollection, isHJCollectionHandle } from './tags'
+import type { HJProduct, HJCollection, Product } from './types'
 import {
   getAllProducts as staticGetAllProducts,
   getProductByHandle as staticGetProductByHandle,
@@ -267,13 +267,30 @@ export async function getProducts(maxItems = 250): Promise<HJProduct[]> {
   }
 }
 
+/**
+ * `collectionHandle` arrives as a plain route param, not a validated
+ * `HJCollectionHandle` — the four fallback call sites in
+ * `getProductsByCollection` used to hand it straight to the static catalogue
+ * via `as HJCollectionHandle`. Runtime risk was low (`staticGetProductsByCollection`
+ * only ever `.filter()`s against it, so a bogus handle degraded to `[]`
+ * anyway) but a cast is still a claim the compiler believes and nothing
+ * checks — the same reasoning that moved `material` and `svgType` off casts
+ * in `tags.ts`, and `collection` on the product mapper in 2026-08-12. This is
+ * that same fix applied to the lookup side.
+ */
+function staticFallbackForCollection(collectionHandle: string): HJProduct[] {
+  return isHJCollectionHandle(collectionHandle)
+    ? staticGetProductsByCollection(collectionHandle)
+    : []
+}
+
 export async function getProductsByCollection(
   collectionHandle: string,
   first = 20
 ): Promise<HJProduct[]> {
   if (!isShopifyConfigured()) {
     reportFallback('getProductsByCollection', 'not-configured', collectionHandle)
-    return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
+    return staticFallbackForCollection(collectionHandle)
   }
   try {
     const response = await shopifyFetch<{
@@ -295,19 +312,19 @@ export async function getProductsByCollection(
     // someone notices; `empty-response` fixes itself when stock arrives.
     if (!response.data?.collection) {
       reportFallback('getProductsByCollection', 'collection-not-found', collectionHandle)
-      return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
+      return staticFallbackForCollection(collectionHandle)
     }
     const edges = response.data.collection.products?.edges ?? []
     if (edges.length === 0) {
       reportFallback('getProductsByCollection', 'empty-response', collectionHandle)
-      return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
+      return staticFallbackForCollection(collectionHandle)
     }
     return edges.map((e) => mapShopifyProduct(e.node))
   } catch (e) {
     if (e instanceof ShopifyFetchError) {
       reportFallback('getProductsByCollection', 'fetch-failed', e.message)
     }
-    return staticGetProductsByCollection(collectionHandle as HJCollectionHandle)
+    return staticFallbackForCollection(collectionHandle)
   }
 }
 

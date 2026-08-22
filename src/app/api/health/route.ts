@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
+import { Resend } from 'resend'
 import { createRateLimiter } from '@/lib/utils/rateLimit'
 
 /**
- * Reports whether rate limiting is actually durable in this deployment.
+ * Reports whether the deployment's out-of-band dependencies actually work.
  *
  * ## Why this exists
  *
@@ -13,23 +14,44 @@ import { createRateLimiter } from '@/lib/utils/rateLimit'
  * weakness a security audit already corrected once for `/api/contact`, quietly
  * reintroduced for `/api/shopify`, which is unauthenticated and creates carts.
  *
- * Nothing about that gap is visible from the outside. It does not error, it does
- * not log, and it only manifests under exactly the traffic it exists to stop.
+ * `/api/contact` has the same shape of gap: PR #32 made a missing
+ * `RESEND_API_KEY` fail honestly at request time (503, no more silent
+ * `{ success: true }`) instead of lying, but that failure is still only
+ * visible to whoever happens to submit the form. `resend` below is the same
+ * "checkable rather than invisible" treatment already given to Redis.
+ *
+ * Nothing about either gap is visible from the outside on its own. Neither
+ * errors, neither logs, and each only manifests under exactly the condition
+ * it exists to catch.
  *
  * ## Configured is not the same as working
  *
- * Reporting `distributed` alone would only prove the two env vars are *set*. A
- * typo'd URL, a revoked token, or a paused Upstash database all leave
- * `distributed: true` while every limit check fails open. So this endpoint spends
- * one real round-trip against Redis and reports what actually happened. A health
- * check that goes green while the thing it checks is broken is worse than no
- * check at all.
+ * Reporting presence alone would only prove an env var is *set*. A typo'd
+ * Upstash URL, a revoked token, a paused database, or a revoked Resend key all
+ * leave "configured" true while the thing it configures is dead. So this
+ * endpoint spends one real round-trip against each and reports what actually
+ * happened. A health check that goes green while the thing it checks is
+ * broken is worse than no check at all.
+ *
+ * `resend` is checked via `apiKeys.list()` — an authenticated, side-effect-free
+ * call that validates the key without sending any mail, deliberately, since a
+ * scheduled health probe sending real email every few minutes would itself be
+ * the kind of silent surprise this file exists to prevent.
+ *
+ * `resend` is informational only: it does not affect `healthy` or the response
+ * status code, which stay scoped to rate-limiting as before. Whether a
+ * misconfigured Resend key should fail a *scheduled* smoke run is a decision
+ * for whoever wires this into `production-smoke.yml` — this project has twice
+ * shipped an alarm that fires on a state its own owner already knows about
+ * (see the 2026-08-13 architecture notes in STATE.md), and `RESEND_API_KEY`
+ * being unset is exactly that: a known, tracked, already-open item, not a
+ * surprise.
  *
  * ## What it deliberately does not return
  *
- * No env values, no URLs, no tokens, no key material — booleans and a fixed
- * status string. The endpoint is public, so it says whether the mechanism works,
- * never how it is wired.
+ * No env values, no URLs, no tokens, no key material — statuses and booleans
+ * only. The endpoint is public, so it says whether each mechanism works, never
+ * how it is wired.
  */
 
 // Never prerendered: a build-time answer would describe the build machine's
@@ -49,6 +71,24 @@ const probe = createRateLimiter({
 })
 
 type RedisStatus = 'ok' | 'unreachable' | 'not-configured'
+type ResendStatus = 'ok' | 'unreachable' | 'not-configured'
+
+/**
+ * `apiKeys.list()` authenticates the key against Resend's API without
+ * sending anything — the same "spend a real round-trip" treatment as the
+ * Redis probe above, without the side effect a send would have.
+ */
+async function checkResend(): Promise<ResendStatus> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return 'not-configured'
+
+  try {
+    const { error } = await new Resend(apiKey).apiKeys.list()
+    return error ? 'unreachable' : 'ok'
+  } catch {
+    return 'unreachable'
+  }
+}
 
 export async function GET(): Promise<NextResponse> {
   let redis: RedisStatus = 'not-configured'
@@ -66,6 +106,7 @@ export async function GET(): Promise<NextResponse> {
     }
   }
 
+  const resend = await checkResend()
   const healthy = probe.distributed && redis === 'ok'
 
   return NextResponse.json(
@@ -73,6 +114,9 @@ export async function GET(): Promise<NextResponse> {
       // True only when limits are genuinely shared across serverless instances.
       rateLimitDistributed: probe.distributed,
       redis,
+      // Informational only — does not affect `healthy` or the status code.
+      // See the file-level doc comment for why this stays non-blocking.
+      resend,
       healthy,
       hint: healthy
         ? undefined
@@ -87,6 +131,6 @@ export async function GET(): Promise<NextResponse> {
       // parsing the body.
       status: healthy ? 200 : 503,
       headers: { 'Cache-Control': 'no-store' },
-    },
+    }
   )
 }
