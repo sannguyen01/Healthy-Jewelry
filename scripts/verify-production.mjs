@@ -42,6 +42,7 @@ import {
   i18nPremise,
   collectionSetPremise,
   specMetafieldPremise,
+  productPhotographyPremise,
   paymentsPremise,
   apiVersionPremise,
   webhookDeliveryPremise,
@@ -1180,17 +1181,24 @@ async function collectPremises() {
   const withSpec = await adminGraphql(
     `query {
        products(first: 250) {
-         edges { node { metafield(namespace: "custom", key: "spec") { value } } }
+         edges {
+           node {
+             metafield(namespace: "custom", key: "spec") { value }
+             featuredImage { url }
+           }
+         }
        }
      }`,
   )
   const specCount = withSpec.products.edges.filter((e) => e.node.metafield?.value?.trim()).length
+  const photoCount = withSpec.products.edges.filter((e) => e.node.featuredImage?.url).length
 
   return [
     apiVersionPremise(),
     i18nPremise(shopLocales),
     collectionSetPremise(collections.edges.map((e) => e.node), KNOWN_COLLECTIONS),
     specMetafieldPremise(specCount, productsCount.count),
+    productPhotographyPremise(photoCount, productsCount.count),
     paymentsPremise(
       ordersCount.count,
       orders.edges.flatMap((e) => e.node.paymentGatewayNames ?? []),

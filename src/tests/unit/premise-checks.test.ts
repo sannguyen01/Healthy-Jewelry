@@ -4,15 +4,15 @@ const {
   i18nPremise,
   collectionSetPremise,
   specMetafieldPremise,
+  productPhotographyPremise,
   paymentsPremise,
   apiVersionPremise,
   webhookDeliveryPremise,
   formatPremises,
 } = await import('../../../scripts/lib/premise-checks.mjs')
 
-const { API_VERSION_ACCESSIBLE_UNTIL, MIGRATION_LEAD_DAYS, SHOPIFY_API_VERSION } = await import(
-  '../../../scripts/lib/api-version.mjs'
-)
+const { API_VERSION_ACCESSIBLE_UNTIL, MIGRATION_LEAD_DAYS, SHOPIFY_API_VERSION } =
+  await import('../../../scripts/lib/api-version.mjs')
 
 /**
  * **Both states, every premise.**
@@ -121,6 +121,22 @@ describe('spec metafield premise', () => {
   })
 })
 
+describe('product photography premise', () => {
+  it('holds — and stays blocking, not opportunity — while no product has a photo', () => {
+    const p = productPhotographyPremise(0, 22) as Premise
+    expect(p.holds).toBe(true)
+    expect(p.kind).toBe('blocking')
+    expect(p.detail).toContain('0/22')
+  })
+
+  it('drifts once photography starts landing, without waiting for full coverage', () => {
+    const p = productPhotographyPremise(3, 22) as Premise
+    expect(p.holds).toBe(false)
+    expect(p.detail).toContain('3/22')
+    expect(p.detail).toContain('STATE.md item 9')
+  })
+})
+
 /**
  * The premise with a **date on it**, which makes it the clearest case for the whole idea.
  *
@@ -208,10 +224,7 @@ describe('payments premise — the one that expires by itself', () => {
 })
 
 describe('formatPremises', () => {
-  const holding = [
-    i18nPremise([{ locale: 'en' }]),
-    specMetafieldPremise(0, 22),
-  ] as Premise[]
+  const holding = [i18nPremise([{ locale: 'en' }]), specMetafieldPremise(0, 22)] as Premise[]
 
   it('says so plainly when everything holds', () => {
     const { drifted, summary } = formatPremises(holding)
