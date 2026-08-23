@@ -367,8 +367,12 @@ meets imagery:
   degraded continuously below it. Testing at 390px and 1280px would have found the failure; testing at
   1280px and 1440px would have missed it entirely. The matrix straddles the breakpoints that matter.
 - **Geometry.** Where a scrim protects text, assert the text actually stays inside the opaque zone.
-  The Hero publishes its fade width as `--hj-hero-fade` so the test derives that boundary instead of
-  hardcoding a number that would go stale the next time the gradient is retuned.
+  The Hero's card is fully opaque and sized to wrap its own content, so the test checks direct
+  containment against the scrim's rendered box rather than deriving a boundary from a published
+  CSS variable — a prior version read a `--hj-hero-fade` custom property for a gradient-fade scrim
+  model the component no longer uses; the property was deleted from the component but the test kept
+  reading it, silently falling back to `0` in a way that happened to still pass. Direct containment
+  has nothing to go stale.
 - **Rendered contrast.** For each text node, make its glyphs transparent, screenshot the element, and
   compute the *worst* contrast between the text colour and any pixel behind it. Worst, not average:
   averaging hides a light word sitting on one pale patch of an otherwise dark photo, which is exactly

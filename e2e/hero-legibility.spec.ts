@@ -197,16 +197,29 @@ for (const viewport of VIEWPORTS) {
       //
       // Split (wide): the photo is `inset: 0` and spans the whole section, so
       // geometric overlap with the <img> is by design and means nothing. What
-      // matters is the scrim's *opaque* zone, which ends one fade-width short of
-      // the scrim's right edge. That edge sliding left under the text is the
-      // exact defect this file exists for, so it is asserted directly rather
-      // than inferred.
+      // matters is whether the text sits fully inside the scrim's own box —
+      // the card is fully opaque and sized to wrap its content (see Hero.tsx),
+      // so there is no fade region to account for; full containment is the
+      // whole check.
+      //
+      // Mode is read from the scrim's *computed background*, not DOM
+      // visibility. `.hj-hero-scrim` is unconditionally rendered at every
+      // width — the <=900px media query only changes its background/padding/
+      // margin via `!important`, it never sets `display: none` — so
+      // `isVisible()` is true at every viewport and can't tell the two modes
+      // apart. Background is the actual signal the CSS uses to say "I'm
+      // protecting something here" vs. "there's nothing behind me to protect
+      // against."
       const scrim = page.locator('.hj-hero-scrim')
-      const scrimVisible = (await scrim.count()) > 0 && (await scrim.first().isVisible())
+      const scrimBackground = await scrim
+        .first()
+        .evaluate((el) => getComputedStyle(el).backgroundColor)
+      const scrimOpaque =
+        scrimBackground !== 'rgba(0, 0, 0, 0)' && scrimBackground !== 'transparent'
 
       const offenders: string[] = []
 
-      if (!scrimVisible) {
+      if (!scrimOpaque) {
         const photoBox = await heroPhoto(page).boundingBox()
         expect(photoBox).not.toBeNull()
         for (const { label, locator } of await heroTextNodes(page)) {
@@ -222,22 +235,15 @@ for (const viewport of VIEWPORTS) {
       } else {
         const scrimBox = await scrim.first().boundingBox()
         expect(scrimBox).not.toBeNull()
-        // The component publishes its own fade width so this stays true if the
-        // gradient is retuned.
-        const fade = await scrim
-          .first()
-          .evaluate((el) =>
-            Number.parseFloat(getComputedStyle(el).getPropertyValue('--hj-hero-fade')) || 0
-          )
-        const opaqueRight = (scrimBox as Box).x + (scrimBox as Box).width - fade
+        const scrimRight = (scrimBox as Box).x + (scrimBox as Box).width
 
         for (const { label, locator } of await heroTextNodes(page)) {
           const box = await locator.boundingBox()
           if (!box) continue
-          const overhang = box.x + box.width - opaqueRight
+          const overhang = box.x + box.width - scrimRight
           if (overhang > OVERLAP_TOLERANCE_PX) {
             offenders.push(
-              `${label}: extends ${Math.round(overhang)}px past the opaque scrim (ends at ${Math.round(opaqueRight)}px)`
+              `${label}: extends ${Math.round(overhang)}px past the opaque scrim (ends at ${Math.round(scrimRight)}px)`
             )
           }
         }

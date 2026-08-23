@@ -22,6 +22,21 @@ vi.mock('@upstash/redis', () => ({
 }))
 
 /**
+ * Resend is mocked the same way and for the same reason: this route's job is
+ * mapping "did the key authenticate?" to a status, not re-verifying Resend's
+ * own SDK. `apiKeys.list()` is the specific call under test, chosen because it
+ * authenticates without sending mail — a real send here would be a side effect
+ * of a health check nobody asked for.
+ */
+const resendApiKeysList = vi.fn()
+
+vi.mock('resend', () => ({
+  Resend: class {
+    apiKeys = { list: () => resendApiKeysList() }
+  },
+}))
+
+/**
  * The endpoint exists to answer one question honestly: *are rate limits
  * actually shared across serverless instances right now?*
  *
@@ -35,6 +50,7 @@ vi.mock('@upstash/redis', () => ({
 interface HealthBody {
   rateLimitDistributed: boolean
   redis: 'ok' | 'unreachable' | 'not-configured'
+  resend: 'ok' | 'unreachable' | 'not-configured'
   healthy: boolean
   hint?: string
 }
@@ -56,12 +72,21 @@ function stubUpstash(configured: boolean) {
   }
 }
 
+function stubResend(apiKey: string | null) {
+  vi.stubEnv('RESEND_API_KEY', apiKey ?? '')
+}
+
 describe('GET /api/health', () => {
   beforeEach(() => {
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
     vi.resetModules()
     upstashLimit.mockReset()
+    resendApiKeysList.mockReset()
+    // Every test that doesn't care about Resend still exercises `checkResend`,
+    // since it always runs — default to "not configured" so pre-existing
+    // rate-limit assertions aren't affected by an unrelated destructure.
+    stubResend(null)
   })
 
   afterEach(() => {
@@ -123,13 +148,97 @@ describe('GET /api/health', () => {
     // say how it is wired.
     stubUpstash(true)
     upstashLimit.mockRejectedValue(new Error('nope'))
+    stubResend('re_test_key')
+    resendApiKeysList.mockResolvedValue({ data: [], error: null })
     const GET = await loadRoute()
 
     const raw = await (await GET()).text()
 
     expect(raw).not.toContain('example.upstash.io')
     expect(raw).not.toContain('test-token')
+    expect(raw).not.toContain('re_test_key')
     expect(raw).not.toMatch(/UPSTASH_REDIS_REST_TOKEN["']?\s*:/)
+    expect(raw).not.toMatch(/RESEND_API_KEY["']?\s*:/)
+  })
+
+  /**
+   * `resend` deliberately never changes `healthy` or the status code — the
+   * cases above already pin `healthy` to rate-limiting alone regardless of
+   * Resend's state. These pin the informational field on its own.
+   */
+  it('reports resend as not-configured when RESEND_API_KEY is unset', async () => {
+    stubUpstash(true)
+    upstashLimit.mockResolvedValue({ success: true })
+    stubResend(null)
+    const GET = await loadRoute()
+
+    const body = (await (await GET()).json()) as HealthBody
+
+    expect(body.resend).toBe('not-configured')
+    expect(resendApiKeysList).not.toHaveBeenCalled()
+  })
+
+  it('reports resend as ok when the key authenticates', async () => {
+    stubUpstash(true)
+    upstashLimit.mockResolvedValue({ success: true })
+    stubResend('re_test_key')
+    resendApiKeysList.mockResolvedValue({ data: [], error: null })
+    const GET = await loadRoute()
+
+    const body = (await (await GET()).json()) as HealthBody
+
+    expect(body.resend).toBe('ok')
+  })
+
+  it('reports resend as unreachable when the key is revoked or invalid', async () => {
+    // Configured true and dead is exactly the case `redis` guards against for
+    // Upstash — a revoked or mistyped Resend key looks identical to a working
+    // one until something actually calls the API.
+    stubUpstash(true)
+    upstashLimit.mockResolvedValue({ success: true })
+    stubResend('re_revoked_key')
+    resendApiKeysList.mockResolvedValue({
+      data: null,
+      error: { name: 'validation_error', message: 'API key is invalid' },
+    })
+    const GET = await loadRoute()
+
+    const body = (await (await GET()).json()) as HealthBody
+
+    expect(body.resend).toBe('unreachable')
+  })
+
+  it('reports resend as unreachable when the API call throws', async () => {
+    stubUpstash(true)
+    upstashLimit.mockResolvedValue({ success: true })
+    stubResend('re_test_key')
+    resendApiKeysList.mockRejectedValue(new Error('ECONNREFUSED'))
+    const GET = await loadRoute()
+
+    const body = (await (await GET()).json()) as HealthBody
+
+    expect(body.resend).toBe('unreachable')
+  })
+
+  it("resend's state never overrides healthy or the status code", async () => {
+    // rate-limiting is fine, Resend is broken — healthy must still be true,
+    // since /api/health's status code is a monitor's signal for rate-limiting
+    // specifically, not a general-purpose "is anything wrong" flag.
+    stubUpstash(true)
+    upstashLimit.mockResolvedValue({ success: true })
+    stubResend('re_revoked_key')
+    resendApiKeysList.mockResolvedValue({
+      data: null,
+      error: { name: 'validation_error', message: 'API key is invalid' },
+    })
+    const GET = await loadRoute()
+
+    const res = await GET()
+    const body = (await res.json()) as HealthBody
+
+    expect(body.resend).toBe('unreachable')
+    expect(body.healthy).toBe(true)
+    expect(res.status).toBe(200)
   })
 
   it('is not cached', async () => {
