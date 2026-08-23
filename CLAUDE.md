@@ -76,17 +76,24 @@ homepage hero is the one exception, since it owns `--text-hero`.
 
 ## Homepage Section Sequence
 1. Hero — **two compositions, breakpoint at 900px**:
-   - **≥901px**: full viewport split. Copy left on `--bg`, "Euro Summer" lifestyle photo right, fading
-     into `--bg` across a 180px strip (`--hj-hero-fade`). No decorative overlay on the photo itself —
-     the ring-arc SVG background ornament was removed (2026-08-03): it sat directly on top of the
-     photograph at `right: -120px`, and a translucent circular outline stacked on a rectangular
-     scrim gradient read as a distorted double-overlay, not a deliberate composition.
-   - **≤900px**: stacked. Copy on `--bg`, photo as a full-width 16:9 band beneath it, `object-position:
-     center`; scrim and scroll cue hidden. The split cannot survive here — its fade is measured
-     from the scrim's own right edge, so below ~866px the opaque zone slides under the copy, and at
-     390px the `right center` crop discards 75% of the frame including the subject.
+   - **≥901px**: full-bleed. The "Euro Summer" lifestyle photo fills the entire section
+     (`object-position: right center`), and the copy sits in its own opaque `--bg` card
+     (`.hj-hero-scrim`) sized to wrap the text plus padding — not a section-spanning rectangle.
+     Because the card wraps its own content instead of being measured/positioned independently,
+     there is no separate width to keep in sync with the text column, which is what caused the
+     scrim-drift regressions in commits a4cfb9c/b1e5178/c55962a. The card is opaque rather than
+     translucent on purpose: every text/backdrop pairing here is only proven against a flat `--bg`,
+     and a blurred semi-transparent card would reopen the "pale text over a pale patch of photo"
+     failure mode `e2e/hero-legibility.spec.ts` exists to catch. No decorative overlay on the photo
+     itself — the ring-arc SVG background ornament was removed (2026-08-03): it sat directly on top
+     of the photograph at `right: -120px` and read as a distorted double-overlay.
+   - **≤900px**: stacked. Copy on `--bg` (card becomes transparent — nothing overlaps the photo down
+     here to protect against), photo as a full-width 16:9 band beneath it, `object-position: center`.
+     The full-bleed treatment cannot survive here: at 390px the `right center` crop discards 75% of
+     the frame including the subject, which is why the layout changes to a stacked band instead of
+     shrinking the same composition.
    - Enforced across six widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
-     photograph without a scrim behind it.
+     photograph without the card behind it.
 2. HorizontalScroll — "BESTSELLING"
 3. CampaignBand — "SCIENCE BEFORE AESTHETICS." (dark)
 4. HorizontalScroll — "NEW ARRIVALS"
