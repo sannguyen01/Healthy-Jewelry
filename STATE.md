@@ -66,7 +66,8 @@ policy**, so the existing Vercel token must be copied rather than a second minte
 ## Open items at a glance
 
 **Every one of these is blocked on account access, not on engineering.** There is no
-outstanding code work — eight items, all needing a credential, a console, or a phone.
+outstanding code work — nine items, all needing a credential, a console, or a phone (photography
+excepted — see item 9's own row).
 Detail for each is in the sections below; this table is an index, deliberately not a second
 copy.
 
@@ -80,15 +81,18 @@ copy.
 | 6 | `VERCEL-ENV` | Vercel | Remaining env vars |
 | 7 | `VISUAL-QA-LIVE` | A real phone | Mobile checkout hand-off by hand |
 | 8 | `SHOPIFY-SPEC-METAFIELD` | Shopify Admin | Enter real measurements — content, not code; must not be invented |
+| 9 | `SHOPIFY-PRODUCT-PHOTOGRAPHY` | Shopify Admin (content/creative) | Upload photos per product — no code step, `<ProductImage>` already prefers a real photo the instant `featuredImage` is set (`docs/catalog-conventions.md`). All 22/22 SKUs are currently at 0 |
 
-**Three of these now watch themselves.** As of 2026-08-12 the production-smoke run evaluates
-the premises these items rest on (`scripts/lib/premise-checks.mjs`), so drift opens a
-`premise-drift` issue instead of waiting to be noticed:
+**Four of these now watch themselves.** As of 2026-08-12 (photography added this session) the
+production-smoke run evaluates the premises these items rest on
+(`scripts/lib/premise-checks.mjs`), so drift opens a `premise-drift` issue instead of waiting to
+be noticed:
 
 | Item | What is watched | On drift |
 |---|---|---|
 | 2 `SHOPIFY-PAYMENTS` | `ordersCount`; once ≥ 1, `paymentGatewayNames` directly | Reminder **upgrades to a real assertion** the moment the first order exists |
 | 8 `SHOPIFY-SPEC-METAFIELD` | Products with `custom.spec` set | Says the line is rendering and the item can close |
+| 9 `SHOPIFY-PRODUCT-PHOTOGRAPHY` | Products with `featuredImage` set | **Blocking**, and reports the moment coverage starts moving off 0/22 — every SKU currently shows a line-art illustration in place of a photograph of the physical object, which for an implant-grade-titanium brand is the one claim the storefront exists to make |
 | — `COLLECTION-SET-DRIFT` | Shopify's collections ⊆ `hjCollections` | **Blocking** — those URLs hard-404 today (Watch List below) |
 | — [ADR 005](docs/adr/005-english-only-storefront.md) | `shopLocales` is `en`-only | Opportunity — the prerequisite for revisiting has been met |
 
@@ -96,14 +100,18 @@ Items 1, 4, 5, 6 are settings-console state the API here cannot read; item 7 nee
 with a phone. Those are human-only by nature, not by omission — see
 [ADR 008](docs/adr/008-decisions-need-premise-detectors.md).
 
-Two standing caveats that are not items because nothing can close them from here:
+One standing caveat that is not an item because nothing can close it from here:
 
-- **`production-smoke` has never executed.** Everything built to verify production is
-  itself unverified against production until items 2–4 land and PR #17 merges — scheduled
-  and `workflow_dispatch` triggers only fire from the default branch.
 - **The credential inventory is inferred from git history**, not read from settings. The
   agent proxy blocks `/actions/secrets`, so `docs/credential-inventory.md` is a checklist
   to run against the UI, never a statement of what is configured.
+
+**Correction, 2026-08-23**: this section previously said `production-smoke` had never
+executed, pending PR #17. That was true when written and is stale now — PR #17 merged
+(`5eb8e13`) and the workflow has been running on its `cron` schedule every six hours since at
+least 2026-08-21, correctly diagnosing and escalating the wrong-token-slot failure (issue #24,
+`human-required` since 2026-08-22). See [ADR 012](docs/adr/012-an-unassigned-escalation-is-not-yet-escalated.md)
+for what that 8-day gap between "correctly escalated" and "acted on" means and what closes it.
 
 ## High Priority (loop is acting or waiting on human)
 
