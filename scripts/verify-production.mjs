@@ -135,14 +135,29 @@ const KNOWN_COLLECTIONS = [
   { handle: 'charms' },
 ]
 
+/**
+ * Three outcomes, not two.
+ *
+ * The first live run of this script reported **12 failures**, and several of them were not
+ * failures — they were checks that never got to look. The Admin token lacked `read_products`,
+ * so "Every product is published to the headless publication" threw an authorization error
+ * and was printed under `Failed:` beside genuine breakage. A reader takes that at face value
+ * and goes looking for unpublished products that are, in fact, published.
+ *
+ * So an unevaluable check gets its own mark. What it does **not** get is a pass: a control
+ * that could not run is not a control that succeeded, so it still counts against the run and
+ * still exits non-zero (ADR 006). The distinction is in the *name*, which is the part a
+ * human acts on.
+ */
 async function check(name, fn) {
   try {
     const detail = await fn()
     results.push({ name, ok: true, detail })
     console.log(`✓ ${name}\n  ${detail}\n`)
   } catch (err) {
-    results.push({ name, ok: false, detail: err.message })
-    console.log(`✗ ${name}\n  ${err.message}\n`)
+    const unevaluable = err.unevaluable === true
+    results.push({ name, ok: false, unevaluable, detail: err.message })
+    console.log(`${unevaluable ? '⚠' : '✗'} ${name}\n  ${err.message}\n`)
   }
 }
 
@@ -150,6 +165,61 @@ function required(varName) {
   const value = process.env[varName]
   if (!value) throw new Error(`${varName} is not set`)
   return value
+}
+
+/**
+ * Turn a Shopify GraphQL error array into a scope-denial sentence, or `null` if the
+ * failure was something else.
+ *
+ * Shopify answers an under-scoped Admin token with **HTTP 200** and an `ACCESS_DENIED`
+ * entry in `errors` — the same shape as a genuine data problem. Raw, it reads as:
+ *
+ *     Admin API: [{"message":"Access denied for products field.","locations":[…],
+ *     "extensions":{"code":"ACCESS_DENIED","documentation":"https://shopify.dev/…"}}]
+ *
+ * printed under the heading "Every product is published to the headless publication".
+ * The check never reached the store, but the line says it did and failed.
+ *
+ * Pure, so the denial branch — which needs a deliberately under-scoped token to observe —
+ * runs in CI against the real payloads captured from the live run.
+ *
+ * `errors` is whatever came back in the GraphQL envelope, so the type admits `undefined`
+ * rather than pretending a caller has already checked. The `Array.isArray` guard below is
+ * the reason that is safe, and the reason it is declared this way instead of asserted away
+ * at the call site.
+ *
+ * @param {{ message?: string, path?: (string | number)[], extensions?: { code?: string, requiredAccess?: string } }[] | undefined | null} errors
+ * @returns {string | null}
+ */
+export function describeAccessDenial(errors) {
+  const denied = (Array.isArray(errors) ? errors : []).filter(
+    (e) => e?.extensions?.code === 'ACCESS_DENIED',
+  )
+  if (denied.length === 0) return null
+
+  const fields = [...new Set(denied.map((e) => e.path?.[0]).filter(Boolean))]
+  // `requiredAccess` is populated for some fields and absent for others, so it is
+  // reported when Shopify offers it and never invented when it does not.
+  const scopes = [...new Set(denied.map((e) => e.extensions?.requiredAccess).filter(Boolean))]
+
+  return (
+    `could not be evaluated — the Admin token is not scoped for ` +
+    `${fields.length > 0 ? fields.join(', ') : 'this query'}.\n` +
+    (scopes.length > 0 ? `  Shopify says it needs: ${scopes.join('; ')}.\n` : '') +
+    '  This is a missing permission on the token, NOT a finding about the store. Regrant\n' +
+    '  the scopes in Shopify Admin → Apps → your custom app → Configuration, then reinstall\n' +
+    '  the app — scope changes do not take effect until it is reinstalled.'
+  )
+}
+
+/**
+ * An error a check could not evaluate, as opposed to one it evaluated and failed.
+ * See the note on `check()`.
+ */
+function unevaluableError(message) {
+  const err = new Error(message)
+  err.unevaluable = true
+  return err
 }
 
 async function adminGraphql(query, variables = {}) {
@@ -163,7 +233,11 @@ async function adminGraphql(query, variables = {}) {
     body: JSON.stringify({ query, variables }),
   })
   const json = await res.json()
-  if (json.errors) throw new Error(`Admin API: ${JSON.stringify(json.errors)}`)
+  if (json.errors) {
+    const denial = describeAccessDenial(json.errors)
+    if (denial) throw unevaluableError(`Admin API ${denial}`)
+    throw new Error(`Admin API: ${JSON.stringify(json.errors)}`)
+  }
   return json.data
 }
 
@@ -183,6 +257,80 @@ async function storefrontGraphql(query, variables = {}) {
 }
 
 // ── checks ──────────────────────────────────────────────────────────────────
+
+/**
+ * Does `PRODUCTION_SITE_URL` actually serve the app, or does it hand back a redirect?
+ *
+ * Found the hard way. The apex domain answered **307 → https://healthy-jewellery.vercel.app/**,
+ * and the consequences were spread across the report as twelve unrelated-looking failures:
+ * `unknownUrlsAreNotIndexable` uses `redirect: 'manual'`, saw the 307, and blamed
+ * `dynamicParams = false` — a correct observation attached to the wrong cause, which is worse
+ * than no observation, because someone will go and change `dynamicParams`.
+ *
+ * The webhook consequence is the serious one and it is invisible to every other check here.
+ * Shopify requires a webhook endpoint to answer 2xx. A 3xx is not a 2xx: the delivery is
+ * recorded as failed and retried, and a subscription that keeps failing is removed
+ * automatically. So while this holds, **no order webhook can ever be delivered to the
+ * configured domain, no matter how correct the signing secret is** — and
+ * `verify-webhook-secret.mjs` cannot see it either, because a 3xx is not one of the route's
+ * documented statuses.
+ *
+ * Runs first so the report names the cause before it lists the symptoms.
+ */
+async function siteUrlIsServedDirectly() {
+  const siteUrl = required('PRODUCTION_SITE_URL')
+  const res = await fetch(siteUrl, {
+    headers: { 'User-Agent': 'healthy-jewellery-production-smoke' },
+    redirect: 'manual',
+  })
+
+  const verdict = classifyOriginResponse(siteUrl, res.status, res.headers.get('location'))
+  if (!verdict.ok) throw new Error(verdict.detail)
+  return verdict.detail
+}
+
+/**
+ * Pure half of the origin check, so the redirect branch is exercised in CI rather than
+ * only ever in production — which is the branch that was wrong for the entire life of
+ * this script.
+ *
+ * @param {string} siteUrl the configured PRODUCTION_SITE_URL
+ * @param {number} status
+ * @param {string | null} location the `Location` response header, if any
+ * @returns {{ ok: boolean, detail: string }}
+ */
+export function classifyOriginResponse(siteUrl, status, location) {
+  if (status < 300 || status >= 400) {
+    return { ok: true, detail: `${siteUrl} answers ${status} directly — no redirect in front of it.` }
+  }
+
+  const target = location ?? '(no Location header)'
+  let sameOrigin = false
+  try {
+    sameOrigin = new URL(target, siteUrl).origin === new URL(siteUrl).origin
+  } catch {
+    // An unparseable Location is its own problem; treat it as cross-origin, which is
+    // the branch that reports more rather than less.
+  }
+
+  return {
+    ok: false,
+    detail:
+      `${siteUrl} answers ${status} → ${target}, so it is NOT the origin serving the app.\n` +
+      '  Two consequences, and the second one is silent:\n' +
+      '  · Shopify requires a webhook endpoint to answer 2xx. A 3xx is a failed delivery,\n' +
+      '    retried, and a subscription that keeps failing is removed — so no order webhook\n' +
+      '    can reach this domain however correct SHOPIFY_WEBHOOK_SECRET is.\n' +
+      '  · Every check below that inspects a status code sees this redirect instead of the\n' +
+      '    app\'s own answer, and will report a plausible but wrong cause.\n' +
+      (sameOrigin
+        ? '  The target is the same origin, so this is likely a path or trailing-slash rule.\n'
+        : '  The target is a DIFFERENT origin — typically a Vercel domain that was never\n' +
+          '  attached to the project, leaving the apex on a redirect instead of an alias.\n') +
+      '  Fix it in Vercel → Project → Settings → Domains, or point PRODUCTION_SITE_URL and\n' +
+      '  the runbook at whichever host is genuinely serving the app.',
+  }
+}
 
 /**
  * The outside-in check. Everything else here talks to Shopify directly; this
@@ -655,7 +803,10 @@ async function unknownUrlsAreNotIndexable() {
     const redirected = collectionRes.status >= 300 && collectionRes.status < 400
     throw new Error(
       `An unknown collection returned ${collectionRes.status}, expected 404. Collections are\n` +
-        '  a closed set, so `dynamicParams = false` should reject them before rendering.' +
+        '  a closed set, so `dynamicParams = false` should reject them before rendering.\n' +
+        '  If the origin check above is also red, read that one first: this request uses\n' +
+        '  `redirect: manual`, so a redirect in front of the app surfaces here as a 3xx and\n' +
+        '  has nothing to do with `dynamicParams`.' +
         (redirected
           ? `\n  It redirected to: ${location ?? '(no Location header)'}\n` +
             '  Nothing in this repository can emit a redirect for /shop/*, so this came from in\n' +
@@ -1231,7 +1382,13 @@ function writeDriftFile(drifted) {
 async function main() {
   console.log('Production reality checks\n')
 
-  // Before anything else: establish *what* is being tested.
+  // Before anything that fetches the site, because a redirect in front of the app makes
+  // every status-code check below describe the redirect rather than the app. This one is
+  // the cause; several of the others would otherwise be printed as independent symptoms —
+  // including the identity check immediately below, which fetches /api/version.
+  await check('PRODUCTION_SITE_URL is served directly, not via a redirect', siteUrlIsServedDirectly)
+
+  // Then: establish *what* is being tested.
   //
   // Every check below describes a deployment, and none of them names it. The run on
   // 2026-08-13 reported eleven failures, and the session that read them spent its effort
@@ -1316,14 +1473,27 @@ async function main() {
     console.log(`Open Graph cold render: ${timings.ogColdMs}ms (budget ${OG_COLD_START_BUDGET_MS}ms)\n`)
   }
 
-  const failed = results.filter((r) => !r.ok)
+  const notPassed = results.filter((r) => !r.ok)
+  const failed = notPassed.filter((r) => !r.unevaluable)
+  const unevaluable = notPassed.filter((r) => r.unevaluable)
+
   console.log('─'.repeat(70))
-  console.log(`${results.length - failed.length}/${results.length} checks passed`)
+  console.log(`${results.length - notPassed.length}/${results.length} checks passed`)
 
   if (failed.length > 0) {
     console.log(`\nFailed: ${failed.map((f) => f.name).join(', ')}`)
-    process.exit(1)
   }
+  // Listed apart from the failures because the reader's next action is different: a
+  // failure is a thing to fix in the store or the deployment, an unevaluable check is a
+  // permission to grant before this run can say anything about it at all.
+  if (unevaluable.length > 0) {
+    console.log(`\nCould not be evaluated: ${unevaluable.map((f) => f.name).join(', ')}`)
+  }
+
+  // Both states exit non-zero. A check that could not run has not passed, and a run that
+  // goes green while a third of it never executed is the failure mode this whole tier
+  // exists to prevent. See docs/adr/006-controls-must-fail-loudly.md.
+  if (notPassed.length > 0) process.exit(1)
 }
 
 // Only run when executed directly. Without this, importing the module to test
