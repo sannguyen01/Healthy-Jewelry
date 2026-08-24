@@ -7,6 +7,8 @@ const {
   unreadTags,
   classifyShopPolicies,
   REQUIRED_SHOP_POLICIES,
+  classifyOriginResponse,
+  describeAccessDenial,
 } = await import(
   '../../../scripts/verify-production.mjs'
 )
@@ -198,5 +200,149 @@ describe('classifyShopPolicies', () => {
       'TERMS_OF_SERVICE',
       'SHIPPING_POLICY',
     ])
+  })
+})
+
+/**
+ * **The branch that was wrong in production for the entire life of the script.**
+ *
+ * `PRODUCTION_SITE_URL` was `https://healthyjewellery.com`, which answered
+ * `307 → https://healthy-jewellery.vercel.app/`. Nothing checked that, so the redirect
+ * surfaced as twelve unrelated-looking failures — including one that blamed
+ * `dynamicParams = false` for a 307 it had no part in.
+ *
+ * A redirect is exactly the kind of state that cannot be reproduced by running the script
+ * locally, so the whole point of splitting the classifier out is that both branches run here.
+ */
+describe('classifyOriginResponse', () => {
+  const SITE = 'https://healthyjewellery.com'
+
+  it('passes a host that answers directly', () => {
+    const { ok, detail } = classifyOriginResponse(SITE, 200, null)
+    expect(ok).toBe(true)
+    expect(detail).toContain('no redirect')
+  })
+
+  it('passes a 4xx or 5xx — broken, but not a redirect, and not this check\'s finding', () => {
+    // Another check will catch a 500. Claiming it here would be a second alarm for one
+    // fault, which is how a report stops being read.
+    for (const status of [404, 500, 503]) {
+      expect(classifyOriginResponse(SITE, status, null).ok).toBe(true)
+    }
+  })
+
+  it('fails the real production case and names the target', () => {
+    const { ok, detail } = classifyOriginResponse(SITE, 307, 'https://healthy-jewellery.vercel.app/')
+    expect(ok).toBe(false)
+    expect(detail).toContain('307')
+    expect(detail).toContain('healthy-jewellery.vercel.app')
+  })
+
+  it('states the webhook consequence, which no other check can see', () => {
+    // The reason this is a blocking finding rather than a cosmetic one: a correct
+    // signing secret cannot rescue a delivery that never gets a 2xx.
+    const { detail } = classifyOriginResponse(SITE, 307, 'https://elsewhere.example/')
+    expect(detail).toMatch(/webhook/i)
+    expect(detail).toMatch(/2xx/)
+    expect(detail).toContain('SHOPIFY_WEBHOOK_SECRET')
+  })
+
+  it('warns that the other status checks will misreport their cause', () => {
+    const { detail } = classifyOriginResponse(SITE, 308, 'https://elsewhere.example/')
+    expect(detail).toMatch(/wrong cause/i)
+  })
+
+  it('distinguishes a same-origin redirect from a different host', () => {
+    // A trailing-slash rule and an unattached domain need different fixes, and the
+    // message should not send someone into the Vercel dashboard for the former.
+    const same = classifyOriginResponse(SITE, 308, 'https://healthyjewellery.com/en')
+    expect(same.detail).toContain('same origin')
+
+    const other = classifyOriginResponse(SITE, 307, 'https://healthy-jewellery.vercel.app/')
+    expect(other.detail).toContain('DIFFERENT origin')
+  })
+
+  it('survives a 3xx with no Location header at all', () => {
+    const { ok, detail } = classifyOriginResponse(SITE, 302, null)
+    expect(ok).toBe(false)
+    expect(detail).toContain('no Location header')
+  })
+
+  it('does not throw on an unparseable Location', () => {
+    expect(() => classifyOriginResponse(SITE, 301, '://not a url')).not.toThrow()
+    expect(classifyOriginResponse(SITE, 301, '://not a url').ok).toBe(false)
+  })
+})
+
+/**
+ * **"Failed" and "could not look" are different sentences.**
+ *
+ * Shopify answers an under-scoped Admin token with HTTP 200 and an `ACCESS_DENIED` entry in
+ * `errors`. The first live run printed that raw beneath "Every product is published to the
+ * headless publication" — so the report asserted a fact about the catalogue that the run had
+ * never actually observed. The payloads below are the real ones from that run.
+ */
+describe('describeAccessDenial', () => {
+  const productsDenied = [
+    {
+      message: 'Access denied for products field.',
+      path: ['products'],
+      extensions: { code: 'ACCESS_DENIED', documentation: 'https://shopify.dev/api/usage/access-scopes' },
+    },
+  ]
+
+  const localesDenied = [
+    {
+      message: 'Access denied for shopLocales field. Required access: `read_locales` access scope.',
+      path: ['shopLocales'],
+      extensions: {
+        code: 'ACCESS_DENIED',
+        requiredAccess: '`read_locales` access scope or `read_markets_home` access scope.',
+      },
+    },
+  ]
+
+  it('returns null when the failure is not an authorization problem', () => {
+    // A real data error must keep its raw payload — this function must not swallow
+    // everything that arrives in `errors`.
+    expect(describeAccessDenial([{ message: 'Field does not exist', extensions: { code: 'undefinedField' } }]))
+      .toBeNull()
+    expect(describeAccessDenial([])).toBeNull()
+    expect(describeAccessDenial(undefined)).toBeNull()
+  })
+
+  it('names the field the token could not read', () => {
+    const detail = describeAccessDenial(productsDenied)
+    expect(detail).toContain('products')
+    expect(detail).toMatch(/could not be evaluated/)
+  })
+
+  it('quotes the scope Shopify asked for when it offers one', () => {
+    expect(describeAccessDenial(localesDenied)).toContain('read_locales')
+  })
+
+  it('does not invent a scope when Shopify does not name one', () => {
+    // `requiredAccess` is absent on the products denial above. Guessing `read_products`
+    // would be right often enough to be trusted and wrong often enough to mislead.
+    expect(describeAccessDenial(productsDenied)).not.toMatch(/needs:/)
+  })
+
+  it('says plainly that this is not a finding about the store', () => {
+    expect(describeAccessDenial(productsDenied)).toMatch(/NOT a finding about the store/)
+  })
+
+  it('mentions the reinstall, which is the step people miss', () => {
+    // Regranting scopes in the app config does nothing until the app is reinstalled;
+    // without this line the next run fails identically and looks like the fix did not work.
+    expect(describeAccessDenial(productsDenied)).toMatch(/reinstall/i)
+  })
+
+  it('de-duplicates fields and scopes across several denials', () => {
+    const detail = describeAccessDenial([...productsDenied, ...productsDenied, ...localesDenied])
+    expect(detail).not.toBeNull()
+    // Non-null asserted above; narrowing it here keeps the two matches on a `string`.
+    const text = detail as string
+    expect(text.match(/products/g)).toHaveLength(1)
+    expect(text.match(/read_locales/g)).toHaveLength(1)
   })
 })
