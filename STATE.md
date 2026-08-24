@@ -271,7 +271,7 @@ for what that 8-day gap between "correctly escalated" and "acted on" means and w
   **Do the mobile hand-off specifically, not desktop-and-assume-parity.** Both
   mobile-only defects this project has had — the hero crop and the invisible
   collection tiles — passed every desktop check, which is why
-  `hero-legibility.spec.ts` samples six widths.
+  `hero-legibility.spec.ts` samples seven widths.
   Loop action: report only
   Human decision: pending
 - [ ] SHOPIFY-SPEC-METAFIELD — **downgraded 2026-08-08: the code path now works,
@@ -519,6 +519,21 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-24**: **A protection that can only grow is not a constraint.** The hero's
+  opaque copy card is a flex item sized by its widest child, and every guardrail on that
+  section — containment, rendered contrast, axe's *incomplete* over imagery — is satisfied
+  *better* the larger the card gets. The one check that sounds like a counterweight ("a usable
+  portion of the frame") measures how much of the source survives `object-fit` cropping, not how
+  much a reader can see, so a card covering 95% of a perfectly framed photo scores 100% there.
+  Codified pressure pointed one way only, and its end state is a photograph that is decoration
+  behind a floating memo, green the whole way. `--hj-hero-card-max-ratio` (0.60, calibrated from
+  a measured 0.514 max at the 901px split-layout floor) now caps the card as a fraction of the
+  photograph's own box — a relationship between two boxes cannot be written as a constant about
+  one of them, which is why the 848px cap it replaced could not express it. See
+  [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md). Explicitly a floor under the
+  composition, not a decision about it: whether an opaque card is the right creative answer at
+  all, as against typography integrated into the photograph, stays open.
+
 - **2026-08-13**: **A control's own reporting path is part of the control.** Both real checks
   in `production-smoke.yml` were piped through `| tee`, and GitHub's default shell is
   `bash -e` with no `pipefail` — so the pipeline reported `tee`'s exit status and neither
@@ -599,7 +614,7 @@ duplicate those files.
   `e2e/visual-assets.spec.ts` — presence is not visibility (the collection tiles
   shipped present, requested successfully, and invisible at `opacity: 0.12`).
   `e2e/hero-legibility.spec.ts` — visibility is not legibility; it samples
-  rendered pixels behind text across six widths, because axe reports
+  rendered pixels behind text across seven widths, because axe reports
   *incomplete* rather than *violation* when the backdrop is an image.
 - **2026-08-02**: Checkout failures are typed and visible instead of swallowed.
   `CheckoutError` distinguishes `not-configured` / `placeholder-catalog` /

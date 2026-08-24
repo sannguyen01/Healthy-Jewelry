@@ -48,6 +48,31 @@
     --text-sm:      clamp(0.825rem, 0.8rem + 0.12vw, 0.95rem);
     --text-xs:      clamp(0.7rem, 0.675rem + 0.12vw, 0.8rem);
 
+    /* ── Hero geometry ── */
+    /* The hero copy card may never occupy more than this fraction of the
+       photograph it sits on. See docs/adr/013-a-protection-that-can-only-grow.md.
+       Percentage-relative rather than absolute px on purpose: the card's
+       containing block IS the hero section, and the photo is `inset: 0` of that
+       same section, so `N * 100%` is literally "N of the photograph's rendered
+       width" at any viewport and after any image swap. The absolute cap this
+       replaced could not say that — 848px is a third of a 2560px photo and 94%
+       of a 901px one.
+       Read as its complement: at least 40% of the picture stays unobstructed.
+       Measured maxima on 2026-08-24, tightest at the 901px split-layout floor
+       and decaying as the viewport grows (the card plateaus at 682px once
+       --text-hero caps):
+         901px 0.514 · 1024px 0.503 · 1440px 0.474 · 2560px 0.266
+       So 0.60 is today's 0.514 rounded up with one step of headroom, not a
+       number picked to fit. Enforced as `max-width` on .hj-hero-scrim and
+       asserted in e2e/hero-legibility.spec.ts, which reads this same property
+       so the two cannot drift. */
+    --hj-hero-card-max-ratio: 0.60;
+
+    /* Shared horizontal inset for the hero copy. One definition, two consumers:
+       the card's side margin in the split layout and the band's side padding in
+       the stacked one. It was the same literal written out in both places. */
+    --hj-hero-pad-x: clamp(20px, 4vw, 64px);
+
     /* ── Spacing ── */
     --space-section: clamp(56px, 8vw, 96px);
     --space-gutter:  clamp(24px, 5vw, 72px);

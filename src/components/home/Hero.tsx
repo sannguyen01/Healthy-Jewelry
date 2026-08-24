@@ -70,14 +70,25 @@ export function Hero() {
           own content instead of being measured/positioned independently,
           there is no width to keep in sync by hand — the class of bug behind
           commits a4cfb9c/b1e5178/c55962a (scrim geometry drifting from the
-          text column) cannot recur here. */}
+          text column) cannot recur here.
+
+          But wrapping its own content is also why it needs a ceiling. The card
+          is a flex item sized by its widest child, so its width is a function
+          of headline glyph advance: edit three words of the h1, raise
+          --text-hero, or load a wider face, and the card grows with it. Every
+          guardrail on this section asks "is the text protected?", and a bigger
+          card is always a better answer to that — so nothing here pushes back.
+          --hj-hero-card-max-ratio is that counter-pressure, and it is a
+          fraction of the photograph rather than a pixel count because the same
+          absolute number cannot mean the same thing at 901px and 2560px. See
+          docs/adr/013-a-protection-that-can-only-grow.md. */}
       <div
         className="hj-hero-scrim"
         style={{
           position: 'relative',
           zIndex: 1,
-          margin: '0 clamp(20px, 4vw, 64px)',
-          maxWidth: 'calc(720px + clamp(20px, 4vw, 64px) * 2)',
+          margin: '0 var(--hj-hero-pad-x)',
+          maxWidth: 'calc(var(--hj-hero-card-max-ratio) * 100%)',
           padding: 'clamp(28px, 3.5vw, 48px)',
           backgroundColor: 'var(--bg)',
         }}
@@ -227,9 +238,14 @@ export function Hero() {
             order: 1;
             margin: 0 !important;
             max-width: 100% !important;
-            /* Clears the 64px fixed header, which no longer overlaps a
-               full-bleed image but does overlap the copy. */
-            padding: 104px clamp(20px, 4vw, 64px) 56px !important;
+            /* Only the horizontal inset is shared with the split layout — it
+               was the same clamp() written out twice. The verticals stay
+               literals and stay separate on purpose: 104px is clearance for the
+               64px fixed header and 56px is separation from the photo band
+               below, neither of which is the desktop card's padding. Unifying
+               three different quantities behind one token would be the drift
+               this file already has scars from, pointing the other way. */
+            padding: 104px var(--hj-hero-pad-x) 56px !important;
             /* Nothing overlaps the photograph down here — it is a band in
                normal flow below the copy, not a backdrop behind it — so the
                card has nothing left to protect against and disappears. */
