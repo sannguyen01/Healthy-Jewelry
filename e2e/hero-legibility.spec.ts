@@ -20,7 +20,7 @@ import {
  * *incomplete*, not *violation*, when the backdrop is an image, precisely
  * because it cannot know what the pixels are. So this measures them.
  *
- * Two independent checks, because they fail in different ways:
+ * Independent checks, because they fail in different ways:
  *
  *   1. Geometry — hero copy must not sit on the photograph at all. Cheap,
  *      deterministic, and it encodes the actual design rule.
@@ -28,6 +28,14 @@ import {
  *      backdrop and assert the worst pixel behind it still clears WCAG AA. This
  *      is what catches pale text on a pale patch of an otherwise dark photo,
  *      which crosses no boundary and so passes every geometric check.
+ *   3. A bound on the protection itself — the card that makes 1 and 2 pass is
+ *      sized by its own content, and both of those checks are satisfied *better*
+ *      the larger it gets. Left alone they license the card growing until the
+ *      photograph is decoration behind a floating memo, with every test green
+ *      the whole way. So the card is also capped as a fraction of the
+ *      photograph's rendered box.
+ *   4. Framing — how much of the source image survives object-fit cropping,
+ *      which is a different question from how much of it a reader can see.
  */
 
 /**
@@ -40,6 +48,11 @@ const VIEWPORTS = [
   { label: '390px — iPhone', width: 390, height: 844 },
   { label: '414px — large phone', width: 414, height: 896 },
   { label: '768px — tablet portrait', width: 768, height: 1024 },
+  // The narrowest width that still gets the split layout, and so the width at
+  // which the copy card is largest relative to the photograph behind it. The
+  // matrix previously jumped 768 -> 1024 with nothing in between, which meant
+  // the worst case for every split-layout invariant was never measured.
+  { label: '901px — split-layout floor', width: 901, height: 900 },
   { label: '1024px — small laptop', width: 1024, height: 768 },
   { label: '1440px — desktop', width: 1440, height: 900 },
 ]
@@ -253,6 +266,101 @@ for (const viewport of VIEWPORTS) {
         offenders,
         `Hero copy left unprotected at ${viewport.width}px:\n  ${offenders.join('\n  ')}`
       ).toEqual([])
+    })
+
+    test('the copy card never outgrows the photograph it sits on', async ({ page }) => {
+      // The check above and this one pull in opposite directions, which is the
+      // point. "Is the copy protected?" is satisfied better by every increase in
+      // the card's size, so on its own it licenses the card growing until the
+      // photograph is a rim around a memo — and nothing else here objects. The
+      // "usable portion of the frame" test below measures how much of the source
+      // survives object-fit cropping, not how much of it a reader can still see;
+      // a card covering 95% of a perfectly framed photo scores 100% there.
+      //
+      // So this is the counter-pressure: the card is bounded as a fraction of
+      // the photograph's own rendered box. Self-relative because an absolute
+      // pixel cap cannot mean the same thing across a 3x width range — the
+      // 848px cap this replaced was a third of a 2560px photo and 94% of a
+      // 901px one. See docs/adr/013-a-protection-that-can-only-grow.md.
+      //
+      // What this adds over the CSS that already enforces it, since a test that
+      // only re-measures its own `max-width` would be decoration. Three things,
+      // and the width ratio is the least of them:
+      //   - the token going missing. `max-width: calc(var(--missing) * 100%)`
+      //     is invalid at computed-value time, so the property falls back to
+      //     its initial value: measured, computed `max-width` becomes `none`
+      //     and the card is unbounded again. And because the cap is not binding
+      //     today (463px of an allowed 540px at 901px), the card's rendered
+      //     width does not change by a pixel at the moment the guardrail
+      //     evaporates — there is no visible symptom for anyone to notice. The
+      //     parse assertion below is the only thing that would.
+      //   - height. `max-width` says nothing about it, so a card that stays
+      //     narrow and grows downward is unconstrained by CSS entirely; only
+      //     the area ratio sees it.
+      //   - the enforcement being replaced. A future absolute-positioned,
+      //     fixed-width or inline-overridden card would still be measured here.
+      const scrim = page.locator('.hj-hero-scrim').first()
+
+      // Same discriminator as the test above, for the same reason: `.hj-hero-scrim`
+      // is rendered at every width, so only its computed background says which
+      // layout is in play.
+      const scrimBackground = await scrim.evaluate((el) => getComputedStyle(el).backgroundColor)
+      const scrimOpaque =
+        scrimBackground !== 'rgba(0, 0, 0, 0)' && scrimBackground !== 'transparent'
+      // Skipped, not silently passed: in the stacked layout the photograph is a
+      // band in normal flow below the copy, so the card overlaps none of it and
+      // the ratio has nothing to measure. A skip says that in the report; an
+      // early `return` would look like a passing assertion that never ran.
+      test.skip(
+        !scrimOpaque,
+        `stacked layout at ${viewport.width}px — the card sits beside the photograph, not on it`
+      )
+
+      // Read the ceiling from the token that also enforces it, so the test and
+      // the CSS cannot drift apart. The failure this guards against is specific
+      // and has happened here: an earlier version of this file read
+      // `--hj-hero-fade`, which had been deleted along with the gradient model,
+      // got NaN, fell back to 0, and kept passing. Hence the assertion before
+      // the use — a missing token has to fail this test, never disable it.
+      const declared = await scrim.evaluate((el) =>
+        getComputedStyle(el).getPropertyValue('--hj-hero-card-max-ratio').trim()
+      )
+      const ceiling = Number.parseFloat(declared)
+      expect(
+        Number.isFinite(ceiling) && ceiling > 0 && ceiling < 1,
+        `--hj-hero-card-max-ratio must resolve to a fraction in (0, 1) on .hj-hero-scrim; got ` +
+          `${JSON.stringify(declared)}. Define it in src/app/globals.css — this test measures the ` +
+          `card against that token and has no default to fall back to.`
+      ).toBe(true)
+
+      const cardBox = await scrim.boundingBox()
+      const photoBox = await heroPhoto(page).boundingBox()
+      expect(cardBox).not.toBeNull()
+      expect(photoBox).not.toBeNull()
+      const card = cardBox as Box
+      const photo = photoBox as Box
+
+      const widthRatio = card.width / photo.width
+      // Area as well as width, because they fail differently. Width is the half
+      // CSS can enforce via max-width; area is the honest answer to "how much
+      // picture is left", and it is the only one that would catch a card that
+      // stays narrow but grows to the full height of the section. The
+      // containment check above cannot see that either — it compares one edge.
+      const overlap = intersection(card, photo)
+      const areaRatio = overlap
+        ? (overlap.width * overlap.height) / (photo.width * photo.height)
+        : 0
+
+      const verdict = (what: string, measured: number) =>
+        `Hero copy card ${what} ${(measured * 100).toFixed(1)}% of the photograph at ` +
+        `${viewport.width}px — ceiling is ${(ceiling * 100).toFixed(0)}% ` +
+        `(${((ceiling - measured) * 100).toFixed(1)} points of headroom left). The card is sized ` +
+        `by its widest child, so this usually means the headline, the type scale, or the loaded ` +
+        `face grew. Either shorten the copy or make the larger card a deliberate, reviewed change ` +
+        `to --hj-hero-card-max-ratio in src/app/globals.css.`
+
+      expect(widthRatio, verdict('spans', widthRatio)).toBeLessThanOrEqual(ceiling)
+      expect(areaRatio, verdict('covers', areaRatio)).toBeLessThanOrEqual(ceiling)
     })
 
     test('every hero text node clears WCAG AA against what is actually behind it', async ({

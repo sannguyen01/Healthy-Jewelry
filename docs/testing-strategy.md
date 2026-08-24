@@ -365,7 +365,11 @@ meets imagery:
 
 - **A width matrix**, not two device presets. The hero's split layout was correct above ~866px and
   degraded continuously below it. Testing at 390px and 1280px would have found the failure; testing at
-  1280px and 1440px would have missed it entirely. The matrix straddles the breakpoints that matter.
+  1280px and 1440px would have missed it entirely. The matrix straddles the breakpoints that matter —
+  and includes the *floor* of each layout mode, not just a width either side of the boundary. 901px
+  is in the matrix because it is the narrowest width that still gets the split layout, and therefore
+  the width at which every split-layout invariant is under the most pressure. It was for a while the
+  one width never measured.
 - **Geometry.** Where a scrim protects text, assert the text actually stays inside the opaque zone.
   The Hero's card is fully opaque and sized to wrap its own content, so the test checks direct
   containment against the scrim's rendered box rather than deriving a boundary from a published
@@ -373,6 +377,22 @@ meets imagery:
   model the component no longer uses; the property was deleted from the component but the test kept
   reading it, silently falling back to `0` in a way that happened to still pass. Direct containment
   has nothing to go stale.
+
+  The transferable rule there is narrower than "never read a token from a test", and worth stating
+  precisely, because reading the source of truth is what `design-tokens-contrast.test.ts` does on
+  purpose rather than duplicating it. The defect was reading one **without asserting it resolved**:
+  a deleted property parses to `NaN`, and a `NaN` that falls back to a permissive default turns a
+  guardrail off in the one way nothing reports. So: derive a boundary directly where you can, and
+  where a test must read a token, assert it parses to a sane value first — a missing token has to
+  fail the test, never disable it.
+- **A bound on the protection itself.** The scrim that makes the two checks above pass is sized by
+  its own content, and both of those checks are satisfied *better* the larger it gets — so on their
+  own they license the card growing until the photograph is decoration behind a floating memo, with
+  everything green the whole way. A protection that can only grow is not a constraint. Assert the
+  ceiling too, relative to whatever the scrim is protecting the text *from*: `hero-legibility.spec.ts`
+  caps the card at `--hj-hero-card-max-ratio` of the photograph's own rendered box, as both a width
+  ratio and an occluded-area ratio (area is the only one that catches a card that stays narrow but
+  grows to full height). See [ADR 013](adr/013-a-protection-that-can-only-grow.md).
 - **Rendered contrast.** For each text node, make its glyphs transparent, screenshot the element, and
   compute the *worst* contrast between the text colour and any pixel behind it. Worst, not average:
   averaging hides a light word sitting on one pale patch of an otherwise dark photo, which is exactly

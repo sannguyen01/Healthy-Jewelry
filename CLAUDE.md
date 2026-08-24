@@ -92,8 +92,13 @@ homepage hero is the one exception, since it owns `--text-hero`.
      The full-bleed treatment cannot survive here: at 390px the `right center` crop discards 75% of
      the frame including the subject, which is why the layout changes to a stacked band instead of
      shrinking the same composition.
-   - Enforced across six widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
+   - Enforced across seven widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
      photograph without the card behind it.
+   - The card is also **bounded**: `--hj-hero-card-max-ratio` (0.60) caps it at a fraction of the
+     photograph's own rendered box, because every other guardrail here is satisfied better the
+     larger the card gets and so none of them push back. Enforced as `max-width` and asserted as
+     both a width and an occluded-area ratio. See
+     [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md) before widening it.
 2. HorizontalScroll — "BESTSELLING"
 3. CampaignBand — "SCIENCE BEFORE AESTHETICS." (dark)
 4. HorizontalScroll — "NEW ARRIVALS"
