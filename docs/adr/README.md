@@ -35,6 +35,7 @@ pointer; the reasoning lives here once.
 | [013](013-a-protection-that-can-only-grow.md) | A protection that can only grow is not a constraint | Spans `globals.css`, `Hero.tsx`, `hero-legibility.spec.ts`, `docs/testing-strategy.md` and `STATE.md` |
 | [014](014-monochrome-was-not-decided.md) | Monochrome was not decided | Spans the palette in `globals.css`, `JewelrySVG`, `ProductImage`, the contrast test, `CLAUDE.md` and the FAQ/Terms copy |
 | [015](015-a-gate-that-was-only-ever-documented.md) | A gate that was only ever documented | Five documents assert required checks that do not exist; spans `testing-strategy.md`, `CONTRIBUTING.md`, `safety.md`, `loop-constraints.md` and `production-smoke.yml` |
+| [016](016-fit-is-a-measurement-nobody-took.md) | Fit is a measurement nobody took | Third instance of the ADR 013/014 shape; spans `Nav.tsx`, the shared `viewportFit` harness, `header-fit.spec.ts`, `hero-legibility.spec.ts`, `CLAUDE.md` and `STATE.md` |
 
 ## Format
 

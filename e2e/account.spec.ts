@@ -50,7 +50,7 @@ test.describe('Account — not configured', () => {
     await expect(page).toHaveURL(/\/account\?status=(failed|unavailable)/)
   })
 
-  test('is never indexable — it is one person\'s data', async ({ page }) => {
+  test("is never indexable — it is one person's data", async ({ page }) => {
     await page.goto('/account')
     const robots = page.locator('meta[name="robots"]')
     await expect(robots).toHaveAttribute('content', /noindex/)
@@ -59,8 +59,22 @@ test.describe('Account — not configured', () => {
 
 test.describe('Account — navigation', () => {
   test('the nav offers a route to it', async ({ page }) => {
+    // Account lives in two places depending on width, and this file runs at both
+    // project defaults — 1280px in `chromium`, 412px in `mobile`. Below 769px the
+    // header sheds Search and Account into the full-screen overlay, because four
+    // text controls in a 64px bar need 435px of width and no phone is that wide
+    // (see e2e/header-fit.spec.ts). Resolving the link by where it actually is
+    // keeps this test about *reaching the account page* rather than about the
+    // breakpoint.
     await page.goto('/')
-    const link = page.getByRole('link', { name: /your account/i })
+    const inHeader = page.locator('header').getByRole('link', { name: /your account/i })
+    let link = inHeader
+    if (!(await inHeader.isVisible())) {
+      await page.getByRole('button', { name: /open menu/i }).click()
+      link = page
+        .getByRole('dialog', { name: /mobile navigation/i })
+        .getByRole('link', { name: /your account/i })
+    }
     await expect(link).toBeVisible()
     await link.click()
     await expect(page).toHaveURL(/\/account$/)

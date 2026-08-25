@@ -47,7 +47,13 @@ export function Nav({ cartCount }: NavProps) {
         <Link
           href="/"
           aria-label="Healthy Jewelry — home"
-          style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}
+          // `flex: 0 1 auto` + `minWidth: 0`, not `flexShrink: 0`. The header is a
+          // fixed-height row that must fit a 320px phone, and something has to give
+          // when it cannot. This makes the brand the thing that gives: the wordmark
+          // ellipsises, which costs a few letters, rather than the controls being
+          // pushed past the viewport edge, which costs the visitor the only route to
+          // navigation they have. See docs/adr/016.
+          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 1 auto', minWidth: 0 }}
         >
           <Image
             src="/logo.png"
@@ -64,6 +70,9 @@ export function Nav({ cartCount }: NavProps) {
               fontSize: 'clamp(1rem, 1.4vw, 1.25rem)',
               letterSpacing: '0.10em',
               lineHeight: 1.1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
               color: menuOpen ? 'var(--on-dark)' : 'var(--ink)',
               transition: 'color 400ms cubic-bezier(0.00, 0.00, 0.30, 1.00)',
             }}
@@ -116,12 +125,16 @@ export function Nav({ cartCount }: NavProps) {
             display: 'flex',
             alignItems: 'center',
             gap: '20px',
+            // The counterpart to the brand link's `0 1 auto`: controls hold their
+            // size and the brand absorbs the difference.
+            flexShrink: 0,
           }}
         >
           {/* Search icon — /search owns the input and the query string, so this
               control only has to get the visitor there. */}
           <button
             aria-label="Search"
+            className="hj-desktop-only"
             onClick={() => {
               setMenuOpen(false)
               router.push('/search')
@@ -157,6 +170,7 @@ export function Nav({ cartCount }: NavProps) {
           <Link
             href="/account"
             aria-label="Your account"
+            className="hj-desktop-only"
             style={{
               fontFamily: 'var(--font-ui)',
               fontSize: '0.68rem',
@@ -199,6 +213,7 @@ export function Nav({ cartCount }: NavProps) {
                   width: '16px',
                   height: '16px',
                   borderRadius: '50%',
+                  flexShrink: 0,
                   backgroundColor: 'var(--ink)',
                   color: 'var(--bg)',
                   fontSize: '9px',
@@ -267,6 +282,51 @@ export function Nav({ cartCount }: NavProps) {
               {link.label}
             </Link>
           ))}
+          {/* Search and Account are hidden from the header below 769px, so they
+              live here. Account was never in this overlay at all — on a phone it
+              was reachable only through a 10.88px word crammed against the edge
+              of the viewport, which is where this whole change started.
+              `e2e/header-fit.spec.ts` asserts both are present, so a control
+              removed from the header cannot quietly cease to exist. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginTop: '8px' }}>
+            <button
+              aria-label="Search"
+              onClick={() => {
+                setMenuOpen(false)
+                router.push('/search')
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+                fontSize: '0.85rem',
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--titanium)',
+                padding: '10px 4px',
+              }}
+            >
+              Search
+            </button>
+            <Link
+              href="/account"
+              aria-label="Your account"
+              onClick={() => setMenuOpen(false)}
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: '0.85rem',
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--titanium)',
+                textDecoration: 'none',
+                padding: '10px 4px',
+              }}
+            >
+              Account
+            </Link>
+          </div>
+
           <p
             style={{
               fontFamily: 'var(--font-ui)',
@@ -285,6 +345,10 @@ export function Nav({ cartCount }: NavProps) {
       <style>{`
         @media (max-width: 768px) {
           .hj-desktop-nav { display: none !important; }
+          /* Search and Account move into the full-screen overlay below this
+             width. Without it the header needs 435px of content to lay out and
+             every phone is narrower than that — see e2e/header-fit.spec.ts. */
+          .hj-desktop-only { display: none !important; }
         }
         @media (min-width: 769px) {
           .hj-mobile-menu-btn { display: none !important; }

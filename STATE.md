@@ -519,6 +519,19 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-25**: The header did not fit a phone. `<header>` required **414px** empty and
+  **435px** with a bag badge — 40px padding, a 182px brand lockup at `flexShrink: 0`, and 212px
+  of controls with no shrink capacity — so on every phone the MENU button, the only route to
+  navigation there is, was cut off at the viewport edge (114px over at 320px, 24px at 390px,
+  2px at 412px). Search and Account moved into the mobile overlay, which had never carried an
+  account entry at all; the brand link became the element that shrinks. Now fits below 200px in
+  both bag states, with the wordmark intact at every real device width. Three tools that could
+  have caught it and cannot: `toBeVisible()` is a rendering predicate, `.click()` aims at an
+  in-viewport point, and `document.scrollWidth` is blind because the header is `fixed` *and*
+  `globals.css` sets `overflow-x: hidden`. `e2e/support/viewportFit.ts` is the geometric
+  replacement; `e2e/header-fit.spec.ts` binary-searches the narrowest fitting width per layout
+  mode and records it as an annotation on success as well as failure. Third instance of the
+  ADR 013 / ADR 014 shape — see `docs/adr/016-fit-is-a-measurement-nobody-took.md`.
 - **2026-08-25**: **A gate that was only ever documented.** `main` is not branch-protected —
   verified against the GitHub API, every branch returns `"protected": false` — and five
   documents asserted the opposite, `docs/testing-strategy.md` contradicting itself eight lines

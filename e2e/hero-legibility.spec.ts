@@ -7,6 +7,10 @@ import {
   requiredContrast,
   type Rgb,
 } from '../src/lib/utils/contrast'
+// Shared with e2e/header-fit.spec.ts. Both specs ask geometric questions about
+// the same rendered boxes, and two copies of `intersection` would be two
+// tolerances to keep in step.
+import { intersection, OVERLAP_TOLERANCE_PX, type Box } from './support/viewportFit'
 
 /**
  * Hero legibility across viewport widths.
@@ -57,27 +61,8 @@ const VIEWPORTS = [
   { label: '1440px — desktop', width: 1440, height: 900 },
 ]
 
-/** Overlap smaller than this is a sub-pixel rounding artefact, not a defect. */
-const OVERLAP_TOLERANCE_PX = 2
-
 /** Device pixels trimmed from each edge of a sampled region — see sampleBackdrop. */
 const SAMPLE_INSET_PX = 4
-
-interface Box {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-function intersection(a: Box, b: Box): Box | null {
-  const x = Math.max(a.x, b.x)
-  const y = Math.max(a.y, b.y)
-  const right = Math.min(a.x + a.width, b.x + b.width)
-  const bottom = Math.min(a.y + a.height, b.y + b.height)
-  if (right - x <= OVERLAP_TOLERANCE_PX || bottom - y <= OVERLAP_TOLERANCE_PX) return null
-  return { x, y, width: right - x, height: bottom - y }
-}
 
 /**
  * The text nodes the hero's message depends on. Targeted by content rather than

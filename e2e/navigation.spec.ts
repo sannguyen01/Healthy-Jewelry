@@ -1,4 +1,24 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
+
+/**
+ * The search control lives in two places depending on width, and these tests run
+ * at both project defaults — 1280px in `chromium`, 412px in `mobile`.
+ *
+ * Below 769px the header sheds Search and Account into the full-screen overlay,
+ * because keeping four text controls in a 64px bar needs 435px of content and no
+ * phone is that wide (see `e2e/header-fit.spec.ts`). Resolving the control by
+ * where it actually is, rather than pinning a viewport, keeps these tests
+ * testing *search* rather than testing the breakpoint — which is what
+ * `header-fit.spec.ts` is for.
+ */
+async function searchControl(page: Page): Promise<Locator> {
+  const inHeader = page.locator('header').getByRole('button', { name: /search/i })
+  if (await inHeader.isVisible()) return inHeader
+  await page.getByRole('button', { name: /open menu/i }).click()
+  return page
+    .getByRole('dialog', { name: /mobile navigation/i })
+    .getByRole('button', { name: /search/i })
+}
 
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -61,11 +81,11 @@ test.describe('Navigation', () => {
   })
 
   test('search button is visible', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /search/i })).toBeVisible()
+    await expect(await searchControl(page)).toBeVisible()
   })
 
   test('search button navigates to /search', async ({ page }) => {
-    await page.getByRole('button', { name: /search/i }).click()
+    await (await searchControl(page)).click()
     await expect(page).toHaveURL(/\/search/)
   })
 
@@ -73,7 +93,7 @@ test.describe('Navigation', () => {
     // The button shipped for months with no click handler at all. Landing on
     // /search is only half of it — the page has to offer a working query input,
     // otherwise the control is still a dead end.
-    await page.getByRole('button', { name: /search/i }).click()
+    await (await searchControl(page)).click()
     await expect(page).toHaveURL(/\/search/)
 
     // `searchbox`, not `textbox` — the input is `type="search"`.
