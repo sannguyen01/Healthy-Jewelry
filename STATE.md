@@ -519,6 +519,39 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-25**: **Legibility is not composition, and a guardrail that never names a
+  section cannot notice one leaving.** Every homepage assertion was a single-element
+  existence check. Measured: deleting `<MaterialsSection />` left all twelve tests in
+  `e2e/homepage.spec.ts` green — `getByText(/niobium/i).first()` matched the *hero eyebrow*
+  and the other two matched *product cards in the first strip*. Same family as the
+  `--hj-hero-fade` bug PR #34 fixed: a guardrail passing on the wrong element. It also hid
+  two content defects that only a cross-section question can see — the TITANIUM strip was
+  `getProductsByCollection('necklaces')`, so 2 of its 4 cards repeated strips above it
+  (`orbit-pendant-titanium` carrying its Bestseller badge twice) and 2 of 4 were not
+  titanium (a 316L pendant and a niobium chain, each rendering a material line
+  contradicting the heading). `e2e/homepage-composition.spec.ts` now asserts sequence,
+  strip distinctness, label truth, heading outline and the dark band's position. Generalised
+  in `docs/testing-strategy.md`: **a guardrail that gets greener the more you add cannot see
+  repetition** — ADR 013 one level up, from a card that could only grow to a page that could
+  only accumulate.
+
+- **2026-08-25**: **Correction — the `0/22` photography figure has never been observed.**
+  `productPhotographyPremise` is computed only by `collectPremises()` inside
+  `verify-production.mjs`, which runs only in `production-smoke.yml`. That workflow has failed
+  **30 consecutive scheduled runs** (2026-08-17 → 2026-08-24, every 6h), every one of them at
+  the preflight step in ~9 seconds, with `Live store and storefront` and `Webhook signing
+  secret` both **skipped** — consistent with issue #24. So `verify-production.mjs` has not
+  executed in the observable window: no `photoCount` computed, no `premise-drift.json`
+  written, and the drift-reporting step returns early on the missing file every time. The
+  `0/22` recorded against item 9 is hand-entered, not measured. By ADR 008's own standard —
+  *"a detector that has only ever been observed saying 'fine' is not a detector"* — this one
+  has never been observed saying anything. Also note check #3
+  (`liveSiteServesShopifyData`) already asserts `dome-ring-titanium`, `flat-band-niobium` and
+  `cone-studs-niobium` are absent from the live site: **the check for the fabricated-catalog
+  regression exists and has been skipped 30 times.** No code change here — issue #24 is a
+  Shopify console action — but any gate built on this signal would be decoration until it
+  runs, per ADR 006.
+
 - **2026-08-24**: **A protection that can only grow is not a constraint.** The hero's
   opaque copy card is a flex item sized by its widest child, and every guardrail on that
   section — containment, rendered contrast, axe's *incomplete* over imagery — is satisfied

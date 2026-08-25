@@ -10,13 +10,9 @@ import {
   MaterialsSection,
 } from '@/components/home'
 import type { CollectionTile } from '@/components/home/CollectionGrid'
-import {
-  getBestsellers,
-  getNewArrivals,
-  getProducts,
-  getProductsByCollection,
-} from '@/lib/shopify'
+import { getBestsellers, getNewArrivals, getProducts } from '@/lib/shopify'
 import { hjCollections } from '@/lib/data/hj-data'
+import { stripByMaterial } from '@/lib/utils/homepageStrips'
 
 export const metadata: Metadata = {
   title: 'Healthy Jewelry — Implant-Grade Titanium',
@@ -47,12 +43,22 @@ export default async function HomePage() {
   //
   // `getBestsellers` and `getNewArrivals` stay Shopify-side queries: deriving them from the
   // catalogue would move their ordering from Shopify's query to our filter.
-  const [bestsellers, newArrivals, titaniumNecklaces, allProducts] = await Promise.all([
+  const [bestsellers, newArrivals, allProducts] = await Promise.all([
     getBestsellers(),
     getNewArrivals(),
-    getProductsByCollection('necklaces'),
     getProducts(),
   ])
+
+  // The third strip is titled TITANIUM, so it holds titanium — it used to hold
+  // `getProductsByCollection('necklaces')`, which put a 316L steel pendant and a niobium
+  // chain under that heading, each rendering its own contradicting material line. It also
+  // repeated two of the four cards from the strips above it, because the three lists were
+  // computed independently and never compared. See `stripByMaterial` for both.
+  //
+  // Derived from `allProducts` rather than a fourth query: material is parsed from tags,
+  // not a Shopify-side facet, so there is no server ordering to defer to — and the fetch
+  // budget stays at three, one below what `homepage-fetch-budget.test.ts` allows.
+  const titanium = stripByMaterial(allProducts, 'titanium', [...bestsellers, ...newArrivals])
 
   // Resolved here because `CollectionGrid` is a client component and cannot await Shopify.
   // `hjCollections` is site structure — five fixed routes — not catalogue data.
@@ -71,7 +77,12 @@ export default async function HomePage() {
         <CampaignBand />
         <HorizontalScroll label="NEW ARRIVALS" products={newArrivals} />
         <CollectionGrid tiles={collectionTiles} />
-        <HorizontalScroll label="TITANIUM" products={titaniumNecklaces} />
+        {/* `viewAllHref` stays defaulted to /shop. All three strips pointing at the same
+            destination is a real weakness, but /shop takes no material or badge param —
+            its filter is client-side — so a /shop?material=titanium link would promise a
+            filter it would not apply. Fixing it properly means teaching /shop to read
+            searchParams, which is its own change, not a rider on this one. */}
+        <HorizontalScroll label="TITANIUM" products={titanium} />
         <MaterialsSection />
       </main>
       <Footer />
