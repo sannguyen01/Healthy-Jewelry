@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { stripByMaterial, duplicateAcrossStrips } from '@/lib/utils/homepageStrips'
+import { stripByMaterial, duplicateAcrossStrips, dedupeInOrder } from '@/lib/utils/homepageStrips'
 import type { HJMaterialHandle, HJProduct } from '@/lib/shopify/types'
 import { hjProducts } from '@/lib/data/hj-data'
 
@@ -106,6 +106,73 @@ describe('stripByMaterial', () => {
         { label: 'TITANIUM', products: strip },
       ])
     ).toEqual([])
+  })
+})
+
+describe('dedupeInOrder', () => {
+  it('keeps a shared product in the earlier strip only', () => {
+    // The page's order is its priority order: BESTSELLING outranks NEW ARRIVALS.
+    const shared = product('both', 'titanium')
+    const [first, second] = dedupeInOrder([
+      [shared, product('a', 'titanium')],
+      [shared, product('b', 'titanium')],
+    ])
+
+    expect(first.map((p) => p.handle)).toEqual(['both', 'a'])
+    expect(second.map((p) => p.handle)).toEqual(['b'])
+  })
+
+  it('reproduces the live-store case the E2E suite structurally cannot', () => {
+    // BESTSELLING and NEW ARRIVALS are two independent Shopify queries, `tag:bestseller`
+    // and `tag:new`. A product carrying both tags is returned by both — and `badge`
+    // collapses to a single value with bestseller winning, so it renders the same
+    // "Bestseller" pill in both strips.
+    //
+    // The static fallback cannot produce this: `badge` is one scalar field, so
+    // `badge === 'Bestseller'` and `badge === 'New'` are disjoint by construction. That is
+    // exactly why this case lives here — e2e/homepage-composition.spec.ts runs against
+    // mock.myshopify.com and could never observe it, however carefully it asks.
+    const doubleTagged = product('meridian-cuff', 'titanium', { badge: 'Bestseller' })
+    const fromBestsellerQuery = [doubleTagged, product('tectonic-ring', 'titanium')]
+    const fromNewQuery = [doubleTagged, product('nova-pendant', 'titanium')]
+
+    expect(
+      duplicateAcrossStrips([
+        { label: 'BESTSELLING', products: fromBestsellerQuery },
+        { label: 'NEW ARRIVALS', products: fromNewQuery },
+      ])
+    ).toEqual([{ handle: 'meridian-cuff', labels: ['BESTSELLING', 'NEW ARRIVALS'] }])
+
+    const [bestsellers, newArrivals] = dedupeInOrder([fromBestsellerQuery, fromNewQuery])
+
+    expect(
+      duplicateAcrossStrips([
+        { label: 'BESTSELLING', products: bestsellers },
+        { label: 'NEW ARRIVALS', products: newArrivals },
+      ])
+    ).toEqual([])
+    expect(newArrivals.map((p) => p.handle)).toEqual(['nova-pendant'])
+  })
+
+  it('collapses a product repeated within one strip', () => {
+    // A hand-curated or paginated Shopify collection can return the same product twice.
+    const twice = product('a', 'titanium')
+
+    expect(dedupeInOrder([[twice, twice]])[0]).toHaveLength(1)
+  })
+
+  it('preserves order and leaves disjoint strips untouched', () => {
+    const strips = [
+      [product('a', 'titanium'), product('b', 'titanium')],
+      [product('c', 'titanium')],
+    ]
+
+    expect(dedupeInOrder(strips).map((s) => s.map((p) => p.handle))).toEqual([['a', 'b'], ['c']])
+  })
+
+  it('handles empty input without inventing a strip', () => {
+    expect(dedupeInOrder([])).toEqual([])
+    expect(dedupeInOrder([[]])).toEqual([[]])
   })
 })
 

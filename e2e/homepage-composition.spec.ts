@@ -217,6 +217,71 @@ test.describe('Homepage composition', () => {
     expect(skips, 'the homepage heading outline skips a level').toEqual([])
   })
 
+  test('every light-to-light seam carries the same divider', async ({ page }) => {
+    // A divider belongs to the *boundary*, not to one of the sections either side of it —
+    // and this one belongs to HorizontalScroll, so it appears wherever a strip happens to
+    // end rather than wherever two sections meet. The result was three structurally
+    // identical light-on-light seams with two treatments: NEW ARRIVALS→CollectionGrid and
+    // TITANIUM→MaterialsSection had a hairline (the strip's own borderBottom),
+    // CollectionGrid→TITANIUM had none, because CollectionGrid does not draw one. Same two
+    // backgrounds, same gap, different rule — visible as an inconsistency and invisible to
+    // every per-section test, since each section is individually correct.
+    //
+    // Two exemptions, both for the same reason — the section already supplies its own edge,
+    // so a hairline would be a second boundary drawn over a boundary:
+    //
+    //   - Either side is dark. The campaign band's own edge is the transition, and a 1px
+    //     --ash line against #0A0A0A is not a divider anyone reads. (The strip above the
+    //     band still draws one, because a component cannot know what follows it. That is
+    //     the cost of the divider living on a section, and it is why this rule is written
+    //     about pairs.)
+    //   - The hero. It terminates in the photograph at every width — full-bleed above
+    //     900px, a 16:9 band below it — so the image edge is the seam. This one was found
+    //     by writing the assertion: the rule as first drafted flagged Hero → BESTSELLING
+    //     alongside the real defect, and the honest answer was that the hero is genuinely
+    //     different rather than that the rule should be loosened until it stopped
+    //     complaining.
+    const seams = await page.evaluate(() => {
+      const luminance = (el: Element) => {
+        const [r, g, b] = (getComputedStyle(el).backgroundColor.match(/\d+/g) ?? ['255']).map(
+          Number
+        )
+        return 0.2126 * r + 0.7152 * (g ?? r) + 0.0722 * (b ?? r)
+      }
+      const hasDivider = (el: Element) => {
+        const style = getComputedStyle(el)
+        return style.borderBottomStyle !== 'none' && parseFloat(style.borderBottomWidth) > 0
+      }
+      const sections = [...document.querySelectorAll('main > section')]
+      const label = (el: Element) =>
+        el.querySelector('.label-eyebrow')?.textContent?.trim() ??
+        el.querySelector('h1, h2')?.textContent?.trim().slice(0, 24) ??
+        'section'
+
+      return sections.slice(0, -1).map((section, index) => {
+        const next = sections[index + 1]
+        return {
+          seam: `${label(section)} → ${label(next)}`,
+          bothLight: luminance(section) >= 60 && luminance(next) >= 60,
+          // The hero ends in its photograph, so the image edge is already the boundary.
+          endsInPhotograph: section.querySelector('h1') !== null,
+          divider: hasDivider(section),
+        }
+      })
+    })
+
+    const lightSeams = seams.filter((seam) => seam.bothLight && !seam.endsInPhotograph)
+    expect(lightSeams.length, 'expected several light-on-light seams to compare').toBeGreaterThan(1)
+
+    expect(
+      lightSeams.filter((seam) => !seam.divider).map((seam) => seam.seam),
+      'These seams join two light sections but draw no divider, while their structural ' +
+        'twins do. Whatever the treatment is, it has to be the same one at every equivalent ' +
+        'boundary — a rule that depends on which component happens to sit above it is not a ' +
+        'rule.'
+    ).toEqual([])
+  })
+
   test('the single dark interruption falls in the first half of the page', async ({ page }) => {
     // CLAUDE.md: void-white is dominant, with exactly one dark interruption. Both halves of
     // that are page-level claims — "exactly one" cannot be checked from inside the band, and

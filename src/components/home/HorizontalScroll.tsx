@@ -13,7 +13,11 @@ interface HorizontalScrollProps {
   viewAllHref?: string
 }
 
-export function HorizontalScroll({ label, products, viewAllHref = '/shop' }: HorizontalScrollProps) {
+export function HorizontalScroll({
+  label,
+  products,
+  viewAllHref = '/shop',
+}: HorizontalScrollProps) {
   const [sectionRef, visible] = useReveal(0.08)
 
   return (
@@ -38,7 +42,15 @@ export function HorizontalScroll({ label, products, viewAllHref = '/shop' }: Hor
           gap: '20px',
         }}
       >
-        <span className="label-eyebrow">{label}</span>
+        {/* An h2, not a span. This is the section's title — it is what tells a reader
+            which strip they are in — and until now the three strips contributed no heading
+            at all, so a screen-reader outline of the homepage went hero → campaign band →
+            collection tiles → materials and never mentioned the products. `margin: 0`
+            inline because .label-eyebrow was written for spans and carries no margin reset;
+            everything visual still comes from the class, so this renders identically. */}
+        <h2 className="label-eyebrow" style={{ margin: 0 }}>
+          {label}
+        </h2>
         <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
         <Link
           href={viewAllHref}

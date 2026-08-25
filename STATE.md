@@ -530,7 +530,17 @@ duplicate those files.
   (`orbit-pendant-titanium` carrying its Bestseller badge twice) and 2 of 4 were not
   titanium (a 316L pendant and a niobium chain, each rendering a material line
   contradicting the heading). `e2e/homepage-composition.spec.ts` now asserts sequence,
-  strip distinctness, label truth, heading outline and the dark band's position. Generalised
+  strip distinctness, label truth, heading outline, seam consistency and the dark band's
+  position. Three follow-on defects the assertions themselves surfaced: the first two strips
+  are independent Shopify queries (`tag:bestseller`, `tag:new`), so a doubly-tagged product
+  renders in both with the same Bestseller pill — unpreventable by the strip-3 fix and
+  *unobservable* on the fallback, whose scalar `badge` makes the two filters disjoint, so
+  the guard had to live in the code path (`dedupeInOrder`) rather than only in a test; the
+  divider was owned by `HorizontalScroll` rather than by the boundary, so of three identical
+  light-on-light seams two had a hairline and one did not; and the three strips contributed
+  no heading at all — "BESTSELLING" was a `<span>` — so the products were absent from the
+  page's screen-reader outline entirely, and `CollectionGrid` hung `h3` tiles under no `h2`.
+  Both labels are now `h2`, computed-identical to the spans they replaced. Generalised
   in `docs/testing-strategy.md`: **a guardrail that gets greener the more you add cannot see
   repetition** — ADR 013 one level up, from a card that could only grow to a page that could
   only accumulate.

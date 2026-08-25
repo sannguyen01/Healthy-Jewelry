@@ -32,6 +32,12 @@ export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
       style={{
         backgroundColor: 'var(--bg)',
         padding: 'clamp(48px, 6vw, 80px) var(--space-gutter, clamp(20px,4vw,64px))',
+        // Matches the hairline HorizontalScroll draws. Without it the seam below this
+        // section was the only light-on-light boundary on the homepage with no divider,
+        // while its two structural twins had one — because the rule lived on the strip
+        // component rather than on the boundary, so it applied wherever a strip happened to
+        // end. Asserted in e2e/homepage-composition.spec.ts.
+        borderBottom: '1px solid var(--ash)',
       }}
     >
       <div
@@ -42,7 +48,11 @@ export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
           gap: '20px',
         }}
       >
-        <span className="label-eyebrow">Collections</span>
+        {/* Also an h2: this section rendered h3 tile titles with no heading above them,
+            so its tiles hung off the previous section's outline. See HorizontalScroll. */}
+        <h2 className="label-eyebrow" style={{ margin: 0 }}>
+          Collections
+        </h2>
         <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
       </div>
 
@@ -93,11 +103,7 @@ export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
                       pointerEvents: 'none',
                     }}
                   >
-                    <JewelrySVG
-                      type={svgType}
-                      className="w-2/3 h-2/3"
-                      style={{ opacity: 0.45 }}
-                    />
+                    <JewelrySVG type={svgType} className="w-2/3 h-2/3" style={{ opacity: 0.45 }} />
                   </div>
                 )
               )}

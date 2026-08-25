@@ -12,7 +12,7 @@ import {
 import type { CollectionTile } from '@/components/home/CollectionGrid'
 import { getBestsellers, getNewArrivals, getProducts } from '@/lib/shopify'
 import { hjCollections } from '@/lib/data/hj-data'
-import { stripByMaterial } from '@/lib/utils/homepageStrips'
+import { dedupeInOrder, stripByMaterial } from '@/lib/utils/homepageStrips'
 
 export const metadata: Metadata = {
   title: 'Healthy Jewelry — Implant-Grade Titanium',
@@ -43,11 +43,19 @@ export default async function HomePage() {
   //
   // `getBestsellers` and `getNewArrivals` stay Shopify-side queries: deriving them from the
   // catalogue would move their ordering from Shopify's query to our filter.
-  const [bestsellers, newArrivals, allProducts] = await Promise.all([
+  const [rawBestsellers, rawNewArrivals, allProducts] = await Promise.all([
     getBestsellers(),
     getNewArrivals(),
     getProducts(),
   ])
+
+  // The first two strips are two independent Shopify queries — `tag:bestseller` and
+  // `tag:new` — so a product carrying both tags is returned by both and renders in both,
+  // showing the same "Bestseller" pill each time (badge collapses to one value, bestseller
+  // winning). The static fallback cannot reproduce that, because its `badge` is a single
+  // scalar and the two filters are disjoint by construction — so no test running against
+  // mock.myshopify.com can see it. Guarded here rather than only asserted.
+  const [bestsellers, newArrivals] = dedupeInOrder([rawBestsellers, rawNewArrivals])
 
   // The third strip is titled TITANIUM, so it holds titanium — it used to hold
   // `getProductsByCollection('necklaces')`, which put a 316L steel pendant and a niobium

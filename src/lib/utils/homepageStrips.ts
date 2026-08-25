@@ -48,6 +48,45 @@ export function stripByMaterial(
 }
 
 /**
+ * The same strips with every product kept only where it first appears.
+ *
+ * `stripByMaterial` closes the duplication the *static* catalogue could produce. It does not
+ * close the one the live store can, and the difference is worth spelling out because it is
+ * invisible to every test in this repo:
+ *
+ *   - The first two strips come from two independent Shopify queries, `tag:bestseller` and
+ *     `tag:new` (`GET_BESTSELLERS` / `GET_NEW_ARRIVALS`). A product carrying both tags is
+ *     returned by both, so it renders in both strips — and `badge` collapses to a single
+ *     value with bestseller winning (`src/lib/shopify/index.ts`), so it shows the *same*
+ *     "Bestseller" pill in both places. Precisely the `orbit-pendant-titanium` defect, one
+ *     data source over.
+ *   - On the static fallback that cannot happen: `badge` is one scalar field, so
+ *     `badge === 'Bestseller'` and `badge === 'New'` are disjoint by construction. Which
+ *     means `e2e/homepage-composition.spec.ts` — running against `mock.myshopify.com` — can
+ *     never observe this case, however carefully it asks.
+ *
+ * So the fixture proves the parts and cannot prove the whole, which is the failure this
+ * whole change is about. The guard therefore lives in the code path rather than only in the
+ * assertion: earlier strips win, because the page's order is its priority order.
+ */
+export function dedupeInOrder<T extends { handle: string }>(
+  strips: ReadonlyArray<readonly T[]>
+): T[][] {
+  const seen = new Set<string>()
+  return strips.map((strip) => {
+    const kept: T[] = []
+    for (const item of strip) {
+      // Also collapses a product repeated *within* one strip, which a paginated or
+      // hand-curated Shopify collection can produce on its own.
+      if (seen.has(item.handle)) continue
+      seen.add(item.handle)
+      kept.push(item)
+    }
+    return kept
+  })
+}
+
+/**
  * Handles appearing in more than one strip, with the strips that share them.
  *
  * Reported rather than silently de-duplicated, because which strip should lose a product is
