@@ -14,7 +14,10 @@ const variantStyles: Record<BadgeVariant, React.CSSProperties> = {
     border: '1px solid rgba(157,167,175,0.3)',
   },
   new: {
-    color: 'var(--sage)',
+    // --sage-text, not --sage: this is 9px label copy needing 4.5:1, and raw
+    // --sage is 2.16:1 over its own tint here. The tint and border below stay
+    // on the accent — same split as `bestseller` above.
+    color: 'var(--sage-text)',
     backgroundColor: 'rgba(140,168,154,0.12)',
     border: '1px solid rgba(140,168,154,0.3)',
   },

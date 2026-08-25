@@ -28,7 +28,19 @@
        #E3E2DE), where an earlier #5E6870 measured 4.39:1 and quietly failed AA.
        Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
     --titanium-text: #59636B; /* titanium-toned text on light backgrounds */
-    --sage:      #8CA89A;  /* green accent */
+    --sage:      #8CA89A;  /* accent — borders, tints, fills. NOT text on --bg */
+    /* Sage darkened to carry text on light backgrounds. --sage itself is 2.36:1
+       on --bg — worse than --titanium's 2.25:1, the ratio that made
+       --titanium-text necessary — and it shipped as 9-13px text in four places
+       for want of a row in design-tokens-contrast.test.ts. This is 6.02:1 on
+       --bg, 5.46:1 on --nacre, 5.03:1 on the badge's 12% sage tint.
+       Chosen against the *worst* surface, and with margin: the minimum passing
+       value (#57685F) clears the current 12% tint at 4.54:1 but fails the moment
+       that alpha rises — 4.44:1 at 15%, 4.30:1 at 20%. This holds AA from 10%
+       through 25%, so retuning the tint cannot silently reintroduce the defect.
+       Light surfaces only: 2.72:1 on --ink, asserted as a negative.
+       Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
+    --sage-text: #516159; /* sage-toned text on light backgrounds */
     --mist:      #A8A49E;  /* muted text — on dark backgrounds only */
     --on-dark:   #F0EDE8;  /* text on dark backgrounds */
     --black:     #0A0A0A;  /* campaign band dark */
@@ -418,8 +430,11 @@
   }
 
   .badge-new {
+    /* Border keeps the raw accent — borders carry no contrast obligation — while
+       the label takes the text-safe token. Same division as the bestseller badge
+       and the gallery thumbnail in ProductDetail.tsx. */
     border-color: var(--sage);
-    color: var(--sage);
+    color: var(--sage-text);
   }
 
   .badge-sale {

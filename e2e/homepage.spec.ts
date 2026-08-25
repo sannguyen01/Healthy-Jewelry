@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
@@ -23,16 +23,39 @@ test.describe('Homepage', () => {
     await expect(page.getByText(/science before aesthetics/i)).toBeVisible()
   })
 
+  /**
+   * Scoped to the materials section, not to the page.
+   *
+   * These three read `page.getByText(...).first()` until 2026-08-25, which does not mean
+   * "the materials section says this" — it means "the first node anywhere on the homepage
+   * says this", and on this page that is never the materials section. `/niobium/i` matched
+   * the **hero eyebrow** ("Implant-Grade Titanium · Niobium · 316L Steel"); the other two
+   * matched **product cards in the first scroll strip**, which render their material as a
+   * line of card metadata. Measured: with `<MaterialsSection />` deleted from `page.tsx`,
+   * all twelve tests in this file still passed.
+   *
+   * Same family as the `--hj-hero-fade` bug — a guardrail that passes on the wrong thing —
+   * and it is the reason `e2e/homepage-composition.spec.ts` exists: a homepage assertion
+   * that never says *which section* cannot notice a section going missing.
+   *
+   * Located by its heading rather than a test id, matching the convention in
+   * hero-legibility.spec.ts: a failure then names copy a visitor could not find.
+   */
+  const materialsSection = (page: Page) =>
+    page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { level: 2, name: /built from the inside out/i }) })
+
   test('materials section mentions Grade 23 Titanium', async ({ page }) => {
-    await expect(page.getByText(/grade 23 titanium/i).first()).toBeVisible()
+    await expect(materialsSection(page).getByText(/grade 23 titanium/i)).toBeVisible()
   })
 
   test('materials section mentions Niobium', async ({ page }) => {
-    await expect(page.getByText(/niobium/i).first()).toBeVisible()
+    await expect(materialsSection(page).getByText(/^niobium$/i)).toBeVisible()
   })
 
   test('materials section mentions 316L Surgical Steel', async ({ page }) => {
-    await expect(page.getByText(/316L surgical steel/i).first()).toBeVisible()
+    await expect(materialsSection(page).getByText(/316L surgical steel/i)).toBeVisible()
   })
 
   test('footer is present', async ({ page }) => {

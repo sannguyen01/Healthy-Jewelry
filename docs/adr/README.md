@@ -33,6 +33,7 @@ pointer; the reasoning lives here once.
 | [011](011-repeated-identical-failures-must-escalate.md) | A channel that repeats itself is a channel people mute | Spans the smoke workflow, `loop-constraints.md`, and `STATE.md` |
 | [012](012-an-unassigned-escalation-is-not-yet-escalated.md) | An unassigned escalation is not yet escalated | Spans the smoke workflow, ADR 011, `loop-constraints.md`, `LOOP.md`, and `STATE.md` |
 | [013](013-a-protection-that-can-only-grow.md) | A protection that can only grow is not a constraint | Spans `globals.css`, `Hero.tsx`, `hero-legibility.spec.ts`, `docs/testing-strategy.md` and `STATE.md` |
+| [014](014-monochrome-was-not-decided.md) | Monochrome was not decided | Spans the palette in `globals.css`, `JewelrySVG`, `ProductImage`, the contrast test, `CLAUDE.md` and the FAQ/Terms copy |
 
 ## Format
 

@@ -398,6 +398,44 @@ meets imagery:
   averaging hides a light word sitting on one pale patch of an otherwise dark photo, which is exactly
   the failure worth catching.
 
+### …and legibility is not composition
+
+`hero-legibility.spec.ts` can be perfect while the page around it says the same thing three times.
+Every homepage assertion before 2026-08-25 was a single-element existence check, and each passed no
+matter what surrounded it — which is what per-component testing *is*, not an oversight in any one
+spec. Measured consequence: deleting `<MaterialsSection />` from `page.tsx` left all twelve tests in
+`homepage.spec.ts` green, because `page.getByText(/niobium/i).first()` matched the **hero eyebrow**
+and the other two matched **product cards in the first scroll strip**. A homepage assertion that
+never says *which section* cannot notice a section going missing.
+
+`e2e/homepage-composition.spec.ts` is the model for whole-page properties. What makes a question
+belong there rather than in a section's own spec is that **it cannot be answered from inside one
+section**:
+
+- **Sequence.** `CLAUDE.md`'s "Homepage Section Sequence" is a design decision, and prose-only
+  decisions drift. The rendered order is asserted against it, and `homepage-fetch-budget.test.ts`
+  asserts the source order, so the two disagreeing is itself a finding.
+- **Distinctness.** The three scroll strips are one component with one layout, card, reveal and
+  "View All" destination — their contents are the entire difference between them. Two of the third
+  strip's four cards were products the visitor had already scrolled past, because the three lists
+  were computed independently and never compared.
+- **Truthfulness of a label.** The strip titled TITANIUM contained a 316L steel pendant and a niobium
+  chain, each rendering its own contradicting material line. Every card was correct; only the
+  relationship between a label and its contents was wrong.
+- **Outline, not fragments.** Exactly one `h1`, and no skipped heading level across the whole page.
+
+The general rule, and the reason this tier keeps earning its place: **a guardrail that gets greener
+the more you add cannot see repetition.** Add a fourth identical strip and every existing homepage
+assertion improves — more product links, more material names. Only a comparative question notices
+that the fourth strip said nothing the first three had not. That is the same shape as
+[ADR 013](adr/013-a-protection-that-can-only-grow.md), one level up: there it was a card that could
+only grow, here it is a page that can only accumulate.
+
+What this tier deliberately does **not** assert is whether the sequence is *good*. That is not a
+property a test can hold. What it holds is the evidence a human needs to argue about it — that the
+strips are distinct, the labels true, the order intended — so the creative question is settled
+against real structure instead of a guess.
+
 **axe cannot do this.** Its `color-contrast` rule reports *incomplete* rather than *violation* when
 the backdrop is an image, because it has no way to know what the pixels are. Anything relying on axe
 alone is unprotected the moment text is placed over a photograph.

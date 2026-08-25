@@ -393,7 +393,10 @@ export default function CartPage() {
                     style={{
                       fontFamily: 'var(--font-body)',
                       fontSize: 'var(--text-sm)',
-                      color: 'var(--sage)',
+                      // 13.2-15.2px at weight 300 on bare --bg: ordinary body
+                      // copy, and the only one of the four sage usages with no
+                      // tint softening it. Was 2.36:1.
+                      color: 'var(--sage-text)',
                       fontWeight: 300,
                     }}
                   >
