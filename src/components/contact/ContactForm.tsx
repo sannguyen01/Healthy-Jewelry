@@ -142,7 +142,11 @@ export function ContactForm() {
             fontSize: 'var(--text-xl)',
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
-            color: 'var(--sage)',
+            // --text-xl clamps 22.4px -> 35.2px, so this crosses WCAG's 24px
+            // large-text boundary mid-viewport: it is normal text needing 4.5:1
+            // on a phone and large text needing 3:1 on a desktop. --sage-text
+            // clears both; --sage cleared neither, at 2.36:1 on --bg.
+            color: 'var(--sage-text)',
           }}
         >
           ✓ Message sent.

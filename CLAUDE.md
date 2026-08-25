@@ -28,16 +28,24 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--ink` | #1A1714 | Primary text, logo |
 | `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
 | `--titanium-text` | #5E6870 | Titanium-toned **text** on light backgrounds |
-| `--sage` | #8CA89A | Green accent |
+| `--sage` | #8CA89A | Green accent — borders, tints, fills. **Not text** |
+| `--sage-text` | #516159 | Sage-toned **text** on light backgrounds |
 | `--mist` | #A8A49E | Muted text — dark backgrounds only |
 | `--on-dark` | #F0EDE8 | Text on dark backgrounds |
 | `--black` | #0A0A0A | Campaign band dark |
 | `--mid` | #2C2926 | Dark hover states |
 
-**Contrast rule**: `--titanium` is 2.25:1 on `--bg` — below the WCAG AA 4.5:1 floor. Use
-`--titanium-text` (5.23:1) for any titanium-toned copy on a light surface; `--titanium` itself is fine
-for borders, tints, and text on `--ink`/`--black`. Every documented pairing is enforced by
-`src/tests/unit/design-tokens-contrast.test.ts` — add new pairings there.
+**Contrast rule**: the two chromatic accents are both below the WCAG AA 4.5:1 floor on `--bg` —
+`--titanium` at 2.25:1 and `--sage` at 2.36:1 — so each has a darkened sibling for text. Use
+`--titanium-text` (5.64:1) and `--sage-text` (6.02:1) for any accent-toned copy on a light surface;
+the raw accents are fine for borders, tints, and (for `--titanium`) text on `--ink`/`--black`.
+Neither `-text` token is a general-purpose text colour: both fail on dark surfaces, where
+`--on-dark` and `--mist` apply.
+
+Every documented pairing is enforced by `src/tests/unit/design-tokens-contrast.test.ts` — add new
+pairings there. A new colour token must be **classified**: either a `TEXT_PAIRINGS` row naming the
+surfaces it renders text on, or an `ACCENT_ONLY` entry saying what it is for. There is no third
+option, because "unclassified" is how `--sage` shipped as 9–13px text at 1.97:1 in four places.
 
 **Ease tokens**:
 - `--ease: cubic-bezier(0.16, 1, 0.3, 1)` (smooth spring)

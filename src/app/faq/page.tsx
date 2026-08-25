@@ -31,7 +31,7 @@ const sections: Section[] = [
       },
       {
         q: 'What is niobium?',
-        a: 'Niobium is a soft, lustrous transition metal that is completely biocompatible and nickel-free. It is naturally hypoallergenic and is one of the safest metals for people with metal sensitivities. We anodize our niobium pieces to create vivid colors without any dyes or coatings — the color comes from a thin oxide layer on the metal itself.',
+        a: 'Niobium is a soft, lustrous transition metal that is completely biocompatible and nickel-free. It is naturally hypoallergenic and is one of the safest metals for people with metal sensitivities. Anodizing it in an oxygen-free environment grows a thin oxide layer, and that layer is what gives the metal its color — no dyes, no coatings, nothing applied on top. The color is the surface of the metal, which is why it cannot chip, fade, or wash off.',
       },
       {
         q: 'Can I wear it in water?',

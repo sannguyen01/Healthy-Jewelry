@@ -46,6 +46,11 @@ describe('Badge', () => {
   it('new badge has sage color style', () => {
     render(<Badge variant="new" />)
     const badge = screen.getByText('New')
-    expect(badge).toHaveStyle({ color: 'var(--sage)' })
+    // The text-safe sage, not the raw accent — mirroring the bestseller case
+    // above and for the same reason. This asserted `var(--sage)` until
+    // 2026-08-25, faithfully pinning what shipped: 9px label copy at 2.16:1 over
+    // its own tint, which is worse than the 2.25:1 titanium case that had
+    // already motivated the split.
+    expect(badge).toHaveStyle({ color: 'var(--sage-text)' })
   })
 })

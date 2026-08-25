@@ -116,8 +116,10 @@ export default function TermsPage() {
               price you will pay.
             </p>
             <p style={bodyStyle}>
-              We make every effort to display product colors accurately, but actual colors may vary
-              depending on your screen settings. All dimensions listed are approximate.
+              Product imagery is illustrative. Where a piece has not yet been photographed its
+              listing shows a line drawing rather than a photograph, so finishes — anodized
+              niobium color in particular — are not depicted. Where a photograph is shown, colors
+              may still vary with your screen settings. All dimensions listed are approximate.
             </p>
           </div>
 
