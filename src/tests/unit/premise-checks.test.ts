@@ -4,7 +4,6 @@ const {
   i18nPremise,
   collectionSetPremise,
   specMetafieldPremise,
-  productPhotographyPremise,
   paymentsPremise,
   apiVersionPremise,
   webhookDeliveryPremise,
@@ -121,21 +120,11 @@ describe('spec metafield premise', () => {
   })
 })
 
-describe('product photography premise', () => {
-  it('holds — and stays blocking, not opportunity — while no product has a photo', () => {
-    const p = productPhotographyPremise(0, 22) as Premise
-    expect(p.holds).toBe(true)
-    expect(p.kind).toBe('blocking')
-    expect(p.detail).toContain('0/22')
-  })
-
-  it('drifts once photography starts landing, without waiting for full coverage', () => {
-    const p = productPhotographyPremise(3, 22) as Premise
-    expect(p.holds).toBe(false)
-    expect(p.detail).toContain('3/22')
-    expect(p.detail).toContain('STATE.md item 9')
-  })
-})
+/**
+ * The product-photography premise was promoted to a failing check on 2026-08-25 and its
+ * tests moved with it, to `production-smoke-handles.test.ts`'s
+ * `classifyPhotographyCoverage` block. See the note in `scripts/lib/premise-checks.mjs`.
+ */
 
 /**
  * The premise with a **date on it**, which makes it the clearest case for the whole idea.

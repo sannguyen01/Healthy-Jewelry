@@ -42,7 +42,6 @@ import {
   i18nPremise,
   collectionSetPremise,
   specMetafieldPremise,
-  productPhotographyPremise,
   paymentsPremise,
   apiVersionPremise,
   webhookDeliveryPremise,
@@ -67,6 +66,20 @@ import { describeFetchError, hintForFetchError } from './lib/fetch-error.mjs'
  * this number means anything, which is why it is asserted here and not in a unit test.
  */
 const OG_COLD_START_BUDGET_MS = 2500
+
+/**
+ * The floor for product photography coverage, as a count of photographed products.
+ *
+ * One, not all 22, and deliberately so: the claim being defended is that the storefront
+ * shows the physical object at all, and the first photograph is what turns that from false
+ * to true. A percentage target would be a merchandising opinion; this is the difference
+ * between a catalogue that argues its case and one that draws icons of it.
+ *
+ * Justified in STATE.md item 9 (SHOPIFY-PRODUCT-PHOTOGRAPHY, kind: blocking) and
+ * docs/adr/014-monochrome-was-not-decided.md, which defers the palette's colour question
+ * until this stops being zero.
+ */
+const MIN_PHOTOGRAPHED_PRODUCTS = 1
 
 /**
  * Imported, never re-declared. This literal used to be spelled out here *and* in
@@ -1037,6 +1050,105 @@ async function photographedProductsShowTheirPhotograph() {
 }
 
 /**
+ * The catalogue shows photographs of the products, not illustrations of them.
+ *
+ * ## Why this is a check and not a premise
+ *
+ * `productPhotographyPremise` used to report this, and a premise never fails the run
+ * (ADR 008). That was right while zero coverage was new information; it stopped being right
+ * once the number had been sat at 0/22 for weeks with nothing acting on it. ADR 008 names
+ * its own escalation path for exactly that: *"if premise-drift issues start accumulating
+ * unread, the right response is to promote the specific premise to a failing check, not to
+ * make all of them fail."* This is that promotion, so the premise is removed rather than
+ * left to print a contradicting verdict beside it.
+ *
+ * ## Why it fails where `homepageStripsHaveEnoughProducts` only observes
+ *
+ * That one is also a catalogue-content threshold and is deliberately in the never-fails
+ * tier, because a thin scroll strip is a merchandising choice and turning someone's
+ * merchandising into a red build is how a signal becomes noise. This is a different kind of
+ * fact. For a brand whose entire argument is implant-grade metal — weight, finish, how the
+ * surface takes light — a schematic icon cannot make the case the storefront exists to
+ * make. STATE.md already tracks it as `blocking`; this makes the tracking mean something.
+ *
+ * ## What it does not claim
+ *
+ * It cannot run until the Admin token in `production-smoke.yml`'s environment is fixed
+ * (issue #24) — the workflow has died at preflight for 30 consecutive scheduled runs, so
+ * `verify-production.mjs` has not executed in the observable window and the 0/22 on record
+ * is hand-entered rather than measured. That is not a reason to write the check loosely: an
+ * under-scoped token routes through `adminGraphql`, which throws an unevaluable error, so
+ * this lands in "Could not be evaluated" and still exits non-zero. It cannot go quietly
+ * green, per ADR 006.
+ */
+async function productPhotographyCoverage() {
+  // `featuredImage`, matching what `collectPremises` counted — not the `featuredMedia`
+  // that `photographedProductsShowTheirPhotograph` reads. Two numerators for the same
+  // store would let this check and the one above it disagree about the same fact.
+  const data = await adminGraphql(
+    `query {
+       products(first: 250) {
+         edges { node { featuredImage { url } } }
+       }
+     }`,
+  )
+
+  const products = data.products.edges.map((e) => e.node)
+  const photographed = products.filter((p) => p.featuredImage?.url).length
+
+  const verdict = classifyPhotographyCoverage(photographed, products.length)
+  if (!verdict.ok) throw new Error(verdict.detail)
+  return verdict.detail
+}
+
+/**
+ * Pure half of the coverage check, so both branches run in CI — the failing one is the
+ * branch that has never been observed live, which is precisely the branch most likely to be
+ * wrong the day it finally fires.
+ *
+ * @param {number} photographed products with a featuredImage
+ * @param {number} total products in the store
+ * @returns {{ ok: boolean, detail: string }}
+ */
+export function classifyPhotographyCoverage(photographed, total) {
+  // An empty store is not zero coverage — it is nothing to cover, and reporting it as a
+  // photography problem would send the reader to the wrong console. Same guard as
+  // `everyProductPublishedToHeadless`.
+  if (total === 0) {
+    return {
+      ok: false,
+      detail:
+        'The store has no products at all, so photography coverage says nothing. Fix the ' +
+        'catalogue first — this check has no opinion until there is something to photograph.',
+    }
+  }
+
+  if (photographed < MIN_PHOTOGRAPHED_PRODUCTS) {
+    return {
+      ok: false,
+      detail:
+        `${photographed}/${total} products have a photograph, below the floor of ` +
+        `${MIN_PHOTOGRAPHED_PRODUCTS}, so every surface draws the JewelrySVG ` +
+        'illustration instead.\n' +
+        '  For an implant-grade-metal brand the physical object is the argument — weight,\n' +
+        '  finish, how the surface takes light — and a line drawing cannot make it.\n' +
+        '  Fix: upload a photo per product in Shopify Admin. There is no code step;\n' +
+        '  <ProductImage> prefers the real photo the instant featuredImage is set.\n' +
+        '  See STATE.md item 9 and docs/catalog-conventions.md.',
+    }
+  }
+
+  return {
+    ok: true,
+    detail:
+      `${photographed}/${total} products have a photograph` +
+      (photographed < total
+        ? ` — the other ${total - photographed} draw the illustration, which is correct until they are shot.`
+        : ' — full coverage.'),
+  }
+}
+
+/**
  * Every tag namespace the store uses is one the code reads.
  *
  * Tags are the only channel Shopify gives this project for "which metal is this"
@@ -1335,21 +1447,18 @@ async function collectPremises() {
          edges {
            node {
              metafield(namespace: "custom", key: "spec") { value }
-             featuredImage { url }
            }
          }
        }
      }`,
   )
   const specCount = withSpec.products.edges.filter((e) => e.node.metafield?.value?.trim()).length
-  const photoCount = withSpec.products.edges.filter((e) => e.node.featuredImage?.url).length
 
   return [
     apiVersionPremise(),
     i18nPremise(shopLocales),
     collectionSetPremise(collections.edges.map((e) => e.node), KNOWN_COLLECTIONS),
     specMetafieldPremise(specCount, productsCount.count),
-    productPhotographyPremise(photoCount, productsCount.count),
     paymentsPremise(
       ordersCount.count,
       orders.edges.flatMap((e) => e.node.paymentGatewayNames ?? []),
@@ -1416,6 +1525,7 @@ async function main() {
     'A photographed product actually shows its photograph',
     photographedProductsShowTheirPhotograph,
   )
+  await check('The catalogue has product photography at all', productPhotographyCoverage)
   await check('Rate limiting is distributed, not per-instance', rateLimitingIsDistributed)
   await check('A signed webhook actually revalidates the cached page', webhookRevalidatesTheCachedPage)
   await check('Unknown URLs cannot be indexed', unknownUrlsAreNotIndexable)
