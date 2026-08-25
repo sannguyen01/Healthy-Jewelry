@@ -277,13 +277,26 @@ Two caches shave the fixed overhead further:
 
 ### Branch protection
 
-`main` requires both `verify` and `e2e` to pass. This is the part that makes the rest stick: before it,
-a red suite was ignorable, and PRs #3 and #4 were both merged with CI failing — which is how three
-defects reached production. Enabling it was only reasonable once a passing run existed to enforce
-against.
+**`main` is not branch-protected, and there are no required status checks.** Verified against the
+GitHub API on 2026-08-25: every branch, `main` included, reports `"protected": false`. This paragraph
+previously claimed the opposite, eight lines below line 7 of this same file saying — correctly — that
+the repository enforces no required checks. See
+[ADR 015](adr/015-a-gate-that-was-only-ever-documented.md).
 
-PRs use GitHub auto-merge, so a change lands the moment its checks go green rather than waiting on
-someone to notice.
+The merge record agrees with line 7: PRs #34–#37 were squash-merged by hand with
+`E2E tests (Playwright)` red. #34 merged 4m37s *after* that job concluded `failure`; #35–#37 merged
+while it was still running. Auto-merge cannot explain that — it merges only after checks settle
+green.
+
+To enable it, the required contexts are **`Lint · Type-check · Unit tests · Build`** and
+**`E2E tests (Playwright)`**. Not `verify` and `e2e`: those are the *job IDs* in `ci.yml`, and GitHub
+publishes each check run under the job's `name:`. Requiring the job IDs would register two contexts
+nothing ever reports — every PR blocked forever, E2E still never gating. That trap is the reason the
+exact strings are written out here.
+
+The old paragraph's one accurate claim was its precondition — *"enabling it was only reasonable once
+a passing run existed to enforce against"*. That run exists as of 2026-08-25: 412 passed, 8 skipped,
+0 failed.
 
 ---
 

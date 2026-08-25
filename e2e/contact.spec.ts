@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 test.describe('Contact page — layout', () => {
   test.beforeEach(async ({ page }) => {
@@ -80,8 +80,39 @@ test.describe('Contact page — form fields', () => {
 })
 
 test.describe('Contact form — submission', () => {
+  /**
+   * The success state is reachable only by interception, and that is not a
+   * workaround — it is the contract.
+   *
+   * These two tests used to submit for real and expect success, on the strength of
+   * a comment that read "RESEND_API_KEY is not set in E2E env — API returns 200 via
+   * graceful degradation". PR #32 (`ed7dafc`) deleted exactly that behaviour: a
+   * missing key now returns 503 rather than a fabricated `{ success: true }`,
+   * because telling a customer their message arrived while it was silently dropped
+   * is worse than failing honestly. #32 updated `api-contact-route.test.ts` in
+   * lockstep and never touched this file, so from 2026-08-22 these two asserted a
+   * contract the product had deliberately abandoned — and they were the *only* e2e
+   * coverage of the success state, which means that state has been unverified ever
+   * since while appearing to be tested.
+   *
+   * Do not "fix" a future failure here by asserting the error state instead. That
+   * is what the unconfigured-environment test below already covers. Losing the
+   * interception would lose the last proof that a successful submission renders at
+   * all.
+   */
+  async function stubSuccessfulSend(page: Page) {
+    await page.route('**/api/contact', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      })
+    )
+  }
+
   test('valid submission shows success message', async ({ page }) => {
     await page.goto('/contact')
+    await stubSuccessfulSend(page)
 
     await page.getByLabel(/^name$/i).fill('San Nguyen')
     await page.getByLabel(/^email$/i).fill('san@example.com')
@@ -91,7 +122,6 @@ test.describe('Contact form — submission', () => {
 
     await page.getByRole('button', { name: /send message/i }).click()
 
-    // RESEND_API_KEY is not set in E2E env — API returns 200 via graceful degradation
     await expect(page.getByText(/message sent/i)).toBeVisible({ timeout: 8000 })
 
     // Form is replaced by success state — submit button should be gone
@@ -100,6 +130,7 @@ test.describe('Contact form — submission', () => {
 
   test('success message includes follow-up copy', async ({ page }) => {
     await page.goto('/contact')
+    await stubSuccessfulSend(page)
 
     await page.getByLabel(/^name$/i).fill('Test User')
     await page.getByLabel(/^email$/i).fill('test@example.com')
@@ -112,6 +143,34 @@ test.describe('Contact form — submission', () => {
     // test is that the *confirmation* repeats the promise.
     const success = page.getByText(/message sent/i).locator('..')
     await expect(success.getByText(/24 hours/i)).toBeVisible({ timeout: 8000 })
+  })
+
+  test('an unconfigured environment fails honestly rather than faking success', async ({
+    page,
+  }) => {
+    // No interception: this is the request CI actually makes. RESEND_API_KEY is set
+    // nowhere in .github/ or playwright.config.ts's webServer.env, so the route takes
+    // its 503 branch and the form must say so.
+    //
+    // This is the assertion whose absence let the drift above go unnoticed for three
+    // days: #32 changed the behaviour, the unit tests followed, and nothing in e2e
+    // was watching the pair together. It is also the only test here that exercises
+    // the real route end to end.
+    await page.goto('/contact')
+
+    await page.getByLabel(/^name$/i).fill('San Nguyen')
+    await page.getByLabel(/^email$/i).fill('san@example.com')
+    await page.getByLabel(/^message$/i).fill('A question about titanium sizing and fit.')
+
+    await page.getByRole('button', { name: /send message/i }).click()
+
+    await expect(page.getByText(/failed to send message/i)).toBeVisible({ timeout: 8000 })
+    await expect(page.getByRole('link', { name: /hello@healthyjewellery\.com/i })).toBeVisible()
+
+    // The form stays, so the customer can retry or copy their message out. A success
+    // state here would be the exact regression #32 removed.
+    await expect(page.getByRole('button', { name: /send message/i })).toBeVisible()
+    await expect(page.getByText(/message sent/i)).toHaveCount(0)
   })
 
   // The form validates in the browser before it ever calls the API

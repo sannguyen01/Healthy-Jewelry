@@ -9,9 +9,8 @@ const {
   REQUIRED_SHOP_POLICIES,
   classifyOriginResponse,
   describeAccessDenial,
-} = await import(
-  '../../../scripts/verify-production.mjs'
-)
+  classifyPhotographyCoverage,
+} = await import('../../../scripts/verify-production.mjs')
 
 /**
  * `scripts/verify-production.mjs` tells the static fallback apart from the live
@@ -161,7 +160,7 @@ describe('classifyShopPolicies', () => {
     ['shop name', '<p>{{ shop_name }} operates this store.</p>'],
     ['contact email', '<p>Email us at {{ email }}.</p>'],
     ['a conditional block', '<p>{% if selling_to_europe %}EEA text{% endif %}</p>'],
-  ])('flags a policy still carrying Shopify\'s %s placeholder', (_label, body) => {
+  ])("flags a policy still carrying Shopify's %s placeholder", (_label, body) => {
     const result = classifyShopPolicies([{ type: 'PRIVACY_POLICY', body }], ['PRIVACY_POLICY'])
     expect(result.ok).toBe(false)
     expect(result.templated).toEqual(['PRIVACY_POLICY'])
@@ -171,8 +170,9 @@ describe('classifyShopPolicies', () => {
 
   it('treats an empty body as absent — a heading with no text is not a policy', () => {
     for (const body of ['', '   ', '\n']) {
-      expect(classifyShopPolicies([{ type: 'REFUND_POLICY', body }], ['REFUND_POLICY']).missing)
-        .toEqual(['REFUND_POLICY'])
+      expect(
+        classifyShopPolicies([{ type: 'REFUND_POLICY', body }], ['REFUND_POLICY']).missing
+      ).toEqual(['REFUND_POLICY'])
     }
   })
 
@@ -223,7 +223,7 @@ describe('classifyOriginResponse', () => {
     expect(detail).toContain('no redirect')
   })
 
-  it('passes a 4xx or 5xx — broken, but not a redirect, and not this check\'s finding', () => {
+  it("passes a 4xx or 5xx — broken, but not a redirect, and not this check's finding", () => {
     // Another check will catch a 500. Claiming it here would be a second alarm for one
     // fault, which is how a report stops being read.
     for (const status of [404, 500, 503]) {
@@ -232,7 +232,11 @@ describe('classifyOriginResponse', () => {
   })
 
   it('fails the real production case and names the target', () => {
-    const { ok, detail } = classifyOriginResponse(SITE, 307, 'https://healthy-jewellery.vercel.app/')
+    const { ok, detail } = classifyOriginResponse(
+      SITE,
+      307,
+      'https://healthy-jewellery.vercel.app/'
+    )
     expect(ok).toBe(false)
     expect(detail).toContain('307')
     expect(detail).toContain('healthy-jewellery.vercel.app')
@@ -287,7 +291,10 @@ describe('describeAccessDenial', () => {
     {
       message: 'Access denied for products field.',
       path: ['products'],
-      extensions: { code: 'ACCESS_DENIED', documentation: 'https://shopify.dev/api/usage/access-scopes' },
+      extensions: {
+        code: 'ACCESS_DENIED',
+        documentation: 'https://shopify.dev/api/usage/access-scopes',
+      },
     },
   ]
 
@@ -305,8 +312,11 @@ describe('describeAccessDenial', () => {
   it('returns null when the failure is not an authorization problem', () => {
     // A real data error must keep its raw payload — this function must not swallow
     // everything that arrives in `errors`.
-    expect(describeAccessDenial([{ message: 'Field does not exist', extensions: { code: 'undefinedField' } }]))
-      .toBeNull()
+    expect(
+      describeAccessDenial([
+        { message: 'Field does not exist', extensions: { code: 'undefinedField' } },
+      ])
+    ).toBeNull()
     expect(describeAccessDenial([])).toBeNull()
     expect(describeAccessDenial(undefined)).toBeNull()
   })
@@ -344,5 +354,57 @@ describe('describeAccessDenial', () => {
     const text = detail as string
     expect(text.match(/products/g)).toHaveLength(1)
     expect(text.match(/read_locales/g)).toHaveLength(1)
+  })
+})
+
+/**
+ * The branch that has never been observed live.
+ *
+ * `verify-production.mjs` has not executed in 30 consecutive scheduled runs — the workflow
+ * dies at preflight — so the failing branch of this check has never run against the real
+ * store and, on current evidence, neither has the passing one. That is exactly the shape
+ * `premise-checks.test.ts` warns about: *"a detector that has only ever been observed
+ * saying 'fine' is not a detector."* Both branches run here instead.
+ */
+describe('classifyPhotographyCoverage', () => {
+  it('fails when nothing is photographed, and names the console to fix it in', () => {
+    const { ok, detail } = classifyPhotographyCoverage(0, 22) as { ok: boolean; detail: string }
+
+    expect(ok).toBe(false)
+    expect(detail).toContain('0/22')
+    // The reader's next action, not just the verdict — the house style from
+    // describeAccessDenial. This one is a content task in a console, not a code change.
+    expect(detail).toMatch(/Shopify Admin/)
+    expect(detail).toMatch(/no code step/i)
+    expect(detail).toMatch(/STATE\.md item 9/)
+  })
+
+  it('passes on the very first photograph', () => {
+    // The floor is one, deliberately: the claim is that the storefront shows the object at
+    // all, and the first photo is what turns that from false to true.
+    const { ok, detail } = classifyPhotographyCoverage(1, 22) as { ok: boolean; detail: string }
+
+    expect(ok).toBe(true)
+    expect(detail).toContain('1/22')
+    // Partial coverage is reported as correct-for-now rather than as a smaller failure.
+    expect(detail).toMatch(/21 draw the illustration/)
+  })
+
+  it('reports full coverage distinctly from partial', () => {
+    const full = classifyPhotographyCoverage(22, 22) as { ok: boolean; detail: string }
+
+    expect(full.ok).toBe(true)
+    expect(full.detail).toMatch(/full coverage/i)
+    expect(full.detail).not.toMatch(/illustration/)
+  })
+
+  it('treats an empty store as nothing to cover, not as zero coverage', () => {
+    // A false alarm on day one is fatal to a detector, and "0 of 0 products have a photo"
+    // would send the reader to the photography console when the catalogue is the problem.
+    const { ok, detail } = classifyPhotographyCoverage(0, 0) as { ok: boolean; detail: string }
+
+    expect(ok).toBe(false)
+    expect(detail).toMatch(/no products at all/i)
+    expect(detail).not.toMatch(/Shopify Admin/)
   })
 })

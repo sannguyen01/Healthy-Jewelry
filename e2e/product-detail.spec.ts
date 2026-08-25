@@ -210,8 +210,22 @@ test.describe('Product detail — breadcrumb navigation', () => {
     test(`every breadcrumb link on /products/${handle} resolves`, async ({ page, request }) => {
       await page.goto(`/products/${handle}`)
 
-      const hrefs = await page
-        .getByRole('navigation', { name: /breadcrumb/i })
+      const breadcrumb = page.getByRole('navigation', { name: /breadcrumb/i })
+
+      // Wait for the breadcrumb before reading it. `evaluateAll` is the one locator
+      // method that does NOT auto-wait — it resolves against whatever matches at
+      // that instant and returns [] if nothing does — so without this the next line
+      // races page render and the assertion below fails with `Received: 0`.
+      //
+      // That is not hypothetical: this test failed exactly that way on CI for
+      // `disc-studs-titanium` (run 32801022396) and was recorded as `1 flaky` for
+      // `cable-cuff-titanium` in the run before it, while passing locally every
+      // time. 418 tests across 2 workers against one `next start` is the load that
+      // makes it show. The 30s timeout below was added for the same symptom and
+      // guards the wrong line — a slow *link response* was never the problem.
+      await expect(breadcrumb.getByRole('link').first()).toBeVisible()
+
+      const hrefs = await breadcrumb
         .getByRole('link')
         .evaluateAll((links) => links.map((l) => l.getAttribute('href') ?? ''))
 

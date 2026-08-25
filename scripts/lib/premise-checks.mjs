@@ -139,43 +139,20 @@ export function specMetafieldPremise(productsWithSpec, totalProducts) {
 }
 
 /**
- * Every product currently renders as a hand-drawn SVG rather than a photograph — not a
- * design decision. `PRODUCT_FRAGMENT` requested no image field and `HJProduct` had nowhere
- * to put one until that was fixed, so a fully photographed store would still have rendered
- * zero photographs; see `docs/catalog-conventions.md`. The plumbing is finished now — upload
- * a photo in Shopify Admin and it appears, no code step — so the only thing left to detect
- * is whether anyone has.
+ * `productPhotographyPremise` lived here until 2026-08-25 and was promoted to a failing
+ * check — `productPhotographyCoverage` in `scripts/verify-production.mjs`.
  *
- * `blocking`, not `opportunity`: for a titanium/biocompatible jewelry brand, the physical
- * object *is* the argument (weight, finish, how the metal catches light) and a schematic
- * icon cannot make it. Modeled on `specMetafieldPremise` (holds while the tracked gap stays
- * unchanged, drifts — loudly, once — the moment it starts closing) rather than
- * `paymentsPremise`/`webhookDeliveryPremise`, because there is no order-count style event
- * that flips this from unverifiable to verifiable; it is checkable today and every day.
+ * ADR 008 names that path itself: *"if premise-drift issues start accumulating unread, the
+ * right response is to promote the specific premise to a failing check, not to make all of
+ * them fail."* Zero coverage had been the reported state for weeks with nothing acting on
+ * it, which is the condition that clause describes.
  *
- * @param {number} photoCount
- * @param {number} totalProducts
- * @returns {Premise}
+ * It is removed rather than kept alongside, because its polarity was the inverse of the
+ * check's: `holds: photoCount === 0` treated zero as the premise *holding*, so the two
+ * would have printed `✗ coverage is zero` and `✓ premise holds` about the same number in
+ * the same run output.
  */
-export function productPhotographyPremise(photoCount, totalProducts) {
-  return {
-    id: 'SHOPIFY-PRODUCT-PHOTOGRAPHY',
-    decision: 'STATE.md — SHOPIFY-PRODUCT-PHOTOGRAPHY',
-    kind: 'blocking',
-    // Holds in the sense the premise is still accurate: zero photography is the known,
-    // already-tracked state (STATE.md item 9), not new information each run.
-    holds: photoCount === 0,
-    detail:
-      photoCount === 0
-        ? `0/${totalProducts} products have a featuredImage. Every surface still renders the ` +
-          'svg: illustration for all of them — a known, tracked content gap (STATE.md item 9), ' +
-          'not a code defect.'
-        : `${photoCount}/${totalProducts} products now have a featuredImage. Photography has ` +
-          'started landing — no code change needed, every surface already prefers the real ' +
-          `photo over the illustration. Update STATE.md item 9, and close it once all ` +
-          `${totalProducts} are covered.`,
-  }
-}
+
 
 /**
  * The payments blocker, and the one premise that **expires by itself**.
