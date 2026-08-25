@@ -27,9 +27,21 @@ next.config.ts
 empty on purpose; the fix phase is disabled entirely at L1.
 
 This is not the same thing as GitHub's auto-merge feature, which is enabled on
-this repository for *human-opened* PRs: those land automatically once `verify`
-and `e2e` — both required checks on `main` — go green. A human decided to open
-the PR and the gate decided it was safe; no loop is merging anything unreviewed.
+this repository for *human-opened* PRs.
+
+**The justification that used to sit here was false, and it is worth stating why
+rather than quietly rewriting it.** It read: those PRs land once `verify` and
+`e2e` — "both required checks on `main`" — go green, so "a human decided to open
+the PR and the gate decided it was safe". `main` is not branch-protected and
+there are no required checks (verified 2026-08-25; see
+`docs/adr/015-a-gate-that-was-only-ever-documented.md`). The permission was real
+and the gate it rested on was not, which is the failure ADR 006 describes: a
+control that announces protection it is not providing.
+
+So the accurate statement is narrower. A human decides to open the PR, and a
+human decides to merge it. CI runs and its result is the thing to read, but
+nothing enforces it. Enabling enforcement is a console action — the exact
+contexts are in `docs/testing-strategy.md`.
 
 ## Human gates (always required)
 

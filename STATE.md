@@ -519,6 +519,26 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-25**: **A gate that was only ever documented.** `main` is not branch-protected —
+  verified against the GitHub API, every branch returns `"protected": false` — and five
+  documents asserted the opposite, `docs/testing-strategy.md` contradicting itself eight lines
+  apart. The merge record agrees with the accurate half: PRs #34–#37 were hand-merged with
+  `E2E tests (Playwright)` red, #34 landing 4m37s *after* that job concluded `failure` and
+  #35–#37 while it was still running. Worse than a stale doc, because `docs/safety.md` and
+  `loop-constraints.md` justified auto-merge *on the grounds that* the gate decides safety —
+  a real permission resting on a control that does not exist (ADR 006's shape, with nothing
+  underneath). And the obvious remedy is booby-trapped: `verify`/`e2e` are job IDs, while
+  GitHub reports `Lint · Type-check · Unit tests · Build` and `E2E tests (Playwright)`, so
+  requiring the documented strings would block every PR forever while still never gating on
+  E2E. Corrected in all four editable documents and recorded in
+  [ADR 015](docs/adr/015-a-gate-that-was-only-ever-documented.md); `vercel.json` added to
+  `gate.yaml`'s denylist, since it holds `buildCommand` and was the one file in that
+  neighbourhood a loop could rewrite. **Enabling protection is a console action and remains
+  open** — but the precondition is now met: the suite is green (412 passed, 8 skipped, 0
+  failed) for the first time since 2026-08-22, after two stale tests were fixed
+  (`contact.spec.ts` encoded a contract PR #32 deleted; `product-detail.spec.ts:210` read a
+  locator with `evaluateAll`, which does not auto-wait, and raced page render).
+
 - **2026-08-25**: **Legibility is not composition, and a guardrail that never names a
   section cannot notice one leaving.** Every homepage assertion was a single-element
   existence check. Measured: deleting `<MaterialsSection />` left all twelve tests in

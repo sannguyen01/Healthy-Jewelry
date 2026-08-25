@@ -2,8 +2,15 @@
 
 ## Branch protection
 
-Nothing lands on `main` directly — every change goes through a PR. `main`
-requires the `verify` and `e2e` CI checks to pass (see `docs/testing-strategy.md`).
+Nothing lands on `main` directly — every change goes through a PR.
+
+**`main` is not currently branch-protected and no status checks are required** — this
+line claimed otherwise until 2026-08-25. CI still runs on every PR and its result is
+the thing to read before merging; it is simply not enforced. To enable enforcement the
+required contexts are `Lint · Type-check · Unit tests · Build` and
+`E2E tests (Playwright)` — not `verify`/`e2e`, which are job IDs GitHub never reports
+as contexts. See `docs/testing-strategy.md` and
+`docs/adr/015-a-gate-that-was-only-ever-documented.md`.
 
 ## Branch naming
 

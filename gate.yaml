@@ -19,6 +19,10 @@ denylist:
   - ".github/workflows/**"
   - "src/lib/shopify/**"
   - "next.config.ts"
+  # Holds `buildCommand`, and is where any future deploy gate (an `ignoreCommand`)
+  # would live. `.vercel/**` above covers only the gitignored local link directory,
+  # so this file sat unprotected beside next.config.ts. See docs/adr/015.
+  - "vercel.json"
 
 maxFiles: 10
 

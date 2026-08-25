@@ -7,8 +7,11 @@
 ## Push & Merge
 - Don't push before telling me
 - A loop never merges its own work to main. GitHub auto-merge on a human-opened
-  PR is a different thing and is fine: it lands only after `verify` and `e2e`
-  (both required checks) pass.
+  PR is a different thing and is fine — but note the reason given here until
+  2026-08-25 ("it lands only after `verify` and `e2e`, both required checks")
+  was false: `main` is not branch-protected and nothing is required. The rule
+  stands on its own; its old justification did not. See
+  `docs/adr/015-a-gate-that-was-only-ever-documented.md`.
 - Always create a draft PR first; let me review before marking ready
 
 ## Paths
@@ -49,7 +52,9 @@
 
 - Never push to `main`. A merge to `main` auto-deploys to Vercel production
   (project `prj_yXFNldDpw3O3r3BWnM0g5ExpfVmN`) via its native Git integration.
-  `main` is branch-protected and requires `verify` + `e2e` to pass.
+  `main` is **not** branch-protected and requires nothing — so the merge button
+  is the deploy button, with no check between them. That makes this rule more
+  load-bearing than it reads, not less.
 - Never edit `.env`, `.env.*`, `.vercel/`, or any Vercel environment variable.
 - Never *autonomously* edit `src/lib/shopify/**` (Storefront API client/queries/
   mutations), `.github/workflows/**`, or `next.config.ts`'s security headers —
