@@ -82,6 +82,26 @@ homepage hero is the one exception, since it owns `--text-hero`.
 - Nav: transparent → frosted glass (scrollY > 60)
 - Cards: image + name + price only (minimal)
 
+### Header composition — two layouts, breakpoint at 768px
+- **≥769px**: brand lockup · centred primary links · Search · Account · Bag.
+- **≤768px**: brand lockup · Bag · Menu. **Search and Account move into the full-screen
+  overlay** (`.hj-desktop-only`), which also carries the three primary links. They are not
+  duplicated — the header copies are `display: none` down here.
+- The header **must fit 320px**. It did not: with four controls in the bar it required 414px
+  empty and 435px with a bag badge, so on every phone the MENU button — the only route to
+  navigation there is — was cut off at the viewport edge. See
+  [ADR 016](docs/adr/016-fit-is-a-measurement-nobody-took.md).
+- **The brand gives, the controls never do.** The brand link is `flex: 0 1 auto; min-width: 0`
+  and the wordmark ellipsises; the control cluster is `flexShrink: 0`. A truncated wordmark is
+  a cosmetic loss, an unreachable control is a functional one. This is why the 768px breakpoint
+  is a *composition* choice rather than a correctness dependency: get it wrong and the layout
+  degrades instead of amputating.
+- Enforced by `e2e/header-fit.spec.ts`, which sweeps 320–1440px and binary-searches the
+  narrowest fitting width per layout mode. Probes are geometric — element boxes against
+  `window.innerWidth` — because `scrollWidth` is blind here twice over (the header is `fixed`,
+  and `globals.css` sets `overflow-x: hidden`), and because `toBeVisible()` and `.click()` both
+  pass on a control whose centre is off-screen.
+
 ## Homepage Section Sequence
 1. Hero — **two compositions, breakpoint at 900px**:
    - **≥901px**: full-bleed. The "Euro Summer" lifestyle photo fills the entire section
@@ -164,6 +184,10 @@ Full detail in **`docs/testing-strategy.md`**. In short:
   automated coverage the UI layer has.** Anything a user has to see or click belongs in `e2e/`.
 - Presence is not visibility. `e2e/visual-assets.spec.ts` asserts imagery actually renders — bytes
   arrive, the box is non-zero, and the effective opacity clears the legibility floor.
+- **And visibility is not reachability.** `toBeVisible()` returns true for a control whose centre
+  is outside the viewport, and `.click()` deliberately aims at an in-viewport point instead, so
+  both pass on a button a thumb cannot hit. `e2e/support/viewportFit.ts` measures geometry
+  instead — see [ADR 016](docs/adr/016-fit-is-a-measurement-nobody-took.md).
 - E2E runs against a **production build** (`pnpm build && pnpm start`), never `pnpm dev` — that is what
   Vercel serves.
 
