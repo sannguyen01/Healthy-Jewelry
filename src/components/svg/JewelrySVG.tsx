@@ -1,6 +1,7 @@
 'use client'
 
 import type { CSSProperties } from 'react'
+import { viewBoxFor } from '@/lib/svg/viewbox'
 
 interface JewelrySVGProps {
   type: string
@@ -17,6 +18,12 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
   const baseProps = {
     xmlns: 'http://www.w3.org/2000/svg',
     fill: 'none',
+    // One source of truth, shared with anything that needs to know how the mark is
+    // proportioned. These were 25 literals that disagreed with each other in both
+    // ratio and padding — see src/lib/svg/viewbox.ts.
+    viewBox: viewBoxFor(type),
+    // So a geometry probe can name the offender rather than reporting "an svg".
+    'data-svg-type': type,
     className,
     style,
   }
@@ -24,7 +31,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
   switch (type) {
     case 'ring-arc':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           <circle cx="40" cy="40" r="33" stroke={c1} strokeWidth="7" fill="none" />
           <circle cx="40" cy="40" r="22" stroke={c2} strokeWidth="1" fill="none" opacity="0.5" />
         </svg>
@@ -32,7 +39,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'ring-dome':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           <circle cx="40" cy="40" r="33" stroke={c1} strokeWidth="13" fill="none" />
           <ellipse cx="40" cy="28" rx="12" ry="6" fill={c2} opacity="0.6" />
         </svg>
@@ -40,14 +47,14 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'ring-flat':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           <circle cx="40" cy="40" r="33" stroke={c1} strokeWidth="9" fill="none" />
         </svg>
       )
 
     case 'ring-split':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           <path
             d="M14 40 A26 26 0 1 1 66 40"
             stroke={c1}
@@ -62,7 +69,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'necklace-disc':
       return (
-        <svg {...baseProps} viewBox="0 0 80 100">
+        <svg {...baseProps}>
           {/* Chain */}
           <path
             d="M40 8 C20 8 10 20 10 35"
@@ -89,7 +96,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'necklace-bar':
       return (
-        <svg {...baseProps} viewBox="0 0 80 100">
+        <svg {...baseProps}>
           {/* Chain */}
           <path
             d="M40 8 C20 8 10 22 10 38"
@@ -113,7 +120,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'necklace-drop':
       return (
-        <svg {...baseProps} viewBox="0 0 80 110">
+        <svg {...baseProps}>
           {/* Chain */}
           <path
             d="M40 8 C20 8 10 22 10 38"
@@ -137,7 +144,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'necklace-chain':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* S-curve belcher links */}
           <path
             d="M15 20 C15 12 25 12 25 20 C25 28 35 28 35 20 C35 12 45 12 45 20 C45 28 55 28 55 20 C55 12 65 12 65 20"
@@ -165,7 +172,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'earring-stud':
       return (
-        <svg {...baseProps} viewBox="0 0 40 80">
+        <svg {...baseProps}>
           {/* Post */}
           <line x1="20" y1="10" x2="20" y2="45" stroke={c3} strokeWidth="2" strokeLinecap="round" />
           {/* Stud */}
@@ -175,7 +182,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'earring-hoop':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Open arc hoop */}
           <path
             d="M20 40 A20 20 0 1 1 60 40"
@@ -189,7 +196,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'earring-drop':
       return (
-        <svg {...baseProps} viewBox="0 0 40 100">
+        <svg {...baseProps}>
           {/* Post */}
           <line x1="20" y1="6" x2="20" y2="22" stroke={c3} strokeWidth="2" strokeLinecap="round" />
           {/* Elongated oval drop */}
@@ -199,7 +206,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'earring-cone':
       return (
-        <svg {...baseProps} viewBox="0 0 40 100">
+        <svg {...baseProps}>
           {/* Post */}
           <line x1="20" y1="6" x2="20" y2="22" stroke={c3} strokeWidth="2" strokeLinecap="round" />
           {/* Cone triangle */}
@@ -209,7 +216,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'bracelet-cuff':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Open oval cuff */}
           <path
             d="M18 40 A22 16 0 1 1 62 40"
@@ -223,7 +230,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'bracelet-bangle':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Closed oval bangle */}
           <ellipse cx="40" cy="40" rx="28" ry="20" stroke={c1} strokeWidth="7" fill="none" />
         </svg>
@@ -231,7 +238,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'bracelet-link':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Rectangular links chain */}
           <rect
             x="6"
@@ -284,7 +291,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'ring-halo':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Band with a raised outer halo ring */}
           <circle cx="40" cy="40" r="33" stroke={c1} strokeWidth="6" fill="none" />
           <circle cx="40" cy="40" r="26" stroke={c2} strokeWidth="3" fill="none" opacity="0.7" />
@@ -295,7 +302,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'ring-facet':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Band with a faceted, cut-metal crown — geometry, never a stone */}
           <circle cx="40" cy="44" r="30" stroke={c1} strokeWidth="6" fill="none" />
           <path d="M40 6 L54 20 L40 34 L26 20 Z" fill={c1} />
@@ -308,7 +315,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'earring-threader':
       return (
-        <svg {...baseProps} viewBox="0 0 40 100">
+        <svg {...baseProps}>
           {/* A fine chain that threads through the lobe and hangs long */}
           <path
             d="M20 8 C10 22 30 34 20 50 C12 64 24 76 20 94"
@@ -326,7 +333,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'bracelet-chain':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Interlocking oval links around the wrist line */}
           <ellipse cx="16" cy="40" rx="9" ry="6" stroke={c1} strokeWidth="3.5" fill="none" />
           <ellipse cx="32" cy="40" rx="9" ry="6" stroke={c2} strokeWidth="3.5" fill="none" />
@@ -337,7 +344,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'bracelet-bead':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Beads strung on a cord */}
           <path
             d="M10 40 A30 22 0 0 1 70 40"
@@ -361,7 +368,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'charm-classic':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Bail plus a teardrop charm body */}
           <circle cx="40" cy="16" r="8" stroke={c3} strokeWidth="3" fill="none" />
           <path d="M40 28 C56 44 52 66 40 70 C28 66 24 44 40 28 Z" fill={c1} />
@@ -370,7 +377,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'charm-disc':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           {/* Bail plus a flat engraved disc */}
           <circle cx="40" cy="14" r="7" stroke={c3} strokeWidth="3" fill="none" />
           <circle cx="40" cy="48" r="22" fill={c1} />
@@ -380,7 +387,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'charm-anchor':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           <circle cx="40" cy="12" r="6" stroke={c3} strokeWidth="3" fill="none" />
           {/* Shank, crossbar and fluked arms */}
           <line x1="40" y1="22" x2="40" y2="62" stroke={c1} strokeWidth="5" strokeLinecap="round" />
@@ -397,7 +404,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'charm-star':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           <circle cx="40" cy="12" r="6" stroke={c3} strokeWidth="3" fill="none" />
           {/* Five-point star */}
           <path
@@ -409,7 +416,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
 
     case 'charm-heart':
       return (
-        <svg {...baseProps} viewBox="0 0 80 80">
+        <svg {...baseProps}>
           <circle cx="40" cy="12" r="6" stroke={c3} strokeWidth="3" fill="none" />
           <path
             d="M40 72 C10 52 16 26 32 26 C38 26 40 32 40 34 C40 32 42 26 48 26 C64 26 70 52 40 72 Z"
@@ -426,7 +433,7 @@ export function JewelrySVG({ type, dark = false, className, style }: JewelrySVGP
       // into blank boxes, so the last resort is a visible mark rather than an
       // invisible one.
       return (
-        <svg {...baseProps} viewBox="0 0 80 80" data-svg-fallback="true">
+        <svg {...baseProps} data-svg-fallback="true">
           <circle cx="40" cy="40" r="30" stroke={c1} strokeWidth="5" fill="none" />
           <circle cx="40" cy="40" r="18" stroke={c2} strokeWidth="1.5" fill="none" opacity="0.6" />
         </svg>
