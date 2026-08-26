@@ -64,13 +64,13 @@ const WIDTHS = [320, 390, 768, 1280] as const
  * the mark grows, and a ceiling alone permits a speck. `svgScale` is 70% and the
  * viewBoxes carry a 2% margin, so the design target is ~0.673.
  *
- * Measured on the build before this change: `ring-arc` 0.692, `earring-stud` 0.324.
- * The floor is what that 0.324 fails.
+ * Measured against the pre-change build by running this spec on it: `ring-arc` 0.639,
+ * `earring-stud` 0.324. The floor is what that 0.324 fails.
  */
 const MIN_MARK_EXTENT = 0.6
 const MAX_MARK_EXTENT = 0.75
 
-/** How far the largest mark may out-read the smallest. Was 2.13 before this change. */
+/** How far the largest mark may out-read the smallest. Measured at 1.97 before. */
 const MAX_EXTENT_SPREAD = 1.15
 
 /**
