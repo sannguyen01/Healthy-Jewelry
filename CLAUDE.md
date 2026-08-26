@@ -135,6 +135,26 @@ homepage hero is the one exception, since it owns `--text-hero`.
 7. MaterialsSection — Grade 23 Ti / Niobium / 316L Steel
 8. Footer
 
+## Product Detail Page — the image tile
+
+The tile is **square and bounded on both sides**: `aspect-ratio: 1 / 1` shapes it,
+`--hj-product-tile-max` (560px) caps it, and there is no `min-height`. It carried
+`min-height: 480px` *and* `aspect-ratio: 1 / 1` — which cannot both hold, because min-height wins
+and the ratio then derives the width from it. The tile rendered 480 x 480 at every width and hung
+184px past a 320px viewport, invisibly, since `globals.css` sets `overflow-x: hidden`. Never give
+it a `min-height` again, and never let it grow uncapped: the detail section has no `max-width`.
+
+Illustration `viewBox`es live in `src/lib/svg/viewbox.ts`, not in `JewelrySVG`, and each is the
+measured tight bounds of its own artwork. That is what makes `ProductImage`'s `svgScale` mean "how
+much of the tile the illustration fills" — with padded boxes it did not, and one `svgScale="70%"`
+produced a 7x spread in rendered size. A new illustration needs a measured entry there, not a
+hand-guessed one.
+
+Enforced by `e2e/product-image-fit.spec.ts` (containment, squareness, the cap, extent bounded both
+ways, clipping, spread across ratios, buy-control position) and
+`src/tests/unit/svg-viewbox-contract.test.tsx`. See
+[ADR 017](docs/adr/017-a-box-that-could-not-be-both.md).
+
 ## Architecture Principles
 - Server Components by default; `'use client'` only for interactive elements
 - Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer/CartDrawer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
