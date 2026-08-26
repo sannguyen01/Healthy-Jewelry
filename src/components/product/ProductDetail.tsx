@@ -91,41 +91,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
         gap: 'var(--space-gutter)',
       }}
     >
-      <style>{`
-        @media (min-width: 768px) {
-          .hj-detail-grid {
-            grid-template-columns: 1fr 1fr !important;
-          }
-        }
-      `}</style>
-
-      <div
-        className="hj-detail-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: 'var(--space-gutter)',
-        }}
-      >
+      {/* Columns and gap live in globals.css. They were inline here with a
+          `<style>` tag overriding them at 768px — the `!important` existed only
+          because an inline value cannot otherwise lose to a media query. */}
+      <div className="hj-detail-grid">
         {/* Left — photograph, gallery, or illustration */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div
-            className="card-tile"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: '480px',
-              aspectRatio: '1 / 1',
-              position: 'relative',
-            }}
-          >
+          <div className="card-tile hj-product-tile">
             {activeImage ? (
               <Image
                 src={activeImage.url}
                 alt={activeImage.altText?.trim() || product.title}
                 fill
-                sizes="(max-width: 900px) 100vw, 50vw"
+                sizes="(max-width: 767px) 100vw, (max-width: 1120px) 50vw, 560px"
                 // The largest above-the-fold image on the page it belongs to,
                 // and the reason someone opened it.
                 priority
@@ -135,7 +113,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
               <ProductImage
                 product={product}
                 svgScale="70%"
-                sizes="(max-width: 900px) 100vw, 50vw"
+                sizes="(max-width: 767px) 100vw, (max-width: 1120px) 50vw, 560px"
                 priority
               />
             )}

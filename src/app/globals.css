@@ -85,6 +85,17 @@
        the stacked one. It was the same literal written out in both places. */
     --hj-hero-pad-x: clamp(20px, 4vw, 64px);
 
+    /* ── Product detail tile ── */
+    /* The tile is square and bounded above. `min-height` + `aspect-ratio` was not a
+       floor with a ratio, it was a contradiction: min-height set the height and the
+       ratio derived the width from it, so a 480px box rendered at every width and
+       hung 184px past a 320px viewport. `overflow-x: hidden` on html/body meant no
+       scrollbar and no symptom — the blindness ADR 016 documents for the header.
+       The ceiling is load-bearing too: the detail section has no max-width, so
+       `aspect-ratio` alone grows without limit (612px measured at 1440px).
+       See docs/adr/017-a-box-that-could-not-be-both.md. */
+    --hj-product-tile-max: 560px;
+
     /* ── Spacing ── */
     --space-section: clamp(56px, 8vw, 96px);
     --space-gutter:  clamp(24px, 5vw, 72px);
@@ -275,6 +286,32 @@
   .hj-coll-grid {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Stated once. ProductDetail's `sizes` hint carries 767px — this minus one —
+     and the two described different widths (768 vs 900) until they were joined up. */
+  .hj-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-gutter);
+  }
+
+  @media (min-width: 768px) {
+    .hj-detail-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  /* The product detail image tile. Pairs with .card-tile, which supplies the
+     nacre fill, positioning and overflow. */
+  .hj-product-tile {
+    width: 100%;
+    max-width: var(--hj-product-tile-max);
+    margin-inline: auto;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
     justify-content: center;
   }
 
