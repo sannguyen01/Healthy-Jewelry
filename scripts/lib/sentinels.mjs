@@ -147,8 +147,19 @@ export const SENTINELS = [
     file: 'scripts/lib/webhook-signature.mjs',
     find: "createHmac('sha256', secret).update(Buffer.from(rawBody)).digest('base64')",
     replace: "createHmac('sha256', 'not-the-secret').update(Buffer.from(rawBody)).digest('base64')",
-    specs: ['src/tests/unit/webhook-signature-contract.test.ts'],
-    invariant: 'a payload signed with the wrong secret is rejected',
+    // Deliberately NOT webhook-signature-contract.test.ts, and the first run of this
+    // probe is why. That file's only HMAC assertion compares the header against
+    // `signWebhookBody(body, 's')` — both sides calling the same function, so a
+    // signWebhookBody that ignored the secret entirely would satisfy it. Its other
+    // assertion accepts `expect.any(String)`. It is a module-boundary and request-shape
+    // test, which is what it is for, and it protects this invariant not at all.
+    //
+    // webhook-signature-script.test.ts does, because it uses the **real route handler as
+    // the oracle** instead of re-deriving the expected value: the script builds the
+    // request, the route decides, and a wrong secret comes back 401. That is the
+    // difference between a test that agrees with itself and one that can be wrong.
+    specs: ['src/tests/unit/webhook-signature-script.test.ts'],
+    invariant: 'a payload signed with the wrong secret is rejected by the deployed route',
     scar: 'The old verification procedure was to place a real order and read Vercel logs — one-shot, costly, and leaving no repeatable artifact.',
   },
 
