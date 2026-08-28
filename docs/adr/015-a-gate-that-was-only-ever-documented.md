@@ -45,8 +45,17 @@ everyone would reach for first is the one that bricks the repository.
 A gate this repository claims must be verifiable from this repository. Until protection is
 configured, the documents say it is not configured, and record what enabling it requires:
 
-- **Required contexts, exactly**: `Lint · Type-check · Unit tests · Build` and
-  `E2E tests (Playwright)`. Not `verify`, not `e2e`.
+- **Required contexts, exactly**:
+
+  ```required-checks
+  Lint · Type-check · Unit tests · Build
+  E2E tests (Playwright)
+  ```
+
+  Not `verify`, not `e2e`. As of 2026-08-28 that block is machine-checked against `ci.yml`
+  by `src/tests/unit/required-checks-contract.test.ts` — see
+  [ADR 018](018-a-claim-about-a-control-is-not-a-control.md), which generalises this
+  record's finding from this one gate to every control the repository claims to have.
 - **A promotion gate is sequenced after a merge gate, not before it.** Gating deploys while
   anyone can merge anything to `main` at any time is theatre: `main` auto-deploys to Vercel
   production with nothing in between, so the merge button *is* the deploy button.

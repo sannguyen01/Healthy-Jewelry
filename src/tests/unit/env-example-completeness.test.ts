@@ -63,6 +63,15 @@ const EXEMPT = new Set([
   'VERCEL_ENV', // injected by Vercel
   'VERCEL_GIT_COMMIT_SHA',
   'VERCEL_GIT_COMMIT_REF',
+
+  // Provided by the Actions runner to `control-audit.yml`, never by a contributor.
+  // GITHUB_TOKEN is the workflow token; the branch-protection probe reports
+  // `unevaluable` without one rather than guessing, so a local run needs nothing set.
+  // Documenting these in .env.local.example would invite someone to mint a PAT for a
+  // script that does not need one outside CI.
+  'GITHUB_TOKEN',
+  'GITHUB_REPOSITORY',
+  'GITHUB_API_URL',
 ])
 
 describe('.env.local.example completeness', () => {

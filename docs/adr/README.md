@@ -37,6 +37,7 @@ pointer; the reasoning lives here once.
 | [015](015-a-gate-that-was-only-ever-documented.md) | A gate that was only ever documented | Five documents assert required checks that do not exist; spans `testing-strategy.md`, `CONTRIBUTING.md`, `safety.md`, `loop-constraints.md` and `production-smoke.yml` |
 | [016](016-fit-is-a-measurement-nobody-took.md) | Fit is a measurement nobody took | Third instance of the ADR 013/014 shape; spans `Nav.tsx`, the shared `viewportFit` harness, `header-fit.spec.ts`, `hero-legibility.spec.ts`, `CLAUDE.md` and `STATE.md` |
 | [017](017-a-box-that-could-not-be-both.md) | A box that could not be both | Fourth instance of that shape; spans `globals.css`, `ProductDetail.tsx`, `JewelrySVG`, `src/lib/svg/viewbox.ts`, two test layers and `CLAUDE.md` |
+| [018](018-a-claim-about-a-control-is-not-a-control.md) | A claim about a control is not a control | The sentence ADRs 004, 006, 010, 011, 015 and 016 all wrote separately; spans `docs/controls.json`, the control-audit workflow, the branch-protection probe, `CONTRIBUTING.md` and `docs/testing-strategy.md` |
 
 ## Format
 

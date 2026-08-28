@@ -288,11 +288,25 @@ The merge record agrees with line 7: PRs #34–#37 were squash-merged by hand wi
 while it was still running. Auto-merge cannot explain that — it merges only after checks settle
 green.
 
-To enable it, the required contexts are **`Lint · Type-check · Unit tests · Build`** and
-**`E2E tests (Playwright)`**. Not `verify` and `e2e`: those are the *job IDs* in `ci.yml`, and GitHub
-publishes each check run under the job's `name:`. Requiring the job IDs would register two contexts
-nothing ever reports — every PR blocked forever, E2E still never gating. That trap is the reason the
-exact strings are written out here.
+To enable it, the required contexts are exactly these two strings:
+
+```required-checks
+Lint · Type-check · Unit tests · Build
+E2E tests (Playwright)
+```
+
+Not `verify` and `e2e`: those are the *job IDs* in `ci.yml`, and GitHub publishes each check run
+under the job's `name:`. Requiring the job IDs would register two contexts nothing ever reports —
+every PR blocked forever, E2E still never gating. That trap is the reason the exact strings are
+written out here.
+
+**And the reason they are now written out in a fenced block rather than in prose.** Writing the
+right strings down was never the hard part; keeping them right was. A job renamed in `ci.yml` turns
+this paragraph into the same trap it warns about, and nothing would say so.
+`src/tests/unit/required-checks-contract.test.ts` reads every ```required-checks block in the
+repository and compares it against the names `ci.yml` actually publishes, in both directions, in
+the fast gate. Rename a job and the suite fails until this block follows. See
+[ADR 018](adr/018-a-claim-about-a-control-is-not-a-control.md).
 
 The old paragraph's one accurate claim was its precondition — *"enabling it was only reasonable once
 a passing run existed to enforce against"*. That run exists as of 2026-08-25: 412 passed, 8 skipped,
