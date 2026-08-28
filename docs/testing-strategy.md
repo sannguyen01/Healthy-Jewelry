@@ -98,6 +98,60 @@ Two properties are worth copying into any premise check added later:
 The tier ships **unproven against production**, like everything else in the production tier, because
 `production-smoke` has still never executed.
 
+**Correction, 2026-08-28.** That last sentence has been stale since PR #17 merged: the workflow has run
+on schedule every six hours since at least 2026-08-21. It has also failed at the preflight on every one
+of those runs, which means the premise checks have not executed either — the sentence stayed accidentally
+true, for a different reason, and nothing distinguished the two. That gap is what the control-audit tier
+below exists to name.
+
+---
+
+## The control-audit tier
+
+The three tiers above all answer *is the code correct?* or *is the store working?* None of them can
+answer **are the controls we believe in actually there?** — they *are* the controls, and a control
+cannot be the evidence for itself.
+
+`.github/workflows/control-audit.yml` runs every six hours and asks the questions the other tiers
+structurally cannot:
+
+| Probe | Question |
+|---|---|
+| `probe-branch-protection.mjs` | Does `main` actually require the checks five documents said it did? |
+| `probe-assertion-liveness.mjs` | If these twelve invariants broke, would anything go red? |
+| `probe-smoke-liveness.mjs` | Has anything looked at the live store in the last 26 hours? |
+
+It **reports and never blocks.** Two of the three findings it can produce are console state only a human
+can change, and a blocking check on those is a permanent merge freeze — the same trade the premise tier
+makes, for the same reason.
+
+Three properties are worth copying into anything added here:
+
+- **A registry, not prose.** `docs/controls.json` names every control this repository claims, its probe,
+  the workflow that invokes it, whether it can watch itself, and the human action still outstanding.
+  `src/tests/unit/control-registry.test.ts` enforces that an entry is *checkable* — and rejected one on
+  its first run, which named a library `production-smoke.yml` imports but never invokes. See
+  [ADR 018](adr/018-a-claim-about-a-control-is-not-a-control.md).
+- **Four states, never two.** `enforced` / `absent` / `mismatched` / `unevaluable`, and
+  `alive` / `dead` / `unapplicable` / `unevaluable`. Collapsing "this failed" into "this could not run"
+  is how a monitor launders its most important finding into a shrug — [ADR 010](adr/010-a-control-that-cannot-fail.md),
+  which the liveness probe violated in its own first version and now does not.
+- **Absence, not presence.** Every other check here fires when something fails.
+  `probe-smoke-liveness.mjs` fires when nothing has *succeeded*, keyed on the step conclusion rather
+  than the job's — because a job that fails at its preflight is a completed run, and the last thirteen
+  days of them checked nothing at all. See [ADR 022](adr/022-absence-needs-its-own-alarm.md).
+
+### What each tier cannot see
+
+| Tier | Blind to |
+|---|---|
+| `verify` | Anything a user has to look at or click; anything about the live store |
+| `e2e` | The real Shopify catalogue — it runs against `mock.myshopify.com` |
+| `production-smoke` | Whether its own checks executed; whether the merge gate exists |
+| control-audit | **Its own death.** If the workflow stops running, nothing says so — recorded in `docs/controls.json` as `selfMonitoring: false` rather than closed with a fifth tier |
+
+That last row is deliberate. Somewhere the regress stops, and the useful thing is to say where.
+
 ### The source-analysis guardrails parse; they do not match
 
 `metadata-data-source.test.ts`, `cache-tag-contract.test.ts` and
