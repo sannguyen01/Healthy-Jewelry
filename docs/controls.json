@@ -71,6 +71,16 @@
       "adr": "docs/adr/008-decisions-need-premise-detectors.md"
     },
     {
+      "id": "assertion-liveness",
+      "claims": "the tests protecting twelve named invariants can still fail when those invariants are broken",
+      "status": "configured",
+      "probe": "scripts/probe-assertion-liveness.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Covers twelve declared sentinels, not the whole suite. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move — which is why the probe reports `unapplicable` loudly rather than skipping.",
+      "adr": "docs/adr/020-a-test-that-cannot-fail-is-documentation.md"
+    },
+    {
       "id": "hero-card-bound",
       "claims": "the hero copy card may occupy no more than 60% of the photograph it sits on",
       "status": "configured",

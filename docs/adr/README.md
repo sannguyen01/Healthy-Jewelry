@@ -39,6 +39,7 @@ pointer; the reasoning lives here once.
 | [017](017-a-box-that-could-not-be-both.md) | A box that could not be both | Fourth instance of that shape; spans `globals.css`, `ProductDetail.tsx`, `JewelrySVG`, `src/lib/svg/viewbox.ts`, two test layers and `CLAUDE.md` |
 | [018](018-a-claim-about-a-control-is-not-a-control.md) | A claim about a control is not a control | The sentence ADRs 004, 006, 010, 011, 015 and 016 all wrote separately; spans `docs/controls.json`, the control-audit workflow, the branch-protection probe, `CONTRIBUTING.md` and `docs/testing-strategy.md` |
 | [019](019-an-unclassified-entry-is-an-unverified-one.md) | An unclassified entry is an unverified one | The `--sage` hole generalised; spans the sitemap route, `preflight-secrets.mjs`, `gate.yaml`, `loop-constraints.md` and three reconciliation tests |
+| [020](020-a-test-that-cannot-fail-is-documentation.md) | A test that cannot fail is documentation | ADR 006's question asked of assertions, by a machine; spans the sentinel registry, the liveness probe, the anchor contract, `e2e/COVERAGE.md` and the control-audit workflow |
 
 ## Format
 

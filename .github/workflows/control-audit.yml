@@ -82,6 +82,26 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node scripts/probe-branch-protection.mjs 2>&1 | tee merge-gate.log
 
+      # Twelve invariants broken on purpose, one at a time, to check that the tests
+      # protecting them still go red. See docs/adr/020.
+      #
+      # `continue-on-error` for the same reason the merge-gate probe has it: a dead
+      # assertion is a health finding, not a reason to fail a scheduled audit that also
+      # carries other results. The summary below reports it either way.
+      #
+      # Vitest sentinels only. The two Playwright ones each need a production build, and
+      # this job installs no dependencies on purpose — adding them would make the audit
+      # breakable by a dependency change the merge gate has not seen yet, which is the
+      # property that keeps this tier independent. Run them by hand with
+      # `--with-e2e` when the sentinel set changes.
+      - name: Assertion liveness — can these tests still fail?
+        id: liveness
+        continue-on-error: true
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          node scripts/probe-assertion-liveness.mjs 2>&1 | tee liveness.log
+
       - name: Audit summary
         if: always()
         run: |
@@ -91,8 +111,9 @@ jobs:
             echo "| Control | Result |"
             echo "|---|---|"
             echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
+            echo "| Assertion liveness (12 sentinels) | ${{ steps.liveness.outcome }} |"
             echo ""
-            for log in merge-gate; do
+            for log in merge-gate liveness; do
               if [ -s "$log.log" ]; then
                 echo "<details><summary>$log</summary>"
                 echo ""
