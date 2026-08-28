@@ -27,7 +27,7 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--graphite` | #6B6762 | Secondary text |
 | `--ink` | #1A1714 | Primary text, logo |
 | `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
-| `--titanium-text` | #5E6870 | Titanium-toned **text** on light backgrounds |
+| `--titanium-text` | #59636B | Titanium-toned **text** on light backgrounds |
 | `--sage` | #8CA89A | Green accent — borders, tints, fills. **Not text** |
 | `--sage-text` | #516159 | Sage-toned **text** on light backgrounds |
 | `--mist` | #A8A49E | Muted text — dark backgrounds only |
@@ -41,6 +41,13 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 the raw accents are fine for borders, tints, and (for `--titanium`) text on `--ink`/`--black`.
 Neither `-text` token is a general-purpose text colour: both fail on dark surfaces, where
 `--on-dark` and `--mist` apply.
+
+This table is enforced too, not just the pairings: `design-tokens-contrast.test.ts` reads every
+hex above and every ratio in the paragraph above back out of this file and compares them against
+`globals.css`. It listed `--titanium-text` as `#5E6870` until 2026-08-28 — the value that was
+*rejected* for measuring 4.39:1 on the bestseller badge's composited tint, which is why the real
+token is `#59636B`. The ratio beside it was right and the swatch was wrong: somebody updated the
+number and not the colour, and nothing compared the two.
 
 Every documented pairing is enforced by `src/tests/unit/design-tokens-contrast.test.ts` — add new
 pairings there. A new colour token must be **classified**: either a `TEXT_PAIRINGS` row naming the
