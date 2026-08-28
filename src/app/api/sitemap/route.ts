@@ -1,28 +1,20 @@
 import { NextResponse } from 'next/server'
 import { getProducts } from '@/lib/shopify'
+import { STATIC_PAGES } from '@/lib/seo/sitemapPages'
 import { SITE_URL } from '@/config/site'
 
+/**
+ * The page list lives in `@/lib/seo/sitemapPages`, not here.
+ *
+ * A Next route module may only export the HTTP methods and a fixed set of config keys —
+ * `next build` rejects anything else with a type error against `{ [x: string]: never }`.
+ * So `STATIC_PAGES` and `SITEMAP_EXCLUDED` cannot live in this file *and* be readable by
+ * `src/tests/unit/sitemap-completeness.test.ts`, which has to read the real list rather
+ * than a copy of it — the same reason `design-tokens-contrast.test.ts` parses
+ * `globals.css` instead of restating the palette.
+ */
 export async function GET(): Promise<NextResponse> {
   const products = await getProducts()
-
-  const staticPages = [
-    { loc: '/', changefreq: 'weekly', priority: '1.0' },
-    { loc: '/shop', changefreq: 'daily', priority: '0.9' },
-    { loc: '/shop/rings', changefreq: 'daily', priority: '0.8' },
-    { loc: '/shop/necklaces', changefreq: 'daily', priority: '0.8' },
-    { loc: '/shop/earrings', changefreq: 'daily', priority: '0.8' },
-    { loc: '/shop/bracelets', changefreq: 'daily', priority: '0.8' },
-    { loc: '/shop/charms', changefreq: 'daily', priority: '0.8' },
-    { loc: '/about', changefreq: 'monthly', priority: '0.6' },
-    { loc: '/materials', changefreq: 'monthly', priority: '0.7' },
-    { loc: '/search', changefreq: 'monthly', priority: '0.5' },
-    { loc: '/privacy', changefreq: 'yearly', priority: '0.3' },
-    { loc: '/terms', changefreq: 'yearly', priority: '0.3' },
-    { loc: '/shipping', changefreq: 'monthly', priority: '0.4' },
-    { loc: '/faq', changefreq: 'monthly', priority: '0.5' },
-    { loc: '/stores', changefreq: 'monthly', priority: '0.3' },
-    { loc: '/legal', changefreq: 'yearly', priority: '0.2' },
-  ] as const
 
   const productPages = products.map((p) => ({
     loc: `/products/${p.handle}`,
@@ -30,7 +22,7 @@ export async function GET(): Promise<NextResponse> {
     priority: '0.7',
   }))
 
-  const allPages = [...staticPages, ...productPages]
+  const allPages = [...STATIC_PAGES, ...productPages]
 
   const urlEntries = allPages
     .map(

@@ -37,6 +37,11 @@ pointer; the reasoning lives here once.
 | [015](015-a-gate-that-was-only-ever-documented.md) | A gate that was only ever documented | Five documents assert required checks that do not exist; spans `testing-strategy.md`, `CONTRIBUTING.md`, `safety.md`, `loop-constraints.md` and `production-smoke.yml` |
 | [016](016-fit-is-a-measurement-nobody-took.md) | Fit is a measurement nobody took | Third instance of the ADR 013/014 shape; spans `Nav.tsx`, the shared `viewportFit` harness, `header-fit.spec.ts`, `hero-legibility.spec.ts`, `CLAUDE.md` and `STATE.md` |
 | [017](017-a-box-that-could-not-be-both.md) | A box that could not be both | Fourth instance of that shape; spans `globals.css`, `ProductDetail.tsx`, `JewelrySVG`, `src/lib/svg/viewbox.ts`, two test layers and `CLAUDE.md` |
+| [018](018-a-claim-about-a-control-is-not-a-control.md) | A claim about a control is not a control | The sentence ADRs 004, 006, 010, 011, 015 and 016 all wrote separately; spans `docs/controls.json`, the control-audit workflow, the branch-protection probe, `CONTRIBUTING.md` and `docs/testing-strategy.md` |
+| [019](019-an-unclassified-entry-is-an-unverified-one.md) | An unclassified entry is an unverified one | The `--sage` hole generalised; spans the sitemap route, `preflight-secrets.mjs`, `gate.yaml`, `loop-constraints.md` and three reconciliation tests |
+| [020](020-a-test-that-cannot-fail-is-documentation.md) | A test that cannot fail is documentation | ADR 006's question asked of assertions, by a machine; spans the sentinel registry, the liveness probe, the anchor contract, `e2e/COVERAGE.md` and the control-audit workflow |
+| [021](021-a-metric-with-only-one-direction.md) | A metric that only ever passes more easily in one direction is not a constraint | ADR 013 and 017's shape audited across the codebase; spans `sizedElements.ts`, the geometry audit, the degenerate-clamp lint rule and `HorizontalScroll.tsx` |
+| [022](022-absence-needs-its-own-alarm.md) | Absence needs its own alarm | Every control here reports a failure's presence, none a success's absence; spans both workflows, the liveness probe, the schedule constant and two tests |
 
 ## Format
 

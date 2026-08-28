@@ -519,6 +519,54 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-28**: **Seven controls that reported something other than the truth, and the
+  general mechanism none of the six previous fixes produced.** ADRs 004, 006, 010, 011, 015
+  and 016 each recorded one instance of a single sentence — *the artefact that was supposed
+  to provide confidence was structurally incapable of producing it, and looked identical
+  either way* — and each was found by a human reading code and fixed where it was found.
+  Five workstreams, ADRs 018–022:
+  - **Controls must carry a probe** (ADR 018). `main` still returns `"protected": false`,
+    and the documented repair is booby-trapped: `verify`/`e2e` are job IDs, so requiring
+    them registers two contexts nothing publishes — every PR blocked forever, silently.
+    `required-checks-contract.test.ts` compares every ```required-checks fence in the repo
+    against the `name:` GitHub actually publishes, in the fast gate; `docs/controls.json`
+    plus `control-registry.test.ts` make every control claim name a probe and a workflow
+    that invokes it; `probe-branch-protection.mjs` asks GitHub six-hourly and keeps
+    `absent` (a 404) apart from `unevaluable`. **The registry's own first run rejected an
+    entry**: it named a library `production-smoke.yml` imports but never invokes.
+  - **Enumerations must reconcile** (ADR 019). `/contact` was missing from the sitemap's
+    hand list, beside three routes absent correctly; the five collection paths were a
+    second copy of `hjCollections` and are now derived. The preflight's three secret lists,
+    and `gate.yaml` against `loop-constraints.md` (which never received ADR 015's
+    `vercel.json`), are now reconciled both ways.
+  - **Tests must be able to fail** (ADR 020). Comparing spec mtimes against routes was
+    measured and rejected — `shop.spec.ts` is 24 days stale and healthy, `contact.spec.ts`
+    was *newer* than its route through its fossil period. Instead: AST anchor resolution,
+    a coverage manifest (which found `/faq`, `/legal` and `/stores` with **zero** automated
+    coverage of any kind), and a 12-sentinel mutation probe. **It found a real defect on
+    its first run** — `webhook-signature-contract.test.ts`'s only HMAC assertion compares
+    the header against the same function that produced it, so it protects that invariant
+    not at all; `webhook-signature-script.test.ts` does, by using the real route as oracle.
+  - **Bounds must be two-sided** (ADR 021). ADR 013 and ADR 017's shape audited across
+    every box: nine declarations classified, and `min-height` + `aspect-ratio` on one
+    element now forbidden outright. `HorizontalScroll` carried
+    `clamp(220px, 260px, 280px)` — a constant middle argument, so a fixed 260px at every
+    viewport while reading as fluid. **The E2E suite was audited and found already
+    symmetric**, so the lint rule this was meant to carry was not written: it would have
+    fired on two legitimate floors and nothing else.
+  - **Absence needs its own alarm** (ADR 022). Every scheduled smoke run since 2026-08-15
+    reports `Live store and storefront: skipped` and finishes in six seconds. Issue #24
+    correctly names the credential 32 times; nothing named the consequence, because every
+    control here reports the presence of a failure and none the absence of a success.
+    `probe-smoke-liveness.mjs` keys on the *step* conclusion, in its own channel.
+  Two documentation drifts fell out of building the checks rather than of reading:
+  `CONTRIBUTING.md` still said "Both must be green before merge" eight lines below the
+  paragraph correcting exactly that claim, and `CLAUDE.md`'s palette table listed
+  `--titanium-text` as `#5E6870` — the value `globals.css` *rejected* for measuring 4.39:1
+  on the badge tint — beside the ratio that is correct for the value that replaced it.
+  And the liveness probe shipped with the flaw it exists to find: it read any red run as
+  the mutation being caught, so a missing browser binary made it report two sentinels alive
+  having measured nothing. It establishes a baseline now.
 - **2026-08-25**: The header did not fit a phone. `<header>` required **414px** empty and
   **435px** with a bag badge — 40px padding, a 182px brand lockup at `flexShrink: 0`, and 212px
   of controls with no shrink capacity — so on every phone the MENU button, the only route to

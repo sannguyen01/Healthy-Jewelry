@@ -1,0 +1,256 @@
+name: Control audit
+
+# The fourth tier, and the one that asks a different question from the other three.
+#
+# `ci.yml` asks "is this change correct?". `production-smoke.yml` asks "is the live
+# store working?". Neither can ask "are the controls we believe in actually there?" —
+# they *are* the controls, and a control cannot be the evidence for itself.
+#
+# Six times now this repository has shipped something that reported one thing and did
+# another (ADRs 004, 006, 010, 011, 015, 016). Each was found by a human reading code.
+# This workflow is where that reading is done automatically, on a schedule, of
+# everything named in `docs/controls.json`.
+#
+# See docs/adr/018-a-claim-about-a-control-is-not-a-control.md.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# THIS WORKFLOW CANNOT RUN UNTIL IT IS ON THE DEFAULT BRANCH.
+#
+# Scheduled runs execute only from the default branch, and `workflow_dispatch` needs
+# the file there before the button appears. While this lives on a feature branch it is
+# not failing — it does not exist as far as the Actions API is concerned. A merge-order
+# fact, not a misconfiguration. The same note sits at the top of production-smoke.yml
+# for the same reason.
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+  schedule:
+    # Every 6 hours, matching production-smoke's cadence because the smoke-liveness
+    # probe measures that workflow and a monitor slower than what it monitors reports
+    # yesterday's news. src/tests/unit/heartbeat-window.test.ts holds the two in step.
+    - cron: '20 */6 * * *'
+
+concurrency:
+  group: control-audit
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  # Reading branch protection needs administration:read, which a workflow token cannot
+  # be granted — `permissions:` cannot widen the GITHUB_TOKEN beyond the repository
+  # scopes GitHub allows. So the merge-gate probe will report `unevaluable` here unless
+  # CONTROL_AUDIT_TOKEN (a PAT with administration:read) is set. That is deliberately
+  # visible rather than silently absent: an unevaluable probe says so, and never
+  # reports `absent` on a permission problem. See ADR 010's separation of "failed" from
+  # "could not run".
+  checks: read
+  actions: read
+
+# GitHub's Linux default is `bash -e {0}` — no pipefail — so a piped step reports the
+# exit status of `tee` rather than of the script that mattered. Two steps in
+# production-smoke.yml shipped that way and neither could fail. Declared at workflow
+# scope so a step nobody has written yet inherits the fix.
+# See docs/adr/010-a-control-that-cannot-fail.md.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  audit:
+    name: Audit the controls this repository claims
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No `pnpm install`. Every probe here is dependency-free and uses Node 22's global
+      # fetch, so this job cannot be broken by a dependency change the merge gate has
+      # not seen yet — the same property that keeps production-smoke.yml independent.
+
+      - name: Merge gate — is main actually protected?
+        id: merge-gate
+        continue-on-error: true
+        env:
+          # Falls back to the workflow token, which cannot read protection settings and
+          # will correctly report `unevaluable` rather than guessing `absent`.
+          GITHUB_TOKEN: ${{ secrets.CONTROL_AUDIT_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/probe-branch-protection.mjs 2>&1 | tee merge-gate.log
+
+      # Twelve invariants broken on purpose, one at a time, to check that the tests
+      # protecting them still go red. See docs/adr/020.
+      #
+      # `continue-on-error` for the same reason the merge-gate probe has it: a dead
+      # assertion is a health finding, not a reason to fail a scheduled audit that also
+      # carries other results. The summary below reports it either way.
+      #
+      # Vitest sentinels only. The two Playwright ones each need a production build, and
+      # this job installs no dependencies on purpose — adding them would make the audit
+      # breakable by a dependency change the merge gate has not seen yet, which is the
+      # property that keeps this tier independent. Run them by hand with
+      # `--with-e2e` when the sentinel set changes.
+      - name: Assertion liveness — can these tests still fail?
+        id: liveness
+        continue-on-error: true
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          node scripts/probe-assertion-liveness.mjs 2>&1 | tee liveness.log
+
+      # Is anything still looking at production?
+      #
+      # Separate from production-smoke's own failure channel on purpose. That one says
+      # "the store is broken"; this one says "we have not looked at the store since the
+      # 15th". Those are different facts, and issue #24's 32 comments are what happens
+      # when one channel carries both.
+      - name: Production verification liveness — is anything still looking?
+        id: smoke-liveness
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/probe-smoke-liveness.mjs 2>&1 | tee smoke-liveness.log
+
+      # Its own label, its own issue.
+      #
+      # `continue-on-error` so a notification problem can never mask or manufacture a
+      # result — the same trade production-smoke.yml makes for its reporter.
+      - name: Report a dark verification tier
+        if: steps.smoke-liveness.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const label = 'verification-dark'
+            const title = 'Nothing is verifying production'
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+
+            let diagnosis = 'The liveness probe produced no output.'
+            try {
+              const log = fs.readFileSync('smoke-liveness.log', 'utf-8').trim()
+              if (log) diagnosis = ['```', log.slice(-3000), '```'].join('
+')
+            } catch {
+              // Fall through to the default — never invent a diagnosis from an absence.
+            }
+
+            const body = [
+              'The production verification tier is dark: runs are completing, and the checks',
+              'inside them are not executing.',
+              '',
+              diagnosis,
+              '',
+              '**This is not the same finding as "production smoke is failing."** That issue',
+              'names a credential and is doing its job. This one names the consequence nobody',
+              'was told about: while the preflight fails, every step after it reports',
+              '`skipped`, and from outside a skipped job is indistinguishable from a passing',
+              'one. The fabricated-catalogue detector and the photography check have not run',
+              'in that window.',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'See `docs/adr/022-absence-needs-its-own-alarm.md`.',
+            ].join('
+')
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            // One issue, updated — never a new one per run. ADR 011: a channel that
+            // repeats itself is a channel people mute, and this one has exactly one thing
+            // to say until it is fixed.
+            if (open.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              })
+              return
+            }
+
+            const issue = open[0]
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100,
+            })
+            const last = comments[comments.length - 1]
+            const withoutRun = (text) => text.replace(/Run: \S+/g, '').trim()
+            if (last && withoutRun(last.body) === withoutRun(body)) return // nothing new to say
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body,
+            })
+
+      # And close it when the tier comes back, so the label means what it says.
+      - name: Close the liveness issue on recovery
+        if: steps.smoke-liveness.outcome == 'success'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'verification-dark'
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: 'A production-smoke run has executed the live checks again. Closing.',
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              })
+            }
+
+      - name: Audit summary
+        if: always()
+        run: |
+          {
+            echo "## Control audit"
+            echo ""
+            echo "| Control | Result |"
+            echo "|---|---|"
+            echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
+            echo "| Assertion liveness (12 sentinels) | ${{ steps.liveness.outcome }} |"
+            echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
+            echo ""
+            for log in merge-gate liveness smoke-liveness; do
+              if [ -s "$log.log" ]; then
+                echo "<details><summary>$log</summary>"
+                echo ""
+                echo '```'
+                cat "$log.log"
+                echo '```'
+                echo "</details>"
+                echo ""
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

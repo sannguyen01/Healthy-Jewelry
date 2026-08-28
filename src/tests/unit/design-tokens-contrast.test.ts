@@ -376,3 +376,93 @@ describe('Composited surfaces meet WCAG 2.1 AA', () => {
     ).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+/**
+ * The palette CLAUDE.md documents must be the palette `globals.css` defines.
+ *
+ * `CLAUDE.md` carries a token table — one row per colour, with its hex — and a paragraph
+ * stating the ratios that justify the two `-text` siblings. Both are read by every person
+ * and every agent working in this repository, and until 2026-08-28 the table listed
+ * `--titanium-text` as `#5E6870`.
+ *
+ * That is not merely a stale value. It is the value this codebase **rejected**: the
+ * comment beside the real token records that `#5E6870` measured 4.39:1 on the bestseller
+ * badge's composited tint and quietly failed AA, which is why the shipped token is
+ * `#59636B`. The documented ratio next to it — 5.64:1 — is correct for `#59636B` and
+ * wrong for `#5E6870`, which is 5.23:1 on `--bg`. Somebody updated the number and not the
+ * swatch, and nothing compared the two.
+ *
+ * The tests above already read tokens from `globals.css` rather than restating them, "so
+ * the test cannot drift from the stylesheet it is guarding". The documentation had no such
+ * protection, and documentation is what a reader reaches for first.
+ *
+ * See [ADR 019](../../../docs/adr/019-an-unclassified-entry-is-an-unverified-one.md).
+ */
+describe('the documented palette is the real palette', () => {
+  const CLAUDE_MD = readFileSync(path.resolve(__dirname, '../../../CLAUDE.md'), 'utf8')
+
+  /** `| \`--token\` | #RRGGBB | … |` rows from the design-system table. */
+  const documentedTokens = new Map<string, string>()
+  for (const row of CLAUDE_MD.matchAll(/^\|\s*`--([\w-]+)`\s*\|\s*(#[0-9a-fA-F]{6})\s*\|/gm)) {
+    documentedTokens.set(row[1], row[2].toUpperCase())
+  }
+
+  it('found the token table', () => {
+    // Without this the two comparisons below pass over an empty map — the shape of green
+    // that proves nothing, which is the failure this whole family of tests exists for.
+    expect(documentedTokens.size).toBeGreaterThan(8)
+  })
+
+  it.each([...documentedTokens.keys()])('--%s has the hex CLAUDE.md claims', (name) => {
+    expect(
+      token(name),
+      `CLAUDE.md documents --${name} as ${documentedTokens.get(name)}, but globals.css ` +
+        `defines it as ${tokens[name]}. Whichever a reader found first is the answer they ` +
+        `got, and one of them is a colour this project does not ship.`
+    ).toBe(documentedTokens.get(name))
+  })
+
+  it('documents every token globals.css defines for the palette', () => {
+    // The reverse direction: a token added to the stylesheet and not to the table is
+    // unclassified in the place people actually read, which is how --sage shipped as
+    // text in four places.
+    for (const name of Object.keys(tokens)) {
+      // Geometry, spacing, easing and duration tokens are not colours and have no row.
+      if (!/^[0-9a-fA-F]{6}$/.test(tokens[name].slice(1))) continue
+      expect(
+        documentedTokens.has(name),
+        `globals.css defines --${name} (${tokens[name]}) and CLAUDE.md's palette table ` +
+          `does not list it.`
+      ).toBe(true)
+    }
+  })
+
+  /**
+   * Ratio claims in the contrast-rule paragraph, e.g. ``--titanium` at 2.25:1` and
+   * ``--titanium-text` (5.64:1)`. Matched within a bounded window after the token name so
+   * the extraction is defined rather than hopeful, and the count is asserted below so the
+   * scan's coverage is a number rather than a silence.
+   */
+  const documentedRatios: Array<{ name: string; claimed: number }> = []
+  for (const claim of CLAUDE_MD.matchAll(/`--([\w-]+)`[^\n]{0,12}?\(?(\d\.\d{2}):1/g)) {
+    documentedRatios.push({ name: claim[1], claimed: Number.parseFloat(claim[2]) })
+  }
+
+  it('found the ratio claims', () => {
+    expect(documentedRatios.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it.each(documentedRatios.map((r) => [`--${r.name} at ${r.claimed}:1`, r] as const))(
+    'CLAUDE.md claims %s, and it measures that',
+    (_label, { name, claimed }) => {
+      // Every ratio in that paragraph is stated against --bg.
+      const measured = contrastRatio(token(name), token('bg'))
+      expect(
+        measured,
+        `CLAUDE.md says --${name} is ${claimed}:1 on --bg. It measures ` +
+          `${measured.toFixed(2)}:1. A wrong ratio in the one paragraph explaining which ` +
+          `token carries text is worse than no ratio: it reads as a measurement.`
+      ).toBeCloseTo(claimed, 1)
+    }
+  )
+})

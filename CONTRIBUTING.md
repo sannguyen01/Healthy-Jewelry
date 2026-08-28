@@ -6,11 +6,23 @@ Nothing lands on `main` directly — every change goes through a PR.
 
 **`main` is not currently branch-protected and no status checks are required** — this
 line claimed otherwise until 2026-08-25. CI still runs on every PR and its result is
-the thing to read before merging; it is simply not enforced. To enable enforcement the
-required contexts are `Lint · Type-check · Unit tests · Build` and
-`E2E tests (Playwright)` — not `verify`/`e2e`, which are job IDs GitHub never reports
-as contexts. See `docs/testing-strategy.md` and
-`docs/adr/015-a-gate-that-was-only-ever-documented.md`.
+the thing to read before merging; it is simply not enforced. See
+`docs/testing-strategy.md` and `docs/adr/015-a-gate-that-was-only-ever-documented.md`.
+
+To enable enforcement, the required contexts are exactly these two strings:
+
+```required-checks
+Lint · Type-check · Unit tests · Build
+E2E tests (Playwright)
+```
+
+Not `verify`/`e2e` — those are the job IDs in `ci.yml`, and GitHub publishes each check
+run under the job's `name:`. Requiring a job ID registers a context nothing ever
+reports, which does not error: it blocks every pull request permanently and silently.
+The block above is machine-checked against `ci.yml` by
+`src/tests/unit/required-checks-contract.test.ts`, so those strings are provably the
+ones GitHub publishes today. Run `pnpm exec vitest run required-checks-contract` before
+typing them in.
 
 ## Branch naming
 
@@ -38,7 +50,11 @@ Observed convention in this repo's history:
 4. Open the PR — `.github/PULL_REQUEST_TEMPLATE.md` loads automatically.
    Fill in the Summary, check off the Type of Change, and complete the
    Checklist honestly. Don't check a box you didn't verify.
-5. CI runs `verify` then `e2e` automatically. Both must be green before merge.
+5. CI runs `verify` then `e2e` automatically. **Read both before merging** — they are
+   not enforced, so nothing stops a red merge except you. This line read "Both must be
+   green before merge" until 2026-08-28, eight lines below the paragraph correcting
+   exactly that claim: PR #39 fixed four of the five documents ADR 015 named and
+   reproduced the contradiction inside the fifth.
 6. Squash or merge per the repo's configured merge methods (all three —
    merge/squash/rebase — are currently enabled; standard merge commits are
    the norm for this repo's history).

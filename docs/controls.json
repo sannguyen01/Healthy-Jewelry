@@ -1,0 +1,146 @@
+{
+  "$comment": [
+    "The registry of controls this repository claims to have, and the probe that proves each claim.",
+    "",
+    "Read docs/adr/018-a-claim-about-a-control-is-not-a-control.md before editing. The short",
+    "version: a document may not assert that a control is configured unless a probe named here",
+    "reads that configuration from its own source of truth. Prose is a claim; a probe is evidence.",
+    "",
+    "JSON rather than YAML on purpose. This repo has no YAML parser dependency, so a YAML",
+    "registry would need a hand-written one — and a hand-written parser that silently matches",
+    "nothing is exactly the failure this registry exists to catch. A registry whose own reader",
+    "could quietly return an empty set would be the joke writing itself.",
+    "",
+    "src/tests/unit/control-registry.test.ts enforces the invariants: every probe path exists and",
+    "is wired into the workflow named here, every adr path exists, nothing may claim",
+    "status 'configured' without a scheduled probe, and every control-shaped ADR has an entry."
+  ],
+
+  "controls": [
+    {
+      "id": "merge-gate",
+      "claims": "main requires both CI check runs to pass before a pull request can merge",
+      "status": "not-configured",
+      "requiredContexts": ["Lint · Type-check · Unit tests · Build", "E2E tests (Playwright)"],
+      "contextSource": ".github/workflows/ci.yml",
+      "probe": "scripts/probe-branch-protection.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": true,
+      "humanAction": "GitHub → Settings → Branches → add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` — those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
+      "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md"
+    },
+    {
+      "id": "smoke-secret-isolation",
+      "claims": "the five production-smoke secrets are scoped to the production-readonly environment, not to the repository",
+      "status": "not-configured",
+      "probe": "scripts/preflight-secrets.mjs",
+      "probeRunsIn": ".github/workflows/production-smoke.yml",
+      "selfMonitoring": true,
+      "humanAction": "GitHub → Settings → Environments → production-readonly: put the five secrets there and set the variable SMOKE_SECRETS_SOURCE=environment. Never set that marker at repository scope — it is what distinguishes isolated from merely green.",
+      "knownLimit": "A convention, not an enforcement. GitHub gives a job no way to ask where a secret came from, so setting the marker at repository scope defeats it. Recorded rather than overclaimed — ADR 006.",
+      "adr": "docs/adr/006-controls-must-fail-loudly.md"
+    },
+    {
+      "id": "workflow-pipefail",
+      "claims": "every workflow runs its steps under pipefail, so a piped step cannot report success for a failing command",
+      "status": "configured",
+      "probe": "src/tests/unit/workflow-shell-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "adr": "docs/adr/010-a-control-that-cannot-fail.md"
+    },
+    {
+      "id": "smoke-escalation",
+      "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours",
+      "status": "configured",
+      "probe": ".github/workflows/production-smoke.yml",
+      "probeRunsIn": ".github/workflows/production-smoke.yml",
+      "selfMonitoring": false,
+      "knownLimit": "The escalation logic lives inline in a github-script step and has no unit test. Issue #24 shows it working — escalated and labelled human-required on 2026-08-22 — but that is evidence from one occurrence, not a standing check.",
+      "adr": "docs/adr/011-repeated-identical-failures-must-escalate.md"
+    },
+    {
+      "id": "premise-detectors",
+      "claims": "every recorded decision that rests on a live premise has a detector that reports when the premise drifts",
+      "status": "configured",
+      "probe": "scripts/verify-production.mjs",
+      "probeRunsIn": ".github/workflows/production-smoke.yml",
+      "probeLibrary": "scripts/lib/premise-checks.mjs",
+      "selfMonitoring": true,
+      "knownLimit": "Runs only inside production-smoke, whose real checks have not executed since 2026-08-15. A detector downstream of a failing preflight is a detector that is not running — which is what the smoke-liveness control exists to say out loud.",
+      "adr": "docs/adr/008-decisions-need-premise-detectors.md"
+    },
+    {
+      "id": "assertion-liveness",
+      "claims": "the tests protecting twelve named invariants can still fail when those invariants are broken",
+      "status": "configured",
+      "probe": "scripts/probe-assertion-liveness.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Covers twelve declared sentinels, not the whole suite. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move — which is why the probe reports `unapplicable` loudly rather than skipping.",
+      "adr": "docs/adr/020-a-test-that-cannot-fail-is-documentation.md"
+    },
+    {
+      "id": "smoke-liveness",
+      "claims": "something has actually verified the live store within the last 26 hours",
+      "status": "configured",
+      "probe": "scripts/probe-smoke-liveness.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that — the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark.",
+      "adr": "docs/adr/022-absence-needs-its-own-alarm.md"
+    },
+    {
+      "id": "hero-card-bound",
+      "claims": "the hero copy card may occupy no more than 60% of the photograph it sits on",
+      "status": "configured",
+      "probe": "e2e/hero-legibility.spec.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "adr": "docs/adr/013-a-protection-that-can-only-grow.md"
+    },
+    {
+      "id": "header-fit",
+      "claims": "every header control is reachable inside the viewport down to 320px",
+      "status": "configured",
+      "probe": "e2e/header-fit.spec.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "adr": "docs/adr/016-fit-is-a-measurement-nobody-took.md"
+    },
+    {
+      "id": "product-tile-bound",
+      "claims": "the product image tile is square, capped, and contained at every viewport",
+      "status": "configured",
+      "probe": "e2e/product-image-fit.spec.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "adr": "docs/adr/017-a-box-that-could-not-be-both.md"
+    }
+  ],
+
+  "$decisionAdrsComment": [
+    "Every ADR is classified: it either describes a control (and appears as an `adr` above) or",
+    "it records a decision (and appears here with the reason it is not a control).",
+    "There is no third option, because 'unclassified' is how --sage shipped as 9-13px text at",
+    "1.97:1 in four places, and how a gate nothing enforced was asserted by five documents.",
+    "",
+    "A control, for this purpose, is a mechanism whose absence is not visible from the thing it",
+    "protects. A decision is reasoning that is wrong out loud when violated."
+  ],
+
+  "decisionAdrs": {
+    "docs/adr/001-two-webhook-secrets.md": "Records which of two secrets Shopify signs with. A fact about an external system, not a mechanism that can go missing.",
+    "docs/adr/002-cart-completion-discriminator.md": "A code-level discriminator. Its absence is a failing test, not a silent one.",
+    "docs/adr/003-client-server-config-split.md": "A module boundary. Violating it is a lint or type error at the point of violation.",
+    "docs/adr/004-static-fallback-is-not-a-data-source.md": "An architectural rule. Its enforcement mechanism is the premise-detectors control above.",
+    "docs/adr/005-english-only-storefront.md": "A scope decision, watched by the premise-detectors control rather than being one.",
+    "docs/adr/007-regex-guardrails-have-unknown-coverage.md": "A rule about how controls are written, not a control. It constrains the entries above.",
+    "docs/adr/009-api-version-must-be-asserted-not-declared.md": "Asserted inside verify-production.mjs, which the premise-detectors and smoke-liveness controls already cover.",
+    "docs/adr/012-an-unassigned-escalation-is-not-yet-escalated.md": "An escalation convention for humans. Covered mechanically by the smoke-escalation control above.",
+    "docs/adr/014-monochrome-was-not-decided.md": "A palette decision. Its enforcement is design-tokens-contrast.test.ts, which fails loudly in the gate.",
+    "docs/adr/018-a-claim-about-a-control-is-not-a-control.md": "The rule this registry implements. It is the frame, not an entry in it.",
+    "docs/adr/021-a-metric-with-only-one-direction.md": "A rule about how sizes are written, and the audit that enforces it runs in the fast gate and fails by name. Its absence would be visible, which is what makes it a guardrail rather than a control.",
+    "docs/adr/019-an-unclassified-entry-is-an-unverified-one.md": "A rule about how enumerations are written, like ADR 007 is about how guardrails are written. Its three reconciliation tests run in the fast gate and fail by name, so their absence would be visible; that is what makes them guardrails rather than controls."
+  }
+}

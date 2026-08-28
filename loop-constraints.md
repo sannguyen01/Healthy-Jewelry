@@ -56,10 +56,30 @@
   is the deploy button, with no check between them. That makes this rule more
   load-bearing than it reads, not less.
 - Never edit `.env`, `.env.*`, `.vercel/`, or any Vercel environment variable.
-- Never *autonomously* edit `src/lib/shopify/**` (Storefront API client/queries/
-  mutations), `.github/workflows/**`, or `next.config.ts`'s security headers —
-  escalate instead. These are maintained, not frozen; a human-directed change to
-  them is ordinary work.
+- Never *autonomously* edit the paths below — escalate instead. These are maintained,
+  not frozen; a human-directed change to them is ordinary work.
+
+  ```denylist-paths
+  .env
+  .env.*
+  **/secrets/**
+  **/credentials/**
+  **/*_key*
+  **/*_secret*
+  .vercel/**
+  **/migrations/**
+  .github/workflows/**
+  src/lib/shopify/**
+  next.config.ts
+  vercel.json
+  ```
+
+  That block is not a restatement of `gate.yaml` — it is checked against it by
+  `src/tests/unit/gate-denylist-contract.test.ts`, in both directions. `gate.yaml`'s
+  own header says it "mirrors loop-constraints.md", and a mirror nobody looks into
+  drifts: `vercel.json` was added to the machine-readable policy by ADR 015 and never
+  reached the prose, so the two disagreed about what a loop was allowed to rewrite.
+  Whichever a reader found first was the answer they got.
 - Dependency major-version bumps (`next`, `react`, `react-dom`, any `@shopify/*`
   package) and any high-severity CVE fix must escalate with written rationale.
 - Always use `pnpm`, never `npm` — this repo has no package-lock.json.

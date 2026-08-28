@@ -160,6 +160,43 @@ jobs:
           SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
         run: node scripts/verify-webhook-secret.mjs | tee webhook.log
 
+      # A machine-readable record of which checks actually executed.
+      #
+      # Until 2026-08-28 the only record was the markdown table below, which nothing can
+      # query. That mattered: every run since 2026-08-15 has failed at the preflight, so
+      # `storefront` and `webhook` have reported `skipped` thirty-plus times in a row —
+      # and from outside a skipped step is indistinguishable from a passing one. The
+      # fabricated-catalogue detector and the photography check have been dark that whole
+      # time with nothing saying so.
+      #
+      # `scripts/probe-smoke-liveness.mjs` reads step conclusions from the Actions API, so
+      # this receipt is not what it depends on. It is here for a human opening the run,
+      # and as the artifact a future check can read without the API.
+      - name: Write the run receipt
+        if: always()
+        run: |
+          cat > smoke-receipt.json <<JSON
+          {
+            "run": "${{ github.run_id }}",
+            "completedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "checks": {
+              "preflight": "${{ steps.preflight.outcome }}",
+              "storefront": "${{ steps.storefront.outcome }}",
+              "webhook": "${{ steps.webhook.outcome }}"
+            },
+            "configured": "${{ steps.preflight.outputs.configured }}"
+          }
+          JSON
+          cat smoke-receipt.json
+
+      - name: Upload the run receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-receipt
+          path: smoke-receipt.json
+          retention-days: 30
+
       # A readable verdict in the Actions tab without opening logs.
       - name: Job summary
         if: always()
@@ -173,6 +210,24 @@ jobs:
               echo "It is not a failure and no issue was filed."
               echo ""
             fi
+
+            # The verdict as a sentence, before the table.
+            #
+            # "A job reporting skipped reads exactly like a job reporting passed" is true
+            # of a table and false of a sentence. A reader scanning three rows of `skipped`
+            # sees three rows; a reader shown "2 of 3 checks did not execute" sees the
+            # finding. Same data, and only one of them is read.
+            did_not_run=0
+            for outcome in "${{ steps.storefront.outcome }}" "${{ steps.webhook.outcome }}"; do
+              case "$outcome" in success|failure) ;; *) did_not_run=$((did_not_run + 1)) ;; esac
+            done
+            if [ "$did_not_run" -gt 0 ] && [ "${{ steps.preflight.outputs.configured }}" = "true" ]; then
+              echo "> ⚠ **$did_not_run of 2 live checks did not execute.** This run reported a"
+              echo "> result without looking at the live store. Fix the preflight failure"
+              echo "> below; until then nothing is verifying production."
+              echo ""
+            fi
+
             echo "| Check | Result |"
             echo "|---|---|"
             echo "| Secrets preflight | ${{ steps.preflight.outcome }} (${{ steps.preflight.outputs.state }}) |"

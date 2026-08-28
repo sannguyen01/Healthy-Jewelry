@@ -92,7 +92,17 @@ export function HorizontalScroll({
             href={`/products/${product.handle}`}
             style={{
               display: 'block',
-              width: 'clamp(220px, 260px, 280px)',
+              // `clamp(220px, 260px, 280px)` until 2026-08-28 — three arguments that
+              // described a fluid card and produced a fixed 260px one, because the
+              // middle argument is what a clamp interpolates and a constant there pins
+              // the result. The bounds either side never applied at any viewport.
+              //
+              // The ceiling is 260px, not 280px, so every width at or above 383px
+              // renders exactly what it rendered before. Below that the card now
+              // shrinks instead of eating the screen: at 320px it was 260px, 81% of the
+              // viewport, leaving almost no sight of the next card in a strip whose
+              // whole affordance is that you can see there is a next card.
+              width: 'clamp(200px, 68vw, 260px)',
               flexShrink: 0,
               textDecoration: 'none',
               transition: 'transform 0.3s var(--ease)',
@@ -119,10 +129,10 @@ export function HorizontalScroll({
               <ProductImage
                 product={product}
                 svgScale="60%"
-                // The card is `clamp(220px, 260px, 280px)` wide — a fixed 260px, not a
-                // fluid grid cell — so the hint is a width, not a viewport fraction.
-                // 280px covers the clamp's ceiling if the card ever widens.
-                sizes="280px"
+                // The card is now genuinely fluid — `clamp(200px, 68vw, 260px)` — so the
+                // hint follows the same shape. 260px is the ceiling and therefore the
+                // widest this ever renders; below 383px the viewport term governs.
+                sizes="(max-width: 383px) 68vw, 260px"
               />
               {product.badge && (
                 <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
