@@ -102,6 +102,134 @@ jobs:
           pnpm install --frozen-lockfile
           node scripts/probe-assertion-liveness.mjs 2>&1 | tee liveness.log
 
+      # Is anything still looking at production?
+      #
+      # Separate from production-smoke's own failure channel on purpose. That one says
+      # "the store is broken"; this one says "we have not looked at the store since the
+      # 15th". Those are different facts, and issue #24's 32 comments are what happens
+      # when one channel carries both.
+      - name: Production verification liveness — is anything still looking?
+        id: smoke-liveness
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/probe-smoke-liveness.mjs 2>&1 | tee smoke-liveness.log
+
+      # Its own label, its own issue.
+      #
+      # `continue-on-error` so a notification problem can never mask or manufacture a
+      # result — the same trade production-smoke.yml makes for its reporter.
+      - name: Report a dark verification tier
+        if: steps.smoke-liveness.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const label = 'verification-dark'
+            const title = 'Nothing is verifying production'
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+
+            let diagnosis = 'The liveness probe produced no output.'
+            try {
+              const log = fs.readFileSync('smoke-liveness.log', 'utf-8').trim()
+              if (log) diagnosis = ['```', log.slice(-3000), '```'].join('
+')
+            } catch {
+              // Fall through to the default — never invent a diagnosis from an absence.
+            }
+
+            const body = [
+              'The production verification tier is dark: runs are completing, and the checks',
+              'inside them are not executing.',
+              '',
+              diagnosis,
+              '',
+              '**This is not the same finding as "production smoke is failing."** That issue',
+              'names a credential and is doing its job. This one names the consequence nobody',
+              'was told about: while the preflight fails, every step after it reports',
+              '`skipped`, and from outside a skipped job is indistinguishable from a passing',
+              'one. The fabricated-catalogue detector and the photography check have not run',
+              'in that window.',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'See `docs/adr/022-absence-needs-its-own-alarm.md`.',
+            ].join('
+')
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            // One issue, updated — never a new one per run. ADR 011: a channel that
+            // repeats itself is a channel people mute, and this one has exactly one thing
+            // to say until it is fixed.
+            if (open.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              })
+              return
+            }
+
+            const issue = open[0]
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100,
+            })
+            const last = comments[comments.length - 1]
+            const withoutRun = (text) => text.replace(/Run: \S+/g, '').trim()
+            if (last && withoutRun(last.body) === withoutRun(body)) return // nothing new to say
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body,
+            })
+
+      # And close it when the tier comes back, so the label means what it says.
+      - name: Close the liveness issue on recovery
+        if: steps.smoke-liveness.outcome == 'success'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'verification-dark'
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: 'A production-smoke run has executed the live checks again. Closing.',
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              })
+            }
+
       - name: Audit summary
         if: always()
         run: |
@@ -112,8 +240,9 @@ jobs:
             echo "|---|---|"
             echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
             echo "| Assertion liveness (12 sentinels) | ${{ steps.liveness.outcome }} |"
+            echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
             echo ""
-            for log in merge-gate liveness; do
+            for log in merge-gate liveness smoke-liveness; do
               if [ -s "$log.log" ]; then
                 echo "<details><summary>$log</summary>"
                 echo ""

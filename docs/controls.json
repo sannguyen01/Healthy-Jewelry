@@ -81,6 +81,16 @@
       "adr": "docs/adr/020-a-test-that-cannot-fail-is-documentation.md"
     },
     {
+      "id": "smoke-liveness",
+      "claims": "something has actually verified the live store within the last 26 hours",
+      "status": "configured",
+      "probe": "scripts/probe-smoke-liveness.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that — the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark.",
+      "adr": "docs/adr/022-absence-needs-its-own-alarm.md"
+    },
+    {
       "id": "hero-card-bound",
       "claims": "the hero copy card may occupy no more than 60% of the photograph it sits on",
       "status": "configured",
