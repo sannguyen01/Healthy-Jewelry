@@ -109,7 +109,22 @@ function runTests(sentinel) {
   return { failed: result.status !== 0, exitCode: result.status ?? -1 }
 }
 
-/** @param {import('./lib/sentinels.mjs').Sentinel} sentinel */
+/**
+ * @param {import('./lib/sentinels.mjs').Sentinel} sentinel
+ *
+ * Establishes a green baseline before mutating, because a red result only means the
+ * mutation was caught if the same tests were passing a moment earlier.
+ *
+ * This was not in the first version, and the omission was caught the way these things
+ * always are — by accident. The pinned `chrome-headless-shell` build was missing from
+ * this machine, so *every* Playwright run failed at browser launch, and the probe read
+ * those failures as two sentinels alive. It reported exactly the answer it wanted and had
+ * measured nothing.
+ *
+ * That is ADR 010's distinction — "this check failed" versus "this check could not run" —
+ * which the branch-protection probe keeps carefully and this one did not, inside the tool
+ * built to find precisely that class of mistake.
+ */
 function probe(sentinel) {
   const file = path.join(ROOT, sentinel.file)
   const original = fs.readFileSync(file, 'utf8')
@@ -137,6 +152,22 @@ function probe(sentinel) {
   process.once('SIGTERM', onSignal)
 
   try {
+    // Baseline first. A test that is already failing tells us nothing when it fails again.
+    const baseline = runTests(sentinel)
+    if (baseline.failed) {
+      return {
+        id: sentinel.id,
+        state: 'unevaluable',
+        invariant: sentinel.invariant,
+        specs: sentinel.specs,
+        detail:
+          `${sentinel.specs.join(', ')} already fails without the mutation (exit ` +
+          `${baseline.exitCode}). Until it passes, a red result under mutation proves ` +
+          `nothing — the tests would have been red either way. Fix the suite, or the ` +
+          `environment, then re-run.`,
+      }
+    }
+
     fs.writeFileSync(file, original.replace(sentinel.find, sentinel.replace))
     const { failed, exitCode, viaBuild } = runTests(sentinel)
     return {
@@ -174,7 +205,9 @@ function main() {
   }
 
   const dead = results.filter((r) => r.state === 'dead')
-  const unapplicable = results.filter((r) => r.state === 'unapplicable')
+  const unapplicable = results.filter(
+    (r) => r.state === 'unapplicable' || r.state === 'unevaluable'
+  )
 
   if (asJson) {
     console.log(JSON.stringify({ results, dead: dead.length, unapplicable: unapplicable.length }, null, 2))
@@ -188,7 +221,9 @@ function main() {
         console.log(`    should have failed: ${result.specs.join(', ')}`)
         console.log(`    why it matters: ${result.scar}`)
       }
-      if (result.state === 'unapplicable') console.log(`    ${result.detail}`)
+      if (result.state === 'unapplicable' || result.state === 'unevaluable') {
+        console.log(`    ${result.detail}`)
+      }
     }
     console.log('')
     if (dead.length > 0) {
@@ -198,8 +233,10 @@ function main() {
       )
     } else if (unapplicable.length > 0) {
       console.log(
-        `Every applicable sentinel is alive, but ${unapplicable.length} could not be ` +
-          `applied. A sentinel that cannot run is not evidence of anything.`
+        `Every evaluable sentinel is alive, but ${unapplicable.length} could not be ` +
+          `evaluated — the anchor moved, or the tests were already red before the ` +
+          `mutation. A sentinel that cannot run is not evidence of anything, and reading ` +
+          `it as evidence is how a probe reports the answer it wanted.`
       )
     } else {
       console.log(`All ${results.length} sentinels alive.`)

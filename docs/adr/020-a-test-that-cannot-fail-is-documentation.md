@@ -86,11 +86,23 @@ answered by reading is a question that gets asked once.
 - **The probe refuses to run on a dirty working tree.** It edits tracked files and restores
   them in a `finally` and on SIGINT/SIGTERM, but a crash mid-run over uncommitted work would be
   unrecoverable. A tool that can destroy more than the bug it looks for is not worth having.
-- **Three outcomes, not two.** `alive`, `dead`, and `unapplicable` — a sentinel whose anchor
-  text no longer occurs exactly once in its file. That is a real finding (a check that cannot
-  run is not a check) but a *different* one, and reporting it as "green under mutation" would be
-  a false accusation against a test that may be perfectly alive. Same separation as
+- **Four outcomes, not two.** `alive`, `dead`, `unapplicable` (the anchor text no longer occurs
+  exactly once in its file) and `unevaluable` (the tests were already failing before the
+  mutation). Each is a real finding, and only `dead` means a test has stopped carrying
+  information. Reporting `unapplicable` as "green under mutation" would be a false accusation
+  against a test that may be perfectly alive. Same separation as
   [ADR 010](010-a-control-that-cannot-fail.md)'s, one layer up.
+- **`unevaluable` was missing from the first version, and the omission proved the point.** The
+  probe mutated, ran the tests, and read any failure as the mutation being caught. On this
+  machine the pinned `chrome-headless-shell` build was absent, so *every* Playwright run failed
+  at browser launch — and the probe reported both Playwright sentinels alive. It printed exactly
+  the answer it wanted and had measured nothing.
+
+  A red result only means the mutation was caught if the same tests were green a moment
+  earlier, so the probe now establishes a baseline before mutating and reports `unevaluable`
+  when it cannot. This is the "this check failed" versus "this check could not run" distinction
+  that `probe-branch-protection.mjs` keeps carefully — omitted from the tool built to find
+  exactly that class of mistake, in the same change that built the other one.
 - **A mutation that breaks the build counts as caught.** For the Playwright sentinels, `pnpm
   build` failing is something going red, which is what the probe asks.
 - **It runs weekly, not in the merge gate.** Twelve mutations, each a full test run and two of
