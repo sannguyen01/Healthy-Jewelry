@@ -119,6 +119,7 @@
     "docs/adr/009-api-version-must-be-asserted-not-declared.md": "Asserted inside verify-production.mjs, which the premise-detectors and smoke-liveness controls already cover.",
     "docs/adr/012-an-unassigned-escalation-is-not-yet-escalated.md": "An escalation convention for humans. Covered mechanically by the smoke-escalation control above.",
     "docs/adr/014-monochrome-was-not-decided.md": "A palette decision. Its enforcement is design-tokens-contrast.test.ts, which fails loudly in the gate.",
-    "docs/adr/018-a-claim-about-a-control-is-not-a-control.md": "The rule this registry implements. It is the frame, not an entry in it."
+    "docs/adr/018-a-claim-about-a-control-is-not-a-control.md": "The rule this registry implements. It is the frame, not an entry in it.",
+    "docs/adr/019-an-unclassified-entry-is-an-unverified-one.md": "A rule about how enumerations are written, like ADR 007 is about how guardrails are written. Its three reconciliation tests run in the fast gate and fail by name, so their absence would be visible; that is what makes them guardrails rather than controls."
   }
 }

@@ -38,8 +38,18 @@
 
 import fs from 'node:fs'
 
-/** Where each variable is configured, so the failure message is actionable. */
-const WHERE = {
+/**
+ * Where each variable is configured, so the failure message is actionable.
+ *
+ * Exported so `src/tests/unit/preflight-enumeration.test.ts` can hold these keys against
+ * the argument list the workflow actually passes. Three hand-maintained lists describe
+ * the same five secrets — this map, the `env:` block on the preflight step, and the
+ * argument list beneath it — and nothing joined them. A secret added to the workflow but
+ * not to the argument list is a secret the preflight never checks, which is precisely
+ * the state this script exists to make impossible for *missing* secrets and could not
+ * see about itself.
+ */
+export const WHERE = {
   PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
   SHOPIFY_STORE_DOMAIN: 'y0k9ve-q1.myshopify.com',
   SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'copy the value already working in Vercel',
