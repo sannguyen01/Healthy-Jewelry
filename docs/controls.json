@@ -130,6 +130,7 @@
     "docs/adr/012-an-unassigned-escalation-is-not-yet-escalated.md": "An escalation convention for humans. Covered mechanically by the smoke-escalation control above.",
     "docs/adr/014-monochrome-was-not-decided.md": "A palette decision. Its enforcement is design-tokens-contrast.test.ts, which fails loudly in the gate.",
     "docs/adr/018-a-claim-about-a-control-is-not-a-control.md": "The rule this registry implements. It is the frame, not an entry in it.",
+    "docs/adr/021-a-metric-with-only-one-direction.md": "A rule about how sizes are written, and the audit that enforces it runs in the fast gate and fails by name. Its absence would be visible, which is what makes it a guardrail rather than a control.",
     "docs/adr/019-an-unclassified-entry-is-an-unverified-one.md": "A rule about how enumerations are written, like ADR 007 is about how guardrails are written. Its three reconciliation tests run in the fast gate and fail by name, so their absence would be visible; that is what makes them guardrails rather than controls."
   }
 }

@@ -40,6 +40,7 @@ pointer; the reasoning lives here once.
 | [018](018-a-claim-about-a-control-is-not-a-control.md) | A claim about a control is not a control | The sentence ADRs 004, 006, 010, 011, 015 and 016 all wrote separately; spans `docs/controls.json`, the control-audit workflow, the branch-protection probe, `CONTRIBUTING.md` and `docs/testing-strategy.md` |
 | [019](019-an-unclassified-entry-is-an-unverified-one.md) | An unclassified entry is an unverified one | The `--sage` hole generalised; spans the sitemap route, `preflight-secrets.mjs`, `gate.yaml`, `loop-constraints.md` and three reconciliation tests |
 | [020](020-a-test-that-cannot-fail-is-documentation.md) | A test that cannot fail is documentation | ADR 006's question asked of assertions, by a machine; spans the sentinel registry, the liveness probe, the anchor contract, `e2e/COVERAGE.md` and the control-audit workflow |
+| [021](021-a-metric-with-only-one-direction.md) | A metric that only ever passes more easily in one direction is not a constraint | ADR 013 and 017's shape audited across the codebase; spans `sizedElements.ts`, the geometry audit, the degenerate-clamp lint rule and `HorizontalScroll.tsx` |
 
 ## Format
 
