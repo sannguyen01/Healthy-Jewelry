@@ -295,8 +295,11 @@ export function describeCredentialRejection(surface, status, errors) {
   const secret =
     surface === 'Admin' ? 'SHOPIFY_ADMIN_ACCESS_TOKEN' : 'SHOPIFY_STOREFRONT_ACCESS_TOKEN'
 
+  // Deliberately does not name the surface: every caller already prefixes it, and
+  // "Admin API could not be evaluated — the Admin API rejected the token" is what the
+  // acceptance run printed. `describeAccessDenial` is worded to slot in the same way.
   return (
-    `could not be evaluated — the ${surface} API rejected the token` +
+    `could not be evaluated — the API rejected this token` +
     `${typeof status === 'number' ? ` (HTTP ${status})` : ''}.\n` +
     (messages.length > 0 ? `  Shopify says: ${messages.join('; ')}\n` : '') +
     `  This is a credential problem, NOT a finding about the store. ${secret} does not hold\n` +

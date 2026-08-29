@@ -502,6 +502,21 @@ describe('describeCredentialRejection', () => {
     )
   })
 
+  it('does not repeat the surface its caller has already named', () => {
+    // `adminGraphql` throws `Admin API ${rejection}`. The first acceptance run printed
+    // "Admin API could not be evaluated — the Admin API rejected the token" because this
+    // sentence named the surface too. `describeAccessDenial` slots in the same position.
+    expect(describeCredentialRejection('Admin', 401, REJECTED_BODY)).not.toMatch(
+      /the Admin API rejected/,
+    )
+    expect(describeAccessDenial([
+      { message: 'Access denied for products field.', path: ['products'], extensions: { code: 'ACCESS_DENIED' } },
+    ])).toMatch(/^could not be evaluated/)
+    expect(describeCredentialRejection('Admin', 401, REJECTED_BODY)).toMatch(
+      /^could not be evaluated/,
+    )
+  })
+
   it('recognises the rejection sentence even when the status is 200', () => {
     // Some Shopify surfaces answer 200 with the same message. Status is the primary signal
     // because it is the one they are consistent about; this is the fallback.
