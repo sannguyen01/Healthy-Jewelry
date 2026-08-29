@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const { WHERE, SHAPE_RULES, SOURCE_MARKER } = await import('../../../scripts/preflight-secrets.mjs')
+import { parse } from 'yaml'
+
+const { WHERE, SHAPE_RULES, SOURCE_MARKER, CAPABILITIES } = await import(
+  '../../../scripts/preflight-secrets.mjs'
+)
 
 /**
  * **The preflight checks every secret the smoke run actually uses.**
@@ -142,5 +146,83 @@ describe('the isolation marker is read from a variable, never a secret', () => {
 
   it('is not in the argument list, because it is a marker and not a credential', () => {
     expect(args).not.toContain(SOURCE_MARKER)
+  })
+})
+
+/**
+ * **Every live step gates on its own capability, and on nothing else.**
+ *
+ * The capability outputs are only worth having if the workflow reads them. It did not, for
+ * fourteen days, and the reason was invisible at the call site: the storefront step read
+ * `if: steps.preflight.outputs.configured == 'true'`, `configured` was `'true'` throughout,
+ * and **GitHub implicitly ANDs `success()` onto an `if:` that names no status function** —
+ * so a failed preflight skipped a step whose own credentials were fine.
+ *
+ * Twelve of seventeen checks were skipped by a credential none of them reads. Nothing caught
+ * it, and nothing would have caught its return: `preflight-secrets.test.ts` proves the
+ * outputs are computed correctly, which says nothing about whether anyone consumes them.
+ *
+ * These assertions are the join. See
+ * [ADR 026](../../../docs/adr/026-a-capability-is-not-a-verdict.md).
+ */
+describe('the workflow consumes the capabilities the preflight emits', () => {
+  const workflow = parse(source) as {
+    jobs?: Record<string, { steps?: Array<{ id?: string; name?: string; if?: string }> }>
+  }
+  const steps = Object.values(workflow.jobs ?? {}).flatMap((job) => job.steps ?? [])
+
+  /** The steps that reach production, keyed by the capability each one needs. */
+  const LIVE_STEPS: Record<string, string> = {
+    storefront: 'storefrontReady',
+    webhook: 'webhookReady',
+  }
+
+  it('found the workflow steps', () => {
+    // Every assertion below is vacuous over an empty list.
+    expect(steps.length).toBeGreaterThan(5)
+  })
+
+  it('every capability the script defines has a step that uses it', () => {
+    // The reverse direction: a capability nothing consumes is dead weight that reads as
+    // protection.
+    for (const capability of Object.keys(CAPABILITIES)) {
+      expect(
+        Object.keys(LIVE_STEPS),
+        `preflight-secrets.mjs defines the "${capability}" capability and no live step is ` +
+          `mapped to it here. Either wire it up or drop it.`
+      ).toContain(capability)
+    }
+  })
+
+  it.each(Object.entries(LIVE_STEPS))('the %s step gates on %s', (stepId, output) => {
+    const step = steps.find((s) => s.id === stepId)
+    expect(step, `no step with id "${stepId}"`).toBeDefined()
+    expect(
+      step?.if ?? '',
+      `the "${stepId}" step must gate on steps.preflight.outputs.${output} — the credentials ` +
+        `it actually needs — rather than on whether the whole setup was valid.`
+    ).toContain(`steps.preflight.outputs.${output}`)
+  })
+
+  it.each(Object.keys(LIVE_STEPS))('the %s step names a status function explicitly', (stepId) => {
+    // The mechanism that made this invisible. Without `always()` (or another status
+    // function), GitHub ANDs `success()` on, and a failed preflight silently re-couples
+    // execution to the verdict — which is the entire fourteen-day regression.
+    const step = steps.find((s) => s.id === stepId)
+    expect(
+      step?.if ?? '',
+      `the "${stepId}" step's if: names no status function, so GitHub will imply success() ` +
+        `and a failed preflight will skip it regardless of its own credentials. This is the ` +
+        `exact regression ADR 026 documents. Write always() explicitly.`
+    ).toMatch(/\balways\(\)/)
+  })
+
+  it.each(Object.keys(LIVE_STEPS))('the %s step does not gate on the preflight verdict', (stepId) => {
+    const step = steps.find((s) => s.id === stepId)
+    expect(
+      step?.if ?? '',
+      `the "${stepId}" step gates on the preflight's outcome, which re-couples capability to ` +
+        `verdict: one wrong credential again vetoes checks that never read it.`
+    ).not.toMatch(/steps\.preflight\.outcome/)
   })
 })

@@ -174,9 +174,28 @@ async function check(name, fn) {
   }
 }
 
-function required(varName) {
+/**
+ * A credential this check needs, or an **unevaluable** error.
+ *
+ * Not a plain `Error`. A missing credential means the check could not look; it says nothing
+ * about whether the thing it examines is broken. Throwing a hard failure here prints
+ * `✗ Every product is published to the headless publication` under `Failed:` and sends a
+ * reader hunting for unpublished products that are, in fact, published — the exact
+ * mislabelling `describeAccessDenial` was written to prevent one layer down, arriving
+ * through the credential instead of through the API's response.
+ *
+ * This matters now that each live step gates on its own capability rather than on the
+ * preflight's verdict: a run with a wrong Admin token executes the twelve checks that never
+ * read it, and the five that do must report `⚠ could not evaluate` rather than five
+ * fabricated production failures.
+ *
+ * An unevaluable check still counts against the run and still exits non-zero (ADR 006) —
+ * a control that could not run is not a control that succeeded. Only the *name* changes,
+ * which is the part a human acts on.
+ */
+export function required(varName) {
   const value = process.env[varName]
-  if (!value) throw new Error(`${varName} is not set`)
+  if (!value) throw unevaluableError(`${varName} is not set, so this check could not run`)
   return value
 }
 

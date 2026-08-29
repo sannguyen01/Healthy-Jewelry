@@ -132,9 +132,25 @@ jobs:
       # Catalogue, publishing scope, the real cart → checkoutUrl path, metadata,
       # search, rate-limit durability, and cache revalidation.
       # Runs every check even when one fails, so a run reports the whole picture.
+      # `always()` is load-bearing, and its absence cost fourteen days of verification.
+      #
+      # An `if:` that names no status function has `success()` implicitly ANDed onto it by
+      # GitHub. So while this read `if: steps.preflight.outputs.configured == 'true'`, a
+      # *failed preflight* skipped it — even though `configured` was 'true' the whole time.
+      #
+      # The preflight failed because SHOPIFY_ADMIN_ACCESS_TOKEN held the wrong kind of token.
+      # This step needs PRODUCTION_SITE_URL, SHOPIFY_STORE_DOMAIN and the *Storefront* token;
+      # it never reads the Admin one. Twelve of its seventeen checks — including "Live site
+      # serves Shopify data, not the static fallback", the only thing between customers and a
+      # catalogue whose variant IDs Shopify rejects at checkout — were skipped for a
+      # credential they do not use.
+      #
+      # `storefrontReady` says whether *this step's own* credentials are present and
+      # well-formed. The preflight's verdict is unchanged and still fails the run.
+      # See docs/adr/026-a-capability-is-not-a-verdict.md.
       - name: Live store and storefront
         id: storefront
-        if: steps.preflight.outputs.configured == 'true'
+        if: always() && steps.preflight.outputs.storefrontReady == 'true'
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
@@ -153,7 +169,14 @@ jobs:
         # there is nothing to verify or when the preflight itself already said
         # what is wrong. Before this it ran with no secrets at all, printed a
         # usage error, and (through the pipefail bug) reported success.
-        if: always() && steps.preflight.outcome == 'success' && steps.preflight.outputs.configured == 'true'
+        # Same correction as the storefront step above. `steps.preflight.outcome == 'success'`
+        # made this conditional on the *whole* setup being valid, so a wrong Admin token
+        # skipped a probe that signs a payload with SHOPIFY_WEBHOOK_SECRET and lets the
+        # deployed route judge it — no Admin API involved. `webhookReady` names what this
+        # step actually needs. The original intent is preserved: a catalogue failure must
+        # not hide a secret failure, which is why this still runs independently of the
+        # storefront step's result.
+        if: always() && steps.preflight.outputs.webhookReady == 'true'
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
@@ -184,7 +207,11 @@ jobs:
               "storefront": "${{ steps.storefront.outcome }}",
               "webhook": "${{ steps.webhook.outcome }}"
             },
-            "configured": "${{ steps.preflight.outputs.configured }}"
+            "configured": "${{ steps.preflight.outputs.configured }}",
+            "capabilities": {
+              "storefront": "${{ steps.preflight.outputs.storefrontReady }}",
+              "webhook": "${{ steps.preflight.outputs.webhookReady }}"
+            }
           }
           JSON
           cat smoke-receipt.json
@@ -222,9 +249,11 @@ jobs:
               case "$outcome" in success|failure) ;; *) did_not_run=$((did_not_run + 1)) ;; esac
             done
             if [ "$did_not_run" -gt 0 ] && [ "${{ steps.preflight.outputs.configured }}" = "true" ]; then
-              echo "> ⚠ **$did_not_run of 2 live checks did not execute.** This run reported a"
-              echo "> result without looking at the live store. Fix the preflight failure"
-              echo "> below; until then nothing is verifying production."
+              echo "> ⚠ **$did_not_run of 2 live checks did not execute.** A check is skipped"
+              echo "> only when its own credentials are missing or malformed — not because"
+              echo "> some other secret is wrong. Storefront ready:"
+              echo "> \`${{ steps.preflight.outputs.storefrontReady }}\`, webhook ready:"
+              echo "> \`${{ steps.preflight.outputs.webhookReady }}\`. See the preflight below."
               echo ""
             fi
 

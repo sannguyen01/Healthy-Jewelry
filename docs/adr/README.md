@@ -45,6 +45,7 @@ pointer; the reasoning lives here once.
 | [023](023-the-last-link-is-a-person.md) | The last link is a person | ADR 022's concession made load-bearing after the audit tier died on arrival; spans `controls.json`, the weekly checklist and the registry test |
 | [024](024-a-tool-never-pointed-at-a-known-answer.md) | A tool that has never been pointed at a known answer is a first draft | Three probes, one week, and every defect fell on the one without a fixture test; spans the mutation probe, its decision test and the registry rule |
 | [025](025-a-number-in-prose-is-a-claim.md) | A number in prose is a claim like any other | A rejected colour value survived in two documents at once; spans `CLAUDE.md`, `testing-strategy.md` and the numeric sweep |
+| [026](026-a-capability-is-not-a-verdict.md) | A capability is not a verdict | One wrong credential skipped twelve checks that never read it; spans the preflight, the production verifier, the smoke workflow and the liveness probe |
 
 ## Format
 

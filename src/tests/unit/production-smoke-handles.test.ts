@@ -10,6 +10,7 @@ const {
   classifyOriginResponse,
   describeAccessDenial,
   classifyPhotographyCoverage,
+  required,
 } = await import('../../../scripts/verify-production.mjs')
 
 /**
@@ -406,5 +407,49 @@ describe('classifyPhotographyCoverage', () => {
     expect(ok).toBe(false)
     expect(detail).toMatch(/no products at all/i)
     expect(detail).not.toMatch(/Shopify Admin/)
+  })
+})
+
+/**
+ * **A missing credential means a check could not look, not that production is broken.**
+ *
+ * `required()` threw a plain `Error`, so a check whose credential was absent printed under
+ * `Failed:` beside genuine breakage — sending a reader hunting for unpublished products
+ * that are, in fact, published. That is the mislabelling `describeAccessDenial` was written
+ * to prevent one layer down, arriving through the credential instead of through the API's
+ * response.
+ *
+ * It became load-bearing on 2026-08-29, when each live step started gating on its own
+ * capability rather than on the preflight's verdict. A run with a wrong Admin token now
+ * executes the twelve checks that never read it; the five that do must report
+ * `⚠ could not evaluate` rather than five fabricated production failures.
+ *
+ * An unevaluable check still counts against the run and still exits non-zero (ADR 006) —
+ * a control that could not run is not a control that succeeded. Only the name changes.
+ */
+describe('a credential this check cannot reach', () => {
+  it('throws unevaluable rather than a plain failure', () => {
+    delete process.env.__HJ_ABSENT_FOR_TEST__
+    let thrown: (Error & { unevaluable?: boolean }) | null = null
+    try {
+      required('__HJ_ABSENT_FOR_TEST__')
+    } catch (error) {
+      thrown = error as Error & { unevaluable?: boolean }
+    }
+    expect(thrown, 'required() should throw when the variable is absent').not.toBeNull()
+    expect(
+      thrown?.unevaluable,
+      'a missing credential is "could not run", not "production is broken" — ADR 010'
+    ).toBe(true)
+  })
+
+  it('says so in words a reader can act on', () => {
+    expect(() => required('__HJ_ABSENT_FOR_TEST__')).toThrow(/could not run/)
+  })
+
+  it('returns the value when it is present', () => {
+    process.env.__HJ_PRESENT_FOR_TEST__ = 'a-value'
+    expect(required('__HJ_PRESENT_FOR_TEST__')).toBe('a-value')
+    delete process.env.__HJ_PRESENT_FOR_TEST__
   })
 })

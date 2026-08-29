@@ -122,6 +122,67 @@ export function malformedSecrets(required, env) {
 }
 
 /**
+ * Which credentials each live check *actually* needs.
+ *
+ * ## Why capability is separate from the setup verdict
+ *
+ * The preflight answers a governance question — *is this environment configured?* — and the
+ * workflow was using that single answer to decide whether the live checks may run. Those are
+ * different questions, and conflating them cost this repository fourteen days of verification.
+ *
+ * `SHOPIFY_ADMIN_ACCESS_TOKEN` held the wrong kind of token, so the preflight failed. The
+ * storefront step's `if:` names no status function, and GitHub implicitly ANDs `success()` —
+ * so a failed preflight skipped it. That token is used by **five** of the seventeen live
+ * checks. The other twelve never touch the Admin API, including `Live site serves Shopify
+ * data, not the static fallback` — the only thing standing between customers and a static
+ * catalogue whose variant IDs Shopify rejects at checkout. It was skipped for a credential it
+ * does not use. So was the webhook probe, which needs no Admin token either.
+ *
+ * A capability says only: *can this particular check reach what it examines?* The setup
+ * verdict stays exactly as loud as it was — a misconfigured environment still fails this
+ * step, still turns the run red, and still files its issue. What changes is that a wrong
+ * credential no longer vetoes checks that never read it.
+ *
+ * Isolation is deliberately **not** part of a capability. `SMOKE_SECRETS_SOURCE` exists to
+ * make repo-scoped secrets *visible* (ADR 006), not to prevent a read-only probe from
+ * running; the secrets reach the job either way, so blocking execution protects nothing. Its
+ * absence still fails the preflight, so nothing about it goes quiet.
+ *
+ * See docs/adr/026-a-capability-is-not-a-verdict.md.
+ *
+ * @type {Record<string, string[]>}
+ */
+export const CAPABILITIES = {
+  /** `verify-production.mjs` — the storefront, cart, metadata, SEO and rate-limit checks. */
+  storefront: ['PRODUCTION_SITE_URL', 'SHOPIFY_STORE_DOMAIN', 'SHOPIFY_STOREFRONT_ACCESS_TOKEN'],
+  /** `verify-webhook-secret.mjs` — signs a probe and lets the deployed route judge it. */
+  webhook: ['PRODUCTION_SITE_URL', 'SHOPIFY_STORE_DOMAIN', 'SHOPIFY_WEBHOOK_SECRET'],
+}
+
+/**
+ * Which capabilities are usable right now.
+ *
+ * A capability is ready when every credential it names is present and none is malformed.
+ * `not-configured` disables everything: with no secrets at all there is nothing to reach,
+ * and a store nobody has set up must stay quiet rather than report an outage it never
+ * looked for.
+ *
+ * @param {PreflightState} state
+ * @param {Record<string, string | undefined>} env
+ * @returns {Record<string, boolean>}
+ */
+export function capabilities(state, env) {
+  const ready = {}
+  for (const [name, needed] of Object.entries(CAPABILITIES)) {
+    ready[name] =
+      state !== 'not-configured' &&
+      needed.every((secret) => !!env[secret]) &&
+      malformedSecrets(needed, env).length === 0
+  }
+  return ready
+}
+
+/**
  * The three states this can be in, which are not two.
  *
  * `not-configured` — **every** secret absent. Nobody has done the setup yet. That
@@ -282,9 +343,15 @@ function main() {
 
   const { ok, state, missing, malformed, lines } = preflight(required, process.env)
 
+  const ready = capabilities(state, process.env)
+
   writeStepOutputs(fs, process.env.GITHUB_OUTPUT, {
     configured: String(state !== 'not-configured'),
     state,
+    // One output per capability, so each live step gates on what *it* needs rather than
+    // on whether this step succeeded. See CAPABILITIES above.
+    storefrontReady: String(ready.storefront),
+    webhookReady: String(ready.webhook),
   })
 
   if (ok) {

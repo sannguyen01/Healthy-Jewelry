@@ -519,6 +519,35 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-29**: **Twelve live checks were skipped for fourteen days by a credential none
+  of them reads.** Issue #45 said nothing was verifying production, and named the cause:
+  `SHOPIFY_ADMIN_ACCESS_TOKEN` is the wrong kind of token, so the preflight fails, so the
+  live checks are skipped. Right about the trigger, wrong about the scope. Counted from
+  source, that token is read by **5 of 17** checks. The other twelve — including *Live site
+  serves Shopify data, not the static fallback*, the only thing between customers and a
+  catalogue whose variant IDs Shopify rejects at checkout — never touch the Admin API. Nor
+  does the webhook probe, which signs a payload and lets the deployed route judge it.
+  The mechanism was subtler than the condition read: the step said
+  `if: steps.preflight.outputs.configured == 'true'`, and `configured` was `'true'`
+  throughout (it means "not *un*configured"; the state was `misconfigured`). **An `if:` that
+  names no status function has `success()` implicitly ANDed onto it by GitHub**, so a failed
+  preflight skipped it — a condition a reader sees is not the condition that applies.
+  Fixed by separating capability from verdict (ADR 026): `preflight-secrets.mjs` emits one
+  output per capability naming the secrets that capability needs, and each live step gates
+  on its own with an explicit `always()`. Verified against production's exact secret shape:
+  the preflight still exits 1 with `✗ Secrets set to the wrong kind of value` *and* emits
+  `storefrontReady=true`. Nothing is papered over — the run stays red, #24 stays open, and
+  thirteen checks start running.
+  Two supporting corrections: `required()` now throws **unevaluable**, so five checks that
+  cannot reach their credential report `⚠ could not evaluate` instead of five fabricated
+  production failures; and the liveness probe asks whether the live step **executed**, not
+  whether it **succeeded** — the old rule conflated *nobody is checking* with *somebody
+  checked and did not like what they found*. `skipped`, `cancelled` and an absent step all
+  remain dark, so the dead-man's switch keeps its teeth.
+  **The suite passed before the new tests were written**, because nothing exercised a step
+  that ran *and failed*. ADR 024's lesson landing on this change: green over a case nobody
+  wrote is not evidence.
+
 - **2026-08-29**: **The audit tier never ran, and the floor is now a rule instead of a
   confession.** Four hours after PR #42 merged, `control-audit.yml` — the workflow it added to
   audit whether the controls work — turned out to be **invalid YAML from the commit that created
