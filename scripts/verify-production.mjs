@@ -245,6 +245,86 @@ export function describeAccessDenial(errors) {
 }
 
 /**
+ * Turn a **rejected** credential into a sentence, or `null` if the failure was something else.
+ *
+ * `describeAccessDenial` above handles the token Shopify *accepted* and then refused a field
+ * to: HTTP 200, an `errors` **array**, `extensions.code === 'ACCESS_DENIED'`. That is
+ * authorization. It is not the only way a credential can stop a check from looking, and it
+ * was the only one classified.
+ *
+ * A token of the wrong *kind* — a Storefront token sent to the Admin API — is rejected at the
+ * door instead, and Shopify answers in a different shape entirely:
+ *
+ *     HTTP 401
+ *     {"errors":"[API] Invalid API key or access token (unrecognized login or wrong password)"}
+ *
+ * `errors` is a **string**, so `Array.isArray` is false, so `describeAccessDenial` returns
+ * `null`, so the call fell through to a plain `Error` and five checks printed under `Failed:`
+ * as though they had examined the store. Run 33232085670 is that log — the acceptance run for
+ * the very change that claimed these five would report `⚠ could not evaluate`. The
+ * classification had a hole in exactly the shape of production's actual state, and nothing had
+ * pointed it at that known answer ([ADR 024](docs/adr/024-a-tool-never-pointed-at-a-known-answer.md)).
+ *
+ * Status is the primary signal because it is the one Shopify is consistent about: 401 and 403
+ * from *our* request to *their* API are always a statement about our credential and never a
+ * finding about the store. The message match is the fallback for the surfaces that answer 200
+ * with the same sentence.
+ *
+ * Pure, so both branches run in CI against the verbatim payload from that run.
+ *
+ * @param {'Admin' | 'Storefront'} surface
+ * @param {number | undefined} status
+ * @param {unknown} errors
+ * @returns {string | null}
+ */
+export function describeCredentialRejection(surface, status, errors) {
+  const messages = (
+    typeof errors === 'string'
+      ? [errors]
+      : Array.isArray(errors)
+        ? errors.map((e) => (typeof e === 'string' ? e : e?.message))
+        : []
+  ).filter((m) => typeof m === 'string' && m.trim().length > 0)
+
+  const rejectedByStatus = status === 401 || status === 403
+  const rejectedByMessage = messages.some((m) =>
+    /invalid api key or access token|unrecognized login|access token is invalid/i.test(m),
+  )
+  if (!rejectedByStatus && !rejectedByMessage) return null
+
+  const secret =
+    surface === 'Admin' ? 'SHOPIFY_ADMIN_ACCESS_TOKEN' : 'SHOPIFY_STOREFRONT_ACCESS_TOKEN'
+
+  return (
+    `could not be evaluated — the ${surface} API rejected the token` +
+    `${typeof status === 'number' ? ` (HTTP ${status})` : ''}.\n` +
+    (messages.length > 0 ? `  Shopify says: ${messages.join('; ')}\n` : '') +
+    `  This is a credential problem, NOT a finding about the store. ${secret} does not hold\n` +
+    `  a token this API recognises — most often a token for the *other* surface, which is a\n` +
+    '  different credential rather than a differently-scoped one. Correct it in the Shopify\n' +
+    '  admin; no code change resolves this, and no other check here depends on it.'
+  )
+}
+
+/**
+ * Parse a Shopify response body without letting a non-JSON error page throw.
+ *
+ * A rejected request does not always answer in JSON, and `res.json()` throwing here would
+ * lose the status — the one field that says unambiguously whether the credential or the store
+ * is at fault.
+ *
+ * @param {Response} res
+ */
+async function readGraphqlBody(res) {
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { errors: text.trim().slice(0, 300) }
+  }
+}
+
+/**
  * An error a check could not evaluate, as opposed to one it evaluated and failed.
  * See the note on `check()`.
  */
@@ -264,7 +344,10 @@ async function adminGraphql(query, variables = {}) {
     },
     body: JSON.stringify({ query, variables }),
   })
-  const json = await res.json()
+  const json = await readGraphqlBody(res)
+  // Rejected before under-scoped: a 401 never reaches the point where a scope could matter.
+  const rejection = describeCredentialRejection('Admin', res.status, json.errors)
+  if (rejection) throw unevaluableError(`Admin API ${rejection}`)
   if (json.errors) {
     const denial = describeAccessDenial(json.errors)
     if (denial) throw unevaluableError(`Admin API ${denial}`)
@@ -283,7 +366,12 @@ async function storefrontGraphql(query, variables = {}) {
     },
     body: JSON.stringify({ query, variables }),
   })
-  const json = await res.json()
+  const json = await readGraphqlBody(res)
+  // Symmetric with the Admin surface on purpose. This one is not failing today, and a
+  // classification that only covers the credential currently known to be wrong is the
+  // asymmetry this repository keeps finding the hard way.
+  const rejection = describeCredentialRejection('Storefront', res.status, json.errors)
+  if (rejection) throw unevaluableError(`Storefront API ${rejection}`)
   if (json.errors) throw new Error(`Storefront API: ${JSON.stringify(json.errors)}`)
   return json.data
 }
@@ -970,7 +1058,26 @@ async function shopifyServesThePinnedApiVersion() {
       // the header is the measurement, and it is present even on an error.
       body: JSON.stringify({ query: '{ shop { name } }' }),
     })
-    return { label, ...compareServedApiVersion(res.headers.get('x-shopify-api-version')) }
+
+    // "Present even on an error" is true of an error the API *answered*, and false of a
+    // request it refused. A 401 carries no `x-shopify-api-version`, so `compareServedApiVersion`
+    // reads `null` and reports "the serving version is unknown, it cannot be assumed to be the
+    // pinned one" — which is a sentence about Shopify, printed because of our own credential.
+    // Run 33232085670 published exactly that. Rejection is its own outcome here too.
+    if (res.status === 401 || res.status === 403) {
+      return {
+        label,
+        rejected: true,
+        matches: false,
+        reason: `rejected the token (HTTP ${res.status}), so the served version could not be read`,
+      }
+    }
+
+    return {
+      label,
+      rejected: false,
+      ...compareServedApiVersion(res.headers.get('x-shopify-api-version')),
+    }
   }
 
   const surfaces = [
@@ -982,9 +1089,20 @@ async function shopifyServesThePinnedApiVersion() {
     }),
   ]
 
-  const drifted = surfaces.filter((s) => !s.matches)
+  // Drift on a surface that answered outranks a rejection on one that did not: it is a real
+  // finding, and it is actionable now. A rejection alone leaves the question open, which is
+  // what `unevaluable` means.
+  const drifted = surfaces.filter((s) => !s.rejected && !s.matches)
   if (drifted.length > 0) {
     throw new Error(drifted.map((s) => `${s.label} API: ${s.reason}`).join('\n  '))
+  }
+
+  const rejected = surfaces.filter((s) => s.rejected)
+  if (rejected.length > 0) {
+    throw unevaluableError(
+      rejected.map((s) => `${s.label} API ${s.reason}`).join('\n  ') +
+        '\n  The surfaces that did answer were served the pinned version.',
+    )
   }
 
   return `Both surfaces served ${API_VERSION}, as pinned`

@@ -108,6 +108,47 @@ stays exactly as loud; it simply no longer vetoes checks that would otherwise wo
   does, and the fix is to ask what each part actually needs rather than what the whole
   requires.
 
+## Addendum, same day — what the acceptance run found
+
+The run dispatched to prove this ADR
+([33232085670](https://github.com/sannguyen01/Healthy-Jewelry/actions/runs/33232085670))
+did prove it: `Live store and storefront` executed instead of being skipped, and **10 of 17
+checks passed** after fourteen days in which none had run. It also falsified the sentence two
+paragraphs above. The five Admin-dependent checks did **not** report `unevaluable`. They
+printed under `Failed:`, exactly as the change was written to prevent.
+
+The reason is worth recording, because it is this repository's shape again in a place that had
+just been examined for it. Two kinds of credential failure were classified:
+
+| State | Shopify's answer | Classified by |
+|---|---|---|
+| **Absent** | — | `required()` |
+| **Accepted, under-scoped** | HTTP 200, `errors` an **array**, `ACCESS_DENIED` | `describeAccessDenial()` |
+| **Rejected** | HTTP 401, `errors` a **string** | **nothing** |
+
+`Array.isArray('[API] Invalid API key or access token…')` is false, so `describeAccessDenial`
+returned `null` and the call fell through to a plain `Error`. The third row is the state the
+store has actually been in since 2026-08-15 — the one #24 and #45 are both about — and it was
+the one row nobody had written down. Two of three looked like a complete pair.
+
+It manufactured a production finding in three separate places from one credential: the five
+Admin checks; the store observations (which said "could not be evaluated" correctly, being
+worded independently); and `shopifyServesThePinnedApiVersion`, where a 401 carries no
+`x-shopify-api-version` header, so `compareServedApiVersion(null)` reported *"the version
+actually serving these requests is unknown"* — a sentence about Shopify, printed because of our
+own token.
+
+`describeCredentialRejection(surface, status, errors)` closes it, on both API surfaces rather
+than only the one currently failing, and `credential failure modes are exhaustively classified`
+in `production-smoke-handles.test.ts` makes the table above a set with no third option — the
+same rule `TEXT_PAIRINGS` ∪ `ACCENT_ONLY` applies to colour tokens, for the same reason.
+
+The general lesson, which is [ADR 024](024-a-tool-never-pointed-at-a-known-answer.md)'s arriving
+one level up: **a classifier is exhaustive only over the cases somebody wrote down, and the case
+nobody writes down is the one the system is currently in.** Unblocking the checks is what
+revealed it — the defect had been latent behind a skipped step for a fortnight, and no amount of
+reading would have surfaced it. Running the thing is the test.
+
 Referenced by: `scripts/preflight-secrets.mjs`, `scripts/verify-production.mjs`,
 `scripts/probe-smoke-liveness.mjs`, `.github/workflows/production-smoke.yml`,
 [ADR 006](006-controls-must-fail-loudly.md), [ADR 022](022-absence-needs-its-own-alarm.md).
