@@ -519,6 +519,49 @@ architecture principles, and `docs/testing-strategy.md` for what each test layer
 covers and why. This loop appends new decisions it observes below; it does not
 duplicate those files.
 
+- **2026-08-29**: **The audit tier never ran, and the floor is now a rule instead of a
+  confession.** Four hours after PR #42 merged, `control-audit.yml` — the workflow it added to
+  audit whether the controls work — turned out to be **invalid YAML from the commit that created
+  it**. Two JS string literals carried a real newline where `'\n'` was intended. GitHub rejects
+  such a file before scheduling anything, so all three runs showed `conclusion: failure` with
+  **zero jobs**: no log, no summary, no annotation. `docs/controls.json` named it as `probeRunsIn`
+  for three controls, two of them `configured`. Two guardrails passed over it because both read
+  the file as text, and a text search cannot tell a valid document from a broken one — ADR 007's
+  subject. ADR 022 had written *"the audit cannot detect its own death"* in the same commit.
+  Eighth instance of the shape, and the first where the artefact implementing the fix was the one
+  that failed. Fixed in PR #43 with `workflow-validity.test.ts`, which parses every workflow with
+  a real parser (`yaml`, a new devDependency) and checks jobs, triggers, `steps.<id>` references,
+  embedded `github-script` syntax, and log-file provenance; `control-registry.test.ts` now
+  requires `probeRunsIn` to parse and define a job.
+  Then five workstreams, ADRs 023–025:
+  - **The last link is a person** (ADR 023). Every control names a `backstop:` — `control:<id>`
+    or `human:<cadence>` — and the registry walks the chain, failing on a cycle or a dead end.
+    The floor is `docs/weekly-verification.md`: four checks, five minutes, weekly, regardless of
+    what any dashboard says. Two of them ask whether the automation ran at all, which is the pair
+    no automation can answer about itself.
+  - **A tool never pointed at a known answer is a first draft** (ADR 024). Three probes were built
+    in one week; every defect fell on the one whose decision was tangled with filesystem and
+    subprocess work and therefore had **no test at all**. Its verdict is now the pure
+    `classifyProbeResult`, and the registry refuses to admit a `scripts/*.mjs` probe that no test
+    imports. Removing that test makes the registry reject the entry by name — the state that
+    actually shipped.
+  - **An accepted gap expires** (W8). The branch-protection probe was already silent on an honestly
+    declared gap, so the ADR 011 noise risk never existed — but silence has its own failure, and
+    `accepted` decays into `forgotten` with nothing marking the moment. `acceptedSince` now expires
+    after 30 days, forcing the decision to be restated in a diff rather than the alarm to fire in a
+    channel nobody reads.
+  - **The heartbeat gets an anchor the workflow cannot move** (W9). Every bound on the liveness
+    window was a multiple of the cron in the file being watched, so widening both together passed
+    every assertion while production went unverified for days. `ABSOLUTE_MAX_WINDOW_HOURS = 48` and
+    `MAX_ACCEPTABLE_SMOKE_INTERVAL_HOURS = 12` derive from nothing.
+  - **A number in prose is a claim** (ADR 025). The `--titanium-text` drift was found by accident
+    and patched where it was noticed — so it survived, unchanged, in `docs/testing-strategy.md`,
+    which carried the same rejected `#5E6870` with its own correctly-computed 5.23:1 beside it. The
+    exhaustive sweep found that second copy in under a minute, plus a claim that
+    `premise-checks.test.ts` runs 18 tests when it runs 29. Live documents are now swept
+    completely: every number is reconciled against a source or marked historical, with ADRs and
+    `STATE.md` historical by construction because re-measuring a decision record would falsify it.
+
 - **2026-08-28**: **Seven controls that reported something other than the truth, and the
   general mechanism none of the six previous fixes produced.** ADRs 004, 006, 010, 011, 015
   and 016 each recorded one instance of a single sentence — *the artefact that was supposed

@@ -42,6 +42,9 @@ pointer; the reasoning lives here once.
 | [020](020-a-test-that-cannot-fail-is-documentation.md) | A test that cannot fail is documentation | ADR 006's question asked of assertions, by a machine; spans the sentinel registry, the liveness probe, the anchor contract, `e2e/COVERAGE.md` and the control-audit workflow |
 | [021](021-a-metric-with-only-one-direction.md) | A metric that only ever passes more easily in one direction is not a constraint | ADR 013 and 017's shape audited across the codebase; spans `sizedElements.ts`, the geometry audit, the degenerate-clamp lint rule and `HorizontalScroll.tsx` |
 | [022](022-absence-needs-its-own-alarm.md) | Absence needs its own alarm | Every control here reports a failure's presence, none a success's absence; spans both workflows, the liveness probe, the schedule constant and two tests |
+| [023](023-the-last-link-is-a-person.md) | The last link is a person | ADR 022's concession made load-bearing after the audit tier died on arrival; spans `controls.json`, the weekly checklist and the registry test |
+| [024](024-a-tool-never-pointed-at-a-known-answer.md) | A tool that has never been pointed at a known answer is a first draft | Three probes, one week, and every defect fell on the one without a fixture test; spans the mutation probe, its decision test and the registry rule |
+| [025](025-a-number-in-prose-is-a-claim.md) | A number in prose is a claim like any other | A rejected colour value survived in two documents at once; spans `CLAUDE.md`, `testing-strategy.md` and the numeric sweep |
 
 ## Format
 

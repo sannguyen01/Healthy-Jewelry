@@ -89,7 +89,7 @@ Two properties are worth copying into any premise check added later:
 
 - **Pure evaluator, network at the caller.** The drifted branch never runs locally, so it is the branch
   most likely to be wrong the day it fires — the same lesson as the completed-order cart path.
-  `src/tests/unit/premise-checks.test.ts` exercises **both** states of every premise, 18 tests, with
+  `src/tests/unit/premise-checks.test.ts` exercises **both** states of every premise, 29 tests, with
   the false-positive cases (`frontpage`, `en-GB`) pinned explicitly.
 - **A check may expire itself.** `SHOPIFY-PAYMENTS` is unverifiable only while `ordersCount` is 0;
   the first order makes `paymentGatewayNames` readable and the reminder becomes a real assertion.
@@ -148,9 +148,28 @@ Three properties are worth copying into anything added here:
 | `verify` | Anything a user has to look at or click; anything about the live store |
 | `e2e` | The real Shopify catalogue — it runs against `mock.myshopify.com` |
 | `production-smoke` | Whether its own checks executed; whether the merge gate exists |
-| control-audit | **Its own death.** If the workflow stops running, nothing says so — recorded in `docs/controls.json` as `selfMonitoring: false` rather than closed with a fifth tier |
+| control-audit | **Its own death.** If the workflow stops running, nothing says so |
 
-That last row is deliberate. Somewhere the regress stops, and the useful thing is to say where.
+That last row was not a hypothetical for even one day. `control-audit.yml` shipped as **invalid
+YAML** and never ran: GitHub rejected it before scheduling anything, so three runs appeared with
+`conclusion: failure` and zero jobs — no log, no summary, no annotation — while three entries in
+`docs/controls.json` asserted their probe ran there. Nothing here noticed. A person reading the
+Actions tab did.
+
+So there is now a fifth row, and it is not a tier:
+
+| **The weekly five minutes** | Nothing below it. This is the floor |
+
+[`docs/weekly-verification.md`](weekly-verification.md) is four checks a person runs once a week
+*regardless of what any dashboard says*, because the premise is that the dashboards may be lying.
+Two of the four cannot be automated away by construction — they ask whether the automation ran at
+all. Every control in `docs/controls.json` now names a `backstop:`, and
+`control-registry.test.ts` walks that chain and fails unless it reaches `human:<cadence>`. Two
+controls backstopping each other is a loop where each link is covered by something covered by
+nothing, and it fails too.
+
+That is where the regress stops, stated as a rule the registry enforces rather than as a
+concession in prose. See [ADR 023](adr/023-the-last-link-is-a-person.md).
 
 ### The source-analysis guardrails parse; they do not match
 
@@ -417,7 +436,7 @@ documented pairing, rather than 25 minutes into E2E against whatever happens to 
 pages the a11y spec visits.
 
 `--titanium` is the accent token: borders, tints, fills, and text on dark surfaces (7.29:1 on `--ink`).
-`--titanium-text` (#5E6870, 5.23:1 on `--bg`) is what carries titanium-toned text on light surfaces.
+`--titanium-text` (#59636B, 5.64:1 on `--bg`) is what carries titanium-toned text on light surfaces.
 The test asserts that `--titanium` **fails** AA on `--bg`, so the reason the second token exists is
 itself part of the contract.
 

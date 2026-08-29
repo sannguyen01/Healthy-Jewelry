@@ -52,6 +52,9 @@ interface Control {
   selfMonitoring?: boolean
   humanAction?: string
   knownLimit?: string
+  backstop?: string
+  acceptedSince?: string
+  acceptedWhy?: string
   adr?: string
   requiredContexts?: string[]
   contextSource?: string
@@ -166,6 +169,58 @@ describe('every probe exists and is wired in', () => {
   )
 })
 
+describe('every probe has been pointed at a known answer', () => {
+  /**
+   * **A verification tool may not be registered here until a test has fed it a fixture
+   * with a known answer and asserted the verdict.**
+   *
+   * Three probes, one week, three self-referential defects — and they did not fall evenly.
+   * `probe-branch-protection.mjs` and `probe-smoke-liveness.mjs` both shipped with their
+   * decisions as pure functions and fixture tests around them, and both shipped correct.
+   * `probe-assertion-liveness.mjs` shipped with neither, and produced two: a sentinel
+   * naming a spec that protects nothing, and a missing browser binary read as proof that
+   * a mutation had been caught.
+   *
+   * The rule is not "write more tests". It is that a tool whose verdict cannot be
+   * exercised without side effects has no known-answer test *available* to it, so the
+   * question never gets asked. Extracting the decision is the requirement; the test is
+   * what proves the extraction was real.
+   *
+   * See ADR 024.
+   */
+  const scriptProbes = registry.controls.filter((c) => c.probe.startsWith('scripts/'))
+
+  it('there are script probes to check', () => {
+    expect(scriptProbes.length).toBeGreaterThan(0)
+  })
+
+  it.each(scriptProbes.map((c) => [c.id, c] as const))(
+    '%s: some test imports its probe directly',
+    (_id, control) => {
+      const testDir = join(ROOT, 'src/tests/unit')
+      const importers = readdirSync(testDir).filter((file) => {
+        if (!file.endsWith('.test.ts') && !file.endsWith('.test.tsx')) return false
+        const source = readFileSync(join(testDir, file), 'utf8')
+        // An import, not a mention. The liveness probe was named in a doc comment for a
+        // week while having no test at all, which is exactly the state this rejects.
+        return new RegExp(`import\\(['"\`][^'"\`]*${control.probe.replace(/[/.]/g, '\\$&')}`).test(
+          source
+        )
+      })
+
+      expect(
+        importers.length,
+        `${control.id} registers ${control.probe} as a control, and no test under ` +
+          `src/tests/unit imports it. A tool that has never been pointed at a known ` +
+          `answer is a first draft: every probe defect this repository has found was ` +
+          `found that way, and the one probe without such a test produced two of them.\n\n` +
+          `Extract its verdict into a pure function and assert it against fixtures, as ` +
+          `probe-branch-protection.test.ts and smoke-liveness.test.ts do.`
+      ).toBeGreaterThan(0)
+    }
+  )
+})
+
 describe('a claim of "configured" has to be backed by something', () => {
   it.each(registry.controls.filter((c) => c.status === 'configured').map((c) => [c.id, c] as const))(
     '%s: claims configured, so its probe must run automatically',
@@ -209,6 +264,143 @@ describe('a claim of "configured" has to be backed by something', () => {
       }
     }
   })
+})
+
+/**
+ * How long an accepted gap may sit before someone has to say so again.
+ *
+ * Not a deadline for fixing it — a deadline for *re-deciding* it. Both open gaps are
+ * console actions this repository cannot perform, and a check that failed until a human
+ * changed a GitHub setting would be a permanent red suite, which is the ADR 008 trade in
+ * reverse.
+ */
+const ACCEPTED_GAP_MAX_AGE_DAYS = 30
+
+/** Cadences a human backstop may name. A cadence nobody could keep is not a backstop. */
+const HUMAN_CADENCES = ['per-pull-request', 'daily', 'weekly', 'monthly']
+
+describe('the chain of backstops ends at a person', () => {
+  /**
+   * Every tier in this repository is code checked by other code in this repository, and
+   * that chain cannot have a self-supporting bottom rung. `control-audit.yml` is the
+   * proof: the workflow that watches every other control was invalid YAML from the commit
+   * that created it, produced three runs with zero jobs, and **nothing here noticed**. A
+   * human reading the Actions tab did.
+   *
+   * ADR 022 conceded that the audit cannot detect its own death and left it there. This
+   * says where the regress stops instead, and refuses to let anyone pretend otherwise.
+   */
+  it('every control names a backstop', () => {
+    for (const control of registry.controls) {
+      expect(
+        control.backstop,
+        `${control.id} does not say what catches its own failure. Name either ` +
+          `control:<id> or human:<cadence> — and if the honest answer is "nothing", that ` +
+          `is what human:<cadence> is for.`
+      ).toBeTruthy()
+    }
+  })
+
+  it('every backstop is well-formed', () => {
+    for (const control of registry.controls) {
+      const backstop = control.backstop ?? ''
+      const isControl = backstop.startsWith('control:')
+      const isHuman = backstop.startsWith('human:')
+      expect(
+        isControl || isHuman,
+        `${control.id}: backstop "${backstop}" is neither control:<id> nor human:<cadence>`
+      ).toBe(true)
+
+      if (isControl) {
+        const target = backstop.slice('control:'.length)
+        expect(
+          registry.controls.map((c) => c.id),
+          `${control.id} is backstopped by "${target}", which is not a control`
+        ).toContain(target)
+      }
+      if (isHuman) {
+        expect(
+          HUMAN_CADENCES,
+          `${control.id}: "${backstop.slice('human:'.length)}" is not a cadence anyone keeps`
+        ).toContain(backstop.slice('human:'.length))
+      }
+    }
+  })
+
+  it.each(registry.controls.map((c) => [c.id, c] as const))(
+    '%s: following its backstops reaches a person',
+    (_id, control) => {
+      const seen: string[] = []
+      let current: Control | undefined = control
+
+      while (current) {
+        if (seen.includes(current.id)) {
+          expect.fail(
+            `The backstop chain from ${control.id} cycles: ${[...seen, current.id].join(' → ')}.\n\n` +
+              `Two controls backstopping each other is a chain with no bottom — each one ` +
+              `is "covered" by something that is itself covered by nothing.`
+          )
+        }
+        seen.push(current.id)
+
+        const backstop: string = current.backstop ?? ''
+        if (backstop.startsWith('human:')) return // reached the floor
+
+        const nextId: string = backstop.slice('control:'.length)
+        current = registry.controls.find((c) => c.id === nextId)
+      }
+
+      expect.fail(`The backstop chain from ${control.id} runs out without reaching a person`)
+    }
+  )
+
+  it('the human backstop is a document someone can actually follow', () => {
+    // A cadence with no checklist is an intention. The floor has to be executable by a
+    // person in a few minutes, or it is the same confession ADR 022 already made.
+    expect(
+      existsSync(join(ROOT, 'docs/weekly-verification.md')),
+      'docs/weekly-verification.md is missing, so "human:weekly" points at nothing'
+    ).toBe(true)
+  })
+})
+
+describe('an accepted gap expires rather than decaying', () => {
+  const accepted = registry.controls.filter((c) => c.status === 'not-configured')
+
+  it('there are gaps to check', () => {
+    // If this ever hits zero, both console actions are done — delete this block rather
+    // than letting it pass over an empty set.
+    expect(accepted.length).toBeGreaterThan(0)
+  })
+
+  it.each(accepted.map((c) => [c.id, c] as const))('%s: records when and why', (_id, control) => {
+    expect(control.acceptedSince, `${control.id} does not say when its gap was accepted`).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/
+    )
+    expect(
+      (control.acceptedWhy ?? '').length,
+      `${control.id}: the reason is too short to be one`
+    ).toBeGreaterThan(40)
+  })
+
+  it.each(accepted.map((c) => [c.id, c] as const))(
+    '%s: the acceptance has been restated recently enough',
+    (_id, control) => {
+      const days = Math.floor(
+        (Date.now() - new Date(control.acceptedSince ?? 0).getTime()) / 86_400_000
+      )
+      expect(
+        days,
+        `${control.id}'s gap was accepted ${days} days ago, over the ` +
+          `${ACCEPTED_GAP_MAX_AGE_DAYS}-day limit.\n\n` +
+          `This is not a deadline for fixing it — it is a deadline for deciding again. ` +
+          `Either close the gap, or update acceptedSince and acceptedWhy to say it is ` +
+          `still a deliberate choice. "Accepted" that nobody restates is indistinguishable ` +
+          `from "forgotten", and the probe stays quiet either way.\n\n` +
+          `${control.humanAction ?? ''}`
+      ).toBeLessThanOrEqual(ACCEPTED_GAP_MAX_AGE_DAYS)
+    }
+  )
 })
 
 describe('every ADR is classified', () => {
