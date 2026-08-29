@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest'
 
-const { preflight, writeStepOutputs, SOURCE_MARKER, EXPECTED_MARKER } = await import(
-  '../../../scripts/preflight-secrets.mjs'
-)
+const {
+  preflight,
+  writeStepOutputs,
+  capabilities,
+  CAPABILITIES,
+  SOURCE_MARKER,
+  EXPECTED_MARKER,
+} = await import('../../../scripts/preflight-secrets.mjs')
 
 /**
  * Two jobs, and the second is the one that matters.
@@ -296,5 +301,93 @@ describe('malformed secrets', () => {
     const text = lines.join('\n')
     expect(text).toContain('wrong kind')
     expect(text).toContain(SOURCE_MARKER)
+  })
+})
+
+/**
+ * **A capability is not a verdict.**
+ *
+ * The preflight answers a governance question — *is this environment configured?* — and the
+ * workflow was using that one answer to decide whether the live checks may run. Those are
+ * different questions, and conflating them cost this repository fourteen days of production
+ * verification.
+ *
+ * `SHOPIFY_ADMIN_ACCESS_TOKEN` held the wrong kind of token, so the preflight failed. The
+ * storefront step's `if:` named no status function, and GitHub implicitly ANDs `success()`,
+ * so a failed preflight skipped it. That token is read by five of seventeen live checks; the
+ * other twelve — including the fabricated-catalogue detector — never touch the Admin API and
+ * were skipped for a credential they do not use. So was the webhook probe.
+ *
+ * These assertions are written against the shape production was actually in, not a shape
+ * invented to make the feature look good. See
+ * [ADR 026](../../../docs/adr/026-a-capability-is-not-a-verdict.md).
+ */
+describe('capabilities are computed per check, not per setup', () => {
+  /** The five secrets, in the exact state issue #24 reports: one Admin token of the wrong kind. */
+  const PRODUCTION_TODAY = {
+    PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
+    SHOPIFY_STORE_DOMAIN: 'y0k9ve-q1.myshopify.com',
+    SHOPIFY_STOREFRONT_ACCESS_TOKEN: '0123456789abcdef0123456789abcdef',
+    SHOPIFY_ADMIN_ACCESS_TOKEN: 'shpca_not_an_admin_token',
+    SHOPIFY_WEBHOOK_SECRET: 'a-webhook-secret',
+  }
+
+  it('the wrong Admin token does not disable the storefront checks', () => {
+    // The finding, as a test. Twelve checks were skipped for fourteen days by a credential
+    // none of them reads.
+    expect(capabilities('misconfigured', PRODUCTION_TODAY).storefront).toBe(true)
+  })
+
+  it('the wrong Admin token does not disable the webhook probe either', () => {
+    // It signs a payload with SHOPIFY_WEBHOOK_SECRET and lets the deployed route judge it.
+    // No Admin API is involved at any point.
+    expect(capabilities('misconfigured', PRODUCTION_TODAY).webhook).toBe(true)
+  })
+
+  it('no capability names the Admin token', () => {
+    // Structural, so a future edit that adds it to a group has to justify itself here.
+    for (const [name, needed] of Object.entries(CAPABILITIES)) {
+      expect(needed, `${name} should not require the Admin token`).not.toContain(
+        'SHOPIFY_ADMIN_ACCESS_TOKEN'
+      )
+    }
+  })
+
+  it('a malformed Storefront token does disable the storefront checks', () => {
+    // The half that must not weaken. A Storefront slot holding an Admin token is the exact
+    // swap that made every fetcher fall back silently, and it must still stop the run.
+    const swapped = { ...PRODUCTION_TODAY, SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_admin_token' }
+    expect(capabilities('misconfigured', swapped).storefront).toBe(false)
+    expect(capabilities('misconfigured', swapped).webhook).toBe(true)
+  })
+
+  it('a missing credential disables only the capabilities that need it', () => {
+    const withoutWebhookSecret = { ...PRODUCTION_TODAY }
+    delete (withoutWebhookSecret as Partial<typeof PRODUCTION_TODAY>).SHOPIFY_WEBHOOK_SECRET
+    const ready = capabilities('misconfigured', withoutWebhookSecret)
+    expect(ready.webhook).toBe(false)
+    expect(ready.storefront).toBe(true)
+  })
+
+  it('nothing is capable when nothing is configured', () => {
+    // A store nobody has set up must stay quiet rather than report an outage it never
+    // looked for — the distinction ADR 006 built the three states for.
+    const ready = capabilities('not-configured', {})
+    expect(Object.values(ready).every((v) => v === false)).toBe(true)
+  })
+
+  it('a fully valid setup is capable of everything', () => {
+    const good = { ...PRODUCTION_TODAY, SHOPIFY_ADMIN_ACCESS_TOKEN: 'shpat_a_real_admin_token' }
+    const ready = capabilities('ready', good)
+    expect(Object.values(ready).every((v) => v === true)).toBe(true)
+  })
+
+  it('isolation is not a capability', () => {
+    // SMOKE_SECRETS_SOURCE exists to make repo-scoped secrets visible, not to stop a
+    // read-only probe running — the secrets reach the job either way. Its absence still
+    // fails the preflight, so nothing about it goes quiet; it just no longer vetoes checks.
+    const ready = capabilities('misconfigured', PRODUCTION_TODAY)
+    expect(PRODUCTION_TODAY).not.toHaveProperty(SOURCE_MARKER)
+    expect(ready.storefront).toBe(true)
   })
 })

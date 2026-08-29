@@ -158,7 +158,8 @@
     "docs/adr/019-an-unclassified-entry-is-an-unverified-one.md": "A rule about how enumerations are written, like ADR 007 is about how guardrails are written. Its three reconciliation tests run in the fast gate and fail by name, so their absence would be visible; that is what makes them guardrails rather than controls.",
     "docs/adr/023-the-last-link-is-a-person.md": "States where the verification regress terminates. It is the frame the backstop field implements, not an entry in it — and its enforcement is a registry test that fails loudly in the fast gate.",
     "docs/adr/024-a-tool-never-pointed-at-a-known-answer.md": "A rule about how verification tools are built and admitted to this registry. Like ADR 007, it constrains the entries rather than being one.",
-    "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible — a guardrail, not a control."
+    "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible — a guardrail, not a control.",
+    "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
   },
   "$backstopComment": [
     "Every control names what catches ITS OWN failure, and following the chain must end at a person.",

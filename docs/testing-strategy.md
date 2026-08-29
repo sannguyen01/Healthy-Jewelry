@@ -57,6 +57,15 @@ Publication scope is asserted as *every product, no exceptions*, never as a coun
 regresses is a new product added and not published, which a hardcoded number would happily pass once
 the total moved on.
 
+**Each live step gates on its own credentials, not on the preflight's verdict.** The
+preflight answers *is this environment configured?*; a step needs to know *can I reach what I
+examine?* Those were the same condition until 2026-08-29, and one wrong Admin token skipped
+twelve checks that never read it — including the fallback detector — for fourteen days.
+`preflight-secrets.mjs` now emits one output per capability and each step reads its own, with
+an explicit `always()` so GitHub's implicit `success()` cannot re-couple them. The verdict is
+unchanged: a misconfigured environment still fails the step, still reddens the run, still
+files its issue. See [ADR 026](adr/026-a-capability-is-not-a-verdict.md).
+
 **It is deliberately not a merge gate.** `.github/workflows/production-smoke.yml` is a separate
 workflow on a schedule plus `workflow_dispatch`, and branch protection must never require it: it is
 *meant* to fail for reasons unrelated to the commit under review, and a Shopify incident must not

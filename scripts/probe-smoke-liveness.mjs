@@ -43,13 +43,35 @@ const API = process.env.GITHUB_API_URL ?? 'https://api.github.com'
 const WORKFLOW = 'production-smoke.yml'
 
 /**
- * The steps whose success means production was actually looked at.
+ * The steps whose **execution** means production was actually looked at.
  *
  * Deliberately not the job's own conclusion. A job that fails at the preflight *is* a
  * completed run, and counting it would satisfy "a run happened" while proving nothing —
  * which is the entire failure this probe exists to name.
+ *
+ * And deliberately not the step's *success*, which is what this asserted until
+ * 2026-08-29. The question here is "has anything looked at the live store?", and a step
+ * that ran and reported real findings has looked. Requiring success would mean the alarm
+ * stays lit for as long as production has a problem — conflating *nobody is checking* with
+ * *somebody checked and did not like what they found*, which are opposite situations with
+ * opposite remedies. The first is this probe's subject; the second is what the smoke run's
+ * own failure issue is for.
+ *
+ * That distinction became load-bearing when each live step started gating on its own
+ * credentials rather than on the preflight's verdict: a run with one wrong Admin token now
+ * executes the twelve checks that never read it and fails on the five that do. Verification
+ * is happening. An alarm insisting otherwise would be a control reporting something other
+ * than the truth — the failure this whole family of tools exists to prevent.
+ *
+ * See docs/adr/026-a-capability-is-not-a-verdict.md.
  */
 export const REQUIRED_STEPS = ['Live store and storefront']
+
+/**
+ * Conclusions that mean a step actually ran. Anything else — `skipped`, `cancelled`, or the
+ * step being absent entirely — means nothing looked.
+ */
+export const EXECUTED_CONCLUSIONS = ['success', 'failure']
 
 /**
  * How far back a successful check must have happened. Four scheduled slots plus margin,
@@ -77,8 +99,8 @@ export function assessLiveness({ runs, stepsByRunId, now, windowHours = DEFAULT_
   const executed = (run) => {
     const steps = stepsByRunId[run.id]
     if (!steps) return null // steps unknown — not the same as "did not run"
-    return REQUIRED_STEPS.every(
-      (name) => steps.find((step) => step.name === name)?.conclusion === 'success'
+    return REQUIRED_STEPS.every((name) =>
+      EXECUTED_CONCLUSIONS.includes(steps.find((step) => step.name === name)?.conclusion)
     )
   }
 
@@ -151,8 +173,8 @@ function darkStreak(runs, stepsByRunId) {
   for (const run of runs) {
     const steps = stepsByRunId[run.id]
     if (!steps) break
-    const ok = REQUIRED_STEPS.every(
-      (name) => steps.find((step) => step.name === name)?.conclusion === 'success'
+    const ok = REQUIRED_STEPS.every((name) =>
+      EXECUTED_CONCLUSIONS.includes(steps.find((step) => step.name === name)?.conclusion)
     )
     if (ok) return { count, lastExecutedAt: run.created_at }
     count++

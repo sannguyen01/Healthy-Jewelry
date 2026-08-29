@@ -101,6 +101,65 @@ describe('against this repository’s real history', () => {
   })
 })
 
+describe('a step that ran and found problems is not darkness', () => {
+  /**
+   * The distinction this probe asserted wrongly until 2026-08-29.
+   *
+   * It required the step to conclude `success`, so a run that executed every live check and
+   * reported real findings counted as "nothing is verifying production". That conflates
+   * *nobody is checking* with *somebody checked and did not like what they found* — opposite
+   * situations with opposite remedies, and only the first is this probe's subject.
+   *
+   * It became load-bearing when each live step started gating on its own credentials rather
+   * than on the preflight's verdict: a wrong Admin token now executes the twelve checks that
+   * never read it and fails on the five that do. Verification is happening, and an alarm
+   * insisting otherwise would be a control reporting something other than the truth.
+   */
+  const RAN_AND_FAILED = REAL_STEPS_OF_A_DARK_RUN.map((step) =>
+    step.name === 'Live store and storefront' ? { ...step, conclusion: 'failure' } : step
+  )
+
+  it('a live step concluding failure counts as lit', () => {
+    const stepsByRunId = Object.fromEntries(REAL_RUNS.map((r) => [r.id, RAN_AND_FAILED]))
+    expect(assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW }).verdict).toBe('lit')
+  })
+
+  it('the old rule would have called that same run dark', () => {
+    // Pinning the behaviour change itself, so a future edit that reverts to
+    // `conclusion === 'success'` fails here rather than silently re-arming a false alarm.
+    const executedUnderOldRule = RAN_AND_FAILED.find(
+      (s) => s.name === 'Live store and storefront'
+    )?.conclusion === 'success'
+    expect(executedUnderOldRule).toBe(false)
+  })
+
+  it('skipped is still dark — the switch keeps its teeth', () => {
+    // The half that must not weaken. A step that never ran is exactly what this probe was
+    // built to catch, and it is still caught.
+    const stepsByRunId = Object.fromEntries(
+      REAL_RUNS.map((r) => [r.id, REAL_STEPS_OF_A_DARK_RUN])
+    )
+    expect(assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW }).verdict).toBe('dark')
+  })
+
+  it('a cancelled step is dark, not lit', () => {
+    // `cancelled` is neither success nor failure. A run someone stopped looked at nothing.
+    const cancelled = REAL_STEPS_OF_A_DARK_RUN.map((step) =>
+      step.name === 'Live store and storefront' ? { ...step, conclusion: 'cancelled' } : step
+    )
+    const stepsByRunId = Object.fromEntries(REAL_RUNS.map((r) => [r.id, cancelled]))
+    expect(assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW }).verdict).toBe('dark')
+  })
+
+  it('a missing step is dark, not lit', () => {
+    const withoutStep = REAL_STEPS_OF_A_DARK_RUN.filter(
+      (s) => s.name !== 'Live store and storefront'
+    )
+    const stepsByRunId = Object.fromEntries(REAL_RUNS.map((r) => [r.id, withoutStep]))
+    expect(assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW }).verdict).toBe('dark')
+  })
+})
+
 describe('the healthy case', () => {
   it('reports lit when a run in the window executed the checks', () => {
     const stepsByRunId = { ...allDark, [REAL_RUNS[0].id]: STEPS_OF_A_LIT_RUN }

@@ -9,7 +9,9 @@ const {
   REQUIRED_SHOP_POLICIES,
   classifyOriginResponse,
   describeAccessDenial,
+  describeCredentialRejection,
   classifyPhotographyCoverage,
+  required,
 } = await import('../../../scripts/verify-production.mjs')
 
 /**
@@ -406,5 +408,189 @@ describe('classifyPhotographyCoverage', () => {
     expect(ok).toBe(false)
     expect(detail).toMatch(/no products at all/i)
     expect(detail).not.toMatch(/Shopify Admin/)
+  })
+})
+
+/**
+ * **A missing credential means a check could not look, not that production is broken.**
+ *
+ * `required()` threw a plain `Error`, so a check whose credential was absent printed under
+ * `Failed:` beside genuine breakage — sending a reader hunting for unpublished products
+ * that are, in fact, published. That is the mislabelling `describeAccessDenial` was written
+ * to prevent one layer down, arriving through the credential instead of through the API's
+ * response.
+ *
+ * It became load-bearing on 2026-08-29, when each live step started gating on its own
+ * capability rather than on the preflight's verdict. A run with a wrong Admin token now
+ * executes the twelve checks that never read it; the five that do must report
+ * `⚠ could not evaluate` rather than five fabricated production failures.
+ *
+ * An unevaluable check still counts against the run and still exits non-zero (ADR 006) —
+ * a control that could not run is not a control that succeeded. Only the name changes.
+ */
+describe('a credential this check cannot reach', () => {
+  it('throws unevaluable rather than a plain failure', () => {
+    delete process.env.__HJ_ABSENT_FOR_TEST__
+    let thrown: (Error & { unevaluable?: boolean }) | null = null
+    try {
+      required('__HJ_ABSENT_FOR_TEST__')
+    } catch (error) {
+      thrown = error as Error & { unevaluable?: boolean }
+    }
+    expect(thrown, 'required() should throw when the variable is absent').not.toBeNull()
+    expect(
+      thrown?.unevaluable,
+      'a missing credential is "could not run", not "production is broken" — ADR 010'
+    ).toBe(true)
+  })
+
+  it('says so in words a reader can act on', () => {
+    expect(() => required('__HJ_ABSENT_FOR_TEST__')).toThrow(/could not run/)
+  })
+
+  it('returns the value when it is present', () => {
+    process.env.__HJ_PRESENT_FOR_TEST__ = 'a-value'
+    expect(required('__HJ_PRESENT_FOR_TEST__')).toBe('a-value')
+    delete process.env.__HJ_PRESENT_FOR_TEST__
+  })
+})
+
+/**
+ * **The hole was exactly the shape of production.**
+ *
+ * `describeAccessDenial` classifies the token Shopify *accepted* and then refused a field to.
+ * Nothing classified the token Shopify *rejected* — and that is the one the store has held for
+ * a fortnight. Run 33230925126 shipped a change whose stated behaviour was "the five
+ * Admin-dependent checks report `⚠ could not evaluate`"; run 33232085670, the acceptance run
+ * for that change, printed all five under `Failed:` instead. Both payloads below are verbatim
+ * from that run.
+ *
+ * The lesson is ADR 024's, landing on the tool that was written to apply it: a classifier is
+ * only exhaustive over the cases somebody thought to write down.
+ */
+describe('describeCredentialRejection', () => {
+  // Verbatim from run 33232085670: Shopify answers a wrong-kind Admin token with HTTP 401 and
+  // `errors` as a **string**, which is why `Array.isArray` — and therefore the whole of
+  // `describeAccessDenial` — never saw it.
+  const REJECTED_BODY = '[API] Invalid API key or access token (unrecognized login or wrong password)'
+
+  it('classifies the 401 that production actually returns', () => {
+    const detail = describeCredentialRejection('Admin', 401, REJECTED_BODY)
+    expect(detail).not.toBeNull()
+    expect(detail).toMatch(/could not be evaluated/)
+    expect(detail).toContain('SHOPIFY_ADMIN_ACCESS_TOKEN')
+  })
+
+  it('says plainly that this is not a finding about the store', () => {
+    // The whole point. A reader who takes `✗ The catalogue has product photography at all`
+    // at face value goes looking for missing photographs that are, in fact, present.
+    expect(describeCredentialRejection('Admin', 401, REJECTED_BODY)).toMatch(
+      /NOT a finding about the store/,
+    )
+  })
+
+  it('quotes what Shopify said rather than paraphrasing it', () => {
+    expect(describeCredentialRejection('Admin', 401, REJECTED_BODY)).toContain(REJECTED_BODY)
+  })
+
+  it('names the right secret for each surface', () => {
+    expect(describeCredentialRejection('Storefront', 401, REJECTED_BODY)).toContain(
+      'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
+    )
+    expect(describeCredentialRejection('Storefront', 401, REJECTED_BODY)).not.toContain(
+      'SHOPIFY_ADMIN_ACCESS_TOKEN',
+    )
+  })
+
+  it('does not repeat the surface its caller has already named', () => {
+    // `adminGraphql` throws `Admin API ${rejection}`. The first acceptance run printed
+    // "Admin API could not be evaluated — the Admin API rejected the token" because this
+    // sentence named the surface too. `describeAccessDenial` slots in the same position.
+    expect(describeCredentialRejection('Admin', 401, REJECTED_BODY)).not.toMatch(
+      /the Admin API rejected/,
+    )
+    expect(describeAccessDenial([
+      { message: 'Access denied for products field.', path: ['products'], extensions: { code: 'ACCESS_DENIED' } },
+    ])).toMatch(/^could not be evaluated/)
+    expect(describeCredentialRejection('Admin', 401, REJECTED_BODY)).toMatch(
+      /^could not be evaluated/,
+    )
+  })
+
+  it('recognises the rejection sentence even when the status is 200', () => {
+    // Some Shopify surfaces answer 200 with the same message. Status is the primary signal
+    // because it is the one they are consistent about; this is the fallback.
+    expect(describeCredentialRejection('Admin', 200, [{ message: REJECTED_BODY }])).not.toBeNull()
+  })
+
+  it('returns null for a genuine data error, and for an authorization denial', () => {
+    // It must not swallow everything. A real breakage has to stay a real breakage, and an
+    // under-scoped token belongs to `describeAccessDenial`, which words it differently.
+    expect(
+      describeCredentialRejection('Admin', 200, [
+        { message: 'Field does not exist', extensions: { code: 'undefinedField' } },
+      ]),
+    ).toBeNull()
+    expect(
+      describeCredentialRejection('Admin', 200, [
+        { message: 'Access denied for products field.', extensions: { code: 'ACCESS_DENIED' } },
+      ]),
+    ).toBeNull()
+    expect(describeCredentialRejection('Admin', 200, undefined)).toBeNull()
+    expect(describeCredentialRejection('Admin', 200, [])).toBeNull()
+  })
+})
+
+/**
+ * **Every way a credential can stop a check from looking is classified — and only those.**
+ *
+ * Three tools, one job between them: `required` (absent), `describeCredentialRejection`
+ * (refused), `describeAccessDenial` (accepted, under-scoped). Two of the three existed and the
+ * middle one did not, which is not a gap anybody would have described as missing — the
+ * remaining two looked like a complete pair. This table is the assertion that they are a set:
+ * a new credential shape has to be added to a row here, and a row that no tool claims fails.
+ *
+ * The same no-third-option rule as `TEXT_PAIRINGS` ∪ `ACCENT_ONLY` in the design tokens, for
+ * the same reason.
+ */
+describe('credential failure modes are exhaustively classified', () => {
+  const REJECTED = '[API] Invalid API key or access token (unrecognized login or wrong password)'
+
+  /** @type {[string, () => boolean][]} */
+  const cases: [string, () => boolean][] = [
+    [
+      'absent — the variable is not set at all',
+      () => {
+        try {
+          required('HJ_DEFINITELY_UNSET_FOR_THIS_TEST')
+          return false
+        } catch (err) {
+          return (err as { unevaluable?: boolean }).unevaluable === true
+        }
+      },
+    ],
+    [
+      'refused — the API rejected the token (HTTP 401, `errors` a string)',
+      () => describeCredentialRejection('Admin', 401, REJECTED) !== null,
+    ],
+    [
+      'accepted but under-scoped (HTTP 200, ACCESS_DENIED in an array)',
+      () =>
+        describeAccessDenial([
+          { message: 'Access denied for products field.', path: ['products'], extensions: { code: 'ACCESS_DENIED' } },
+        ]) !== null,
+    ],
+  ]
+
+  it.each(cases)('%s is recognised as unevaluable', (_name, isClassified) => {
+    expect(isClassified()).toBe(true)
+  })
+
+  it('does not classify a genuine store finding as a credential problem', () => {
+    // The floor beneath the rule above. A classifier that says yes to everything would pass
+    // every row and report a healthy store as unverifiable.
+    const realError = [{ message: 'Product not found', extensions: { code: 'NOT_FOUND' } }]
+    expect(describeCredentialRejection('Admin', 200, realError)).toBeNull()
+    expect(describeAccessDenial(realError)).toBeNull()
   })
 })
