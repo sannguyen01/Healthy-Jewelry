@@ -136,8 +136,7 @@ jobs:
             let diagnosis = 'The liveness probe produced no output.'
             try {
               const log = fs.readFileSync('smoke-liveness.log', 'utf-8').trim()
-              if (log) diagnosis = ['```', log.slice(-3000), '```'].join('
-')
+              if (log) diagnosis = ['```', log.slice(-3000), '```'].join('\n')
             } catch {
               // Fall through to the default — never invent a diagnosis from an absence.
             }
@@ -158,8 +157,7 @@ jobs:
               `Run: ${runUrl}`,
               '',
               'See `docs/adr/022-absence-needs-its-own-alarm.md`.',
-            ].join('
-')
+            ].join('\n')
 
             const { data: open } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
