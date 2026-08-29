@@ -110,6 +110,46 @@ function runTests(sentinel) {
 }
 
 /**
+ * The verdict, as a function of what was observed and nothing else.
+ *
+ * Extracted from `probe()` so it can be exercised against known answers without mutating
+ * a file or running a suite. That separation is not cosmetic: this probe shipped with two
+ * defects in one week — a sentinel naming the wrong spec, and a missing browser binary
+ * read as "the mutation was caught" — and **it had no unit test at all**, while the two
+ * probes that did have one (`verdict` in probe-branch-protection, `assessLiveness` in
+ * probe-smoke-liveness) shipped clean. The difference was that their decisions were pure
+ * and this one's was tangled with filesystem and subprocess work.
+ *
+ * Four states, and only `dead` means a test has stopped carrying information:
+ *
+ * - `unapplicable` — the mutation could not be applied; the anchor moved.
+ * - `unevaluable`  — the tests were already failing, so a red result proves nothing.
+ * - `alive`        — the mutation was applied and the tests noticed.
+ * - `dead`         — the mutation was applied and the tests did not.
+ *
+ * See docs/adr/024-a-tool-never-pointed-at-a-known-answer.md.
+ *
+ * @param {object} observed
+ * @param {number} observed.occurrences        Times the anchor text appears in the file.
+ * @param {{ failed: boolean, exitCode: number } | null} observed.baseline
+ *   Result of running the specs unmutated, or null when not reached.
+ * @param {{ failed: boolean, exitCode: number, viaBuild?: boolean } | null} observed.mutated
+ *   Result of running them mutated, or null when not reached.
+ * @returns {{ state: 'unapplicable' | 'unevaluable' | 'alive' | 'dead', exitCode?: number, viaBuild?: boolean }}
+ */
+export function classifyProbeResult({ occurrences, baseline, mutated }) {
+  if (occurrences !== 1) return { state: 'unapplicable' }
+  if (!baseline) return { state: 'unevaluable' }
+  if (baseline.failed) return { state: 'unevaluable' }
+  if (!mutated) return { state: 'unevaluable' }
+  return {
+    state: mutated.failed ? 'alive' : 'dead',
+    exitCode: mutated.exitCode,
+    viaBuild: mutated.viaBuild ?? false,
+  }
+}
+
+/**
  * @param {import('./lib/sentinels.mjs').Sentinel} sentinel
  *
  * Establishes a green baseline before mutating, because a red result only means the
@@ -130,7 +170,7 @@ function probe(sentinel) {
   const original = fs.readFileSync(file, 'utf8')
 
   const occurrences = original.split(sentinel.find).length - 1
-  if (occurrences !== 1) {
+  if (classifyProbeResult({ occurrences, baseline: null, mutated: null }).state === 'unapplicable') {
     // Not a dead assertion — a broken sentinel, and a different finding. A mutation that
     // does not apply proves nothing, and reporting it as "green under mutation" would be
     // a false accusation against a test that may be perfectly alive.
@@ -154,7 +194,7 @@ function probe(sentinel) {
   try {
     // Baseline first. A test that is already failing tells us nothing when it fails again.
     const baseline = runTests(sentinel)
-    if (baseline.failed) {
+    if (classifyProbeResult({ occurrences, baseline, mutated: null }).state === 'unevaluable') {
       return {
         id: sentinel.id,
         state: 'unevaluable',
@@ -169,12 +209,13 @@ function probe(sentinel) {
     }
 
     fs.writeFileSync(file, original.replace(sentinel.find, sentinel.replace))
-    const { failed, exitCode, viaBuild } = runTests(sentinel)
+    const mutated = runTests(sentinel)
+    const classified = classifyProbeResult({ occurrences, baseline, mutated })
     return {
       id: sentinel.id,
-      state: failed ? 'alive' : 'dead',
-      exitCode,
-      viaBuild: viaBuild ?? false,
+      state: classified.state,
+      exitCode: classified.exitCode,
+      viaBuild: classified.viaBuild,
       invariant: sentinel.invariant,
       specs: sentinel.specs,
       scar: sentinel.scar,

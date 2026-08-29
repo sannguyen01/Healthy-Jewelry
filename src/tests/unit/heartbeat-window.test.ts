@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const { SMOKE_CRON_INTERVAL_HOURS } = await import('../../../scripts/lib/smoke-schedule.mjs')
+const { SMOKE_CRON_INTERVAL_HOURS, ABSOLUTE_MAX_WINDOW_HOURS, MAX_ACCEPTABLE_SMOKE_INTERVAL_HOURS } =
+  await import('../../../scripts/lib/smoke-schedule.mjs')
 const { DEFAULT_WINDOW_HOURS } = await import('../../../scripts/probe-smoke-liveness.mjs')
 
 /**
@@ -87,6 +88,45 @@ describe('the window fits the interval', () => {
     // falls outside a window measured from the previous one, and the alarm fires on
     // punctuality rather than on absence.
     expect(DEFAULT_WINDOW_HOURS % interval).not.toBe(0)
+  })
+})
+
+describe('the window has an anchor the workflow cannot move', () => {
+  /**
+   * Every assertion in the block above is a multiple of `interval`, which is asserted
+   * equal to the cron in the very file being watched. That made the whole heartbeat
+   * self-referential: widen the cron, widen the window to match, and every check still
+   * passes while production goes unverified for days.
+   *
+   * A monitor calibrated entirely against its subject cannot distinguish "the patient is
+   * fine" from "the patient's own pulse-reader broke", because the subject is what moved.
+   * These two assertions are the fixed reference that restores the difference.
+   */
+  it('never allows silence beyond the absolute maximum', () => {
+    expect(
+      DEFAULT_WINDOW_HOURS,
+      `A ${DEFAULT_WINDOW_HOURS}h window exceeds the ${ABSOLUTE_MAX_WINDOW_HOURS}h policy ` +
+        `maximum. That limit does not derive from the schedule: production may not go ` +
+        `unverified for longer than this no matter what the cron says.`
+    ).toBeLessThanOrEqual(ABSOLUTE_MAX_WINDOW_HOURS)
+  })
+
+  it('never allows the schedule itself to slow past policy', () => {
+    // The assertion that closes the loop. Without it, a one-character cron edit widens
+    // the definition of healthy along with the schedule and nothing objects.
+    expect(
+      SMOKE_CRON_INTERVAL_HOURS,
+      `production-smoke runs every ${SMOKE_CRON_INTERVAL_HOURS}h, slower than the ` +
+        `${MAX_ACCEPTABLE_SMOKE_INTERVAL_HOURS}h policy. That is not a slower heartbeat, ` +
+        `it is a different decision about how often production must be verified — argue ` +
+        `for it by changing MAX_ACCEPTABLE_SMOKE_INTERVAL_HOURS, where a reviewer sees it.`
+    ).toBeLessThanOrEqual(MAX_ACCEPTABLE_SMOKE_INTERVAL_HOURS)
+  })
+
+  it('the policy bounds are mutually satisfiable', () => {
+    // A floor of two intervals and a ceiling of 48h must leave room for a real value, or
+    // the pair is unsatisfiable and the next person to touch the cron is stuck.
+    expect(MAX_ACCEPTABLE_SMOKE_INTERVAL_HOURS * 2).toBeLessThanOrEqual(ABSOLUTE_MAX_WINDOW_HOURS)
   })
 })
 
