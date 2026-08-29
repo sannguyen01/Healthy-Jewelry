@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { parse } from 'yaml'
 
 /**
  * **A document may not assert that a control is configured unless a probe reads that
@@ -100,6 +101,34 @@ describe('every probe exists and is wired in', () => {
         existsSync(join(ROOT, control.probeRunsIn)),
         `${control.probeRunsIn} does not exist`
       ).toBe(true)
+    }
+  )
+
+  it.each(registry.controls.map((c) => [c.id, c] as const))(
+    '%s: that workflow can actually run',
+    (_id, control) => {
+      // Existing is not running. `control-audit.yml` existed, contained every probe path
+      // this registry names, and was invalid YAML from the day it was written — so GitHub
+      // rejected it before scheduling anything and it produced three runs with zero jobs.
+      // This registry asserted three controls were probed there, two of them "configured".
+      //
+      // The old version of this check read the file with readFileSync and grepped it. A
+      // text search cannot tell a valid document from a broken one, which is why it passed
+      // for the entire life of the defect. See
+      // src/tests/unit/workflow-validity.test.ts for the full account.
+      if (!control.probeRunsIn.endsWith('.yml') && !control.probeRunsIn.endsWith('.yaml')) return
+
+      const source = readFileSync(join(ROOT, control.probeRunsIn), 'utf8')
+      let jobs: string[] = []
+      expect(() => {
+        const parsed = parse(source) as { jobs?: Record<string, unknown> }
+        jobs = Object.keys(parsed?.jobs ?? {})
+      }, `${control.probeRunsIn} is not valid YAML, so ${control.id}'s probe never runs`).not.toThrow()
+
+      expect(
+        jobs.length,
+        `${control.probeRunsIn} defines no jobs, so ${control.id}'s probe never runs`
+      ).toBeGreaterThan(0)
     }
   )
 
