@@ -49,7 +49,7 @@
     "axe-playwright": "^2.2.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.23",
-    "jsdom": "^25.0.1",
+    "jsdom": "^30.0.1",
     "pngjs": "^7.0.0",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
