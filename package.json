@@ -48,7 +48,7 @@
     "@vitest/ui": "^3.2.7",
     "axe-playwright": "^2.2.2",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^15.5.23",
+    "eslint-config-next": "^16.3.3",
     "jsdom": "^30.0.1",
     "pngjs": "^7.0.0",
     "postcss": "^8.5.26",
