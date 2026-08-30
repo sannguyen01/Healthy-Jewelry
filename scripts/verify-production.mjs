@@ -310,6 +310,87 @@ export function describeCredentialRejection(surface, status, errors) {
 }
 
 /**
+ * Turn a response that never answered the question into a sentence, or `null` if it did.
+ *
+ * ## The fourth case
+ *
+ * `describeCredentialRejection` covers 401/403 and `describeAccessDenial` covers a 200 with
+ * `ACCESS_DENIED`. Together they classify a token that is *absent*, *under-scoped* or
+ * *rejected* — three cases, arrived at one production incident at a time, and each one
+ * added only after it had already been mislabelled as a finding about the store.
+ *
+ * Everything else still fell through to `throw new Error(...)`, which prints under
+ * `Failed:` beneath a heading like "Every product is published to the headless
+ * publication". Concretely, before this existed:
+ *
+ * - **429** (throttled), **5xx** (Shopify is down), **402** (shop frozen), **423** (locked)
+ *   all reported as store findings. None of them is one — they say we could not look.
+ * - **A non-2xx with an empty body** was worse than mislabelled. `readGraphqlBody` returns
+ *   `{ errors: '' }` for it, `''` is falsy, so the `if (json.errors)` branch was skipped
+ *   entirely and `json.data` — `undefined` — was returned as success. The caller then died
+ *   on `Cannot read properties of undefined`, a stack trace with no mention of Shopify at
+ *   all.
+ * - **A 200 with `data: null` and no `errors`** took the same path to the same crash.
+ *
+ * ## Why this one is closed by rule rather than by case
+ *
+ * The first three were each written after meeting it. That is how a classifier ends up
+ * exhaustive over the cases someone wrote down and silent on the one the system is actually
+ * in — which is the history of this file. So this branch is stated as an invariant instead:
+ *
+ * > **A Shopify GraphQL endpoint answers business-logic problems with HTTP 200 and an
+ * > `errors` array. Therefore any non-2xx is a statement about our request, never about the
+ * > store's contents — and a 2xx carrying neither `data` nor `errors` is not an answer.**
+ *
+ * That covers statuses nobody has enumerated, including ones Shopify has not shipped yet.
+ * A 404 counts too: on a POST to a fixed GraphQL path it means the API version is wrong,
+ * which is a fact about our request.
+ *
+ * Pure, and fuzzed against malformed shapes in `production-smoke-handles.test.ts` rather
+ * than waiting for the fifth real-world case to reveal the next hole the way the third one
+ * did. See [ADR 024](docs/adr/024-a-tool-never-pointed-at-a-known-answer.md).
+ *
+ * @param {number | undefined} status
+ * @param {unknown} body the parsed GraphQL envelope
+ * @returns {string | null}
+ */
+export function describeUnusableResponse(status, body) {
+  const ok = typeof status === 'number' && status >= 200 && status < 300
+  const envelope = typeof body === 'object' && body !== null ? /** @type {any} */ (body) : {}
+
+  // `errors` may be an empty string here — `readGraphqlBody` produces that for an empty
+  // body — so emptiness is checked rather than truthiness. That falsy `''` is exactly what
+  // let an unanswered request be treated as a successful one.
+  const hasErrors =
+    Array.isArray(envelope.errors)
+      ? envelope.errors.length > 0
+      : typeof envelope.errors === 'string'
+        ? envelope.errors.trim().length > 0
+        : envelope.errors != null
+
+  if (ok && (envelope.data != null || hasErrors)) return null
+
+  const detail = ok
+    ? 'answered HTTP 200 with neither `data` nor `errors`'
+    : `answered HTTP ${typeof status === 'number' ? status : '(no status)'}`
+
+  const note = Array.isArray(envelope.errors)
+    ? envelope.errors.map((e) => (typeof e === 'string' ? e : e?.message)).filter(Boolean)
+    : typeof envelope.errors === 'string' && envelope.errors.trim()
+      ? [envelope.errors.trim()]
+      : []
+
+  return (
+    `could not be evaluated — the API ${detail}.\n` +
+    (note.length > 0 ? `  Shopify says: ${note.join('; ').slice(0, 300)}\n` : '') +
+    '  A Shopify GraphQL endpoint reports problems with the store as HTTP 200 and an\n' +
+    '  `errors` array, so this is a statement about the request rather than about the\n' +
+    '  catalogue. Throttling, an outage, a frozen or locked shop and a wrong API version\n' +
+    '  all land here. Nothing in this report below it examined the store.'
+  )
+}
+
+/**
  * Parse a Shopify response body without letting a non-JSON error page throw.
  *
  * A rejected request does not always answer in JSON, and `res.json()` throwing here would
@@ -351,6 +432,10 @@ async function adminGraphql(query, variables = {}) {
   // Rejected before under-scoped: a 401 never reaches the point where a scope could matter.
   const rejection = describeCredentialRejection('Admin', res.status, json.errors)
   if (rejection) throw unevaluableError(`Admin API ${rejection}`)
+  // Before the `errors` branch: a throttle or an outage carries an `errors` array too, and
+  // reading it as a finding about the catalogue is the mislabelling this file keeps making.
+  const unusable = describeUnusableResponse(res.status, json)
+  if (unusable) throw unevaluableError(`Admin API ${unusable}`)
   if (json.errors) {
     const denial = describeAccessDenial(json.errors)
     if (denial) throw unevaluableError(`Admin API ${denial}`)
@@ -375,6 +460,8 @@ async function storefrontGraphql(query, variables = {}) {
   // asymmetry this repository keeps finding the hard way.
   const rejection = describeCredentialRejection('Storefront', res.status, json.errors)
   if (rejection) throw unevaluableError(`Storefront API ${rejection}`)
+  const unusableStorefront = describeUnusableResponse(res.status, json)
+  if (unusableStorefront) throw unevaluableError(`Storefront API ${unusableStorefront}`)
   if (json.errors) throw new Error(`Storefront API: ${JSON.stringify(json.errors)}`)
   return json.data
 }

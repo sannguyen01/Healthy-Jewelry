@@ -25,6 +25,10 @@ beforeEach(() => {
         takeRecords: vi.fn(() => []),
         root: null,
         rootMargin: '',
+        // Added to IntersectionObserver by the DOM lib TypeScript 6 ships.
+        // The `satisfies` below is why this had to be updated rather than
+        // drifting quietly out of shape with the interface it mocks.
+        scrollMargin: '',
         thresholds: [],
       } satisfies IntersectionObserver
     })

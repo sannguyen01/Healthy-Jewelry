@@ -61,9 +61,11 @@ jobs:
           # has to be 0: without it the audit cannot run at all.
           fetch-depth: 0
 
+      # No `version:`. pnpm/action-setup reads `packageManager` from package.json,
+      # which is the single place this repository's pnpm version is declared.
+      # Setting it here as well would let CI and dependabot resolve the lockfile
+      # with different pnpm builds — how the `overrides:` block went missing.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -166,9 +168,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:`. pnpm/action-setup reads `packageManager` from package.json,
+      # which is the single place this repository's pnpm version is declared.
+      # Setting it here as well would let CI and dependabot resolve the lockfile
+      # with different pnpm builds — how the `overrides:` block went missing.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
