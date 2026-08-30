@@ -13,8 +13,32 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
  */
 async function searchControl(page: Page): Promise<Locator> {
   const inHeader = page.locator('header').getByRole('button', { name: /search/i })
+  const openMenu = page.getByRole('button', { name: /open menu/i })
+
+  // Wait for the header to settle into *one* of its two compositions before asking
+  // which one it is.
+  //
+  // `isVisible()` is a point-in-time question with no auto-wait — unlike almost every
+  // other Playwright call in this suite. Asked before the header has rendered it
+  // answers `false`, which is indistinguishable here from "this is the narrow
+  // layout", and the helper then commits irreversibly to the mobile branch. At
+  // 1280px there is no "open menu" button to click, so the failure surfaced 30
+  // seconds later as `locator.click: Test timeout` on a control that was never
+  // supposed to exist at that width — naming neither the race nor the real control.
+  //
+  // Observed on run 33306970766: of the three tests in this block that call this
+  // helper, two passed and one failed, in the same project, in the same run. Same
+  // code, same width, different answer — which is what a race looks like and what a
+  // broken layout does not.
+  //
+  // `.or()` waits until either control is present, so the probe below is asked a
+  // question the page has already finished answering. Resolving by *where the
+  // control actually is* is deliberate and unchanged — pinning a viewport here would
+  // make these tests assert the breakpoint, which is `header-fit.spec.ts`'s job.
+  await inHeader.or(openMenu).first().waitFor({ state: 'visible' })
+
   if (await inHeader.isVisible()) return inHeader
-  await page.getByRole('button', { name: /open menu/i }).click()
+  await openMenu.click()
   return page
     .getByRole('dialog', { name: /mobile navigation/i })
     .getByRole('button', { name: /search/i })
