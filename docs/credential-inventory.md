@@ -20,6 +20,24 @@ still configured. The two halves have to be compared by a human against
 
 Last reconciled by hand: **2026-08-10**.
 
+**The git-history half is no longer hand-run.** `scripts/audit-workflow-secrets.mjs` runs on
+every `verify` job as *Audit workflow credentials*, and its findings go to the run's job
+summary — read them there rather than from this file, which records a point in time. The step
+is `continue-on-error` on purpose: it exits 1 while orphans exist, and a blocking check on a
+finding only a human with console access can clear would freeze every merge (the ADR 008
+trade — report prominently, never block).
+
+Two things that follow, and are easy to get wrong:
+
+- **The count in this document is a claim, not a measurement.** It was written by hand and
+  nothing reconciles it against the auditor's output. If the two disagree, the job summary is
+  right.
+- **The audit cannot run on a shallow clone.** It needs the commits where workflows were
+  deleted, which is why `ci.yml` sets `fetch-depth: 0`. Run it in a sandbox that clones
+  shallowly and it exits 2 with a refusal rather than reporting a false all-clear — the
+  behaviour that matters most, since a security tool that under-reports is worse than one
+  that is absent.
+
 ---
 
 ## Orphaned — revoke and delete
