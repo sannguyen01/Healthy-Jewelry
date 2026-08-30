@@ -9,6 +9,7 @@ const {
   REQUIRED_SHOP_POLICIES,
   classifyOriginResponse,
   describeAccessDenial,
+  describeUnusableResponse,
   describeCredentialRejection,
   classifyPhotographyCoverage,
   required,
@@ -592,5 +593,127 @@ describe('credential failure modes are exhaustively classified', () => {
     const realError = [{ message: 'Product not found', extensions: { code: 'NOT_FOUND' } }]
     expect(describeCredentialRejection('Admin', 200, realError)).toBeNull()
     expect(describeAccessDenial(realError)).toBeNull()
+  })
+})
+
+/**
+ * **The classifier, fuzzed — because three cases were three incidents.**
+ *
+ * `describeCredentialRejection` (rejected), `describeAccessDenial` (under-scoped) and
+ * `required()` (absent) were each written *after* meeting the case in production, and each
+ * one had already been mislabelled as a finding about the store before it was added. The
+ * third arrived on 2026-08-29: an HTTP 401 whose `errors` was a **string**, so
+ * `Array.isArray` was false, so the call fell through to a plain `Error` and five checks
+ * printed under `Failed:` as though they had examined the catalogue — in the acceptance run
+ * for the very change that promised they would not.
+ *
+ * The lesson recorded in-repo is that *a classifier is exhaustive only over the cases
+ * someone wrote down, and the unwritten case is the one the system is actually in*. A
+ * fourth case added the same way would be the same defect on a delay, so this block asserts
+ * an **invariant** over generated shapes rather than a list of remembered ones:
+ *
+ * > No response that failed to answer the question may be reported as a finding about the
+ * > store.
+ *
+ * What that caught when it was first run, before `describeUnusableResponse` existed:
+ *
+ * - 429, 5xx, 402 and 423 all fell through to `throw new Error(...)` and printed under a
+ *   heading like "Every product is published to the headless publication".
+ * - A non-2xx with an **empty body** was worse. `readGraphqlBody` yields `{ errors: '' }`,
+ *   `''` is falsy, the error branch was skipped entirely, and `undefined` was returned as
+ *   though it were data — so the caller died on `Cannot read properties of undefined`, a
+ *   stack trace naming neither Shopify nor the credential.
+ */
+
+/** Status codes Shopify can answer with that say nothing about the catalogue. */
+const NON_ANSWERS = [400, 402, 404, 408, 423, 429, 500, 502, 503, 504, 522]
+
+/** Body shapes seen or plausible from a rejected, throttled, or broken request. */
+const MALFORMED_BODIES: Array<[string, unknown]> = [
+  ['empty string errors (empty response body)', { errors: '' }],
+  ['whitespace-only errors', { errors: '   ' }],
+  ['an HTML error page', { errors: '<html><head><title>502 Bad Gateway</title></head>' }],
+  ['a bare string', { errors: 'Throttled' }],
+  ['an errors object rather than an array', { errors: { message: 'nope' } }],
+  ['an empty errors array', { errors: [] }],
+  ['an array of empty objects', { errors: [{}] }],
+  ['entries with no extensions', { errors: [{ message: 'boom' }] }],
+  ['null errors', { errors: null }],
+  ['no keys at all', {}],
+  ['data explicitly null', { data: null }],
+  ['data null with empty errors', { data: null, errors: [] }],
+]
+
+describe('no unanswered request is reported as a finding about the store', () => {
+  for (const status of NON_ANSWERS) {
+    for (const [label, body] of MALFORMED_BODIES) {
+      it(`HTTP ${status} with ${label} is unevaluable`, () => {
+        const verdict = describeUnusableResponse(status, body)
+
+        expect(
+          verdict,
+          `HTTP ${status} with ${label} was not classified, so it falls through to a ` +
+            'plain Error and prints beneath a heading about the catalogue. A Shopify ' +
+            'GraphQL endpoint answers business-logic problems with 200 and an errors ' +
+            'array, so a non-2xx is always a statement about the request.'
+        ).toBeTruthy()
+
+        expect(verdict).toContain('could not be evaluated')
+        expect(verdict).toContain('rather than about the')
+      })
+    }
+  }
+
+  it('a 200 with neither data nor errors is not an answer', () => {
+    // This one returned `undefined` as data and crashed the caller with a TypeError that
+    // named nothing useful — the only shape here that failed louder than it failed wrongly.
+    expect(describeUnusableResponse(200, {})).toBeTruthy()
+    expect(describeUnusableResponse(200, { data: null })).toBeTruthy()
+    expect(describeUnusableResponse(200, { errors: '' })).toBeTruthy()
+  })
+
+  it('a missing status is not assumed to be fine', () => {
+    // `res.status` should always exist, but an absent one must not read as 2xx — that
+    // would make a transport failure indistinguishable from a healthy store.
+    expect(describeUnusableResponse(undefined, { data: { shop: {} } })).toBeTruthy()
+  })
+
+  it('reports the status so a reader can act on it', () => {
+    expect(describeUnusableResponse(429, { errors: 'Throttled' })).toContain('429')
+  })
+
+  it('surfaces what Shopify said, truncated', () => {
+    const verdict = describeUnusableResponse(503, { errors: 'Service Unavailable' })
+    expect(verdict).toContain('Service Unavailable')
+
+    const long = describeUnusableResponse(502, { errors: 'x'.repeat(5000) })
+    expect(long!.length).toBeLessThan(1200)
+  })
+})
+
+describe('a real answer is still a real answer', () => {
+  it('a 200 with data is not classified', () => {
+    // The half that matters most: over-classifying would turn every genuine store finding
+    // into "could not evaluate" and quietly disable the whole report.
+    expect(describeUnusableResponse(200, { data: { products: { edges: [] } } })).toBeNull()
+  })
+
+  it('a 200 with a genuine GraphQL error is left to the store-finding path', () => {
+    expect(
+      describeUnusableResponse(200, { errors: [{ message: 'Field does not exist' }] })
+    ).toBeNull()
+  })
+
+  it('a 200 with an ACCESS_DENIED array is left to describeAccessDenial', () => {
+    // Ordering contract: the scope classifier owns this shape and words it differently.
+    const denied = { errors: [{ message: 'Access denied', extensions: { code: 'ACCESS_DENIED' } }] }
+    expect(describeUnusableResponse(200, denied)).toBeNull()
+    expect(describeAccessDenial(denied.errors)).toBeTruthy()
+  })
+
+  it('every 2xx with data passes through', () => {
+    for (const status of [200, 201, 202, 204]) {
+      expect(describeUnusableResponse(status, { data: {} })).toBeNull()
+    }
   })
 })
