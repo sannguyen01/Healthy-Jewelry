@@ -65,11 +65,22 @@ const registry: Registry = JSON.parse(readFileSync(join(ROOT, 'docs/controls.jso
 
 const mergeGate = registry.controls.find((c) => c.id === 'merge-gate')
 
-/** Every markdown file in the repo, excluding vendored and generated trees. */
+/**
+ * Every markdown file in the repo, excluding vendored and generated trees.
+ *
+ * `.claude` used to be excluded here alongside them, and it does not belong in that company:
+ * `node_modules`, `.next`, `.git` and `playwright-report` are vendored or generated, while
+ * `.claude/skills/**` is hand-written guidance an agent reads *before* judging this
+ * repository. Excluding it meant the one document that told a reader "both are required
+ * checks on `main`" was the one document this contract could not see — while
+ * `docs/controls.json` recorded `merge-gate` as `not-configured` and eleven commits reached
+ * `main` unverified. Instructions to the thing doing the work are the last place a stale
+ * claim should be allowed to sit.
+ */
 function markdownFiles(dir: string = ROOT): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir)) {
-    if (['node_modules', '.next', '.git', 'playwright-report', '.claude'].includes(entry)) continue
+    if (['node_modules', '.next', '.git', 'playwright-report'].includes(entry)) continue
     const full = join(dir, entry)
     if (statSync(full).isDirectory()) out.push(...markdownFiles(full))
     else if (entry.endsWith('.md')) out.push(full)

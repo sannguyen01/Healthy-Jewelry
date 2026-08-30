@@ -1136,6 +1136,65 @@ async function openGraphRendersWithinBudget() {
  * is what this script's own conclusions rest on, and a fall-forward there would make
  * every other check in this file a report about a different API than it claims.
  */
+/**
+ * What one surface told us about the version it served — status first, header second.
+ *
+ * ## Why this is not a 401/403 special case
+ *
+ * `X-Shopify-API-Version` is present on an error the API *answered* and absent from a request
+ * it *refused*. When it is absent, `compareServedApiVersion(null)` correctly reports "the
+ * serving version is unknown" — a true sentence that becomes a false accusation the moment it
+ * is filed under drift, because the caller throws drift as a plain `Error`: *"the storefront
+ * is running against an API nobody tested it against."*
+ *
+ * That was first met as a 401 (run 33232085670) and fixed as a 401, by naming 401 and 403.
+ * But every other non-2xx behaves identically — **429** when Shopify throttles us, **5xx**
+ * during a Shopify incident, **402** on a frozen shop, **423** on a locked one. Each would
+ * have reported a fall-forward that is not happening, blocking, against a store nobody
+ * looked at.
+ *
+ * So the branch is keyed on the invariant `describeUnusableResponse` states elsewhere in this
+ * file rather than on a list of statuses somebody remembered: **a non-2xx from our request to
+ * Shopify is a statement about the request, never about the store.** The status list stops
+ * being something to keep complete.
+ *
+ * The 401/403 wording is kept distinct because the remedy differs — a refused token is
+ * something to go and fix, a 503 is something to wait out — and telling a reader which one
+ * they have is the whole value of the sentence.
+ *
+ * Pure, so both branches are exercised against known answers in
+ * `src/tests/unit/production-smoke-handles.test.ts`, per
+ * [ADR 024](docs/adr/024-a-tool-never-pointed-at-a-known-answer.md).
+ *
+ * @param {string} label 'Storefront' | 'Admin'
+ * @param {number | undefined} status — admits undefined deliberately. `res.status` should
+ *   always exist, but a transport-layer surprise must read as "we could not look" rather
+ *   than fall through the 2xx branch and be treated as a healthy answer.
+ * @param {string | null | undefined} header the `x-shopify-api-version` response header
+ * @param {string} [pinned]
+ * @returns {{ label: string, unreadable: boolean, matches: boolean, reason: string,
+ *             served?: string | null, pinned?: string }}
+ */
+export function classifyServedVersion(label, status, header, pinned = SHOPIFY_API_VERSION) {
+  const answered = typeof status === 'number' && status >= 200 && status < 300
+
+  if (!answered) {
+    const refused = status === 401 || status === 403
+    return {
+      label,
+      unreadable: true,
+      matches: false,
+      reason: refused
+        ? `rejected the token (HTTP ${status}), so the served version could not be read`
+        : `did not answer (HTTP ${typeof status === 'number' ? status : 'no status'}), so the ` +
+          'served version could not be read. Throttling, an outage, and a frozen or locked ' +
+          'shop all land here; none of them is a finding about the catalogue',
+    }
+  }
+
+  return { label, unreadable: false, ...compareServedApiVersion(header, pinned) }
+}
+
 async function shopifyServesThePinnedApiVersion() {
   const domain = resolveStoreDomain()
 
@@ -1149,25 +1208,7 @@ async function shopifyServesThePinnedApiVersion() {
       body: JSON.stringify({ query: '{ shop { name } }' }),
     })
 
-    // "Present even on an error" is true of an error the API *answered*, and false of a
-    // request it refused. A 401 carries no `x-shopify-api-version`, so `compareServedApiVersion`
-    // reads `null` and reports "the serving version is unknown, it cannot be assumed to be the
-    // pinned one" — which is a sentence about Shopify, printed because of our own credential.
-    // Run 33232085670 published exactly that. Rejection is its own outcome here too.
-    if (res.status === 401 || res.status === 403) {
-      return {
-        label,
-        rejected: true,
-        matches: false,
-        reason: `rejected the token (HTTP ${res.status}), so the served version could not be read`,
-      }
-    }
-
-    return {
-      label,
-      rejected: false,
-      ...compareServedApiVersion(res.headers.get('x-shopify-api-version')),
-    }
+    return classifyServedVersion(label, res.status, res.headers.get('x-shopify-api-version'))
   }
 
   const surfaces = [
@@ -1179,18 +1220,18 @@ async function shopifyServesThePinnedApiVersion() {
     }),
   ]
 
-  // Drift on a surface that answered outranks a rejection on one that did not: it is a real
-  // finding, and it is actionable now. A rejection alone leaves the question open, which is
-  // what `unevaluable` means.
-  const drifted = surfaces.filter((s) => !s.rejected && !s.matches)
+  // Drift on a surface that answered outranks silence from one that did not: it is a real
+  // finding, and it is actionable now. A surface that never answered leaves the question
+  // open, which is what `unevaluable` means.
+  const drifted = surfaces.filter((s) => !s.unreadable && !s.matches)
   if (drifted.length > 0) {
     throw new Error(drifted.map((s) => `${s.label} API: ${s.reason}`).join('\n  '))
   }
 
-  const rejected = surfaces.filter((s) => s.rejected)
-  if (rejected.length > 0) {
+  const unreadable = surfaces.filter((s) => s.unreadable)
+  if (unreadable.length > 0) {
     throw unevaluableError(
-      rejected.map((s) => `${s.label} API ${s.reason}`).join('\n  ') +
+      unreadable.map((s) => `${s.label} API ${s.reason}`).join('\n  ') +
         '\n  The surfaces that did answer were served the pinned version.',
     )
   }

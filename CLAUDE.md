@@ -217,6 +217,18 @@ Full detail in **`docs/testing-strategy.md`**. In short:
   instead — see [ADR 016](docs/adr/016-fit-is-a-measurement-nobody-took.md).
 - E2E runs against a **production build** (`pnpm build && pnpm start`), never `pnpm dev` — that is what
   Vercel serves.
+- **The gate is itself monitored.** A run that dies in setup reports every check as `skipped`, and
+  from outside a skipped check is indistinguishable from a passing one — that is how `main` stayed
+  unbuildable for a day across eleven merges. `scripts/probe-ci-liveness.mjs` (six-hourly, via
+  `control-audit.yml`) raises `merge-gate-dark` when CI runs on `main` stop evaluating the
+  repository. It keys on **`Lint` alone**: an ordinary red build also skips everything after the
+  step that failed, so demanding all four ran would alarm on every broken PR and be muted within a
+  week ([ADR 011](docs/adr/011-repeated-identical-failures-must-escalate.md)).
+- A workflow `if:` that reads another step's result **must name its own status function**. GitHub
+  ANDs `success()` onto any condition that names none, so a question about configuration silently
+  becomes a question about execution — see
+  [ADR 027](docs/adr/027-governance-and-execution-are-different-questions.md), enforced by
+  `src/tests/unit/workflow-condition-contract.test.ts`.
 
 ## PROHIBITED
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand

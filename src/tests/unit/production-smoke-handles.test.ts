@@ -10,10 +10,13 @@ const {
   classifyOriginResponse,
   describeAccessDenial,
   describeUnusableResponse,
+  classifyServedVersion,
   describeCredentialRejection,
   classifyPhotographyCoverage,
   required,
 } = await import('../../../scripts/verify-production.mjs')
+
+const { SHOPIFY_API_VERSION } = await import('../../../scripts/lib/api-version.mjs')
 
 /**
  * `scripts/verify-production.mjs` tells the static fallback apart from the live
@@ -714,6 +717,118 @@ describe('a real answer is still a real answer', () => {
   it('every 2xx with data passes through', () => {
     for (const status of [200, 201, 202, 204]) {
       expect(describeUnusableResponse(status, { data: {} })).toBeNull()
+    }
+  })
+})
+
+/**
+ * **The API-version check, and the third Shopify surface the classifier fix did not reach.**
+ *
+ * `describeUnusableResponse` above closed the "a non-2xx is not a finding about the store"
+ * hole in `adminGraphql` and `storefrontGraphql`. There is a third path that talks to
+ * Shopify — `shopifyServesThePinnedApiVersion`, which reads the `X-Shopify-API-Version`
+ * response header — and it was still keyed on a remembered list of two statuses:
+ *
+ *     if (res.status === 401 || res.status === 403) { …could not read the version… }
+ *     return { ...compareServedApiVersion(res.headers.get('x-shopify-api-version')) }
+ *
+ * That header is present on an error the API *answered* and absent from a request it
+ * *refused*. On a **429**, a **5xx**, a **402** or a **423** it is equally absent, so
+ * `compareServedApiVersion(null)` reported "the serving version is unknown" — true, and then
+ * filed under drift, which the caller throws as a plain `Error` reading *"the storefront is
+ * running against an API nobody tested it against."* A Shopify incident would have been
+ * published as a fall-forward that was not happening, blocking, about a store nothing looked
+ * at.
+ *
+ * Two surfaces fixed out of three is the shape this whole workstream is about: an instance
+ * repaired, the class left open. `classifyServedVersion` is keyed on the invariant instead,
+ * so the status list stops being something to keep complete.
+ *
+ * The second half matters as much as the first. Over-classifying here would silently disable
+ * the fall-forward detector [ADR 009](../../../docs/adr/009-api-version-must-be-asserted-not-declared.md)
+ * exists for — the one that caught this project running seven months on a retired API — so a
+ * 200 with a mismatched header must still be drift, and a 200 with a matching one must still
+ * pass.
+ */
+
+/** Statuses that mean the surface never told us anything about its version. */
+const NO_ANSWER_STATUSES = [400, 401, 402, 403, 404, 408, 423, 429, 500, 502, 503, 504]
+
+describe('a surface that did not answer cannot be reported as version drift', () => {
+  it.each(NO_ANSWER_STATUSES)('HTTP %s is unreadable, never drift', (status) => {
+    const result = classifyServedVersion('Admin', status, null)
+
+    expect(
+      result.unreadable,
+      `HTTP ${status} carries no x-shopify-api-version header, so classifying it by the ` +
+        'header reports "the serving version is unknown" — which the caller throws as a ' +
+        'blocking finding about the store. Every non-2xx is a statement about the request.'
+    ).toBe(true)
+
+    // `drifted` is `surfaces.filter(s => !s.unreadable && !s.matches)`. Being unreadable is
+    // what keeps it out of that list, so this is the assertion that actually protects the
+    // report — `matches` alone would not.
+    expect(result.unreadable && !result.matches).toBe(true)
+  })
+
+  it('a refused token still reads differently from an outage', () => {
+    // Same outcome, different remedy: one is a credential to go and fix, the other is a
+    // wait. Collapsing the wording would cost the reader the only actionable part.
+    expect(classifyServedVersion('Admin', 401, null).reason).toMatch(/rejected the token/)
+    expect(classifyServedVersion('Admin', 403, null).reason).toMatch(/rejected the token/)
+    expect(classifyServedVersion('Admin', 503, null).reason).toMatch(/did not answer/)
+    expect(classifyServedVersion('Admin', 429, null).reason).toMatch(/did not answer/)
+  })
+
+  it('names throttling and outages so the reader stops looking at the catalogue', () => {
+    expect(classifyServedVersion('Storefront', 429, null).reason).toMatch(
+      /none of them is a finding about the catalogue/
+    )
+  })
+
+  it('carries the surface label through, because the report names two of them', () => {
+    expect(classifyServedVersion('Storefront', 500, null).label).toBe('Storefront')
+    expect(classifyServedVersion('Admin', 500, null).label).toBe('Admin')
+  })
+
+  it('a header present on a non-2xx does not rescue it', () => {
+    // Shopify can answer 429 with the header set. The version is still not evidence: the
+    // request was refused service, so nothing was measured about what serves real traffic.
+    expect(classifyServedVersion('Admin', 429, '2026-07').unreadable).toBe(true)
+  })
+
+  it('a missing status is not assumed to be an answer', () => {
+    expect(classifyServedVersion('Admin', undefined, '2026-07').unreadable).toBe(true)
+  })
+})
+
+describe('the fall-forward detector still works', () => {
+  it('a 200 serving the pinned version passes', () => {
+    const result = classifyServedVersion('Admin', 200, SHOPIFY_API_VERSION)
+    expect(result.unreadable).toBe(false)
+    expect(result.matches).toBe(true)
+  })
+
+  it('a 200 serving a different version is drift, and blocking', () => {
+    // The case ADR 009 exists for: this project pinned 2025-01 for ~7 months after it
+    // retired, every request answered 200 by a different API, every other check green.
+    const result = classifyServedVersion('Admin', 200, '2025-01')
+    expect(result.unreadable).toBe(false)
+    expect(result.matches).toBe(false)
+    expect(result.reason).toMatch(/fall-forward/)
+  })
+
+  it('a 200 with no header at all is still not silently accepted', () => {
+    // The surface answered, so this is not "we could not look" — it is Shopify declining to
+    // say, which cannot be read as agreement. Stays in the drift channel deliberately.
+    const result = classifyServedVersion('Admin', 200, null)
+    expect(result.unreadable).toBe(false)
+    expect(result.matches).toBe(false)
+  })
+
+  it('every 2xx is treated as an answer', () => {
+    for (const status of [200, 201, 202, 204]) {
+      expect(classifyServedVersion('Admin', status, SHOPIFY_API_VERSION).matches).toBe(true)
     }
   })
 })

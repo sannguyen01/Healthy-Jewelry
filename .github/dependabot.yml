@@ -11,6 +11,29 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+    # Two majors are pinned *below* their latest release on purpose. Without these,
+    # dependabot re-proposes them weekly, and merging either reproduces the outage of
+    # 2026-08-29 exactly — eleven consecutive dark CI runs, main unbuildable for a day.
+    # See PR #57 and docs/adr/027-governance-and-execution-are-different-questions.md.
+    #
+    # Each entry names the constraint and the condition that lifts it, because an ignore
+    # with no stated expiry is indistinguishable from one nobody dares remove.
+    # src/tests/unit/pnpm-version-contract.test.ts holds these against package.json, so a
+    # pin cannot be raised without the ignore following, or vice versa.
+    ignore:
+      # eslint-config-next's major tracks Next's own. 16.x targets Next 16; against
+      # next@15 `next lint` cannot serialise its flat config and dies on a circular
+      # reference, taking the whole Lint step with it.
+      # LIFT WHEN: `next` itself moves to 16.
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      # @vitejs/plugin-react 6.x requires `vite: ^8.0.0`. pnpm.overrides pins vite to
+      # ^6.4.3 as part of #29's 52-CVE remediation, so the two cannot both hold — and
+      # while the overrides were missing from the lockfile this conflict was invisible.
+      # LIFT WHEN: the `vite` override in package.json moves past 7.
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+
     groups:
       # Patch/minor bumps land as one low-noise weekly PR. Major bumps are
       # excluded from the group so they surface individually — next, react,

@@ -366,6 +366,29 @@ for what that 8-day gap between "correctly escalated" and "acted on" means and w
 
 ## Resolved
 
+- [x] CI-BLACKOUT-LOCKFILE-OVERRIDES — resolved 2026-08-30, PR #57 (`47b0f38`).
+  `main` was unbuildable from 2026-08-29 04:27:56Z: `pnpm install --frozen-lockfile`
+  failed 0 seconds in with `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`, and every step
+  after it — Lint, Type-check, Unit tests, Production build, and the whole E2E
+  job — reported `skipped`. Eleven consecutive runs. **Eleven pull requests were
+  merged by hand in that window**, none of them evaluated by anything, because a
+  red run whose checks all say `skipped` does not look like a failure.
+  Bisecting `pnpm-lock.yaml` puts the break at `eca0527` (#47, the first
+  dependabot merge), which regenerated the lockfile **without** its top-level
+  `overrides:` block while `package.json` kept `pnpm.overrides`. Those four pins
+  are #29's CVE remediation (`pnpm audit: 52 → 0`) for chains no `pnpm update`
+  could reach — so dependabot silently deleted this repository's CVE mechanism,
+  and the gate that would have reported it was the gate the deletion disabled.
+  Root cause of the drop was **unpinned pnpm**: no `packageManager`, `ci.yml`
+  pinning `version: 9` separately, dependabot resolving with its own. Now one
+  declaration (`pnpm@9.15.9`) that `pnpm/action-setup` reads.
+  Restoring the overrides surfaced two majors the corruption had been masking —
+  `@vitejs/plugin-react` 6 needs `vite ^8` against the `^6.4.3` CVE pin, and
+  `eslint-config-next` 16 targets Next 16 — both pinned back, both now carrying
+  `ignore` entries in `dependabot.yml` so the weekly PR cannot re-land them.
+  ADR 027 records the `if:`-coupling class; `probe-ci-liveness.mjs` is the alarm
+  that was missing. Branch protection is **still off** — see High Priority.
+
 - [x] SHOPIFY-PRODUCT-NULL-FALLBACK — resolved 2026-08-22, PR #30 (`8dc678b`).
   `getProduct()` treated Shopify's authoritative `product: null` (a retired or
   renamed handle) the same as an outage, serving the static fallback catalog —
@@ -511,6 +534,21 @@ before PRs #28–32, and green on GitHub's Linux CI. Not a real defect; do not
 fix it by editing the tests. **384** E2E tests across **14** spec files (up
 from 296/11 on 2026-08-08), confirmed via `playwright test --list`, not run in
 full this session.
+
+**2026-08-30 update, measured on Linux after PR #57**: **1913** unit tests
+passing plus 5 skipped across **74** files (`pnpm exec vitest run`), and **488**
+E2E tests across **17** spec files (`pnpm exec playwright test --list`). No
+CRLF artefacts — this checkout is Linux, and the 2026-08-22 collection failures
+do not reproduce.
+
+`.claude/skills/project-conventions/SKILL.md` carried the 2026-08-01 figures
+(443 unit tests, 11 E2E spec files) until 2026-08-30, and instructs its reader
+to "report a shrinking count as a finding" — so measured against 443, a collapse
+from 1913 to 600 would still have read as growth. **A stale baseline does not
+weaken that rule, it inverts it.** Neither documentation guard covered the file:
+`required-checks-contract.test.ts` excluded `.claude` by name and
+`doc-numeric-claims.test.ts` scans a two-item allowlist. Both gaps are closed,
+and `agent-doc-claims.test.ts` now holds agent-facing docs against the registry.
 
 ## Architecture / design decisions
 

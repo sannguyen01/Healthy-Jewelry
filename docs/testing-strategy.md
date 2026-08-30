@@ -129,6 +129,7 @@ structurally cannot:
 | `probe-branch-protection.mjs` | Does `main` actually require the checks five documents said it did? |
 | `probe-assertion-liveness.mjs` | If these twelve invariants broke, would anything go red? |
 | `probe-smoke-liveness.mjs` | Has anything looked at the live store in the last 26 hours? |
+| `probe-ci-liveness.mjs` | Has the merge gate on `main` evaluated anything in the last 48 hours? |
 
 It **reports and never blocks.** Two of the three findings it can produce are console state only a human
 can change, and a blocking check on those is a permanent merge freeze — the same trade the premise tier
@@ -149,6 +150,39 @@ Three properties are worth copying into anything added here:
   `probe-smoke-liveness.mjs` fires when nothing has *succeeded*, keyed on the step conclusion rather
   than the job's — because a job that fails at its preflight is a completed run, and the last thirteen
   days of them checked nothing at all. See [ADR 022](adr/022-absence-needs-its-own-alarm.md).
+
+### The merge gate needed the same alarm, and did not have it
+
+`probe-smoke-liveness.mjs` was built for `production-smoke.yml`. Nothing watched `ci.yml` — and on
+2026-08-29 at 04:27:56Z the merge gate went dark and stayed dark for a day. A dependabot merge had
+regenerated `pnpm-lock.yaml` without its `overrides:` block, so `pnpm install --frozen-lockfile`
+failed 0 seconds in and every step after it reported `skipped`, the whole E2E job included. Eleven
+consecutive runs; eleven pull requests merged by hand against a gate that never ran. The Actions tab
+showed a red X whose cause read as a dependency problem, so nobody read further.
+
+`probe-ci-liveness.mjs` closes it, and shares `scripts/lib/liveness.mjs` with the smoke probe rather
+than copying the arithmetic. Two decisions in it are worth knowing:
+
+- **It keys on `Lint` alone.** A legitimately failing build *also* leaves later steps `skipped` —
+  lint rejects the code and nothing after it runs — which is structurally near-identical to the
+  blackout. A probe demanding all four executed would alarm on every broken pull request and be
+  muted within a week ([ADR 011](adr/011-repeated-identical-failures-must-escalate.md)). `Lint` is
+  the first step that evaluates the repository at all; if it ran, pass or fail, the gate did its
+  job. The gap this leaves — a gate broken *between* lint and build — is recorded as `knownLimit`
+  in `docs/controls.json` rather than quietly assumed away.
+- **"No runs" is `idle`, not `dark`.** `production-smoke.yml` is cron-driven, so silence there means
+  a stopped tier. `ci.yml` fires on push and pull request, so a quiet weekend is a quiet weekend.
+
+### And a condition that read as one question while asking another
+
+GitHub ANDs `success()` onto any `if:` that names no status function, so
+`if: steps.preflight.outputs.configured == 'true'` asked about configuration *and* execution — the
+defect that skipped thirteen production checks for fourteen days. Finding one instance by accident
+does not retire a class: an audit of every `if:` in all four workflows found a second, live, in
+`control-audit.yml` itself, working only because every preceding step happened to set
+`continue-on-error: true`. `src/tests/unit/workflow-condition-contract.test.ts` now parses every
+workflow and fails any condition that reads another step's result without saying when it wants to
+run. See [ADR 027](adr/027-governance-and-execution-are-different-questions.md).
 
 ### What each tier cannot see
 

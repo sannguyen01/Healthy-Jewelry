@@ -41,15 +41,46 @@ flag it if you see:
 
 ## Testing baseline
 
-As of 2026-08-01 on `main`: **443 unit tests** and **11 E2E spec files**
-(homepage, navigation, legal-pages, shop, product-detail, cart, contact,
-checkout, a11y via @axe-core/playwright, visual-assets, hero-legibility).
+Measured on `main` at 2026-08-30, after PR #57: **1913 unit tests** (plus 5
+skipped) across **74 files**, and **488 E2E tests** across **17 spec files**.
+
+Re-measure rather than trusting this line — it is a dated observation, not a
+constant:
+
+```
+pnpm exec vitest run          # unit count
+pnpm exec playwright test --list   # E2E count
+```
+
 Report a *shrinking* count as a finding; a growing one is not itself news.
+**That rule only works if this number is current.** It read "443 unit tests and
+11 E2E spec files" from 2026-08-01 until 2026-08-30, by which point the real
+figures were 1913 and 17 — so a collapse from 1913 to 600 would still have
+registered as growth. A stale baseline does not weaken the check, it inverts it.
 
 CI is two jobs — `verify` (lint, type-check, unit, build; the merge gate) and
-`e2e` (Playwright against a production build, both projects). Both are required
-checks on `main`. See `docs/testing-strategy.md` for what each layer covers,
-the measured timings, and the recorded a11y exception.
+`e2e` (Playwright against a production build, both projects). See
+`docs/testing-strategy.md` for what each layer covers, the measured timings, and
+the recorded a11y exception.
+
+**Whether those are *required* checks is not this file's to assert.**
+`docs/controls.json` is authoritative, and its `merge-gate` entry has read
+`not-configured` throughout — branch protection is off. This file claimed the
+opposite until 2026-08-30, which is exactly what
+`docs/adr/018-a-claim-about-a-control-is-not-a-control.md` forbids: a document
+asserting a control that no probe reads. It mattered. Eleven commits reached
+`main` unverified during the 2026-08-29 blackout precisely because nothing
+required these checks, while this file told every reader they were required.
+
+The two context strings protection *should* require, when someone enables it,
+are the names GitHub actually publishes — never the job IDs `verify` and `e2e`,
+which appear nowhere in the checks API and would block every PR forever
+(ADR 015):
+
+```required-checks
+Lint · Type-check · Unit tests · Build
+E2E tests (Playwright)
+```
 
 ## Outstanding known work (carry-forward — see STATE.md for current status)
 

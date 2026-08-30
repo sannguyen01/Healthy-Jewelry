@@ -151,3 +151,119 @@ describe('the CVE overrides survive', () => {
     ).toEqual([])
   })
 })
+
+/**
+ * **A deliberate downgrade needs an ignore, or dependabot undoes it on a weekly schedule.**
+ *
+ * Repairing the 2026-08-29 outage meant pinning two packages *below* their latest release:
+ *
+ * - `eslint-config-next` back to 15.x, because its major tracks Next's own and 16.x against
+ *   `next@15` kills `next lint` on a circular flat-config reference.
+ * - `@vitejs/plugin-react` back to 4.x, because 6.x requires `vite: ^8.0.0` while
+ *   `pnpm.overrides` pins vite to `^6.4.3` for #29's CVE remediation.
+ *
+ * Neither downgrade defends itself. Dependabot runs weekly and re-proposes both, and the
+ * eleven pull requests merged during the blackout are the evidence for how an unverified
+ * dependabot PR fares here. `.github/dependabot.yml` now carries an `ignore` entry for each.
+ *
+ * This test exists because those two files can drift silently in **both** directions. Raise a
+ * pin without dropping its ignore and the package is frozen for no stated reason; drop an
+ * ignore without raising the pin and the downgrade quietly reverts on the next weekly run.
+ * Neither shows up in a diff anyone reads, so the pair is asserted together.
+ *
+ * Parsed with `yaml`, never grepped — ADR 007, and the same reason
+ * `workflow-condition-contract.test.ts` parses rather than matches.
+ */
+
+/**
+ * Packages held below their latest major on purpose, with the constraint that holds them.
+ *
+ * A named list rather than a computed one: "is this pin deliberate or just old?" cannot be
+ * answered from the manifest, and a test that guessed would either nag about every ordinary
+ * out-of-date dependency or silently excuse a real regression.
+ */
+const DELIBERATE_DOWNGRADES: Record<string, string> = {
+  'eslint-config-next':
+    "its major tracks Next's own; 16.x against next@15 breaks `next lint` on a circular " +
+    'flat-config reference. Lift when `next` moves to 16.',
+  '@vitejs/plugin-react':
+    '6.x requires vite ^8.0.0, which contradicts the `vite: ^6.4.3` CVE override. Lift when ' +
+    'that override moves past 7.',
+}
+
+type Dependabot = {
+  updates?: Array<{
+    'package-ecosystem'?: string
+    ignore?: Array<{ 'dependency-name'?: string; 'update-types'?: string[] }>
+  }>
+}
+
+function npmUpdateBlock() {
+  const doc = parse(readFileSync(join(ROOT, '.github/dependabot.yml'), 'utf8')) as Dependabot
+  const npm = (doc.updates ?? []).find((u) => u['package-ecosystem'] === 'npm')
+  return npm
+}
+
+describe('deliberate downgrades are protected from dependabot', () => {
+  it('dependabot.yml declares an npm ecosystem block', () => {
+    // Without this, every assertion below passes vacuously on a renamed or moved file —
+    // the shape of green that proves nothing (ADR 020).
+    expect(npmUpdateBlock()).toBeTruthy()
+  })
+
+  it.each(Object.keys(DELIBERATE_DOWNGRADES))('%s has a major-version ignore', (name) => {
+    const entries = npmUpdateBlock()?.ignore ?? []
+    const entry = entries.find((e) => e['dependency-name'] === name)
+
+    expect(
+      entry,
+      `${name} is pinned below its latest major on purpose — ${DELIBERATE_DOWNGRADES[name]}\n\n` +
+        'Without an `ignore` entry in .github/dependabot.yml, that pin is re-proposed every ' +
+        'week, and merging the PR reproduces the 2026-08-29 outage: main unbuildable, eleven ' +
+        'consecutive CI runs reporting every check as `skipped`.'
+    ).toBeTruthy()
+
+    expect(
+      entry?.['update-types'],
+      `${name}'s ignore entry must name version-update:semver-major. Ignoring every update ` +
+        'would also freeze the patch and minor releases that carry security fixes, which is a ' +
+        'larger decision than this pin represents.'
+    ).toContain('version-update:semver-major')
+  })
+
+  it('every ignored package is one this repository actually depends on', () => {
+    // An ignore for a package that has been removed is dead weight that silently starts
+    // covering a future dependency of the same name. Same rot as a stale allowlist entry in
+    // workflow-condition-contract.test.ts, and rejected for the same reason.
+    const pkg = packageJson() as { dependencies?: Record<string, string> } & {
+      devDependencies?: Record<string, string>
+    }
+    const declared = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
+    const orphans = (npmUpdateBlock()?.ignore ?? [])
+      .map((e) => e['dependency-name'])
+      .filter((name): name is string => typeof name === 'string' && !(name in declared))
+
+    expect(
+      orphans,
+      `These packages are ignored in dependabot.yml but are not dependencies: ` +
+        `${orphans.join(', ')}. Remove the entries.`
+    ).toEqual([])
+  })
+
+  it('every documented downgrade is still actually downgraded', () => {
+    // The other direction. If someone raises `eslint-config-next` to 16 because Next moved
+    // to 16, this list and the ignore must go with it — otherwise the package stays frozen
+    // at a version nobody chose, for a reason that no longer applies.
+    const pkg = packageJson() as { devDependencies?: Record<string, string> } & {
+      dependencies?: Record<string, string>
+    }
+    const declared = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
+
+    const stale = Object.keys(DELIBERATE_DOWNGRADES).filter((name) => !(name in declared))
+    expect(
+      stale,
+      `DELIBERATE_DOWNGRADES names packages that are no longer dependencies: ` +
+        `${stale.join(', ')}. Drop them here and from dependabot.yml's ignore list.`
+    ).toEqual([])
+  })
+})
