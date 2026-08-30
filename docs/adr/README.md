@@ -46,6 +46,7 @@ pointer; the reasoning lives here once.
 | [024](024-a-tool-never-pointed-at-a-known-answer.md) | A tool that has never been pointed at a known answer is a first draft | Three probes, one week, and every defect fell on the one without a fixture test; spans the mutation probe, its decision test and the registry rule |
 | [025](025-a-number-in-prose-is-a-claim.md) | A number in prose is a claim like any other | A rejected colour value survived in two documents at once; spans `CLAUDE.md`, `testing-strategy.md` and the numeric sweep |
 | [026](026-a-capability-is-not-a-verdict.md) | A capability is not a verdict | One wrong credential skipped twelve checks that never read it; spans the preflight, the production verifier, the smoke workflow and the liveness probe |
+| [027](027-governance-and-execution-are-different-questions.md) | Governance and execution are different questions | The implicit `success()` on an unqualified `if:`, after the same shape appeared as a pipe under `bash -e` and as a failed install; spans both workflows, the condition contract, ADR 010 and ADR 026 |
 
 ## Format
 

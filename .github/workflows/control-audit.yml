@@ -121,7 +121,13 @@ jobs:
       # `continue-on-error` so a notification problem can never mask or manufacture a
       # result — the same trade production-smoke.yml makes for its reporter.
       - name: Report a dark verification tier
-        if: steps.smoke-liveness.outcome == 'failure'
+        # `always() &&` is load-bearing, not decoration. An `if:` naming no status
+        # function has `success()` ANDed onto it by GitHub, so this once asked "did
+        # everything before me succeed, AND is the tier dark?" — and the alarm about
+        # dark alarms would itself go dark the moment any earlier step failed. It
+        # worked only because every step above sets `continue-on-error`, which is a
+        # correctness property held somewhere else entirely. See ADR 027.
+        if: always() && steps.smoke-liveness.outcome == 'failure'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -200,7 +206,8 @@ jobs:
 
       # And close it when the tier comes back, so the label means what it says.
       - name: Close the liveness issue on recovery
-        if: steps.smoke-liveness.outcome == 'success'
+        # Same reasoning as the reporting step above, and the same ADR 027.
+        if: always() && steps.smoke-liveness.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@v7
         with:

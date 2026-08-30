@@ -7,7 +7,7 @@
     "reads that configuration from its own source of truth. Prose is a claim; a probe is evidence.",
     "",
     "JSON rather than YAML on purpose. This repo has no YAML parser dependency, so a YAML",
-    "registry would need a hand-written one — and a hand-written parser that silently matches",
+    "registry would need a hand-written one \u2014 and a hand-written parser that silently matches",
     "nothing is exactly the failure this registry exists to catch. A registry whose own reader",
     "could quietly return an empty set would be the joke writing itself.",
     "",
@@ -21,14 +21,14 @@
       "claims": "main requires both CI check runs to pass before a pull request can merge",
       "status": "not-configured",
       "requiredContexts": [
-        "Lint · Type-check · Unit tests · Build",
+        "Lint \u00b7 Type-check \u00b7 Unit tests \u00b7 Build",
         "E2E tests (Playwright)"
       ],
       "contextSource": ".github/workflows/ci.yml",
       "probe": "scripts/probe-branch-protection.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": true,
-      "humanAction": "GitHub → Settings → Branches → add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` — those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
+      "humanAction": "GitHub \u2192 Settings \u2192 Branches \u2192 add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` \u2014 those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
       "acceptedSince": "2026-08-25",
@@ -41,8 +41,8 @@
       "probe": "scripts/preflight-secrets.mjs",
       "probeRunsIn": ".github/workflows/production-smoke.yml",
       "selfMonitoring": true,
-      "humanAction": "GitHub → Settings → Environments → production-readonly: put the five secrets there and set the variable SMOKE_SECRETS_SOURCE=environment. Never set that marker at repository scope — it is what distinguishes isolated from merely green.",
-      "knownLimit": "A convention, not an enforcement. GitHub gives a job no way to ask where a secret came from, so setting the marker at repository scope defeats it. Recorded rather than overclaimed — ADR 006.",
+      "humanAction": "GitHub \u2192 Settings \u2192 Environments \u2192 production-readonly: put the five secrets there and set the variable SMOKE_SECRETS_SOURCE=environment. Never set that marker at repository scope \u2014 it is what distinguishes isolated from merely green.",
+      "knownLimit": "A convention, not an enforcement. GitHub gives a job no way to ask where a secret came from, so setting the marker at repository scope defeats it. Recorded rather than overclaimed \u2014 ADR 006.",
       "adr": "docs/adr/006-controls-must-fail-loudly.md",
       "backstop": "human:weekly",
       "acceptedSince": "2026-08-15",
@@ -59,13 +59,33 @@
       "backstop": "control:merge-gate"
     },
     {
+      "id": "workflow-condition-hygiene",
+      "claims": "no workflow condition reads another step's result while silently also requiring that nothing earlier succeeded",
+      "status": "configured",
+      "probe": "src/tests/unit/workflow-condition-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "adr": "docs/adr/027-governance-and-execution-are-different-questions.md",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "pnpm-single-resolver",
+      "claims": "one pnpm version resolves this lockfile, and the four CVE overrides cannot be removed without a test failing",
+      "status": "configured",
+      "probe": "src/tests/unit/pnpm-version-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Covers this repository's declarations only. Dependabot resolves lockfiles on its own infrastructure and honours `packageManager`, but nothing here can prove it did \u2014 the evidence is that the regenerated lockfile still carries its `overrides:` block, which `--frozen-lockfile` checks on every run.",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "smoke-escalation",
       "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours",
       "status": "configured",
       "probe": ".github/workflows/production-smoke.yml",
       "probeRunsIn": ".github/workflows/production-smoke.yml",
       "selfMonitoring": false,
-      "knownLimit": "The escalation logic lives inline in a github-script step and has no unit test. Issue #24 shows it working — escalated and labelled human-required on 2026-08-22 — but that is evidence from one occurrence, not a standing check.",
+      "knownLimit": "The escalation logic lives inline in a github-script step and has no unit test. Issue #24 shows it working \u2014 escalated and labelled human-required on 2026-08-22 \u2014 but that is evidence from one occurrence, not a standing check.",
       "adr": "docs/adr/011-repeated-identical-failures-must-escalate.md",
       "backstop": "control:smoke-liveness"
     },
@@ -77,7 +97,7 @@
       "probeRunsIn": ".github/workflows/production-smoke.yml",
       "probeLibrary": "scripts/lib/premise-checks.mjs",
       "selfMonitoring": true,
-      "knownLimit": "Runs only inside production-smoke, whose real checks have not executed since 2026-08-15. A detector downstream of a failing preflight is a detector that is not running — which is what the smoke-liveness control exists to say out loud.",
+      "knownLimit": "Runs only inside production-smoke, whose real checks have not executed since 2026-08-15. A detector downstream of a failing preflight is a detector that is not running \u2014 which is what the smoke-liveness control exists to say out loud.",
       "adr": "docs/adr/008-decisions-need-premise-detectors.md",
       "backstop": "control:smoke-liveness"
     },
@@ -88,7 +108,7 @@
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
-      "knownLimit": "Covers twelve declared sentinels, not the whole suite. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move — which is why the probe reports `unapplicable` loudly rather than skipping.",
+      "knownLimit": "Covers twelve declared sentinels, not the whole suite. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move \u2014 which is why the probe reports `unapplicable` loudly rather than skipping.",
       "adr": "docs/adr/020-a-test-that-cannot-fail-is-documentation.md",
       "backstop": "human:weekly"
     },
@@ -99,7 +119,7 @@
       "probe": "scripts/probe-smoke-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
-      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that — the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark.",
+      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that \u2014 the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark.",
       "adr": "docs/adr/022-absence-needs-its-own-alarm.md",
       "backstop": "human:weekly"
     },
@@ -156,9 +176,9 @@
     "docs/adr/018-a-claim-about-a-control-is-not-a-control.md": "The rule this registry implements. It is the frame, not an entry in it.",
     "docs/adr/021-a-metric-with-only-one-direction.md": "A rule about how sizes are written, and the audit that enforces it runs in the fast gate and fails by name. Its absence would be visible, which is what makes it a guardrail rather than a control.",
     "docs/adr/019-an-unclassified-entry-is-an-unverified-one.md": "A rule about how enumerations are written, like ADR 007 is about how guardrails are written. Its three reconciliation tests run in the fast gate and fail by name, so their absence would be visible; that is what makes them guardrails rather than controls.",
-    "docs/adr/023-the-last-link-is-a-person.md": "States where the verification regress terminates. It is the frame the backstop field implements, not an entry in it — and its enforcement is a registry test that fails loudly in the fast gate.",
+    "docs/adr/023-the-last-link-is-a-person.md": "States where the verification regress terminates. It is the frame the backstop field implements, not an entry in it \u2014 and its enforcement is a registry test that fails loudly in the fast gate.",
     "docs/adr/024-a-tool-never-pointed-at-a-known-answer.md": "A rule about how verification tools are built and admitted to this registry. Like ADR 007, it constrains the entries rather than being one.",
-    "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible — a guardrail, not a control.",
+    "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible \u2014 a guardrail, not a control.",
     "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
   },
   "$backstopComment": [
@@ -167,13 +187,13 @@
     "`control:<id>` points at another entry. `human:<cadence>` is the floor. There is no third form,",
     "and a cycle is a failure: two controls backstopping each other is a chain with no bottom.",
     "",
-    "This exists because the bottom rung broke on arrival. control-audit.yml — the tier that watches",
-    "every other control — was invalid YAML from the commit that created it and produced three runs",
+    "This exists because the bottom rung broke on arrival. control-audit.yml \u2014 the tier that watches",
+    "every other control \u2014 was invalid YAML from the commit that created it and produced three runs",
     "with zero jobs. Nothing in this repository noticed. A human reading the Actions tab did.",
     "",
     "ADR 022 conceded the audit cannot detect its own death and left it there. This says where the",
     "regress stops instead: docs/weekly-verification.md, five minutes, once a week, regardless of what",
-    "any dashboard says — because the premise is that the dashboards may be lying.",
+    "any dashboard says \u2014 because the premise is that the dashboards may be lying.",
     "",
     "See docs/adr/023-the-last-link-is-a-person.md."
   ],
@@ -181,12 +201,12 @@
     "A `not-configured` control names when its gap was accepted and why.",
     "",
     "probe-branch-protection.mjs exits 0 while the registry honestly says not-configured, so an",
-    "accepted gap raises no alarm — correctly, since a six-hourly alarm about a state only a human can",
+    "accepted gap raises no alarm \u2014 correctly, since a six-hourly alarm about a state only a human can",
     "change is the channel ADR 011 says people learn to mute.",
     "",
     "But silence has its own failure: `accepted` decays into `forgotten`, and nothing marks the moment.",
     "So the acceptance expires instead of the alarm firing. control-registry.test.ts fails when an",
     "acceptance is older than ACCEPTED_GAP_MAX_AGE_DAYS, which forces a person to restate it or close",
-    "it — once, in a diff a reviewer sees, rather than every six hours in a channel nobody reads."
+    "it \u2014 once, in a diff a reviewer sees, rather than every six hours in a channel nobody reads."
   ]
 }
