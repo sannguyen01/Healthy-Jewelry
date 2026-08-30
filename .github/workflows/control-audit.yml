@@ -235,6 +235,134 @@ jobs:
               })
             }
 
+      # Is anything still gating what lands on main?
+      #
+      # Separate from ci.yml's own red X on purpose, and for the same reason smoke-liveness
+      # is separate from production-smoke's. A failing gate has evaluated the code and
+      # rejected it — that is the gate working, and the Actions tab already says so. This
+      # asks the other question: has the gate evaluated anything at all? On 2026-08-29 the
+      # answer was no for eleven consecutive runs and a full day, while eleven pull requests
+      # merged by hand, because `Install dependencies` died and every check after it read
+      # `skipped`. ADR 022 was written for exactly this and pointed at the other workflow.
+      - name: Merge gate liveness — is CI still evaluating anything?
+        id: ci-liveness
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/probe-ci-liveness.mjs 2>&1 | tee ci-liveness.log
+
+      # Its own label, its own issue — the ADR 011 rule that a channel carrying two
+      # different facts is a channel people learn to skip.
+      - name: Report a dark merge gate
+        # `always() &&` for the reason in ADR 027: an `if:` naming no status function has
+        # `success()` ANDed onto it, which would make this alarm depend on every earlier
+        # step having passed rather than on what it actually asks.
+        if: always() && steps.ci-liveness.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const label = 'merge-gate-dark'
+            const title = 'Nothing is gating what lands on main'
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+
+            let diagnosis = 'The liveness probe produced no output.'
+            try {
+              const log = fs.readFileSync('ci-liveness.log', 'utf-8').trim()
+              if (log) diagnosis = ['```', log.slice(-3000), '```'].join('\n')
+            } catch {
+              // Fall through — never invent a diagnosis from an absence.
+            }
+
+            const body = [
+              'CI runs on `main` are completing, and the checks inside them are not',
+              'executing.',
+              '',
+              diagnosis,
+              '',
+              '**This is not the same finding as "CI is failing."** A failing gate has read',
+              'the code and rejected it. This one says the gate has not read anything — so',
+              'every merge in this window landed unverified, and the red X in the Actions',
+              'tab names a cause (usually a dependency or setup failure) that stops people',
+              'reading further.',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'See `docs/adr/022-absence-needs-its-own-alarm.md`.',
+            ].join('\n')
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            // One issue, updated — never one per run. ADR 011.
+            if (open.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              })
+              return
+            }
+
+            const issue = open[0]
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100,
+            })
+            const last = comments[comments.length - 1]
+            const withoutRun = (text) => text.replace(/Run: \S+/g, '').trim()
+            if (last && withoutRun(last.body) === withoutRun(body)) return // nothing new to say
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body,
+            })
+
+      # And close it when the gate comes back, so the label means what it says.
+      - name: Close the merge-gate issue on recovery
+        # Same reasoning as above, and the same ADR 027.
+        if: always() && steps.ci-liveness.outcome == 'success'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'merge-gate-dark'
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: 'A CI run on main has evaluated the repository again. Closing.',
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              })
+            }
+
       - name: Audit summary
         if: always()
         run: |
@@ -246,8 +374,9 @@ jobs:
             echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
             echo "| Assertion liveness (12 sentinels) | ${{ steps.liveness.outcome }} |"
             echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
+            echo "| Merge gate liveness (is CI evaluating?) | ${{ steps.ci-liveness.outcome }} |"
             echo ""
-            for log in merge-gate liveness smoke-liveness; do
+            for log in merge-gate liveness smoke-liveness ci-liveness; do
               if [ -s "$log.log" ]; then
                 echo "<details><summary>$log</summary>"
                 echo ""

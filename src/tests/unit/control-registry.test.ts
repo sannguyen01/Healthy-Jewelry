@@ -203,9 +203,16 @@ describe('every probe has been pointed at a known answer', () => {
         const source = readFileSync(join(testDir, file), 'utf8')
         // An import, not a mention. The liveness probe was named in a doc comment for a
         // week while having no test at all, which is exactly the state this rejects.
-        return new RegExp(`import\\(['"\`][^'"\`]*${control.probe.replace(/[/.]/g, '\\$&')}`).test(
-          source
-        )
+        //
+        // `\\s*` after the paren because prettier wraps a long destructuring import onto
+        // the next line, and without it this matched only single-line imports. It was
+        // passing for probe-smoke-liveness.mjs on the strength of heartbeat-window's
+        // one-line import while smoke-liveness.test.ts — the actual known-answer test —
+        // went unseen. A guardrail matching source with a regex has unknown coverage
+        // (ADR 007), and this is that hole inside ADR 024's own enforcement.
+        return new RegExp(
+          `import\\(\\s*['"\`][^'"\`]*${control.probe.replace(/[/.]/g, '\\$&')}`
+        ).test(source)
       })
 
       expect(

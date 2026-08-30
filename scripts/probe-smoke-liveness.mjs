@@ -37,9 +37,9 @@
  */
 
 import { SMOKE_CRON_INTERVAL_HOURS } from './lib/smoke-schedule.mjs'
+import { EXECUTED_CONCLUSIONS, didExecute, darkStreak, githubJson } from './lib/liveness.mjs'
 
 const REPO = process.env.GITHUB_REPOSITORY ?? 'sannguyen01/Healthy-Jewelry'
-const API = process.env.GITHUB_API_URL ?? 'https://api.github.com'
 const WORKFLOW = 'production-smoke.yml'
 
 /**
@@ -68,10 +68,10 @@ const WORKFLOW = 'production-smoke.yml'
 export const REQUIRED_STEPS = ['Live store and storefront']
 
 /**
- * Conclusions that mean a step actually ran. Anything else — `skipped`, `cancelled`, or the
- * step being absent entirely — means nothing looked.
+ * Re-exported so this probe's public surface is unchanged by the extraction. The reasoning
+ * for which conclusions count lives in `lib/liveness.mjs`, beside the shared predicate.
  */
-export const EXECUTED_CONCLUSIONS = ['success', 'failure']
+export { EXECUTED_CONCLUSIONS }
 
 /**
  * How far back a successful check must have happened. Four scheduled slots plus margin,
@@ -95,14 +95,8 @@ export function assessLiveness({ runs, stepsByRunId, now, windowHours = DEFAULT_
   const cutoff = new Date(now.getTime() - windowHours * 3600_000)
   const inWindow = runs.filter((run) => new Date(run.created_at) >= cutoff)
 
-  /** Did this run actually execute the checks? */
-  const executed = (run) => {
-    const steps = stepsByRunId[run.id]
-    if (!steps) return null // steps unknown — not the same as "did not run"
-    return REQUIRED_STEPS.every((name) =>
-      EXECUTED_CONCLUSIONS.includes(steps.find((step) => step.name === name)?.conclusion)
-    )
-  }
+  /** Did this run actually execute the checks? `null` when step data is unknown. */
+  const executed = (run) => didExecute(stepsByRunId[run.id], REQUIRED_STEPS)
 
   if (inWindow.length === 0) {
     return {
@@ -147,7 +141,7 @@ export function assessLiveness({ runs, stepsByRunId, now, windowHours = DEFAULT_
 
   // Runs are happening and the checks are not. The interesting case, and the one that
   // has been true since 2026-08-15.
-  const streak = darkStreak(runs, stepsByRunId)
+  const streak = darkStreak(runs, stepsByRunId, REQUIRED_STEPS)
   return {
     verdict: 'dark',
     reason: 'checks-not-executed',
@@ -167,39 +161,8 @@ export function assessLiveness({ runs, stepsByRunId, now, windowHours = DEFAULT_
   }
 }
 
-/** @returns {{ count: number, lastExecutedAt: string | null }} */
-function darkStreak(runs, stepsByRunId) {
-  let count = 0
-  for (const run of runs) {
-    const steps = stepsByRunId[run.id]
-    if (!steps) break
-    const ok = REQUIRED_STEPS.every((name) =>
-      EXECUTED_CONCLUSIONS.includes(steps.find((step) => step.name === name)?.conclusion)
-    )
-    if (ok) return { count, lastExecutedAt: run.created_at }
-    count++
-  }
-  return { count, lastExecutedAt: null }
-}
-
 function lastExecution(runs, stepsByRunId) {
-  return darkStreak(runs, stepsByRunId).lastExecutedAt
-}
-
-async function githubJson(pathname) {
-  const token = process.env.GITHUB_TOKEN
-  const response = await fetch(`${API}${pathname}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'healthy-jewelry-control-audit',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  })
-  if (!response.ok) {
-    throw new Error(`GitHub returned ${response.status} for ${pathname}`)
-  }
-  return response.json()
+  return darkStreak(runs, stepsByRunId, REQUIRED_STEPS).lastExecutedAt
 }
 
 async function main() {

@@ -124,6 +124,17 @@
       "backstop": "human:weekly"
     },
     {
+      "id": "ci-liveness",
+      "claims": "if CI runs on main stop evaluating the repository, an issue says so \u2014 a run that dies in setup reports every check as skipped, which from outside is indistinguishable from success",
+      "status": "configured",
+      "probe": "scripts/probe-ci-liveness.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Keys on the `Lint` step alone. A run whose lint executed has evaluated the repository, so an ordinary red build reads as `lit` \u2014 deliberately, because demanding that every check ran would alarm on each genuinely broken pull request and become a muted channel (ADR 011). It follows that a gate broken *after* lint, between lint and build, is not covered here; the merge gate's own red X carries that.",
+      "adr": "docs/adr/022-absence-needs-its-own-alarm.md",
+      "backstop": "human:weekly"
+    },
+    {
       "id": "hero-card-bound",
       "claims": "the hero copy card may occupy no more than 60% of the photograph it sits on",
       "status": "configured",
