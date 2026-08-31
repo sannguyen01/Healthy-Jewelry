@@ -22,6 +22,7 @@
       "status": "not-configured",
       "requiredContexts": [
         "Lint \u00b7 Type-check \u00b7 Unit tests \u00b7 Build",
+        "Dependency scope",
         "E2E tests (Playwright)"
       ],
       "contextSource": ".github/workflows/ci.yml",

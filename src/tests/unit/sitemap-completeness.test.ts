@@ -5,6 +5,8 @@ import { GET } from '@/app/api/sitemap/route'
 import { STATIC_PAGES, SITEMAP_EXCLUDED } from '@/lib/seo/sitemapPages'
 import { hjCollections, getAllProducts } from '@/lib/data/hj-data'
 
+import { pageRoutes } from '../support/parsers'
+
 /**
  * **Every route this app serves is either in the sitemap or excluded on the record.**
  *
@@ -48,23 +50,14 @@ const DYNAMIC_ROUTE_SOURCES: Record<string, string> = {
   '/products/[handle]': 'GET() derives one entry per product returned by getProducts()',
 }
 
-/** Every route the app router serves a page for, as the filesystem spells it. */
-function pageRoutes(dir: string = APP, prefix = ''): string[] {
-  const routes: string[] = []
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry)
-    if (statSync(full).isDirectory()) {
-      // `api/` holds route handlers, not pages; private folders start with `_`.
-      if (entry === 'api' || entry.startsWith('_')) continue
-      routes.push(...pageRoutes(full, `${prefix}/${entry}`))
-    } else if (entry === 'page.tsx') {
-      routes.push(prefix === '' ? '/' : prefix)
-    }
-  }
-  return routes
-}
+/** Reads the real `src/app` tree for the walk in `../support/parsers`. */
+const readAppDir = (relative: string) =>
+  readdirSync(join(APP, relative)).map((name) => ({
+    name,
+    isDirectory: statSync(join(APP, relative, name)).isDirectory(),
+  }))
 
-const routes = pageRoutes()
+const routes = pageRoutes(readAppDir)
 const staticRoutes = routes.filter((r) => !r.includes('['))
 const dynamicRoutes = routes.filter((r) => r.includes('['))
 const sitemapPaths = STATIC_PAGES.map((p) => p.loc as string)

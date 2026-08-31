@@ -41,7 +41,7 @@ flag it if you see:
 
 ## Testing baseline
 
-The suite spans **75 unit spec files** and **17 E2E spec files**.
+The suite spans **76 unit spec files** and **17 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
@@ -92,6 +92,7 @@ which appear nowhere in the checks API and would block every PR forever
 
 ```required-checks
 Lint · Type-check · Unit tests · Build
+Dependency scope
 E2E tests (Playwright)
 ```
 

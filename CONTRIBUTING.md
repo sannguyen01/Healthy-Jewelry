@@ -13,6 +13,7 @@ To enable enforcement, the required contexts are exactly these two strings:
 
 ```required-checks
 Lint · Type-check · Unit tests · Build
+Dependency scope
 E2E tests (Playwright)
 ```
 

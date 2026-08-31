@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 
 import { parse } from 'yaml'
 
+import { preflightArguments } from '../support/parsers'
+
 const { WHERE, SHAPE_RULES, SOURCE_MARKER, CAPABILITIES } = await import(
   '../../../scripts/preflight-secrets.mjs'
 )
@@ -33,17 +35,6 @@ const ROOT = resolve(__dirname, '../../..')
 const WORKFLOW = join(ROOT, '.github/workflows/production-smoke.yml')
 const source = readFileSync(WORKFLOW, 'utf8')
 
-/** The names passed to `preflight-secrets.mjs`, read from the `run:` line. */
-function preflightArguments(): string[] {
-  const invocation = source.match(
-    /node scripts\/preflight-secrets\.mjs((?:\s*\\\s*\n\s*[A-Z_][A-Z0-9_]*)+)/
-  )
-  if (!invocation) return []
-  return invocation[1]
-    .split('\n')
-    .map((line) => line.replace(/[\\\s]/g, ''))
-    .filter(Boolean)
-}
 
 /** Every `secrets.NAME` the workflow references anywhere. */
 function referencedSecrets(): string[] {
@@ -55,7 +46,7 @@ function referencedSecrets(): string[] {
   return [...names]
 }
 
-const args = preflightArguments()
+const args = preflightArguments(source)
 const referenced = referencedSecrets()
 
 describe('the parse found the invocation', () => {

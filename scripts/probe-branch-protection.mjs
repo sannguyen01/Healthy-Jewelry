@@ -50,7 +50,7 @@ const REPO = process.env.GITHUB_REPOSITORY ?? 'sannguyen01/Healthy-Jewelry'
 const API = process.env.GITHUB_API_URL ?? 'https://api.github.com'
 const BRANCH = 'main'
 /** Written on every run so the workflow's reporting step reads data, not prose. */
-const OUTPUT = process.env.MERGE_GATE_OUTPUT ?? 'merge-gate.json'
+const OUTPUT = 'merge-gate.json'
 
 /** @returns {{ requiredContexts: string[], status: string }} */
 function claimed() {
