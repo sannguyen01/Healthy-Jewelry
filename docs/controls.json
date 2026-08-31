@@ -22,17 +22,19 @@
       "status": "not-configured",
       "requiredContexts": [
         "Lint \u00b7 Type-check \u00b7 Unit tests \u00b7 Build",
+        "Dependency scope",
         "E2E tests (Playwright)"
       ],
       "contextSource": ".github/workflows/ci.yml",
       "probe": "scripts/probe-branch-protection.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": true,
+      "knownLimit": "The probe reports; it cannot enable protection, and it deliberately still exits 0 on an honestly-documented absence \u2014 failing a scheduled audit over a console action nobody in CI can perform would make the audit a permanent red that people learn to ignore. What changed is that the finding now reaches a person: the audit opens and updates one merge-gate-unenforced issue when the acceptance goes stale, or when ADR 015's own precondition is met. Until 2026-08-31 this probe's finding went into a log file and stopped, which made it the only control here whose result nothing carried.",
       "humanAction": "GitHub \u2192 Settings \u2192 Branches \u2192 add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` \u2014 those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
-      "acceptedSince": "2026-08-25",
-      "acceptedWhy": "ADR 015 recorded the gap; PR #42 made it reportable. Enabling protection is a GitHub console action."
+      "acceptedSince": "2026-08-31",
+      "acceptedWhy": "Restated after the 2026-08-29 blackout, which is what this gap costs when it is called: eleven consecutive CI runs on main died at Install dependencies, every check after reported skipped, and eleven pull requests were merged by hand against a gate that had not run. ADR 015 said protection was only reasonable once a passing run existed to enforce against; the last four runs on main are green, so that blocker is gone and the gap is now a choice rather than a wait. It stays accepted only because enabling protection is a GitHub console action nobody in CI can perform \u2014 and it no longer stays quiet: probe-branch-protection.mjs escalates it under the merge-gate-unenforced label."
     },
     {
       "id": "smoke-secret-isolation",
@@ -76,6 +78,26 @@
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
       "knownLimit": "Covers this repository's declarations only. Dependabot resolves lockfiles on its own infrastructure and honours `packageManager`, but nothing here can prove it did \u2014 the evidence is that the regenerated lockfile still carries its `overrides:` block, which `--frozen-lockfile` checks on every run.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "node-single-authority",
+      "claims": "one declared Node version resolves this repository, and every workflow and Vercel read it from the same field",
+      "status": "configured",
+      "probe": "src/tests/unit/node-version-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Covers this repository's declarations only. Vercel reads `engines.node` from its own build image and nothing here can prove which patch it resolved \u2014 the guarantee is that it reads the same field, and the same major, as CI does. Playwright is deliberately outside this control: `ci.yml` derives the browser version from the installed `@playwright/test` package and keys its cache on it, so the lockfile is already that tool's single authority and a second declaration would be the regression.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "dependency-scope-gate",
+      "claims": "a pull request cannot raise the major of next, react, react-dom or any @shopify/* package without a written rationale in its description",
+      "status": "configured",
+      "probe": "scripts/audit-dependency-scope.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "It reports; it does not block, because main has no branch protection and a red X sits beside a merge button anyone can still press. Registered as configured because the check itself runs and fails correctly \u2014 what is missing is the merge-gate control it would hang from, which is why that is its backstop rather than human:weekly. It also reads the package.json diff only: a major arriving through a transitive dependency, or through pnpm.overrides, is outside it. And `hasWrittenRationale` asks whether somebody wrote a paragraph under a heading, not whether the paragraph is any good \u2014 bounded coverage, stated rather than claimed (ADR 007).",
       "backstop": "control:merge-gate"
     },
     {

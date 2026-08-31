@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 
-const { verdict } = await import('../../../scripts/probe-branch-protection.mjs')
+const { verdict, escalationDecision, PRECONDITION_GREEN_RUNS } = await import(
+  '../../../scripts/probe-branch-protection.mjs'
+)
+const { ACCEPTED_GAP_MAX_AGE_DAYS } = await import('../../../scripts/lib/accepted-gap.mjs')
 
 /**
  * The classification logic of the merge-gate probe, exercised without a token.
@@ -105,5 +108,110 @@ describe('unreadable is not the same as unprotected', () => {
     // scheduled audit red, or the audit becomes the noise it exists to replace.
     const result = verdict(claimConfigured, { state: 'unevaluable', contexts: [], detail: '' })
     expect(result.agrees).not.toBe(false)
+  })
+})
+
+/**
+ * **When an absent gate should wake somebody, and when it should stay quiet.**
+ *
+ * The probe's exit code is deliberately blind to this: "absent, and the registry honestly
+ * says so" is a consistent state and exits 0, because failing a scheduled audit over a
+ * console action nobody in CI can perform produces a permanent red that people mute.
+ *
+ * The consequence, until 2026-08-31, was that the finding went into `merge-gate.log` and
+ * stopped. `smoke-liveness` and `ci-liveness` each open a labelled issue; the merge gate —
+ * the reason eleven commits reached `main` unverified on 2026-08-29 — had no channel at
+ * all. `escalationDecision` is that channel's decision, and it is a pure function precisely
+ * so it can be pointed at known answers here rather than learned from a live run (ADR 024).
+ *
+ * The four cases that must never escalate matter more than the two that must. An alarm that
+ * fires on an unreadable token is an alarm about credentials wearing a branch-protection
+ * label, which is ADR 010's confusion of "failed" with "could not run" rebuilt inside the
+ * fix for it.
+ */
+
+const AT_THE_TIME = new Date('2026-08-31T00:00:00Z')
+const FRESHLY_ACCEPTED = { acceptedSince: '2026-08-29', humanAction: 'GitHub → Settings' }
+const LONG_ACCEPTED = { acceptedSince: '2026-06-01', humanAction: 'GitHub → Settings' }
+const GREEN = Array(PRECONDITION_GREEN_RUNS).fill('success')
+const RED_STREAK = ['failure', 'failure', 'failure', 'failure']
+
+describe('an absent gate escalates for two reasons and no others', () => {
+  it('escalates when the precondition ADR 015 named is now met', () => {
+    // The state this repository is actually in: main unprotected, and the last four CI
+    // runs green after the blackout. ADR 015 said protection was "only reasonable once a
+    // passing run existed to enforce against" — so the stated blocker is gone.
+    const result = escalationDecision({
+      verdict: 'absent',
+      control: FRESHLY_ACCEPTED,
+      ciConclusions: GREEN,
+      now: AT_THE_TIME,
+    })
+    expect(result.escalate).toBe(true)
+    expect(result.reason).toBe('precondition-met')
+  })
+
+  it('escalates when the acceptance has gone stale, whatever CI is doing', () => {
+    const result = escalationDecision({
+      verdict: 'absent',
+      control: LONG_ACCEPTED,
+      ciConclusions: RED_STREAK,
+      now: AT_THE_TIME,
+    })
+    expect(result.escalate).toBe(true)
+    expect(result.reason).toBe('stale-acceptance')
+    expect(result.detail).toContain(String(ACCEPTED_GAP_MAX_AGE_DAYS))
+  })
+
+  it('stays quiet on a fresh acceptance with no green run to enforce against', () => {
+    const result = escalationDecision({
+      verdict: 'absent',
+      control: FRESHLY_ACCEPTED,
+      ciConclusions: RED_STREAK,
+      now: AT_THE_TIME,
+    })
+    expect(result.escalate).toBe(false)
+    expect(result.reason).toBe(null)
+  })
+
+  it('does not count a green streak shorter than the threshold', () => {
+    // One green run after a red streak is as likely to be the flake as the recovery.
+    const result = escalationDecision({
+      verdict: 'absent',
+      control: FRESHLY_ACCEPTED,
+      ciConclusions: ['success', 'failure', 'failure', 'failure'],
+      now: AT_THE_TIME,
+    })
+    expect(result.escalate).toBe(false)
+  })
+
+  it('treats an unreadable run history as no evidence, not as good news', () => {
+    // `null` is "the API did not answer". Reading a precondition out of that is the
+    // laundering ADR 006 is about, in the direction that produces a false alarm.
+    const result = escalationDecision({
+      verdict: 'absent',
+      control: FRESHLY_ACCEPTED,
+      ciConclusions: null,
+      now: AT_THE_TIME,
+    })
+    expect(result.escalate).toBe(false)
+  })
+})
+
+describe('every other verdict is silent here', () => {
+  it.each(['enforced', 'mismatched', 'unevaluable'])('%s does not escalate', (state) => {
+    // `mismatched` already exits 1 and fails loudly; `enforced` has nothing to say; and
+    // `unevaluable` means the probe could not read the setting. Escalating on the last of
+    // those would turn an expired token into an alarm about branch protection — ADR 010's
+    // separation of "this check failed" from "this check could not run", rebuilt inside
+    // the very fix that exists to honour it.
+    const result = escalationDecision({
+      verdict: state,
+      control: LONG_ACCEPTED, // stale enough to fire, if the verdict were absent
+      ciConclusions: GREEN, // green enough to fire, if the verdict were absent
+      now: AT_THE_TIME,
+    })
+    expect(result.escalate).toBe(false)
+    expect(result.reason).toBe(null)
   })
 })

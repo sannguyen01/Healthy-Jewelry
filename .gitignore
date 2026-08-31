@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Written by scripts/probe-branch-protection.mjs on every run (control-audit reads it as data).
+/merge-gate.json

@@ -66,7 +66,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: package.json
 
       # No `pnpm install`. Every probe here is dependency-free and uses Node 22's global
       # fetch, so this job cannot be broken by a dependency change the merge gate has
@@ -81,6 +81,158 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CONTROL_AUDIT_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node scripts/probe-branch-protection.mjs 2>&1 | tee merge-gate.log
+
+      # Its own label, its own issue. `merge-gate-dark` says the checks did not execute;
+      # this says they executed and nothing required them. Two different facts down one
+      # channel is a channel people learn to mute (ADR 011), and these two are the pair
+      # most easily confused — both are "the gate did not stop it".
+      - name: Report an unenforced merge gate
+        # `always() &&` is load-bearing, not decoration. An `if:` naming no status function
+        # has `success()` ANDed onto it, which would make this alarm depend on every earlier
+        # step having passed rather than on what it actually asks. Third recurrence of that
+        # bug in this repository — see docs/adr/027.
+        if: always() && steps.merge-gate.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const label = 'merge-gate-unenforced'
+            const title = 'Nothing requires the checks that run on main'
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+
+            // Read the probe's own output as data. Scraping its prose would mean this
+            // alarm goes quiet the day somebody rewords a sentence.
+            let probe
+            try {
+              probe = JSON.parse(fs.readFileSync('merge-gate.json', 'utf-8'))
+            } catch {
+              // No verdict is not a finding about branch protection. The audit summary
+              // below still carries the step's outcome.
+              return
+            }
+
+            if (!probe?.escalation?.escalate) return
+
+            const REASONS = {
+              'stale-acceptance': [
+                '`main` has no branch protection, and the decision to accept that has not',
+                'been restated inside the window the registry allows.',
+              ],
+              'precondition-met': [
+                '`main` has no branch protection, and the one blocker that was recorded',
+                'against enabling it is gone.',
+              ],
+            }
+
+            const body = [
+              ...(REASONS[probe.escalation.reason] ?? ['`main` has no branch protection.']),
+              '',
+              probe.escalation.detail,
+              '',
+              '**This is not the same finding as `merge-gate-dark`.** That one says the',
+              'checks did not execute. This one says they executed, reported, and bound',
+              'nothing — the merge button on this repository is the deploy button, with no',
+              'check standing between them.',
+              '',
+              '**What a human does about it**',
+              '',
+              probe.humanAction ?? 'See docs/controls.json, control `merge-gate`.',
+              '',
+              'If the answer is that the gap is still a deliberate choice, that is a valid',
+              'answer — record it by updating `acceptedSince` and `acceptedWhy` in',
+              '`docs/controls.json`, and this issue closes itself the day protection is on.',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'See `docs/adr/015-a-gate-that-was-only-ever-documented.md` and',
+              '`docs/adr/018-a-claim-about-a-control-is-not-a-control.md`.',
+            ].join('\n')
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            // One issue, updated — never one per run. ADR 011.
+            if (open.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              })
+              return
+            }
+
+            const issue = open[0]
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              per_page: 100,
+            })
+            const last = comments[comments.length - 1]
+            const withoutRun = (text) => text.replace(/Run: \S+/g, '').trim()
+            if (last && withoutRun(last.body) === withoutRun(body)) return // nothing new to say
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body,
+            })
+
+      # And close it when protection is actually on, so the label means what it says.
+      - name: Close the unenforced-gate issue when protection appears
+        # Same ADR 027 reasoning as above.
+        if: always() && steps.merge-gate.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const label = 'merge-gate-unenforced'
+
+            let probe
+            try {
+              probe = JSON.parse(fs.readFileSync('merge-gate.json', 'utf-8'))
+            } catch {
+              return
+            }
+
+            // Only `enforced` closes it. An `unevaluable` verdict means the probe could not
+            // read the setting, which is not evidence that the gate appeared — closing on it
+            // would turn an expired token into a clean bill of health (ADR 010).
+            if (probe.verdict !== 'enforced') return
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            })
+
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `\`main\` now requires: ${(probe.observedContexts ?? []).join(', ')}. Closing.`,
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              })
+            }
 
       # Twelve invariants broken on purpose, one at a time, to check that the tests
       # protecting them still go red. See docs/adr/020.

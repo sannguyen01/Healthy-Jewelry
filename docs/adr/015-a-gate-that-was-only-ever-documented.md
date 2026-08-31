@@ -49,6 +49,7 @@ configured, the documents say it is not configured, and record what enabling it 
 
   ```required-checks
   Lint · Type-check · Unit tests · Build
+  Dependency scope
   E2E tests (Playwright)
   ```
 

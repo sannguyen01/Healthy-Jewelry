@@ -72,6 +72,12 @@ const EXEMPT = new Set([
   'GITHUB_TOKEN',
   'GITHUB_REPOSITORY',
   'GITHUB_API_URL',
+
+  // Set by `ci.yml` from the pull request event, never by a contributor. It is passed
+  // through the environment rather than interpolated into the `run:` line precisely
+  // because it is attacker-controlled text; putting it in .env.local.example would
+  // suggest it is something a person configures.
+  'PR_BODY',
 ])
 
 describe('.env.local.example completeness', () => {

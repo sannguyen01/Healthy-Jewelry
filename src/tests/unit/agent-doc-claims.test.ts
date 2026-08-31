@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { ROOT, agentFacingDocuments } from '../support/agentDocs'
 
 /**
  * **Instructions to the agent are claims like any other.**
@@ -57,32 +59,10 @@ import { join, relative, resolve } from 'node:path'
  * again.
  */
 
-const ROOT = resolve(__dirname, '../../..')
-
 type Registry = { controls: Array<{ id: string; status: string }> }
 
 const registry: Registry = JSON.parse(readFileSync(join(ROOT, 'docs/controls.json'), 'utf8'))
 const mergeGate = registry.controls.find((c) => c.id === 'merge-gate')
-
-/**
- * Documents written to steer an agent or a contributor's judgement, as opposed to the
- * product itself. These are the ones whose errors propagate into decisions.
- */
-function agentFacingDocuments(): string[] {
-  const explicit = ['CLAUDE.md', 'AGENTS.md', 'LOOP.md', 'loop-constraints.md', 'CONTRIBUTING.md']
-  const found = explicit.filter((f) => existsSync(join(ROOT, f)))
-
-  const skills = join(ROOT, '.claude/skills')
-  if (existsSync(skills)) {
-    for (const entry of readdirSync(skills)) {
-      const skillFile = join(skills, entry, 'SKILL.md')
-      if (statSync(join(skills, entry)).isDirectory() && existsSync(skillFile)) {
-        found.push(relative(ROOT, skillFile))
-      }
-    }
-  }
-  return found
-}
 
 /**
  * Phrasings that assert branch protection is in force.

@@ -74,7 +74,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: package.json
 
       # No `pnpm install`: the script is dependency-free, on Node 22's global
       # fetch. Same reasoning as production-smoke.yml — a dependency change the

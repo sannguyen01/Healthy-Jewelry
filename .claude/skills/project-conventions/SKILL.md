@@ -41,11 +41,20 @@ flag it if you see:
 
 ## Testing baseline
 
-Measured on `main` at 2026-08-30, after PR #57: **1913 unit tests** (plus 5
-skipped) across **74 files**, and **488 E2E tests** across **17 spec files**.
+The suite spans **76 unit spec files** and **17 E2E spec files**.
 
-Re-measure rather than trusting this line — it is a dated observation, not a
-constant:
+Those two counts are the machine-checked half of this section:
+`src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
+spec file disappearing fails the gate instead of quietly lowering the bar. Do not edit
+them by hand to make a check pass — re-measure, and if the number really moved, ask why.
+
+Test *totals* are a dated observation, not a constant. Nothing here can re-measure them
+without running the suites, so they are recorded rather than reconciled:
+
+> Measured on `main` at 2026-08-30, after PR #57: 1913 unit tests (plus 5 skipped), and
+> 488 E2E tests.
+
+Re-measure before trusting them:
 
 ```
 pnpm exec vitest run          # unit count
@@ -53,10 +62,14 @@ pnpm exec playwright test --list   # E2E count
 ```
 
 Report a *shrinking* count as a finding; a growing one is not itself news.
-**That rule only works if this number is current.** It read "443 unit tests and
-11 E2E spec files" from 2026-08-01 until 2026-08-30, by which point the real
-figures were 1913 and 17 — so a collapse from 1913 to 600 would still have
-registered as growth. A stale baseline does not weaken the check, it inverts it.
+**That rule only works if the number is current.** This section read "443 unit tests and
+11 E2E spec files" from 2026-08-01 until 2026-08-30, by which point the real figures were
+1913 and 17 — so a collapse from 1913 to 600 would still have registered as growth. A
+stale baseline does not weaken the check, it inverts it.
+
+Worth stating what is still open: a suite that collapses **without losing a spec file** is
+invisible to the file-count check. That is a smaller hole than a baseline stale by a
+factor of four, not no hole.
 
 CI is two jobs — `verify` (lint, type-check, unit, build; the merge gate) and
 `e2e` (Playwright against a production build, both projects). See
@@ -79,6 +92,7 @@ which appear nowhere in the checks API and would block every PR forever
 
 ```required-checks
 Lint · Type-check · Unit tests · Build
+Dependency scope
 E2E tests (Playwright)
 ```
 

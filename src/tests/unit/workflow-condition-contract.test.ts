@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { parse } from 'yaml'
+import { conditions as parseConditions } from '../support/parsers'
 
 /**
  * **An `if:` that asks about another step must say when it wants to run.**
@@ -93,24 +93,9 @@ function workflowFiles(): string[] {
   return readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f))
 }
 
-type Finding = { where: string; condition: string }
-
-/** Every `if:` in a workflow, job-level and step-level, with a human-readable location. */
-function conditions(file: string): Finding[] {
-  const doc = parse(readFileSync(join(WORKFLOWS, file), 'utf8')) as Workflow
-  const found: Finding[] = []
-
-  for (const [jobId, job] of Object.entries(doc?.jobs ?? {})) {
-    if (typeof job?.if === 'string') {
-      found.push({ where: `job "${jobId}"`, condition: job.if.trim() })
-    }
-    for (const [index, step] of (job?.steps ?? []).entries()) {
-      if (typeof step?.if !== 'string') continue
-      const label = step.name ? `"${step.name}"` : `step #${index + 1}`
-      found.push({ where: `job "${jobId}" → ${label}`, condition: step.if.trim() })
-    }
-  }
-  return found
+/** Every `if:` in one workflow file. The reader itself lives in `../support/parsers`. */
+function conditions(file: string) {
+  return parseConditions(readFileSync(join(WORKFLOWS, file), 'utf8'))
 }
 
 describe('workflow conditions are parseable at all', () => {
