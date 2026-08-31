@@ -81,8 +81,27 @@
   drifts: `vercel.json` was added to the machine-readable policy by ADR 015 and never
   reached the prose, so the two disagreed about what a loop was allowed to rewrite.
   Whichever a reader found first was the answer they got.
-- Dependency major-version bumps (`next`, `react`, `react-dom`, any `@shopify/*`
-  package) and any high-severity CVE fix must escalate with written rationale.
+- Dependency major-version bumps in the packages below, and any high-severity CVE fix,
+  must escalate with written rationale.
+
+  ```escalation-majors
+  next
+  react
+  react-dom
+  @shopify/*
+  ```
+
+  That block is read as data by `scripts/audit-dependency-scope.mjs`, which runs on every
+  pull request and fails one that raises a listed package's major without a written
+  rationale in the description. The rule existed as prose for weeks and was enforced
+  exactly once, by a person: PR #61 noticed that a security advisory had arrived bundled
+  with a Next 16 migration, patched the CVE inside `next@15`, and declined the major. That
+  was correct, and it depended on someone reading carefully at the right moment.
+
+  The scope check is not the whole answer and its header says so: on a `main` with no
+  branch protection a required check requires nothing. It becomes load-bearing the day the
+  merge gate is enabled, and until then it is one more thing that says so out loud rather
+  than one more thing nobody knew was off.
 - Always use `pnpm`, never `npm` — this repo has no package-lock.json.
 - Brand content check: never approve or let through copy mentioning stones,
   gemstones, crystals, chakras, or healing/mystical language — this is a

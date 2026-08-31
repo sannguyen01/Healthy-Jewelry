@@ -90,6 +90,16 @@
       "backstop": "control:merge-gate"
     },
     {
+      "id": "dependency-scope-gate",
+      "claims": "a pull request cannot raise the major of next, react, react-dom or any @shopify/* package without a written rationale in its description",
+      "status": "configured",
+      "probe": "scripts/audit-dependency-scope.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "It reports; it does not block, because main has no branch protection and a red X sits beside a merge button anyone can still press. Registered as configured because the check itself runs and fails correctly \u2014 what is missing is the merge-gate control it would hang from, which is why that is its backstop rather than human:weekly. It also reads the package.json diff only: a major arriving through a transitive dependency, or through pnpm.overrides, is outside it. And `hasWrittenRationale` asks whether somebody wrote a paragraph under a heading, not whether the paragraph is any good \u2014 bounded coverage, stated rather than claimed (ADR 007).",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "smoke-escalation",
       "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours",
       "status": "configured",

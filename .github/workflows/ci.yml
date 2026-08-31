@@ -161,6 +161,49 @@ jobs:
           retention-days: 1
           include-hidden-files: true
 
+  # A security advisory arriving bundled with an unrelated major bump is a real pattern
+  # here, not a hypothetical: PR #60 proposed `next` 15.5.24 -> 16.3.3 to close two
+  # Critical RCEs, and the framework major rode along. PR #61 caught it, patched the CVE
+  # inside `next@15`, and declined the migration — correct, and dependent on a person
+  # reading carefully while a Critical advisory pushed for a fast merge.
+  #
+  # Dependency-free on purpose, like the control-audit probes: no `pnpm install`, so this
+  # cannot be broken by the very dependency change it is inspecting.
+  #
+  # **Known limit, stated rather than implied.** `main` has no branch protection, so a red
+  # X here blocks nothing — anyone can still press merge. What this buys today is that a
+  # bundled major is named at review time instead of noticed or not. It becomes a gate on
+  # the day the merge gate does. See docs/adr/018.
+  dependency-scope:
+    name: Dependency scope
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Both sides of the comparison have to be readable. A shallow clone has the head
+          # and not the base, and this check would then compare the manifest to itself and
+          # find nothing — a green that proves nothing, which is the failure mode the
+          # workflow-secrets auditor already learned the hard way on this same flag.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Does this pull request smuggle a major bump?
+        env:
+          # Through the environment, never interpolated into the `run:` line. A pull
+          # request description is text anyone can write, and
+          # `${{ github.event.pull_request.body }}` inside a shell command is an injection
+          # with a friendly name.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          node scripts/audit-dependency-scope.mjs \
+            --base "origin/${{ github.base_ref }}" \
+            --head "${{ github.event.pull_request.head.sha }}"
+
   e2e:
     name: E2E tests (Playwright)
     runs-on: ubuntu-latest
