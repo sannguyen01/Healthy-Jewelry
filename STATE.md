@@ -3,6 +3,58 @@
 Last run: never (scaffold not yet scheduled)
 Last refreshed by hand: 2026-08-22
 
+## Session note — 2026-08-31
+
+Five coordinated workstreams, all closing gaps the 2026-08-29 blackout exposed.
+Every premise below was checked against the live GitHub API rather than against
+this repository's own prose, which is the habit the SKILL.md defect argues for.
+
+**`main` is still unprotected** — `"protected": false` on every branch, `main`
+included. What changed is that the finding now reaches somebody. The merge-gate
+probe was the only one in `control-audit.yml` with no reporting step: it ran,
+wrote `merge-gate.log`, and exited 0, because "absent and honestly documented"
+is a consistent state. It is, and it was also the single highest-value unclosed
+item going nowhere. `escalationDecision()` opens and updates one
+`merge-gate-unenforced` issue when the acceptance goes stale, or when ADR 015's
+own precondition is met — and the last four CI runs on `main` are green, so it
+is met. Its own label, never `merge-gate-dark`: those are different facts
+(ADR 011).
+
+**Node joins pnpm as a declared authority.** `node-version: '22'` was a bare
+string in five workflow steps across four files, with no `engines.node` and
+Vercel choosing its own. Same shape as the `packageManager` gap, different field
+name, and no outage yet. Playwright deliberately untouched — `ci.yml` already
+derives the browser version from the installed package, so a second declaration
+would be the regression.
+
+**The numeric reconciler reaches agent-facing documents.** The scope was the
+defect twice over: a two-item allowlist, *and* a regex that required the unit to
+be adjacent to the number — so every figure in the stale baseline ("1913 unit
+tests", "488 E2E tests", "443 unit tests") was invisible to it. Spec-file counts
+are now reconciled against the filesystem; the test totals are dated rather than
+pretended into live claims, and the remaining hole is stated in the document.
+
+**PR #61's judgement is now a check.** A `Dependency scope` job fails a major
+bump on `next`, `react`, `react-dom` or `@shopify/*` arriving without a written
+rationale, reading the package list from an `escalation-majors` fence in
+`loop-constraints.md`. Both real PRs are its fixtures. **PR #60 closed** — the
+Next 16 major whose CVE half landed in #61.
+
+**Fuzzing the parsers found two real defects**, not the lists. `preflightArguments`
+over-read past an un-continued newline, returning a *longer* list than it should
+— `echo` and `done` as secrets — which the liveness anchors are blind to.
+`pageRoutes` knew nothing of route groups, so a future `(marketing)/deals` would
+have produced a false finding while hiding a true one.
+
+Two of this branch's own checks caught the rest of it: `required-checks-contract`
+refused the new job until the registry and all four fences named it, and
+`env-example-completeness` rejected an env knob that bought nothing.
+
+**Unchanged and still human-only**: issue #24 (`SHOPIFY_ADMIN_ACCESS_TOKEN` in
+the wrong slot — Shopify Admin console) and branch protection itself (GitHub
+Settings → Branches). Neither is a code fix, and no amount of engineering makes
+them one.
+
 ## Session note — 2026-08-21
 
 Two things changed since the last hand-refresh; neither touches the eight open
