@@ -44,6 +44,7 @@
 
 ## Budget
 - If token spend hits 80% of daily cap, switch to report-only
+- If token spend hits 100% of daily cap, exit immediately
 - If loop-pause-all is active, exit immediately
 
 ---

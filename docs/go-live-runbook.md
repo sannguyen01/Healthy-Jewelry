@@ -66,7 +66,7 @@ step 5 requires:
 
 **Do not proceed until this shows an active provider.** A store with none accepts a
 checkout and then cannot take money — the order is never created, so the webhook
-never fires, so step 4 tests nothing.
+never fires, so step 4 proves nothing.
 
 Shopify Payments **does not serve Vietnam**, so expect a manual method (bank
 transfer / COD) or a third-party gateway. Do not assume it is configured because
