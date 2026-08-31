@@ -28,11 +28,12 @@
       "probe": "scripts/probe-branch-protection.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": true,
+      "knownLimit": "The probe reports; it cannot enable protection, and it deliberately still exits 0 on an honestly-documented absence \u2014 failing a scheduled audit over a console action nobody in CI can perform would make the audit a permanent red that people learn to ignore. What changed is that the finding now reaches a person: the audit opens and updates one merge-gate-unenforced issue when the acceptance goes stale, or when ADR 015's own precondition is met. Until 2026-08-31 this probe's finding went into a log file and stopped, which made it the only control here whose result nothing carried.",
       "humanAction": "GitHub \u2192 Settings \u2192 Branches \u2192 add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` \u2014 those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
-      "acceptedSince": "2026-08-25",
-      "acceptedWhy": "ADR 015 recorded the gap; PR #42 made it reportable. Enabling protection is a GitHub console action."
+      "acceptedSince": "2026-08-31",
+      "acceptedWhy": "Restated after the 2026-08-29 blackout, which is what this gap costs when it is called: eleven consecutive CI runs on main died at Install dependencies, every check after reported skipped, and eleven pull requests were merged by hand against a gate that had not run. ADR 015 said protection was only reasonable once a passing run existed to enforce against; the last four runs on main are green, so that blocker is gone and the gap is now a choice rather than a wait. It stays accepted only because enabling protection is a GitHub console action nobody in CI can perform \u2014 and it no longer stays quiet: probe-branch-protection.mjs escalates it under the merge-gate-unenforced label."
     },
     {
       "id": "smoke-secret-isolation",

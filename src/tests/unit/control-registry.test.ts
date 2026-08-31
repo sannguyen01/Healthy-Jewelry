@@ -3,6 +3,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parse } from 'yaml'
 
+import { ACCEPTED_GAP_MAX_AGE_DAYS } from '../../../scripts/lib/accepted-gap.mjs'
+
 /**
  * **A document may not assert that a control is configured unless a probe reads that
  * configuration from its own source of truth.**
@@ -280,8 +282,17 @@ describe('a claim of "configured" has to be backed by something', () => {
  * console actions this repository cannot perform, and a check that failed until a human
  * changed a GitHub setting would be a permanent red suite, which is the ADR 008 trade in
  * reverse.
+ *
+ * Imported rather than declared, because it is no longer only this file's business:
+ * `probe-branch-protection.mjs` reads the same threshold to decide whether an absent merge
+ * gate has gone from *accepted* to *forgotten*. Two copies of a number that must agree is
+ * the shape `api-version.mjs` and `cacheTags.ts` both exist to prevent, and this file is
+ * the last place that should be reintroducing it.
+ *
+ * It also matters that the two sides disagree about *venue*, not about the number: this
+ * assertion runs inside the merge gate, which is exactly the control that does not exist,
+ * so the probe's issue is the copy of this deadline that can actually be enforced.
  */
-const ACCEPTED_GAP_MAX_AGE_DAYS = 30
 
 /** Cadences a human backstop may name. A cadence nobody could keep is not a backstop. */
 const HUMAN_CADENCES = ['per-pull-request', 'daily', 'weekly', 'monthly']

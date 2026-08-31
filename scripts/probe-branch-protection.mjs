@@ -43,10 +43,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { ACCEPTED_GAP_MAX_AGE_DAYS, daysSinceAccepted, isStale } from './lib/accepted-gap.mjs'
+
 const REGISTRY = path.resolve(import.meta.dirname, '../docs/controls.json')
 const REPO = process.env.GITHUB_REPOSITORY ?? 'sannguyen01/Healthy-Jewelry'
 const API = process.env.GITHUB_API_URL ?? 'https://api.github.com'
 const BRANCH = 'main'
+/** Written on every run so the workflow's reporting step reads data, not prose. */
+const OUTPUT = process.env.MERGE_GATE_OUTPUT ?? 'merge-gate.json'
 
 /** @returns {{ requiredContexts: string[], status: string }} */
 function claimed() {
@@ -55,7 +59,12 @@ function claimed() {
   if (!gate) {
     throw new Error('docs/controls.json has no merge-gate control. Nothing to compare against.')
   }
-  return { requiredContexts: gate.requiredContexts ?? [], status: gate.status }
+  return {
+    requiredContexts: gate.requiredContexts ?? [],
+    status: gate.status,
+    acceptedSince: gate.acceptedSince,
+    humanAction: gate.humanAction,
+  }
 }
 
 /**
@@ -179,10 +188,145 @@ export function verdict(claim, observed) {
   }
 }
 
+/**
+ * How many consecutive green runs on `main` count as "there is now a passing run to enforce
+ * against" — the precondition ADR 015 named for enabling protection at all.
+ *
+ * Four, not one. A single green run after a red streak is as likely to be the flake as the
+ * recovery, and this alarm is only worth having if people believe it (ADR 011).
+ */
+export const PRECONDITION_GREEN_RUNS = 4
+
+/**
+ * **Whether the absence of a merge gate should reach a person right now.**
+ *
+ * Separate from `verdict()` on purpose, and it does not change the exit code. The probe's
+ * exit semantics are correct as they stand: "absent, and the registry honestly says so" is a
+ * *consistent* state, and failing a scheduled audit over a console action nobody in CI can
+ * perform would make the audit a permanent red that people learn to ignore.
+ *
+ * But consistent is not the same as fine, and until now that finding went into a log file
+ * and stopped. `smoke-liveness` and `ci-liveness` each open a labelled issue; the merge gate
+ * — the single highest-value unclosed item in this repository, and the reason eleven commits
+ * reached `main` unverified on 2026-08-29 — had no channel at all. This is that channel's
+ * decision, extracted so it can be pointed at a known answer (ADR 024).
+ *
+ * Two reasons fire, and only on `absent`:
+ *
+ *   · `stale-acceptance`  — the gap has not been consciously restated inside
+ *     ACCEPTED_GAP_MAX_AGE_DAYS. `control-registry.test.ts` already asserts this, but it
+ *     asserts it *in the merge gate*, which is the thing that does not exist. A deadline
+ *     enforced only by the absent control is not a deadline.
+ *   · `precondition-met` — ADR 015 said protection was "only reasonable once a passing run
+ *     existed to enforce against". That is now true, so the one stated blocker is gone and
+ *     somebody should be told rather than left to notice.
+ *
+ * Never on `enforced` (nothing to say), `mismatched` (already exits 1 and fails loudly), or
+ * `unevaluable` — ADR 010's separation of "this check failed" from "this check could not
+ * run" has to survive here too, or an expired token becomes an alarm about branch protection.
+ *
+ * @param {{
+ *   verdict: string,
+ *   control: { acceptedSince?: string, humanAction?: string },
+ *   ciConclusions: string[] | null,
+ *   now?: Date,
+ * }} input
+ * @returns {{ escalate: boolean, reason: 'stale-acceptance' | 'precondition-met' | null, detail: string }}
+ */
+export function escalationDecision({ verdict: state, control, ciConclusions, now = new Date() }) {
+  if (state !== 'absent') {
+    return {
+      escalate: false,
+      reason: null,
+      detail: `Verdict is "${state}". This alarm speaks only for an absent gate.`,
+    }
+  }
+
+  if (isStale(control, now)) {
+    const days = daysSinceAccepted(control, now)
+    return {
+      escalate: true,
+      reason: 'stale-acceptance',
+      detail:
+        `The gap was last consciously accepted ${days} days ago, over the ` +
+        `${ACCEPTED_GAP_MAX_AGE_DAYS}-day limit. "Accepted" that nobody restates is ` +
+        `indistinguishable from "forgotten".`,
+    }
+  }
+
+  // `null` means the run history could not be read. That is not evidence of anything, and
+  // inventing a precondition from an absence is the laundering ADR 006 is about.
+  if (Array.isArray(ciConclusions) && ciConclusions.length >= PRECONDITION_GREEN_RUNS) {
+    const window = ciConclusions.slice(0, PRECONDITION_GREEN_RUNS)
+    if (window.every((c) => c === 'success')) {
+      return {
+        escalate: true,
+        reason: 'precondition-met',
+        detail:
+          `The last ${PRECONDITION_GREEN_RUNS} CI runs on ${BRANCH} all passed, so the one ` +
+          `blocker ADR 015 named — "only reasonable once a passing run existed to enforce ` +
+          `against" — no longer holds.`,
+      }
+    }
+  }
+
+  return {
+    escalate: false,
+    reason: null,
+    detail:
+      'The gap is absent, documented, recently restated, and there is no fresh run of green ' +
+      'CI to enforce against. Nothing new to say.',
+  }
+}
+
+/**
+ * The conclusions of the most recent completed `ci.yml` runs on `main`, newest first.
+ *
+ * Returns `null` on any failure. A history that could not be read must not read as a
+ * history of failures, and must not read as a history of successes either.
+ *
+ * @returns {Promise<string[] | null>}
+ */
+async function recentCiConclusions() {
+  const token = process.env.GITHUB_TOKEN
+  if (!token) return null
+
+  try {
+    const response = await fetch(
+      `${API}/repos/${REPO}/actions/workflows/ci.yml/runs` +
+        `?branch=${BRANCH}&status=completed&per_page=${PRECONDITION_GREEN_RUNS}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'healthy-jewelry-control-audit',
+        },
+      }
+    )
+    if (!response.ok) return null
+    const body = await response.json()
+    const runs = body?.workflow_runs
+    if (!Array.isArray(runs)) return null
+    return runs.map((run) => run?.conclusion ?? 'unknown')
+  } catch {
+    return null
+  }
+}
+
 async function main() {
   const claim = claimed()
   const observed = await actual()
   const result = verdict(claim, observed)
+
+  // Only asked when the answer can matter. An enforced or unreadable gate escalates
+  // nothing, and a request made to decide nothing is a request that can only fail.
+  const ciConclusions = result.verdict === 'absent' ? await recentCiConclusions() : null
+  const escalation = escalationDecision({
+    verdict: result.verdict,
+    control: claim,
+    ciConclusions,
+  })
 
   const payload = {
     control: 'merge-gate',
@@ -192,7 +336,15 @@ async function main() {
     observedState: observed.state,
     observedContexts: observed.contexts,
     detail: observed.detail,
+    escalation,
+    humanAction: claim.humanAction ?? null,
+    recentCiConclusions: ciConclusions,
   }
+
+  // Always written, whatever the verdict, and always as data. The reporting step in
+  // control-audit.yml reads this file rather than scraping the human-readable output —
+  // an alarm that parses prose is an alarm that goes quiet when the prose is reworded.
+  fs.writeFileSync(OUTPUT, JSON.stringify(payload, null, 2))
 
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(payload, null, 2))
@@ -206,6 +358,10 @@ async function main() {
     if (observed.detail && observed.state === 'absent') {
       console.log('')
       console.log(observed.detail)
+    }
+    if (escalation.escalate) {
+      console.log('')
+      console.log(`ESCALATE (${escalation.reason}): ${escalation.detail}`)
     }
   }
 
