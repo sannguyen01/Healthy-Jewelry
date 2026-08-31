@@ -66,7 +66,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: package.json
 
       # No `pnpm install`. Every probe here is dependency-free and uses Node 22's global
       # fetch, so this job cannot be broken by a dependency change the merge gate has

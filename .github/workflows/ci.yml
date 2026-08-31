@@ -70,7 +70,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: package.json
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -177,7 +177,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: package.json
           cache: 'pnpm'
 
       - name: Install dependencies

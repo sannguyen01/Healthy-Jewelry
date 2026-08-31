@@ -79,6 +79,16 @@
       "backstop": "control:merge-gate"
     },
     {
+      "id": "node-single-authority",
+      "claims": "one declared Node version resolves this repository, and every workflow and Vercel read it from the same field",
+      "status": "configured",
+      "probe": "src/tests/unit/node-version-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Covers this repository's declarations only. Vercel reads `engines.node` from its own build image and nothing here can prove which patch it resolved \u2014 the guarantee is that it reads the same field, and the same major, as CI does. Playwright is deliberately outside this control: `ci.yml` derives the browser version from the installed `@playwright/test` package and keys its cache on it, so the lockfile is already that tool's single authority and a second declaration would be the regression.",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "smoke-escalation",
       "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours",
       "status": "configured",
