@@ -47,6 +47,7 @@ pointer; the reasoning lives here once.
 | [025](025-a-number-in-prose-is-a-claim.md) | A number in prose is a claim like any other | A rejected colour value survived in two documents at once; spans `CLAUDE.md`, `testing-strategy.md` and the numeric sweep |
 | [026](026-a-capability-is-not-a-verdict.md) | A capability is not a verdict | One wrong credential skipped twelve checks that never read it; spans the preflight, the production verifier, the smoke workflow and the liveness probe |
 | [027](027-governance-and-execution-are-different-questions.md) | Governance and execution are different questions | The implicit `success()` on an unqualified `if:`, after the same shape appeared as a pipe under `bash -e` and as a failed install; spans both workflows, the condition contract, ADR 010 and ADR 026 |
+| [028](028-a-fixture-is-the-input-you-thought-of.md) | A fixture is the input you thought of | ADR 024 one level up: two of three parsers were wrong the moment they saw generated input, and one returned a *longer* list than it should — the direction no liveness anchor sees; spans `src/tests/support/parsers.ts`, `generate.ts` and `parser-fuzz.test.ts` |
 
 ## Format
 

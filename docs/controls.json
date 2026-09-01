@@ -101,6 +101,16 @@
       "backstop": "control:merge-gate"
     },
     {
+      "id": "install-single-command",
+      "claims": "every consumer that installs from pnpm-lock.yaml passes --frozen-lockfile, so none of them can resolve around a lockfile the merge gate would reject",
+      "status": "configured",
+      "probe": "src/tests/unit/install-command-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Asserts what this repository declares, not what Vercel executes. A project-level Install Command set in the Vercel dashboard overrides vercel.json, and nothing here can read that \u2014 the same blind spot smoke-secret-isolation records for GitHub environment scoping. Verify it once in the dashboard and re-verify when the project is reconfigured; this check covers every other consumer, and covers the file a reviewer would read to answer the question.",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "smoke-escalation",
       "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours",
       "status": "configured",
@@ -212,6 +222,7 @@
     "docs/adr/023-the-last-link-is-a-person.md": "States where the verification regress terminates. It is the frame the backstop field implements, not an entry in it \u2014 and its enforcement is a registry test that fails loudly in the fast gate.",
     "docs/adr/024-a-tool-never-pointed-at-a-known-answer.md": "A rule about how verification tools are built and admitted to this registry. Like ADR 007, it constrains the entries rather than being one.",
     "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible \u2014 a guardrail, not a control.",
+    "docs/adr/028-a-fixture-is-the-input-you-thought-of.md": "A rule about how verification tools are tested before being relied upon, like ADR 007 is about how guardrails are written and ADR 024 about pointing them at a known answer. It constrains the entries rather than being one, and its enforcement is parser-fuzz.test.ts, which fails by name in the fast gate.",
     "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
   },
   "$backstopComment": [
