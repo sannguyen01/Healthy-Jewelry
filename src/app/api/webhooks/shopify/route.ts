@@ -3,17 +3,24 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { shopifyConfig } from '@/config/shopify'
 import { PRODUCTS_TAG, productTag, collectionTag } from '@/lib/shopify/cacheTags'
+import { HANDLED_TOPIC_PREFIXES } from '@/lib/webhooks/retrySafety'
 
 /**
- * Topics this endpoint is built to handle.
+ * Topics this endpoint is built to handle, and why re-delivery of each is harmless, live in
+ * `@/lib/webhooks/retrySafety`. Two reasons they are not here:
  *
- * Previously any topic at all was answered `200 {ok:true}` — including topics
- * never subscribed to, and anything an attacker holding the signing secret
- * chose to send. Answering 200 to work you did not do is a lie to Shopify's
- * delivery log; an unknown topic is now acknowledged as *received* but
- * explicitly recorded as unhandled.
+ * 1. A Next.js `route.ts` may only export route handlers and a fixed set of config keys, so a
+ *    table exported from this file is a type error.
+ * 2. Shopify retries on any non-2xx and re-delivers on its own schedule. Every handler below
+ *    is safe to run twice — but that was true *by accident* until something said so. See
+ *    `RETRY_SAFE`, which a unit test holds against this list in both directions.
+ *
+ * The unhandled-topic branch stands as it was: previously any topic at all was answered
+ * `200 {ok:true}`, including topics never subscribed to and anything an attacker holding the
+ * signing secret chose to send. Answering 200 to work you did not do is a lie to Shopify's
+ * delivery log.
  */
-const HANDLED_TOPIC_PREFIXES = ['products/', 'collections/', 'orders/'] as const
+
 
 /**
  * Why a signature check failed, in a form the operator can act on.

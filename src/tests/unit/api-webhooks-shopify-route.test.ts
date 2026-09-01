@@ -1,6 +1,12 @@
 import { createHmac } from 'crypto'
+import { readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
+
+import { HANDLED_TOPIC_PREFIXES, RETRY_SAFE } from '@/lib/webhooks/retrySafety'
+
+const ROOT = resolve(__dirname, '../../..')
 
 // next/cache is server-only; mock before importing the route
 vi.mock('next/cache', () => ({
@@ -410,5 +416,74 @@ describe('webhook hardening', () => {
       const json = (await res.json()) as { error: string }
       expect(json.error).toBe('Unauthorized')
     })
+  })
+})
+
+/**
+ * **Every handled topic says why re-delivery is harmless.**
+ *
+ * Shopify retries on any non-2xx and re-delivers on its own schedule, so each branch of this
+ * route runs an unknown number of times per event. The endpoint reads no
+ * `X-Shopify-Webhook-Id` and keeps no dedupe store — and is nonetheless correct, because
+ * every handler is a cache invalidation or a log.
+ *
+ * That is a property of the current handler bodies, and until `RETRY_SAFE` existed **nothing
+ * stated it and nothing checked it**. Safe by accident looks exactly like safe by design from
+ * the outside, right up until someone adds a branch that writes a record or sends mail, at
+ * which point duplicates double-apply and no test goes red.
+ *
+ * So the classification is required rather than optional, per
+ * [ADR 019](../../../docs/adr/019-an-unclassified-entry-is-an-unverified-one.md): there is no
+ * third state between "declared retry-safe, with a reason" and "not handled". Adding a topic
+ * to `HANDLED_TOPIC_PREFIXES` without an entry here fails, which is the point at which
+ * somebody has to decide whether the new handler really is safe to run twice.
+ */
+describe('retry safety is classified, not assumed', () => {
+  it('every handled topic prefix has a classification', () => {
+    const unclassified = HANDLED_TOPIC_PREFIXES.filter((prefix) => !(prefix in RETRY_SAFE))
+
+    expect(
+      unclassified,
+      `These topic prefixes are handled with no recorded reason that re-delivery is safe:\n\n  ` +
+        unclassified.join('\n  ') +
+        '\n\nShopify re-delivers. Say why running this handler twice is harmless — ' +
+        '`invalidation-only` or `log-only` — or, if it is not harmless because the handler ' +
+        'writes, sends, or moves something, do not widen a label: give this endpoint real ' +
+        'idempotency on `X-Shopify-Webhook-Id` instead.'
+    ).toEqual([])
+  })
+
+  it('nothing is classified that is not handled', () => {
+    // A stale entry is a claim about a branch that no longer exists — the fossil this suite
+    // has learned twice not to keep.
+    const orphans = Object.keys(RETRY_SAFE).filter(
+      (prefix) => !(HANDLED_TOPIC_PREFIXES as readonly string[]).includes(prefix)
+    )
+    expect(orphans, `RETRY_SAFE describes topics the route does not handle`).toEqual([])
+  })
+
+  it('every reason is a reason, not a placeholder', () => {
+    for (const [prefix, entry] of Object.entries(RETRY_SAFE)) {
+      expect(entry.kind, `${prefix}: no kind`).toMatch(/^(invalidation-only|log-only)$/)
+      expect(entry.why.length, `${prefix}: the reason is too short to be one`).toBeGreaterThan(60)
+    }
+  })
+
+  it('names the two labels the route actually earns', () => {
+    // Both labels mean "no persistent effect". If a third kind is ever added it should be
+    // because the endpoint gained real idempotency, not because a handler outgrew these.
+    const kinds = new Set(Object.values(RETRY_SAFE).map((e) => e.kind))
+    expect([...kinds].sort()).toEqual(['invalidation-only', 'log-only'])
+  })
+
+  it('the route still gates on the same list this table classifies', () => {
+    // The list and the table are one import apart on purpose. If the route ever grows a
+    // private copy, this fails rather than the two drifting.
+    const source = readFileSync(
+      join(ROOT, 'src/app/api/webhooks/shopify/route.ts'),
+      'utf8'
+    )
+    expect(source).toContain("from '@/lib/webhooks/retrySafety'")
+    expect(source).toContain('HANDLED_TOPIC_PREFIXES.some')
   })
 })
