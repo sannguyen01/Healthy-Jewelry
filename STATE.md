@@ -85,6 +85,43 @@ channels → your custom app → API credentials → copy the token that begins
 → Environments → `production-readonly` → update `SHOPIFY_ADMIN_ACCESS_TOKEN` →
 re-run `production-smoke.yml` via `workflow_dispatch` to confirm it closes.
 
+**If the token is not retrievable, generate a new one on that same page.** An
+admin-created custom app shows its Admin API access token *once*, at generation.
+A store where nobody saved it has no way to read it back, and the fix is to
+regenerate rather than to hunt for it. Regenerating invalidates the old value,
+so it must be pasted into `production-readonly` in the same sitting.
+
+### Re-verified against Shopify's live documentation — 2026-09-01
+
+This instruction was challenged on the grounds that Shopify had deprecated
+admin-visible `shpat_` tokens for custom apps as of 2026-01-01, which would have
+turned a console paste into an OAuth/token-exchange implementation project. That
+is **not what Shopify's documentation says**, checked today:
+
+- The expiring-offline-token requirement is **2027-01-01, not 2026**, it applies
+  to **public apps**, and it names custom apps as *unaffected*: "Shopify enforces
+  this on Admin API requests only. It doesn't apply to custom apps or apps
+  created by merchants."
+  ([migrate-to-expiring-offline-access-tokens](https://shopify.dev/docs/apps/build/authentication-authorization/migrate-to-expiring-offline-access-tokens))
+- Access tokens still carry the same prefix under every grant: "Offline and
+  online access tokens are opaque strings that begin with `shpat_`, whichever
+  grant produced them."
+  ([access-tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens))
+  So `preflight-secrets.mjs`'s shape rule stays correct; it does not need a
+  second credential regime.
+- The console path above is still documented and current: Apps > Develop apps >
+  [your app] > API credentials, with "If the token is no longer retrievable,
+  generate a new one."
+  ([legacy/admin-custom-apps](https://shopify.dev/docs/apps/build/authentication-authorization/legacy/admin-custom-apps))
+
+**The one real change, recorded so it is not mistaken for the above:** Shopify no
+longer allows *creating* new admin-created custom apps — "Existing apps are
+unaffected and continue to work." So this path holds for the app that exists. If
+that app is ever deleted, its replacement goes through the Dev Dashboard and
+authenticates with a client ID/secret exchange, and *that* would be the migration
+project. Deleting the app is therefore a decision with a much larger blast radius
+than it appears to have.
+
 ## Live verification — 2026-08-08
 
 First session with live Shopify Admin API access. Everything below was **checked
