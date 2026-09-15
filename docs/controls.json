@@ -33,8 +33,8 @@
       "humanAction": "GitHub \u2192 Settings \u2192 Branches \u2192 add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` \u2014 those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
-      "acceptedSince": "2026-08-31",
-      "acceptedWhy": "Restated after the 2026-08-29 blackout, which is what this gap costs when it is called: eleven consecutive CI runs on main died at Install dependencies, every check after reported skipped, and eleven pull requests were merged by hand against a gate that had not run. ADR 015 said protection was only reasonable once a passing run existed to enforce against; the last four runs on main are green, so that blocker is gone and the gap is now a choice rather than a wait. It stays accepted only because enabling protection is a GitHub console action nobody in CI can perform \u2014 and it no longer stays quiet: probe-branch-protection.mjs escalates it under the merge-gate-unenforced label."
+      "acceptedSince": "2026-09-15",
+      "acceptedWhy": "Restated 2026-09-15 by the defects review, and still a deliberate choice. The original acceptance stands on its own terms: the 2026-08-29 blackout is what this gap costs when it is called \u2014 eleven consecutive CI runs on main died at Install dependencies, every check after reported skipped, and eleven pull requests were merged by hand against a gate that had not run. ADR 015 said protection was only reasonable once a passing run existed to enforce against; that blocker is gone. It stays accepted only because enabling protection is a GitHub console action nobody in CI can perform, and probe-branch-protection.mjs escalates it under the merge-gate-unenforced label rather than letting it go quiet. What changed today is where the staleness of this line is enforced: it was asserted inside the merge gate itself, so on 2026-10-01 it would have turned every pull request red over a console action no diff can affect \u2014 the same severity misplacement ADR 029 records. The age check now runs in control-audit.yml and opens an issue; the gate keeps only the structural assertions a diff can actually break."
     },
     {
       "id": "smoke-secret-isolation",
@@ -47,8 +47,8 @@
       "knownLimit": "A convention, not an enforcement. GitHub gives a job no way to ask where a secret came from, so setting the marker at repository scope defeats it. Recorded rather than overclaimed \u2014 ADR 006.",
       "adr": "docs/adr/006-controls-must-fail-loudly.md",
       "backstop": "human:weekly",
-      "acceptedSince": "2026-08-15",
-      "acceptedWhy": "Issue #24. SHOPIFY_ADMIN_ACCESS_TOKEN holds the wrong kind of token; only a human with Shopify Admin can replace it."
+      "acceptedSince": "2026-09-15",
+      "acceptedWhy": "Restated 2026-09-15 by the defects review, and corrected: the previous reason named the wrong blocker. Issue #24 is that SHOPIFY_ADMIN_ACCESS_TOKEN holds a token of the wrong kind, which is a different fact from this control, and citing it here made an unmet isolation requirement read as a downstream consequence of a credential problem. This control is about scope, not validity: the five smoke secrets must sit on the production-readonly GitHub Environment with the SMOKE_SECRETS_SOURCE=environment marker, because this repository is public and forkable and repository-scoped secrets are readable by every workflow. Correcting the token would not close this gap; moving the secrets would, whatever the token holds. It stays accepted because both are GitHub console actions nobody in CI can perform, and preflight-secrets.mjs asserts the marker so the difference between isolated and merely green stays observable."
     },
     {
       "id": "workflow-pipefail",
