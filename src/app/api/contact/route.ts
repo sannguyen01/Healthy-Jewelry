@@ -13,7 +13,17 @@ import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 // Rate limiting now lives in `@/lib/utils/rateLimit`, shared with
 // `/api/shopify`. It used to be two hand-rolled copies; the Shopify proxy had
 // none at all, which made the un-audited route the softer target.
-const limiter = createRateLimiter({ limit: 5, window: '1 h', prefix: 'hj:contact' })
+// `onError: 'deny'`, and the only route here that takes it. This one sends email
+// through a paid API, so an unmetered contact form costs money and reputation rather
+// than quota. A limiter that cannot be consulted refuses rather than guesses — and
+// ContactForm already renders a "try emailing us directly" fallback on any non-2xx,
+// so failing closed costs the customer a route, not the message.
+const limiter = createRateLimiter({
+  limit: 5,
+  window: '1 h',
+  prefix: 'hj:contact',
+  onError: 'deny',
+})
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // 1. Rate limit by IP

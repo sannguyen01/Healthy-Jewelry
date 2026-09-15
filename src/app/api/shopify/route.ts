@@ -44,7 +44,16 @@ const MAX_BODY_BYTES = 16_384
  * legitimately triggers several operations per checkout attempt, and each bag
  * edit re-syncs. This is a ceiling on abuse, not a budget for browsing.
  */
-const limiter = createRateLimiter({ limit: 60, window: '1 m', prefix: 'hj:shopify' })
+// `onError: 'allow'`. When Upstash cannot be consulted, losing the ceiling costs
+// Shopify quota; refusing instead would cost checkout. This route is the bag's only
+// path to Shopify (src/store/cart.tsx is its sole client), so a `deny` here turns a
+// Redis blip into a storefront that cannot take money. See RateLimitFailurePosture.
+const limiter = createRateLimiter({
+  limit: 60,
+  window: '1 m',
+  prefix: 'hj:shopify',
+  onError: 'allow',
+})
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (await limiter.isLimited(clientIp(request.headers))) {

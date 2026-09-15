@@ -37,7 +37,15 @@ export const dynamic = 'force-dynamic'
 // Generous. A browsing session legitimately fires an event every few seconds, and
 // this bucket exists to stop abuse rather than to budget real use — the same
 // posture as /api/shopify, which is unauthenticated for the same reason.
-const limiter = createRateLimiter({ limit: 120, window: '1 m', prefix: 'hj:analytics' })
+// `onError: 'allow'`. This is measurement. Dropping a beacon because Redis is
+// unreachable would lose the data *and* spend a 500 telling a customer's browser
+// about it — and this route already answers 204 to everything by design.
+const limiter = createRateLimiter({
+  limit: 120,
+  window: '1 m',
+  prefix: 'hj:analytics',
+  onError: 'allow',
+})
 
 /** Small by design. A legitimate event is a few hundred bytes. */
 const MAX_BODY_BYTES = 2_048

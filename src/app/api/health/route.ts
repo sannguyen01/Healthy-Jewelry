@@ -68,6 +68,11 @@ const probe = createRateLimiter({
   limit: 1_000_000,
   window: '1 m',
   prefix: 'hj:health',
+  // Unreachable in practice: this route never calls `isLimited`, only `check()`.
+  // The field is required anyway so that no route can be written without deciding,
+  // and stating it here is cheaper than a reader wondering whether its absence was
+  // a choice. `allow` matches what a limiter with a 1,000,000/min ceiling means.
+  onError: 'allow',
 })
 
 type RedisStatus = 'ok' | 'unreachable' | 'not-configured'
@@ -91,20 +96,14 @@ async function checkResend(): Promise<ResendStatus> {
 }
 
 export async function GET(): Promise<NextResponse> {
-  let redis: RedisStatus = 'not-configured'
-
-  if (probe.distributed) {
-    try {
-      // The round-trip is the test. The verdict is irrelevant — what matters is
-      // that Upstash answered at all.
-      await probe.isLimited('health-check')
-      redis = 'ok'
-    } catch {
-      // Configured but not answering: the case that looks healthy from the env
-      // vars alone and is not.
-      redis = 'unreachable'
-    }
-  }
+  // `check()`, not a try/catch around `isLimited`.
+  //
+  // This route used to read its answer out of an exception thrown by the request
+  // path. That coupled the health check to `isLimited` being allowed to throw —
+  // which was itself the defect it was built to detect: three routes returned 500
+  // at the till on an Upstash blip. Fixing the request path would have blinded
+  // this check silently, because a swallowed error looks exactly like success.
+  const redis: RedisStatus = await probe.check()
 
   const resend = await checkResend()
   const healthy = probe.distributed && redis === 'ok'
@@ -121,7 +120,10 @@ export async function GET(): Promise<NextResponse> {
       hint: healthy
         ? undefined
         : probe.distributed
-          ? 'Upstash is configured but did not answer. Rate limits are failing open.'
+          ? 'Upstash is configured but did not answer. Each limiter falls back to its ' +
+            'declared onError posture: /api/shopify and /api/analytics allow, ' +
+            '/api/contact refuses. Until 2026-09-15 this line read "rate limits are ' +
+            'failing open" while all three actually threw, returning 500 at the till.'
           : 'UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are unset in this ' +
             'environment, so rate limits count per Lambda instance rather than globally. ' +
             'Vercel scopes env vars per environment — set them for Preview as well as Production.',
