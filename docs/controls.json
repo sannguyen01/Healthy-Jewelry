@@ -73,6 +73,16 @@
       "backstop": "control:merge-gate"
     },
     {
+      "id": "test-coverage-threshold",
+      "claims": "the 80% coverage thresholds in vitest.config.ts are evaluated by the merge gate, not merely declared",
+      "status": "configured",
+      "probe": "src/tests/unit/coverage-gate-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "The thresholds are global, not per-file, so a subsystem can sit far below the bar behind a healthy aggregate — lib/shopify/customer measured 39.03% statements against a 91.30% total on 2026-09-15, with customer/client.ts at 0%. The threshold being enforced at all is the fix this control records; the distribution it hides is a separate gap, tracked as issue 14 of the 2026-09-15 defects review.",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "workflow-condition-hygiene",
       "claims": "no workflow condition reads another step's result while silently also requiring that nothing earlier succeeded",
       "status": "configured",
