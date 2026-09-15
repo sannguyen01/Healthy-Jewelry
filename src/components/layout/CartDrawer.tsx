@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { useCartStore, cartItemVariantLabel } from '@/store/cart'
+import { checkoutHandoff, useCartStore, cartItemVariantLabel } from '@/store/cart'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { ProductImage } from '@/components/product/ProductImage'
 import {
@@ -457,21 +457,36 @@ export function CartDrawer() {
             <button
               onClick={async () => {
                 await syncWithShopify()
-                const { checkoutUrl, checkoutError: err, beginCheckout } = useCartStore.getState()
-                if (checkoutUrl) {
+                // Fresh state, read after the await — this path has always been
+                // the correct one. What is new is that the *decision* comes from
+                // `checkoutHandoff`, shared with /checkout/page.tsx, which used to
+                // re-derive it from `checkoutUrl` alone and got it wrong: that
+                // value is persisted, so a stored URL from an earlier visit sent
+                // the customer off-origin before the sync had resolved.
+                //
+                // One sequence, written twice, one correct. Now one decision.
+                const state = useCartStore.getState()
+                const verdict = checkoutHandoff(state)
+
+                if (verdict.go) {
                   // Record which cart we are sending them to pay for. Shopify
                   // deletes a cart once an order is created from it, so this id
                   // is the only way to tell a completed purchase apart from an
                   // expired cart when they come back.
-                  beginCheckout()
-                  window.location.href = checkoutUrl
+                  state.beginCheckout()
+                  window.location.href = verdict.url
                   return
                 }
                 // Previously this navigated to /checkout regardless, where the
                 // same sync failed again and left the customer on a spinner.
-                // With no URL the error is shown here instead, beside the bag
-                // that is still intact.
-                if (!err) {
+                // With nothing to hand off, the error is shown here instead,
+                // beside the bag that is still intact — except for a completed
+                // order, which /checkout renders as a confirmation.
+                if (verdict.reason === 'completed') {
+                  window.location.href = '/checkout'
+                  return
+                }
+                if (verdict.reason !== 'failed') {
                   window.location.href = '/checkout'
                 }
               }}

@@ -246,3 +246,112 @@ describe('the confirmation clears when the customer moves on', () => {
     expect(useCartStore.getState().justCompleted).toBe(false)
   })
 })
+
+/**
+ * **The race that defeated everything above.**
+ *
+ * `/checkout` mounts two effects. One waits for hydration and calls
+ * `syncWithShopify()`. The other redirected off-origin the instant `checkoutUrl`
+ * was truthy — and `checkoutUrl` is persisted, with zustand's localStorage
+ * rehydration synchronous, so the first render already carried a value stored on
+ * a previous visit.
+ *
+ * So a customer returning after paying — a Back press is the common route — still
+ * had `items`, still had `justCompleted: false`, and still had the stored URL for
+ * the cart Shopify had just **deleted on order creation**. The sync that would
+ * have discovered `cart-gone`, matched `pendingCheckoutCartId` and rendered their
+ * confirmation never got to finish. Every mechanism this file tests lost a race
+ * to a sibling effect.
+ *
+ * The fix is a flag that cannot survive a page load, and one shared decision
+ * rather than two implementations — `CartDrawer` has always done this correctly
+ * and imperatively, `/checkout` re-derived it declaratively and got it wrong.
+ */
+describe('checkoutHandoff — may this customer be sent off-origin', () => {
+  const synced = {
+    syncedThisLoad: true,
+    checkoutUrl: 'https://checkout.shopify.com/c/1',
+    checkoutError: null,
+    justCompleted: false,
+  } as const
+
+  it('goes when a sync on this page load produced the URL', async () => {
+    const { checkoutHandoff } = await import('@/store/cart')
+    expect(checkoutHandoff(synced)).toEqual({ go: true, url: synced.checkoutUrl })
+  })
+
+  it('refuses a URL this page load did not produce — the rehydration case', async () => {
+    // Exactly the state a returning customer arrives in: a persisted URL, an
+    // un-run sync. This is the assertion the old `if (checkoutUrl)` could not make.
+    const { checkoutHandoff } = await import('@/store/cart')
+    expect(checkoutHandoff({ ...synced, syncedThisLoad: false })).toEqual({
+      go: false,
+      reason: 'not-synced',
+    })
+  })
+
+  it('refuses after a completed order, whatever else is set', async () => {
+    // Sending them to the cart they paid for is sending them to one Shopify
+    // deleted on order creation. `completed` outranks everything, including a
+    // freshly-synced URL, because the confirmation is the thing they came back for.
+    const { checkoutHandoff } = await import('@/store/cart')
+    expect(checkoutHandoff({ ...synced, justCompleted: true })).toEqual({
+      go: false,
+      reason: 'completed',
+    })
+  })
+
+  it('refuses while an error is being rendered', async () => {
+    const { checkoutHandoff } = await import('@/store/cart')
+    expect(checkoutHandoff({ ...synced, checkoutError: 'network' })).toEqual({
+      go: false,
+      reason: 'failed',
+    })
+  })
+
+  it('refuses with nothing to go to', async () => {
+    const { checkoutHandoff } = await import('@/store/cart')
+    expect(checkoutHandoff({ ...synced, checkoutUrl: null })).toEqual({
+      go: false,
+      reason: 'no-url',
+    })
+  })
+})
+
+describe('a failed sync leaves nothing that reads as permission', () => {
+  it('failCheckout clears the URL and the fresh-sync flag', async () => {
+    // Five refusal paths route through `failCheckout` and none of them
+    // invalidated `checkoutUrl`. Combined with a reconciliation that could leave
+    // the remote cart holding something the bag did not, a customer retrying
+    // after a failure could be handed to a checkout that no longer matched.
+    const { useCartStore: store, checkoutHandoff } = await import('@/store/cart')
+    store.setState({
+      checkoutUrl: 'https://checkout.shopify.com/c/stale',
+      syncedThisLoad: true,
+      checkoutError: null,
+      justCompleted: false,
+    })
+
+    store.getState().failCheckout('network')
+
+    const state = store.getState()
+    expect(state.checkoutUrl).toBeNull()
+    expect(state.syncedThisLoad).toBe(false)
+    expect(checkoutHandoff(state).go).toBe(false)
+  })
+
+  it('a bag edit withdraws permission too', async () => {
+    const { useCartStore: store, checkoutHandoff } = await import('@/store/cart')
+    store.setState({
+      checkoutUrl: 'https://checkout.shopify.com/c/1',
+      syncedThisLoad: true,
+      checkoutError: null,
+      justCompleted: false,
+      items: [],
+    })
+
+    store.getState().addItem(product)
+
+    expect(checkoutHandoff(store.getState())).toEqual({ go: false, reason: 'not-synced' })
+  })
+})

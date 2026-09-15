@@ -508,6 +508,30 @@ export interface CartState {
    */
   hasHydrated: boolean
 
+  /**
+   * Whether **this page load** has produced a checkout URL from a live sync.
+   *
+   * Never persisted, deliberately — that is the entire mechanism.
+   *
+   * `checkoutUrl` *is* persisted, and `/checkout` redirected off-origin the
+   * instant it saw one. Zustand's localStorage rehydration is synchronous, so the
+   * first render already carried the stored value and the redirect effect fired
+   * before the sync effect beside it had resolved — or, on the first commit,
+   * before it had started.
+   *
+   * The consequence was not theoretical. A customer returning to `/checkout`
+   * after paying (a Back press is the common route) still had `items`, still had
+   * `justCompleted: false`, and still had the stored `checkoutUrl` for the cart
+   * Shopify had just **deleted on order creation**. The sync that would have
+   * discovered `cart-gone`, matched `pendingCheckoutCartId` and shown them their
+   * confirmation — the whole ADR 002 mechanism — never got to finish, because a
+   * sibling effect had already sent them to a dead checkout URL.
+   *
+   * A flag that cannot survive a page load is the smallest thing that makes
+   * "this URL came from a sync I just performed" expressible at all.
+   */
+  syncedThisLoad: boolean
+
   // Mutations
   addItem: (product: HJProduct, quantity?: number, variantId?: string) => void
   removeItem: (variantId: string) => void
@@ -543,6 +567,54 @@ export interface CartState {
 
 // ── Store ──────────────────────────────────────────────────────────────────
 
+/**
+ * May this customer be sent off-origin to pay, and where to.
+ *
+ * ## Why this is one function and not two implementations
+ *
+ * There were two, and only one of them was right.
+ *
+ * `CartDrawer.tsx` does it imperatively and correctly: `await syncWithShopify()`,
+ * then read `checkoutUrl` back out of **fresh** state, then redirect.
+ * `/checkout/page.tsx` does the same job with two `useEffect`s, and got it wrong
+ * — its redirect effect fired on `checkoutUrl` alone, which is a *persisted*
+ * value, so a stored URL from a previous visit sent the customer off-origin
+ * before this page load's sync had resolved.
+ *
+ * The same sequence, written twice, one correct. So the *decision* moves here as
+ * a pure function with its own tests, and both call sites ask it rather than
+ * each re-deriving the conditions.
+ *
+ * ## The four ways the answer is no
+ *
+ * Each is a distinct fact and none implies another:
+ *
+ *   · `not-synced`  — the URL did not come from a sync on this page load. This is
+ *     the one that was missing, and the one a persisted value defeats.
+ *   · `failed`      — the last sync refused. `failCheckout` also nulls the URL, so
+ *     this is belt and braces; a customer must not be handed off on a state the
+ *     store is simultaneously rendering an error for.
+ *   · `completed`   — they have already paid. Sending them to the cart they paid
+ *     for is sending them to one Shopify deleted on order creation (ADR 002).
+ *   · `no-url`      — nothing to go to.
+ */
+export type HandoffVerdict =
+  | { go: true; url: string }
+  | { go: false; reason: 'not-synced' | 'failed' | 'completed' | 'no-url' }
+
+export function checkoutHandoff(state: {
+  syncedThisLoad: boolean
+  checkoutUrl: string | null
+  checkoutError: CheckoutError | null
+  justCompleted: boolean
+}): HandoffVerdict {
+  if (state.justCompleted) return { go: false, reason: 'completed' }
+  if (state.checkoutError) return { go: false, reason: 'failed' }
+  if (!state.syncedThisLoad) return { go: false, reason: 'not-synced' }
+  if (!state.checkoutUrl) return { go: false, reason: 'no-url' }
+  return { go: true, url: state.checkoutUrl }
+}
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
@@ -550,6 +622,7 @@ export const useCartStore = create<CartState>()(
       isOpen: false,
       shopifyCartId: null,
       checkoutUrl: null,
+      syncedThisLoad: false,
       isLoading: false,
       checkoutError: null,
       hasHydrated: false,
@@ -571,7 +644,12 @@ export const useCartStore = create<CartState>()(
        * being a completely different problem.
        */
       failCheckout: (reason: CheckoutError) => {
-        set({ checkoutError: reason })
+        // `checkoutUrl: null` is new, and it is the half of this that is not
+        // about page loads. Five refusal paths route through here and none of
+        // them invalidated the URL, so a customer retrying after a failure could
+        // be handed to a checkout for a cart that no longer matched their bag. A
+        // failed sync must leave nothing behind that reads as permission.
+        set({ checkoutError: reason, checkoutUrl: null, syncedThisLoad: false })
         track({ name: 'checkout_failed', reason, itemCount: get().items.length })
       },
 
@@ -598,6 +676,7 @@ export const useCartStore = create<CartState>()(
               // may no longer apply to these lines. Shopify's total is scoped
               // to the lines that produced it, so it goes too.
               checkoutUrl: null,
+              syncedThisLoad: false,
               checkoutError: null,
               shopifyTotal: null,
               // Shopping again dismisses the previous order's confirmation.
@@ -607,6 +686,7 @@ export const useCartStore = create<CartState>()(
           return {
             items: [...state.items, { product, quantity, variantId: resolvedVariantId }],
             checkoutUrl: null,
+            syncedThisLoad: false,
             checkoutError: null,
             shopifyTotal: null,
             justCompleted: false,
@@ -641,6 +721,7 @@ export const useCartStore = create<CartState>()(
         set((state) => ({
           items: state.items.filter((item) => item.variantId !== variantId),
           checkoutUrl: null,
+          syncedThisLoad: false,
           checkoutError: null,
           shopifyTotal: null,
         }))
@@ -656,6 +737,7 @@ export const useCartStore = create<CartState>()(
             item.variantId === variantId ? { ...item, quantity } : item
           ),
           checkoutUrl: null,
+          syncedThisLoad: false,
           checkoutError: null,
           shopifyTotal: null,
         }))
@@ -666,6 +748,7 @@ export const useCartStore = create<CartState>()(
           items: [],
           shopifyCartId: null,
           checkoutUrl: null,
+          syncedThisLoad: false,
           checkoutError: null,
           pendingCheckoutCartId: null,
           shopifyTotal: null,
@@ -723,6 +806,7 @@ export const useCartStore = create<CartState>()(
                 items: [],
                 shopifyCartId: null,
                 checkoutUrl: null,
+                syncedThisLoad: false,
                 pendingCheckoutCartId: null,
                 shopifyTotal: null,
                 checkoutError: null,
@@ -780,6 +864,9 @@ export const useCartStore = create<CartState>()(
             shopifyCartId: cart.id,
             checkoutUrl: cart.checkoutUrl,
             checkoutError: null,
+            // The only place this becomes true. Everything that hands a customer
+            // off the origin requires it.
+            syncedThisLoad: true,
             shopifyTotal: truth.total,
             // Adopt Shopify's price for every line it priced. The bag has been
             // carrying whatever the price was when the item was added, which
