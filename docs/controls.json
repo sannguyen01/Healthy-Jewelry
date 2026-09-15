@@ -134,14 +134,23 @@
     },
     {
       "id": "smoke-escalation",
-      "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours",
+      "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours, and the comparison that decides \"same diagnosis\" is a pure function with fixture tests rather than a string inside a YAML file",
       "status": "configured",
-      "probe": ".github/workflows/production-smoke.yml",
-      "probeRunsIn": ".github/workflows/production-smoke.yml",
-      "selfMonitoring": false,
-      "knownLimit": "The escalation logic lives inline in a github-script step and has no unit test. Issue #24 shows it working \u2014 escalated and labelled human-required on 2026-08-22 \u2014 but that is evidence from one occurrence, not a standing check.",
+      "probe": "src/tests/unit/escalation-decision.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
       "adr": "docs/adr/011-repeated-identical-failures-must-escalate.md",
       "backstop": "control:smoke-liveness"
+    },
+    {
+      "id": "workflow-inline-script-budget",
+      "claims": "no github-script step in any workflow holds a decision: each is within a 45-line transport budget, and the four blocks that exceed it today are frozen at their current size and may not grow",
+      "status": "configured",
+      "probe": "src/tests/unit/workflow-inline-script-budget.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "adr": "docs/adr/030-an-equivalence-relation-is-the-control.md",
+      "backstop": "control:merge-gate"
     },
     {
       "id": "premise-detectors",
