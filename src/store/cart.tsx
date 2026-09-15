@@ -214,7 +214,10 @@ type SyncOutcome =
 function mapFailure(result: ShopifyResult<unknown>): CheckoutError {
   if (result.status === 503) return 'not-configured'
   if (result.status === 429 || result.status === 502 || result.status >= 500) return 'network'
-  if (!result.ok) return 'shopify-error'
+  // Everything else is Shopify refusing. There used to be an `if (!result.ok)`
+  // here returning the same value as the line below it — a branch that read as a
+  // discrimination and made none, which is the kind of line that survives a
+  // refactor by looking intentional.
   return 'shopify-error'
 }
 
@@ -223,8 +226,137 @@ function failed(result: ShopifyResult<unknown>): boolean {
   return !result.ok || (result.errors?.length ?? 0) > 0
 }
 
-// Reconciles an existing Shopify cart to match the current local lines by
-// removing everything then re-adding the fresh set.
+/**
+ * The three mutations needed to make a remote cart match the local bag.
+ *
+ * Exported and pure so the decision can be asserted against fixtures rather than
+ * inferred from a network trace — the same reason `escalationDecision` and
+ * `planCartReconciliation`'s siblings elsewhere in this repository are pure.
+ */
+export interface CartReconciliation {
+  /** Existing lines whose quantity changed. */
+  updates: { id: string; quantity: number }[]
+  /** Variants the remote cart does not have at all. */
+  additions: SyncLine[]
+  /** Line ids the local bag no longer contains. */
+  removals: string[]
+  /** True when the remote cart already matches — nothing to send. */
+  isNoop: boolean
+}
+
+/**
+ * Diff the remote cart against the local bag.
+ *
+ * ## Why this replaces remove-everything-then-re-add
+ *
+ * The previous reconciliation deleted every line and then added the fresh set,
+ * across three unguarded round-trips. If the add failed — one throttle retry
+ * exhausted, a 5xx, a dropped connection — the customer's Shopify cart was left
+ * **empty**, with no compensating action, and the function returned only
+ * `{ kind: 'failed' }`.
+ *
+ * `cartLinesUpdate` is the in-place primitive that makes that unnecessary. It was
+ * already imported, already registered in the persisted-query allowlist
+ * (`api/shopify/route.ts:29`), and already asserted to be there by
+ * `api-shopify-route.test.ts:148` — and called by nothing. The safe tool was
+ * plumbed and unused while the destructive path shipped.
+ *
+ * ## Order matters, and so does the check that follows it
+ *
+ * The caller issues update → add → **remove last**, so the remote cart is never a
+ * *subset* of what the customer expects at any point mid-flight. The cost of that
+ * ordering is that a failure after the add leaves a *superset* — lines the
+ * customer removed still present — which would be charged at checkout.
+ *
+ * So `syncWithShopify`'s post-sync check became bidirectional. It previously
+ * asserted only that every line sent came back; it now also asserts that nothing
+ * came back that was not sent. Reordering without that would have traded an empty
+ * cart for an over-charged one, which is not a trade worth making.
+ *
+ * ## Duplicates
+ *
+ * Shopify can hold two lines for the same merchandise id. The first is reconciled
+ * and the rest are removed, rather than being left to double a quantity silently.
+ */
+export function planCartReconciliation(
+  existing: ShopifyCartPayload,
+  desired: SyncLine[]
+): CartReconciliation {
+  const updates: CartReconciliation['updates'] = []
+  const additions: SyncLine[] = []
+  const removals: string[] = []
+
+  /** First remote line per merchandise id; any later one is a duplicate. */
+  const byMerchandise = new Map<string, { id: string; quantity: number }>()
+
+  for (const edge of existing.lines.edges) {
+    const merchandiseId = edge.node.merchandise?.id
+    if (!merchandiseId) {
+      // A line whose merchandise Shopify will not name cannot be matched to
+      // anything local, so it cannot be kept.
+      removals.push(edge.node.id)
+      continue
+    }
+    if (byMerchandise.has(merchandiseId)) {
+      removals.push(edge.node.id)
+      continue
+    }
+    byMerchandise.set(merchandiseId, { id: edge.node.id, quantity: edge.node.quantity ?? 0 })
+  }
+
+  const desiredIds = new Set(desired.map((line) => line.merchandiseId))
+
+  for (const line of desired) {
+    const remote = byMerchandise.get(line.merchandiseId)
+    if (!remote) {
+      additions.push(line)
+    } else if (remote.quantity !== line.quantity) {
+      updates.push({ id: remote.id, quantity: line.quantity })
+    }
+  }
+
+  for (const [merchandiseId, remote] of byMerchandise) {
+    if (!desiredIds.has(merchandiseId)) removals.push(remote.id)
+  }
+
+  return {
+    updates,
+    additions,
+    removals,
+    isNoop: updates.length === 0 && additions.length === 0 && removals.length === 0,
+  }
+}
+
+/** Run one cart mutation and normalise its three failure shapes into one. */
+async function applyCartMutation(
+  operation: 'UpdateCartLines' | 'AddToCart' | 'RemoveFromCart',
+  field: 'cartLinesUpdate' | 'cartLinesAdd' | 'cartLinesRemove',
+  variables: Record<string, unknown>
+): Promise<{ ok: true; cart: ShopifyCartPayload | undefined } | { ok: false; error: CheckoutError }> {
+  const result = await postShopifyWithRetry<Record<string, ShopifyMutationResult>>(
+    operation,
+    variables
+  )
+  if (failed(result)) {
+    console.warn(`[HJ] ${operation} failed:`, result.status, result.errors)
+    return { ok: false, error: mapFailure(result) }
+  }
+  const payload = result.data?.[field]
+  if (payload?.userErrors && payload.userErrors.length > 0) {
+    console.warn(`[HJ] ${field} returned userErrors:`, payload.userErrors)
+    return { ok: false, error: 'shopify-error' }
+  }
+  return { ok: true, cart: payload?.cart }
+}
+
+/**
+ * Reconcile an existing Shopify cart to match the current local lines.
+ *
+ * Mutations are issued update → add → remove, and only the ones the diff calls
+ * for. An unchanged bag now costs a single `GetCart` rather than three
+ * round-trips, which matters because each one spends a token of the customer's
+ * own 60/minute budget on `/api/shopify`.
+ */
 async function syncExistingCart(cartId: string, lines: SyncLine[]): Promise<SyncOutcome> {
   const cartResult = await postShopifyWithRetry<{ cart: ShopifyCartPayload | null }>('GetCart', {
     cartId,
@@ -240,37 +372,43 @@ async function syncExistingCart(cartId: string, lines: SyncLine[]): Promise<Sync
     return { kind: 'cart-gone' }
   }
 
-  const existingLineIds = existingCart.lines.edges.map((e) => e.node.id)
-  if (existingLineIds.length > 0) {
-    const removeResult = await postShopifyWithRetry<{ cartLinesRemove: ShopifyMutationResult }>(
-      'RemoveFromCart',
-      { cartId, lineIds: existingLineIds }
-    )
-    if (failed(removeResult)) {
-      return { kind: 'failed', error: mapFailure(removeResult) }
-    }
-    const removeErrors = removeResult.data?.cartLinesRemove?.userErrors
-    if (removeErrors && removeErrors.length > 0) {
-      console.warn('[HJ] cartLinesRemove returned userErrors:', removeErrors)
-      return { kind: 'failed', error: 'shopify-error' }
-    }
+  const plan = planCartReconciliation(existingCart, lines)
+  if (plan.isNoop) {
+    // Already correct. Three round-trips used to be spent proving this.
+    return { kind: 'cart', cart: existingCart }
   }
 
-  const addResult = await postShopifyWithRetry<{ cartLinesAdd: ShopifyMutationResult }>(
-    'AddToCart',
-    { cartId, lines }
-  )
-  if (failed(addResult)) {
-    return { kind: 'failed', error: mapFailure(addResult) }
+  let cart: ShopifyCartPayload = existingCart
+
+  if (plan.updates.length > 0) {
+    const result = await applyCartMutation('UpdateCartLines', 'cartLinesUpdate', {
+      cartId,
+      lines: plan.updates,
+    })
+    if (!result.ok) return { kind: 'failed', error: result.error }
+    if (result.cart) cart = result.cart
   }
-  const added = addResult.data?.cartLinesAdd
-  if (added?.userErrors && added.userErrors.length > 0) {
-    console.warn('[HJ] cartLinesAdd returned userErrors:', added.userErrors)
-    return { kind: 'failed', error: 'shopify-error' }
+
+  if (plan.additions.length > 0) {
+    const result = await applyCartMutation('AddToCart', 'cartLinesAdd', {
+      cartId,
+      lines: plan.additions,
+    })
+    if (!result.ok) return { kind: 'failed', error: result.error }
+    if (result.cart) cart = result.cart
   }
-  return added?.cart
-    ? { kind: 'cart', cart: added.cart }
-    : { kind: 'failed', error: 'shopify-error' }
+
+  // Last, deliberately. Removing first is what could leave the cart empty.
+  if (plan.removals.length > 0) {
+    const result = await applyCartMutation('RemoveFromCart', 'cartLinesRemove', {
+      cartId,
+      lineIds: plan.removals,
+    })
+    if (!result.ok) return { kind: 'failed', error: result.error }
+    if (result.cart) cart = result.cart
+  }
+
+  return { kind: 'cart', cart }
 }
 
 async function createShopifyCart(lines: SyncLine[]): Promise<SyncOutcome> {
@@ -608,13 +746,32 @@ export const useCartStore = create<CartState>()(
           const { cart } = outcome
           const truth = readCartTruth(cart)
 
+          // **Both directions, and the second one is new.**
+          //
           // Shopify may accept a cart and silently omit a line it can no longer
-          // sell. Handing the customer to a checkout containing less than the
-          // bag they were looking at is worse than saying so.
+          // sell. Handing the customer to a checkout containing less than the bag
+          // they were looking at is worse than saying so — that was always
+          // checked.
+          //
+          // The extra check is what makes the reconciliation reordering safe.
+          // `syncExistingCart` now issues removals *last*, so a mid-flight failure
+          // leaves a superset rather than an empty cart. A superset is the better
+          // failure, but only if something notices: an unremoved line is an item
+          // the customer took out of their bag and would still be charged for.
+          // Asserting only that everything sent came back would have traded an
+          // empty cart for an over-charged one.
           const sentVariantIds = lines.map((l) => l.merchandiseId)
           const missing = sentVariantIds.filter((id) => !truth.returnedVariantIds.includes(id))
+          const unexpected = truth.returnedVariantIds.filter((id) => !sentVariantIds.includes(id))
+
           if (missing.length > 0 && truth.returnedVariantIds.length > 0) {
             console.warn('[HJ] Shopify dropped cart lines:', missing)
+            get().failCheckout('lines-unavailable')
+            return
+          }
+
+          if (unexpected.length > 0) {
+            console.warn('[HJ] Shopify cart holds lines the bag does not:', unexpected)
             get().failCheckout('lines-unavailable')
             return
           }
