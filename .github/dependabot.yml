@@ -5,9 +5,26 @@ updates:
   # This repo uses pnpm exclusively (see loop-constraints.md).
   - package-ecosystem: "npm"
     directory: "/"
+    # Pinned to a window rather than left to GitHub. An unpinned `weekly` fires
+    # whenever dependabot's scheduler chooses, so bot work arrived at no time in
+    # particular and was reviewed at no time in particular — which is how eleven of
+    # these merged in one burst (#47-#59) immediately before the 2026-08-29 blackout.
+    #
+    # Asia/Ho_Chi_Minh because that is where the store trades (VND, Vietnam market,
+    # see STATE.md's live verification). Change the three fields below to move the
+    # window; nothing reads them but dependabot.
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Ho_Chi_Minh"
+
+    # Three, not ten. This repository has exactly one collaborator, and a limit of ten
+    # was a limit on dependabot rather than a budget for the person reading. Security
+    # updates are not subject to this cap, so lowering it delays no advisory — and a
+    # major bump on a listed package still arrives as its own PR, because majors are
+    # excluded from every group below.
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -34,13 +51,38 @@ updates:
       - dependency-name: "@vitejs/plugin-react"
         update-types: ["version-update:semver-major"]
 
+    # Two groups, not one. Major bumps stay out of both, so they surface individually —
+    # next, react, react-dom and any @shopify/* major needs the written-rationale
+    # escalation in loop-constraints.md, and that only works if the PR is not buried
+    # inside a bundle of unrelated patch updates.
+    #
+    # The split is the change. `routine-updates` was a single group over everything, and
+    # PR #67 is what that produces: eleven packages in one PR, carrying
+    # @playwright/test 1.62.1 -> 1.63.0 — the framework the entire E2E suite runs on —
+    # labelled as a routine patch bundle beside @upstash/redis and resend. A bump to the
+    # thing that decides whether the other bumps are safe is not a routine patch, and it
+    # should not be reviewable only by reading eleven changelogs.
+    #
+    # `runtime-patches` can break a customer. `toolchain` can break the check that would
+    # have told you. Those are different reviews, so they are different pull requests.
     groups:
-      # Patch/minor bumps land as one low-noise weekly PR. Major bumps are
-      # excluded from the group so they surface individually — next, react,
-      # react-dom, and any @shopify/* major bump requires the written-rationale
-      # escalation in loop-constraints.md, and that only works if the PR isn't
-      # buried inside a bundle of unrelated patch updates.
-      routine-updates:
+      runtime-patches:
+        dependency-type: "production"
         update-types:
           - "minor"
           - "patch"
+      toolchain:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+    # NOT SET, deliberately, and this note is the record of why.
+    #
+    # A `cooldown` window (hold a freshly-published version for N days before proposing
+    # it) is the obvious next control here — #53 bumped framer-motion across two majors
+    # within days of release, unverified, during a CI blackout. It is not written here
+    # because the exact key names and sub-fields could not be read from GitHub's live
+    # documentation at the time of the change, and a config key written from memory is a
+    # claim about a control rather than a control (ADR 018). Verify the schema against
+    # docs.github.com, then add it — do not guess the shape.
