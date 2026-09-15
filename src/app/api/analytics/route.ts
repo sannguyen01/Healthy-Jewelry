@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAnalyticsEventName, sanitiseQuery, MAX_QUERY_LENGTH } from '@/lib/analytics/events'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
+import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
 /**
  * Where storefront events land.
@@ -92,16 +93,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 })
   }
 
-  const contentLength = request.headers.get('content-length')
-  if (contentLength !== null && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
-    return new NextResponse(null, { status: 204 })
-  }
+  // Same shared reader as /api/shopify and /api/contact — real bytes, bounded
+  // before allocation. Every refusal here stays 204: this route answers a
+  // fire-and-forget beacon, and an oversize payload is not something a
+  // customer's browser should hear about or retry.
+  const body = await readBoundedBody(request, MAX_BODY_BYTES)
+  if (!body.ok) return new NextResponse(null, { status: 204 })
 
   let parsed: unknown
   try {
-    const raw = await request.text()
-    if (raw.length > MAX_BODY_BYTES) return new NextResponse(null, { status: 204 })
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(body.text)
   } catch {
     return new NextResponse(null, { status: 204 })
   }

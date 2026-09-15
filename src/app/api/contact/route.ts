@@ -9,10 +9,14 @@ import {
 } from '@/lib/utils/contactValidation'
 import { CONTACT_EMAIL, SENDER_EMAIL } from '@/config/site'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
+import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
 // Rate limiting now lives in `@/lib/utils/rateLimit`, shared with
 // `/api/shopify`. It used to be two hand-rolled copies; the Shopify proxy had
 // none at all, which made the un-audited route the softer target.
+/** See the note at the parse site for how this number was chosen. */
+const MAX_BODY_BYTES = 8_192
+
 // `onError: 'deny'`, and the only route here that takes it. This one sends email
 // through a paid API, so an unmetered contact form costs money and reputation rather
 // than quota. A limiter that cannot be consulted refuses rather than guesses — and
@@ -37,9 +41,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // 2. Parse and validate body
+  //
+  // This route had **no size guard at all** until 2026-09-15, while the two that
+  // did were both measuring UTF-16 code units against a constant named for
+  // bytes. It is the one of the three that reaches a paid third party, so it is
+  // the one where an unbounded body was least affordable.
+  //
+  // 8 KB: validateMessage caps the message at 2,000 characters, which at 4 bytes
+  // per character in the worst case is 8,000 — plus the other three fields and
+  // the JSON envelope. Generous enough never to refuse a real inquiry, small
+  // enough that nothing can be buffered here at any scale worth having.
+  const raw = await readBoundedBody(request, MAX_BODY_BYTES)
+  if (!raw.ok) {
+    return raw.reason === 'too-large'
+      ? NextResponse.json({ error: 'Request body too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
   let body: unknown
   try {
-    body = await request.json()
+    body = JSON.parse(raw.text)
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }

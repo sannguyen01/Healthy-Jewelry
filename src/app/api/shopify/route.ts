@@ -9,6 +9,7 @@ import {
 import { GET_CART } from '@/lib/shopify/queries/cart'
 import { reportApiVersionDrift } from '@/lib/shopify/api-version'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
+import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
 // Persisted queries: the browser sends an operation key, never GraphQL text.
 // The server resolves the key to its own literal query string below, so a
@@ -63,24 +64,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   }
 
-  // Enforce payload size limit before parsing
-  const contentLength = request.headers.get('content-length')
-  if (contentLength !== null && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: 'Request body too large' }, { status: 413 })
+  // Bounded before parsed, and bounded in real bytes. This used to compare
+  // `rawBody.length` — UTF-16 code units — against a constant named
+  // MAX_BODY_BYTES, so the effective budget was up to 3x its stated value on the
+  // multi-byte input a VND storefront receives as a matter of course.
+  const body = await readBoundedBody(request, MAX_BODY_BYTES)
+  if (!body.ok) {
+    return body.reason === 'too-large'
+      ? NextResponse.json({ error: 'Request body too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
   let operation: unknown
   let variables: unknown
 
-  // Parse body with size guard
   try {
-    const rawBody = await request.text()
-    if (rawBody.length > MAX_BODY_BYTES) {
-      return NextResponse.json({ error: 'Request body too large' }, { status: 413 })
-    }
-    const body = JSON.parse(rawBody) as Record<string, unknown>
-    operation = body.operation
-    variables = body.variables
+    const parsed = JSON.parse(body.text) as Record<string, unknown>
+    operation = parsed.operation
+    variables = parsed.variables
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
