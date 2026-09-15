@@ -339,8 +339,48 @@ function staticSearch(q: string): HJProduct[] {
   )
 }
 
+/**
+ * How long a search result stays cached.
+ *
+ * `revalidate: 0` meant every visitor who typed anything spent one uncached
+ * Shopify Storefront call — on a page that is `dynamic` by construction, with no
+ * limiter in front of it. Two people searching "titanium" a second apart cost two
+ * round-trips against the store's quota, which is the quota real shoppers
+ * checking out are drawing on. Every other fetcher in this module already caches
+ * at 3600s.
+ *
+ * Sixty seconds rather than an hour because search is the one surface where a
+ * newly-published product should appear quickly; an hour would make a merchant's
+ * change look lost. It turns the cost from one call per visitor into one call per
+ * distinct query per minute, which for a 22-SKU catalogue is a very small number.
+ */
+const SEARCH_REVALIDATE_SECONDS = 60
+
+/**
+ * The longest query worth sending to Shopify.
+ *
+ * Not a validation rule — a cache-key bound. Every distinct string is its own
+ * cache entry, so an unbounded query length is an unbounded number of entries,
+ * each costing one uncached round-trip to create. No real search is longer than
+ * this; `sanitiseQuery` in the analytics layer caps at a similar length for the
+ * same reason.
+ */
+const MAX_SEARCH_QUERY_LENGTH = 128
+
+/**
+ * The form of a query that reaches both Shopify and the cache key.
+ *
+ * Normalised so that `"Titanium"`, `"titanium "` and `"  titanium  "` are one
+ * cache entry rather than three. The old code normalised for the *static*
+ * fallback and sent the **raw** string to Shopify, so the two halves searched
+ * for different things and every capitalisation variant paid its own round-trip.
+ */
+export function normaliseSearchQuery(query: string): string {
+  return query.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+}
+
 export async function searchProducts(query: string, first = 20): Promise<HJProduct[]> {
-  const q = query.toLowerCase().trim()
+  const q = normaliseSearchQuery(query)
   if (!isShopifyConfigured() || !q) {
     if (!isShopifyConfigured()) reportFallback('searchProducts', 'not-configured', q)
     return staticSearch(q)
@@ -348,7 +388,13 @@ export async function searchProducts(query: string, first = 20): Promise<HJProdu
   try {
     const response = await shopifyFetch<{
       search: { edges: { node: Product }[] }
-    }>(SEARCH_PRODUCTS, { query, first }, { revalidate: 0 })
+    }>(
+      SEARCH_PRODUCTS,
+      // `q`, not `query` — the normalised form is what gets cached, and sending
+      // the raw string here is what made the cache key as varied as the typing.
+      { query: q, first },
+      { revalidate: SEARCH_REVALIDATE_SECONDS }
+    )
     return (response.data?.search?.edges ?? []).map((e) => mapShopifyProduct(e.node))
   } catch (e) {
     // Degrade to the static catalogue, like every other fetcher in this module.

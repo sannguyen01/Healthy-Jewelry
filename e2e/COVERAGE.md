@@ -24,7 +24,6 @@ check too: a stale exception is an assertion nobody re-examined.
 /api/version — Verified by src/tests/unit/api-version-contract.test.ts, which asserts the pinned Shopify API version against the client rather than against a fixture.
 /api/sitemap — Verified by src/tests/unit/sitemap-completeness.test.ts, which renders the XML and holds it against the app router's real route list.
 /api/webhooks/shopify — Verified by src/tests/unit/api-webhooks-shopify-route.test.ts and webhook-signature-contract.test.ts. Driving it from a browser would mean forging a signature in the spec, duplicating the script that already does it.
-/api/search — Exercised through the /search page, which e2e/metadata.spec.ts navigates to with a query. The handler has no behaviour the page does not surface.
 /api/analytics — e2e/analytics.spec.ts asserts the beacons this route receives, from the page side. The route itself is a sink; asserting it twice adds nothing.
 /api/contact — e2e/contact.spec.ts intercepts it to drive the form's success, failure and 503 states, and src/tests/unit/api-contact-route.test.ts exercises the handler. Between them both sides of the contract are covered.
 /api/shopify — e2e/cart.spec.ts and e2e/checkout.spec.ts intercept it to drive cart state; src/tests/unit/api-shopify-route.test.ts covers the proxy and its rate limiting.
