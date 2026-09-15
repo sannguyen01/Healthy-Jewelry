@@ -51,6 +51,18 @@
       "acceptedWhy": "Restated 2026-09-15 by the defects review, and corrected: the previous reason named the wrong blocker. Issue #24 is that SHOPIFY_ADMIN_ACCESS_TOKEN holds a token of the wrong kind, which is a different fact from this control, and citing it here made an unmet isolation requirement read as a downstream consequence of a credential problem. This control is about scope, not validity: the five smoke secrets must sit on the production-readonly GitHub Environment with the SMOKE_SECRETS_SOURCE=environment marker, because this repository is public and forkable and repository-scoped secrets are readable by every workflow. Correcting the token would not close this gap; moving the secrets would, whatever the token holds. It stays accepted because both are GitHub console actions nobody in CI can perform, and preflight-secrets.mjs asserts the marker so the difference between isolated and merely green stays observable."
     },
     {
+      "id": "control-acceptance-freshness",
+      "claims": "every deliberately-accepted control gap is re-decided within 30 days, and a person is told when one is not",
+      "status": "configured",
+      "probe": "scripts/probe-accepted-gap.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Nothing watches this probe. probe-ci-liveness.mjs watches ci.yml and probe-smoke-liveness.mjs watches production-smoke.yml, but no probe watches control-audit.yml — so if that workflow stops executing, this check goes silent and its silence is indistinguishable from an all-clear. That is the exact shape ADR 022 names, one tier up, and it is stated here rather than implied because an unstated limit is how the merge gate stayed dark for eleven runs. The weekly human backstop is what covers it today.",
+      "humanAction": "None while this reads green. When it opens a control-acceptance-stale issue, the action is to re-decide the named gap in docs/controls.json — either close it, or update acceptedSince and acceptedWhy to say it is still a deliberate choice. Never bump the date without re-reading the reason: that is the snooze this control exists to make visible.",
+      "adr": "docs/adr/029-a-governance-clock-is-not-a-merge-gate.md",
+      "backstop": "human:weekly"
+    },
+    {
       "id": "workflow-pipefail",
       "claims": "every workflow runs its steps under pipefail, so a piped step cannot report success for a failing command",
       "status": "configured",

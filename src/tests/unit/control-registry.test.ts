@@ -382,7 +382,35 @@ describe('the chain of backstops ends at a person', () => {
   })
 })
 
-describe('an accepted gap expires rather than decaying', () => {
+/**
+ * **The shape of an acceptance, not its age.**
+ *
+ * This block used to carry a third assertion: that every accepted gap had been restated
+ * inside `ACCEPTED_GAP_MAX_AGE_DAYS`. On 2026-09-15 that assertion turned every pull
+ * request in the repository red, because `smoke-secret-isolation` was accepted
+ * 2026-08-15 and crossed day 31 at midnight UTC. Two of the pull requests it blocked
+ * were dependabot's, whose diffs could not have caused it and whose authors could not
+ * have fixed it: closing that gap is a GitHub Settings action.
+ *
+ * The check was right. Its severity was not — and this repository already holds the
+ * correct posture for the same class in two places. `ci.yml`'s orphaned-credential audit
+ * is `continue-on-error` precisely because "a blocking step would freeze every merge on a
+ * hygiene finding nobody can fix from a pull request", and premise drift reports rather
+ * than blocks ([ADR 008](../../../docs/adr/008-decisions-need-premise-detectors.md)).
+ *
+ * So the age check moved to `scripts/probe-accepted-gap.mjs`, scheduled in
+ * `control-audit.yml`, where it opens a `control-acceptance-stale` issue addressed to
+ * somebody who can act. Its decision is a pure exported function with its own tests in
+ * `probe-accepted-gap.test.ts`, so it is more testable there than it was here, not less.
+ *
+ * What stays is what a diff can actually break: that an accepted gap says **when** it was
+ * accepted, in a parseable form the probe can read, and **why**, at a length that makes it
+ * a reason rather than a gesture. Both fail on the commit that introduces them, which is
+ * the property the age check never had.
+ *
+ * See [ADR 029](../../../docs/adr/029-a-governance-clock-is-not-a-merge-gate.md).
+ */
+describe('an accepted gap records when and why it was accepted', () => {
   const accepted = registry.controls.filter((c) => c.status === 'not-configured')
 
   it('there are gaps to check', () => {
@@ -401,22 +429,27 @@ describe('an accepted gap expires rather than decaying', () => {
     ).toBeGreaterThan(40)
   })
 
+  // The date has to be real, not merely shaped like one. `acceptedSince: "2026-13-45"`
+  // matches the regex above and parses to Invalid Date, which `daysSinceAccepted` would
+  // turn into NaN — and `NaN > 30` is false, so a typo'd date would read as permanently
+  // fresh and the probe would never speak. A guard the old age assertion also lacked.
   it.each(accepted.map((c) => [c.id, c] as const))(
-    '%s: the acceptance has been restated recently enough',
+    '%s: acceptedSince is a real calendar date, not just a date-shaped string',
     (_id, control) => {
-      const days = Math.floor(
-        (Date.now() - new Date(control.acceptedSince ?? 0).getTime()) / 86_400_000
-      )
+      const parsed = new Date(`${control.acceptedSince}T00:00:00Z`)
       expect(
-        days,
-        `${control.id}'s gap was accepted ${days} days ago, over the ` +
-          `${ACCEPTED_GAP_MAX_AGE_DAYS}-day limit.\n\n` +
-          `This is not a deadline for fixing it — it is a deadline for deciding again. ` +
-          `Either close the gap, or update acceptedSince and acceptedWhy to say it is ` +
-          `still a deliberate choice. "Accepted" that nobody restates is indistinguishable ` +
-          `from "forgotten", and the probe stays quiet either way.\n\n` +
-          `${control.humanAction ?? ''}`
-      ).toBeLessThanOrEqual(ACCEPTED_GAP_MAX_AGE_DAYS)
+        Number.isNaN(parsed.getTime()),
+        `${control.id}'s acceptedSince ("${control.acceptedSince}") is shaped like a date ` +
+          `but is not one. daysSinceAccepted() would return NaN, NaN > ` +
+          `${ACCEPTED_GAP_MAX_AGE_DAYS} is false, and the acceptance would read as ` +
+          `permanently fresh — a governance clock that can never fire.`
+      ).toBe(false)
+
+      expect(
+        parsed.getTime(),
+        `${control.id}'s acceptedSince ("${control.acceptedSince}") is in the future. ` +
+          `An acceptance dated forward is one that cannot go stale until it arrives.`
+      ).toBeLessThanOrEqual(Date.now())
     }
   )
 })

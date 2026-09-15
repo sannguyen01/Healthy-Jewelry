@@ -234,6 +234,129 @@ jobs:
               })
             }
 
+      # Every accepted gap, not just the merge gate's.
+      #
+      # This check used to live in `control-registry.test.ts`, inside the merge gate, and
+      # on 2026-09-15 it turned every pull request in the repository red — including two
+      # dependabot PRs whose contents had nothing to do with it — because
+      # `smoke-secret-isolation` had turned 31 days old at midnight UTC. A wall-clock event
+      # is not caused by the change in front of you, so blocking that change reaches the one
+      # person who cannot act on it. Same trade as the credential audit in ci.yml and as
+      # premise drift (ADR 008): report prominently, never block. See docs/adr/029.
+      #
+      # Its own label. `merge-gate-unenforced` above says branch protection is absent; this
+      # says an acceptance has stopped being restated. Both can be true of `merge-gate` at
+      # once and neither implies the other, and `smoke-secret-isolation` can only ever
+      # trigger this one. Two facts down one channel is a channel people mute (ADR 011).
+      - name: Accepted gaps — is any of them being forgotten?
+        id: accepted-gap
+        continue-on-error: true
+        run: node scripts/probe-accepted-gap.mjs 2>&1 | tee accepted-gap.log
+
+      # A transport, not a decision. Every sentence in the issue is composed by
+      # `composeBody()` in the probe, where a test can read it — the smoke workflow's
+      # equivalent logic lives in a YAML string and shipped a comparison that could not
+      # match for 124 consecutive runs. See docs/adr/030.
+      - name: Report a forgotten acceptance
+        # `always() &&` is load-bearing: an `if:` naming no status function has `success()`
+        # ANDed onto it, which would make this alarm depend on every earlier step having
+        # passed rather than on what it actually asks (ADR 027).
+        if: always() && steps.accepted-gap.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+
+            let probe
+            try {
+              probe = JSON.parse(fs.readFileSync('accepted-gap.json', 'utf-8'))
+            } catch {
+              // No verdict is not a finding about acceptances. The audit summary below
+              // still carries the step's outcome.
+              return
+            }
+
+            if (!probe?.escalate || !probe.body) return
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: probe.label,
+            })
+
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`
+            const body = `${probe.body}\n\nRun: ${runUrl}`
+
+            if (open.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: probe.title,
+                body,
+                labels: [probe.label],
+              })
+              return
+            }
+
+            // Update in place rather than commenting. The finding is a current-state
+            // report, not an event log — a new comment every six hours is how issue #24
+            // reached 99 of them (ADR 011).
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: open[0].number,
+              body,
+            })
+
+      # And close it once every acceptance is inside the window again, so the label keeps
+      # meaning what it says.
+      - name: Close the forgotten-acceptance issue on recovery
+        if: always() && steps.accepted-gap.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+
+            let probe
+            try {
+              probe = JSON.parse(fs.readFileSync('accepted-gap.json', 'utf-8'))
+            } catch {
+              return
+            }
+
+            // `escalate: false` with an empty `aged` list would mean the probe found no
+            // accepted gaps at all, which is a registry problem rather than a recovery —
+            // closing on it would report an all-clear the probe never gave (ADR 010).
+            if (probe.escalate || !Array.isArray(probe.aged) || probe.aged.length === 0) return
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: probe.label,
+            })
+
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `${probe.detail} Closing.`,
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              })
+            }
+
       # Twelve invariants broken on purpose, one at a time, to check that the tests
       # protecting them still go red. See docs/adr/020.
       #
