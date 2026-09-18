@@ -136,6 +136,42 @@ function declaredThresholds(): Record<string, number> | null {
   return out
 }
 
+/**
+ * One named boolean property of the `thresholds` object, as a real boolean.
+ *
+ * `true`/`false` are keyword tokens rather than literals in the TypeScript AST,
+ * so `isNumericLiteral`-style narrowing does not reach them — which is why
+ * `declaredThresholds()` above silently skips them and this exists separately.
+ * Returns `null` for "not declared", which is a different fact from `false`.
+ */
+function declaredThresholdFlag(name: string): boolean | null {
+  const node = coverageProperty('thresholds')
+  if (!node || !ts.isObjectLiteralExpression(node)) return null
+
+  for (const prop of node.properties) {
+    if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name) && prop.name.text === name) {
+      if (prop.initializer.kind === ts.SyntaxKind.TrueKeyword) return true
+      if (prop.initializer.kind === ts.SyntaxKind.FalseKeyword) return false
+      return null
+    }
+  }
+  return null
+}
+
+/** Any per-glob threshold override, e.g. `'src/lib/foo/**': { lines: 40 }`. */
+function globOverrides(): string[] {
+  const node = coverageProperty('thresholds')
+  if (!node || !ts.isObjectLiteralExpression(node)) return []
+
+  return node.properties
+    .filter(
+      (prop): prop is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(prop) &&
+        (ts.isStringLiteral(prop.name) || ts.isNoSubstitutionTemplateLiteral(prop.name))
+    )
+    .map((prop) => (prop.name as ts.StringLiteralLike).text)
+}
+
 const thresholds = declaredThresholds()
 
 describe('the coverage threshold is declared', () => {
@@ -215,5 +251,46 @@ describe('the scope is stated, not accidental', () => {
         'would then be every file vitest touches, the threshold would fail on arrival, ' +
         'and the fix under time pressure is always to lower the number.'
     ).toBe(true)
+  })
+})
+
+describe('the threshold applies per file, not to the average', () => {
+  /**
+   * **An aggregate is a different control from a floor.**
+   *
+   * Until 2026-09-18 the four thresholds applied to the *project total*, and the
+   * project total was 91%. Six files sat below 80% underneath it —
+   * `shopify/customer/client.ts` at **0%**, which is the module that decides who
+   * is signed in, and `customer/oauth.ts` at 35.9%, which is where the OAuth
+   * nonce was generated and never checked. Seventeen well-covered modules were
+   * paying for them, and the gate reported the mean.
+   *
+   * The difference is not theoretical. Deleting `customer-client.test.ts` and
+   * running the suite both ways: with `perFile: true` the run exits 1 naming
+   * `client.ts` at 0%; with `perFile: false` the identical code exits **0**, all
+   * 2,377 tests green.
+   */
+  it('perFile is declared and true', () => {
+    expect(
+      declaredThresholdFlag('perFile'),
+      'vitest.config.ts applies its coverage thresholds to the project average rather ' +
+        'than to each file. A mean says nothing about a distribution: this repository ' +
+        'sat at 91% overall with a 0%-covered session module underneath it, and the ' +
+        'gate was green the whole time.'
+    ).toBe(true)
+  })
+
+  it('no per-glob override lowers the floor for any path', () => {
+    // An exemption list is the mechanism by which a floor becomes advisory. The
+    // next file below the line gets added to it instead of tested, and the
+    // aggregate's blindness reappears under a different name — scoped, this
+    // time, which makes it harder to notice rather than easier.
+    expect(
+      globOverrides(),
+      'vitest.config.ts declares per-glob coverage overrides. If a file genuinely ' +
+        'cannot be unit-tested, the honest move is to exclude it from `include` with a ' +
+        'stated reason and a compensating control in e2e/COVERAGE.md — not to keep it ' +
+        'in scope under a lower bar that reads as if it were covered.'
+    ).toEqual([])
   })
 })

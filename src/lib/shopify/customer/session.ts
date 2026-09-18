@@ -19,6 +19,17 @@ export interface CustomerSession {
   refreshToken: string
   /** Unix ms. Compared against a clock, never trusted as "probably still fine". */
   expiresAt: number
+  /**
+   * The OpenID Connect ID token from the authorization-code exchange.
+   *
+   * Kept for one reason: Shopify's end-session endpoint takes it as
+   * `id_token_hint`, and without it a logout shows the customer a confirmation
+   * screen instead of signing them out. It is **optional**, and deliberately so
+   * in two directions — a `refresh_token` grant does not return one, and a
+   * session cookie sealed before this field existed must still open rather than
+   * silently signing that customer out on the deploy that adds it.
+   */
+  idToken?: string
 }
 
 export const SESSION_COOKIE = 'hj_customer_session'
@@ -93,12 +104,17 @@ export function openSession(value: string | undefined, secret: string): Customer
     const parsed: unknown = JSON.parse(plain)
     if (typeof parsed !== 'object' || parsed === null) return null
 
-    const { accessToken, refreshToken, expiresAt } = parsed as Record<string, unknown>
+    const { accessToken, refreshToken, expiresAt, idToken } = parsed as Record<string, unknown>
     if (typeof accessToken !== 'string' || accessToken.length === 0) return null
     if (typeof refreshToken !== 'string' || refreshToken.length === 0) return null
     if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) return null
+    // Optional, so an absent one is fine — but a *present* one of the wrong type
+    // is not, and is dropped rather than carried into a URL as `[object Object]`.
+    const carriedIdToken = typeof idToken === 'string' && idToken.length > 0 ? idToken : undefined
 
-    return { accessToken, refreshToken, expiresAt }
+    return carriedIdToken
+      ? { accessToken, refreshToken, expiresAt, idToken: carriedIdToken }
+      : { accessToken, refreshToken, expiresAt }
   } catch {
     // A bad auth tag throws here, which is the correct and expected path for a
     // tampered cookie. It is not an error worth logging on every request.
