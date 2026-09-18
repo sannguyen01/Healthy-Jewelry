@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import { PURGE_NOW } from '@/lib/shopify/cacheTags'
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
@@ -110,7 +111,7 @@ describe('POST /api/revalidate', () => {
 
     it('revalidates the shared products tag, never a string literal', async () => {
       await POST(makeRequest(SECRET))
-      expect(revalidateTag).toHaveBeenCalledWith(PRODUCTS_TAG)
+      expect(revalidateTag).toHaveBeenCalledWith(PRODUCTS_TAG, PURGE_NOW)
     })
 
     it('revalidates every collection tag a fetch actually registers', async () => {
@@ -119,7 +120,7 @@ describe('POST /api/revalidate', () => {
       await POST(makeRequest(SECRET))
 
       for (const collection of hjCollections) {
-        expect(revalidateTag).toHaveBeenCalledWith(collectionTag(collection.handle))
+        expect(revalidateTag).toHaveBeenCalledWith(collectionTag(collection.handle), PURGE_NOW)
       }
     })
 

@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 import { HANDLED_TOPIC_PREFIXES, RETRY_SAFE } from '@/lib/webhooks/retrySafety'
+import { PURGE_NOW } from '@/lib/shopify/cacheTags'
 
 const ROOT = resolve(__dirname, '../../..')
 
@@ -128,14 +129,14 @@ describe('POST /api/webhooks/shopify', () => {
       await POST(req)
       expect(revalidatePath).toHaveBeenCalledWith('/', 'page')
       expect(revalidatePath).toHaveBeenCalledWith('/shop', 'page')
-      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidateTag).toHaveBeenCalledWith('products', PURGE_NOW)
     })
 
     it('scopes revalidation to the specific product when the payload includes a handle', async () => {
       const body = JSON.stringify({ id: 1, handle: 'arc-band-titanium' })
       const req = makeSignedReq(body, TEST_SECRET, 'products/update')
       await POST(req)
-      expect(revalidateTag).toHaveBeenCalledWith('product:arc-band-titanium')
+      expect(revalidateTag).toHaveBeenCalledWith('product:arc-band-titanium', PURGE_NOW)
       // No longer invalidates every generated product detail page —
       // the scoped tag replaces the old blanket path revalidation.
       expect(revalidatePath).not.toHaveBeenCalledWith('/products/[handle]', 'page')
@@ -146,7 +147,7 @@ describe('POST /api/webhooks/shopify', () => {
       const req = makeSignedReq(body, TEST_SECRET, 'products/update')
       const res = await POST(req)
       expect(res.status).toBe(200)
-      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidateTag).toHaveBeenCalledWith('products', PURGE_NOW)
       expect(revalidateTag).not.toHaveBeenCalledWith(expect.stringMatching(/^product:/))
     })
 
@@ -155,7 +156,7 @@ describe('POST /api/webhooks/shopify', () => {
       const req = makeSignedReq(body, TEST_SECRET, 'products/update')
       const res = await POST(req)
       expect(res.status).toBe(200)
-      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidateTag).toHaveBeenCalledWith('products', PURGE_NOW)
     })
 
     it('revalidates product paths on products/create topic', async () => {
@@ -163,14 +164,14 @@ describe('POST /api/webhooks/shopify', () => {
       const req = makeSignedReq(body, TEST_SECRET, 'products/create')
       await POST(req)
       expect(revalidatePath).toHaveBeenCalledWith('/shop', 'page')
-      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidateTag).toHaveBeenCalledWith('products', PURGE_NOW)
     })
 
     it('revalidates product paths on products/delete topic', async () => {
       const body = JSON.stringify({ id: 3 })
       const req = makeSignedReq(body, TEST_SECRET, 'products/delete')
       await POST(req)
-      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidateTag).toHaveBeenCalledWith('products', PURGE_NOW)
     })
 
     it('revalidates collection paths on collections/update topic', async () => {
@@ -191,7 +192,7 @@ describe('POST /api/webhooks/shopify', () => {
       const req = makeSignedReq(body, TEST_SECRET, 'collections/update')
       await POST(req)
 
-      expect(revalidateTag).toHaveBeenCalledWith('collection:rings')
+      expect(revalidateTag).toHaveBeenCalledWith('collection:rings', PURGE_NOW)
       expect(revalidateTag).not.toHaveBeenCalledWith('collections')
     })
 
@@ -204,7 +205,7 @@ describe('POST /api/webhooks/shopify', () => {
       const res = await POST(req)
 
       expect(res.status).toBe(200)
-      expect(revalidateTag).toHaveBeenCalledWith('products')
+      expect(revalidateTag).toHaveBeenCalledWith('products', PURGE_NOW)
       expect(revalidatePath).toHaveBeenCalledWith('/', 'page')
     })
 

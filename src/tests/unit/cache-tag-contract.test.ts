@@ -167,6 +167,69 @@ describe('cache tag contract', () => {
     expect(scanned).toContain('src/lib/shopify/index.ts')
   })
 
+  describe('every purge asks for immediate expiry', () => {
+    /**
+     * **Next 16 made the second argument required, and a plausible wrong value
+     * is invisible.**
+     *
+     * `revalidateTag(tag)` became `revalidateTag(tag, profile)`, where the
+     * profile is a named cacheLife profile or `{ expire }` in seconds. The
+     * required-ness is the good part: the upgrade was five type errors rather
+     * than a silent behaviour change.
+     *
+     * What nothing would catch is the wrong profile. Every caller here is a
+     * webhook or an on-demand purge — something changed in Shopify and the
+     * cached copy is now wrong — so the only correct expiry is immediate. Pass
+     * `'max'` instead (the example in Next's own doc comment) and the code
+     * compiles, both route suites still pass because they mock `next/cache`,
+     * and the sole observable difference is that Shopify webhooks quietly stop
+     * purging anything.
+     *
+     * That is the same failure this file already exists for: a tag spelled two
+     * ways is a silent no-op, and so is a tag purged with a profile that means
+     * "keep serving the cached copy". Read from the AST for the same reason as
+     * everything else here — a `revalidateTag` inside a comment is not a call.
+     */
+    const calls: { file: string; args: string[] }[] = []
+    for (const file of SOURCE_FILES) {
+      const src = readFileSync(file, 'utf-8')
+      for (const args of callsTo(parseSource(file, src), 'revalidateTag')) {
+        calls.push({ file: relative(ROOT, file), args })
+      }
+    }
+
+    it('finds the calls it is meant to be checking', () => {
+      // Without this the two assertions below pass on an empty list, which is
+      // the "covered-looking and worthless" state the suite above guards too.
+      expect(calls.length).toBeGreaterThanOrEqual(5)
+    })
+
+    it('passes a profile at every call site', () => {
+      const bare = calls.filter((c) => c.args.length < 2).map((c) => `${c.file}: ${c.args[0]}`)
+      expect(
+        bare,
+        'A revalidateTag call passes no cacheLife profile. Next 16 requires one — a ' +
+          'single-argument call does not compile, so this failing means the scan is ' +
+          'reading something the compiler is not.'
+      ).toEqual([])
+    })
+
+    it('uses PURGE_NOW, never a named profile that keeps serving stale copy', () => {
+      const wrong = calls
+        .filter((c) => c.args[1] !== 'PURGE_NOW')
+        .map((c) => `${c.file}: revalidateTag(${c.args[0]}, ${c.args[1]})`)
+
+      expect(
+        wrong,
+        'A purge passes something other than PURGE_NOW. Every caller is a webhook or an ' +
+          'on-demand invalidation, where the cached copy is already known to be wrong, so ' +
+          'the expiry must be immediate. A named profile such as "max" means the opposite ' +
+          'and fails silently: it compiles, the mocked route tests pass, and pages stay ' +
+          'stale until their own window closes. See PURGE_NOW in lib/shopify/cacheTags.ts.'
+      ).toEqual([])
+    })
+  })
+
   it('every tag the webhook revalidates is registered by some fetcher', () => {
     // Orphans. Revalidating a tag nothing registered is a no-op that looks
     // exactly like a successful invalidation.

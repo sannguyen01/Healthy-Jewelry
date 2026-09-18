@@ -27,7 +27,7 @@
  * 24-minute E2E suite became noise nobody read.
  */
 
-import { SHOPIFY_API_VERSION, apiVersionStatus } from './api-version.mjs'
+import { apiVersionStatus } from './api-version.mjs'
 
 /**
  * Shopify creates this automatically; it is not one of ours and never will be.

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { PRODUCTS_TAG, collectionTag } from '@/lib/shopify/cacheTags'
+import { PRODUCTS_TAG, collectionTag, PURGE_NOW } from '@/lib/shopify/cacheTags'
 import { hjCollections } from '@/lib/data/hj-data'
 import { timingSafeEqual } from 'crypto'
 
@@ -44,9 +44,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // in an earlier change, but this file was outside the contract test's reach (it read
     // two named files), so the bug survived here. `'products'` was a literal too, correct
     // only by coincidence.
-    revalidateTag(PRODUCTS_TAG)
+    revalidateTag(PRODUCTS_TAG, PURGE_NOW)
     for (const collection of hjCollections) {
-      revalidateTag(collectionTag(collection.handle))
+      revalidateTag(collectionTag(collection.handle), PURGE_NOW)
     }
 
     console.info('[revalidate/route] Revalidation triggered at', new Date().toISOString())

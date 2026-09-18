@@ -1,3 +1,23 @@
+/**
+ * @vitest-environment node
+ *
+ * **Node, not jsdom, and for a reason that is about faithfulness rather than
+ * convenience.**
+ *
+ * This is the one test that runs `next/og` for real. Next 16's rasteriser
+ * checks `instanceof Uint8Array` on the buffer it hands to resvg, and under
+ * jsdom that check fails across realms — jsdom's `Uint8Array` is not Node's —
+ * so the SVG is stringified and resvg reports
+ * `Unsupported input '60,115,118,103,...'`, which is `<svg width=...` as char
+ * codes. The same realm mismatch bit `coverage-gate-contract.test.ts` in this
+ * repository from the other direction, where esbuild refused to initialise
+ * under jsdom because `new TextEncoder().encode('') instanceof Uint8Array` was
+ * false.
+ *
+ * The OG route is a server route. Rendering it in a Node environment is what
+ * production does; rendering it in a simulated browser was always the less
+ * faithful of the two and only worked by accident.
+ */
 import { describe, it, expect } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
