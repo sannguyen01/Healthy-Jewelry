@@ -529,6 +529,61 @@ describe('lib/shopify/index — configured (live Shopify mapping)', () => {
     expect(results).toHaveLength(1)
   })
 
+  /**
+   * **What reaches Shopify is what gets cached, and it used to be neither.**
+   *
+   * `searchProducts` normalised the query for the *static* fallback and sent the
+   * **raw** string to Shopify. So the two halves searched for different things,
+   * and — with `revalidate: 0` — every capitalisation and spacing variant of the
+   * same search paid its own uncached round-trip against the store's quota. That
+   * is the quota real shoppers checking out are drawing on.
+   */
+  it('sends the normalised query to Shopify, not the raw one', async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(mockJsonResponse({ data: { search: { edges: [] } } }))
+    vi.stubGlobal('fetch', mockFetch)
+
+    const { searchProducts } = await import('@/lib/shopify')
+    await searchProducts('  Titanium   RINGS  ')
+
+    const body = JSON.parse(String(mockFetch.mock.calls[0][1].body)) as {
+      variables: { query: string }
+    }
+    expect(body.variables.query).toBe('titanium rings')
+  })
+
+  it('caches search results instead of spending a round-trip per visitor', async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(mockJsonResponse({ data: { search: { edges: [] } } }))
+    vi.stubGlobal('fetch', mockFetch)
+
+    const { searchProducts } = await import('@/lib/shopify')
+    await searchProducts('titanium')
+
+    // `revalidate: 0` is what made /search a per-request Shopify call on a page
+    // that is dynamic by construction and had no limiter in front of it. Every
+    // other fetcher in this module already caches.
+    const init = mockFetch.mock.calls[0][1] as { next?: { revalidate?: number } }
+    expect(init.next?.revalidate).toBeGreaterThan(0)
+  })
+
+  it('caps the query length, because every distinct string is its own cache entry', async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(mockJsonResponse({ data: { search: { edges: [] } } }))
+    vi.stubGlobal('fetch', mockFetch)
+
+    const { searchProducts } = await import('@/lib/shopify')
+    await searchProducts('x'.repeat(5_000))
+
+    const body = JSON.parse(String(mockFetch.mock.calls[0][1].body)) as {
+      variables: { query: string }
+    }
+    expect(body.variables.query.length).toBeLessThanOrEqual(128)
+  })
+
   it('searchProducts falls back to the static catalogue when the Shopify search fails', async () => {
     // Previously asserted `[]`, which encoded a real defect: an empty result is
     // rendered as a confident `No results for "arc band"`, telling the customer

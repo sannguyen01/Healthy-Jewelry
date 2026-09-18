@@ -1,7 +1,73 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-08-22
+Last refreshed by hand: 2026-09-18
+
+## Session note — 2026-09-18
+
+The 2026-09-15 defects review, executed across six workstreams. Twenty issues, each
+approved individually before any code was written. Nineteen landed; one was deliberately
+not built and says so in the pull request rather than in a silence.
+
+**Two claims in this file were wrong, and the work is what showed it.**
+
+**One — "there is no outstanding code work".** The "Open items at a glance" table still
+opens with that sentence, and it was written in good faith: every *tracked* item was
+blocked on a credential or a console. It was not true of the repository. The review found
+nineteen defects with no tracking item at all, several of them customer-facing:
+
+- `createRateLimiter` had no failure posture, so a Redis blip returned **500 on every cart
+  mutation, site-wide** — add-to-bag, quantity edits, checkout initiation.
+- The cart sync removed every remote line before re-adding, so a failure mid-flight left
+  the customer's Shopify cart **empty** with no compensation.
+- `checkoutUrl` is persisted, so a returning visitor could be handed to a hosted checkout
+  built from a bag they no longer had.
+- `getProducts` could not terminate: `hasNextPage: true` with `edges: []` is an ordinary
+  Shopify answer and the loop had no exit for it.
+- The OAuth `nonce` was generated, sent, and compared against nothing.
+
+None was blocked on a credential. The sentence was true of the *list* and read as though it
+were true of the *code*, which is the same aggregate-hides-distribution shape the review
+kept finding elsewhere. The table is still accurate about what it enumerates; what it
+cannot say is that nothing else is wrong.
+
+**Two — the escalation that "correctly escalated".** The 2026-08-23 correction below says
+`production-smoke` has been "correctly diagnosing and escalating the wrong-token-slot
+failure (issue #24)". It diagnosed. It never escalated once. Three independent bugs, none
+reachable by any test because all 110 lines lived inside a YAML `script:` string: a
+volatility filter that missed a wall-clock figure printed inside a `<details>` block, a
+streak counter whose own branch suppressed the comments it counted, and an unpaginated
+`listComments` that made "the last comment" the hundredth *oldest* past a hundred. Issue
+#24 stood at exactly 100 comments — one short of that cliff — when this was found. The
+logic now lives in `scripts/lib/escalation.mjs`, importable and tested.
+
+**And a third, in a control rather than in prose.** `scripts/probe-assertion-liveness.mjs`
+had not applied a single mutation since PR #44 (2026-09-05). Both pre-mutation guards asked
+the verdict function a question it does not answer, so every sentinel reported
+`unevaluable` and the probe exited 0 — a registered control, running weekly, reporting that
+it had measured nothing in the voice of reporting that all was well.
+
+### What this changes about the open items
+
+Nothing closes. Every one of the nine is still blocked on a credential, a console or a
+phone. Two are now better instrumented:
+
+- **`UPSTASH-REDIS` (item 5)** was quietly arming a behaviour change. The in-memory
+  fallback used a **fixed** window while the Upstash path has always used a sliding one, so
+  completing this item would have changed every limiter's behaviour on the day it was done,
+  silently. The fallback is now a sliding window too, and the divergence is gone rather
+  than pending.
+- **`PRODUCTION-SMOKE-SECRETS` (item 4)** gains an alarm channel that can actually fire,
+  per the escalation fix above.
+
+### Standing caveat, restated
+
+This session found three false claims in machine-checked documentation and one control that
+had stopped running. All four were introduced by people acting carefully, and all four read
+as diligence. The countermeasure shipped here is not vigilance: `docs/failure-modes.md`,
+`e2e/COVERAGE.md`'s reasons and `vitest.config.ts`'s per-file floor are each now reconciled
+against their own source of truth by a test, which is the only form of documentation this
+repository has ever managed to keep true.
 
 ## Session note — 2026-08-31
 

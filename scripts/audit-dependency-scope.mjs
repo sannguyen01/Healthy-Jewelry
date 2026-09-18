@@ -191,6 +191,124 @@ export function requiresRationale({ changes, majors, prBody }) {
 }
 
 /** @param {string[]} args @param {string} flag */
+/**
+ * Production dependencies that no source file imports.
+ *
+ * ## The one that paid for this
+ *
+ * `framer-motion` sat in `dependencies` with **zero** import sites anywhere in `src/`,
+ * under either of its package names. It contributed 0 bytes to the bundle — nothing
+ * imports it, so Next tree-shakes it out entirely — and it still cost:
+ *
+ *   · 5.9 MB in node_modules across 3 transitive packages;
+ *   · two dependabot pull requests, #53 and #67;
+ *   · one of those, #53, a **two-major** jump (11.18.2 -> 13.1.1) merged unverified
+ *     during the 2026-08-29 CI blackout;
+ *   · a standing CVE surface — an advisory in framer-motion, motion-dom or motion-utils
+ *     raises an alert on this repository for code that never executes.
+ *
+ * None of that is visible from the bundle, which is why it survived. A dependency's cost
+ * is not only what it ships.
+ *
+ * ## Why an allowlist is not optional
+ *
+ * Plenty of legitimate dependencies are never imported from `src/`: `react-dom` is Next's
+ * peer requirement, `tailwindcss` and `postcss` run at build time through config files,
+ * `typescript` is invoked as a binary. A check without the allowlist false-positives on
+ * all of them on day one — and a detector that cries wolf immediately loses its reader,
+ * which is exactly the reasoning `collectionSetPremise` records for exempting `frontpage`.
+ *
+ * Every entry carries the reason it is there, because an unexplained exemption is
+ * indistinguishable from an oversight ([ADR 019](../docs/adr/019-an-unclassified-entry-is-an-unverified-one.md)).
+ *
+ * @param {Record<string, string>} dependencies  the manifest's `dependencies` block
+ * @param {string[]} importedSpecifiers          every module specifier imported under src/
+ * @param {Record<string, string>} [allowlist]   name -> why it is never imported
+ * @returns {{ ok: boolean, unused: string[], summary: string }}
+ */
+export function unusedDependencies(dependencies, importedSpecifiers, allowlist = NOT_IMPORTED_BY_DESIGN) {
+  const imported = new Set()
+  for (const specifier of importedSpecifiers) {
+    // `next/font/google` counts as a use of `next`; `@upstash/redis/foo` of `@upstash/redis`.
+    // Scoped packages keep two segments, everything else keeps one.
+    const parts = specifier.split('/')
+    imported.add(specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0])
+  }
+
+  const unused = Object.keys(dependencies ?? {})
+    .filter((name) => !imported.has(name))
+    .filter((name) => !(name in allowlist))
+    .sort()
+
+  if (unused.length === 0) {
+    return {
+      ok: true,
+      unused: [],
+      summary: `All ${Object.keys(dependencies ?? {}).length} production dependencies are imported, or exempt with a stated reason.`,
+    }
+  }
+
+  return {
+    ok: false,
+    unused,
+    summary:
+      `${unused.length} production dependenc${unused.length === 1 ? 'y is' : 'ies are'} ` +
+      `imported by nothing under src/: ${unused.join(', ')}.\n\n` +
+      'Remove it, or add it to NOT_IMPORTED_BY_DESIGN in this file with the reason it is ' +
+      'here. A dependency nobody imports still accrues dependabot pull requests, CVE ' +
+      'advisories and major-version decisions — framer-motion cost all three while ' +
+      'contributing zero bytes to the bundle.',
+  }
+}
+
+/**
+ * Production dependencies that legitimately have no import site under `src/`.
+ *
+ * Each value is the reason. A bare list would be a list nobody could audit.
+ */
+export const NOT_IMPORTED_BY_DESIGN = {
+  'react-dom':
+    "Next.js's own peer requirement. The framework renders with it; application code " +
+    'never imports it directly, and removing it breaks the build.',
+}
+
+/**
+ * Every module specifier imported anywhere under `src/`.
+ *
+ * Text-scanned rather than parsed, deliberately and with a stated limit: this runs in a
+ * dependency-free CI job (see the header) that does no `pnpm install`, so the TypeScript
+ * AST scanner this repository prefers is not available to it. The consequence is bounded
+ * in the safe direction — a specifier inside a comment counts as an import, so the check
+ * can only ever *miss* an unused dependency, never invent one. A false negative here is a
+ * dependency that survives a little longer; a false positive would be a green check
+ * demanding you delete something load-bearing.
+ *
+ * @param {string} dir
+ * @returns {string[]}
+ */
+export function importedSpecifiersUnder(dir) {
+  const found = []
+  const pattern = /(?:from\s*|import\s*\(\s*|require\(\s*)['"`]([^'"`]+)['"`]/g
+
+  /** @param {string} current */
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name)
+      if (entry.isDirectory()) {
+        walk(full)
+      } else if (/\.(ts|tsx|js|jsx|mjs)$/.test(entry.name)) {
+        for (const match of fs.readFileSync(full, 'utf8').matchAll(pattern)) {
+          // Relative and alias imports are not packages.
+          if (!match[1].startsWith('.') && !match[1].startsWith('@/')) found.push(match[1])
+        }
+      }
+    }
+  }
+
+  walk(dir)
+  return found
+}
+
 function arg(args, flag) {
   const i = args.indexOf(flag)
   return i === -1 ? undefined : args[i + 1]
@@ -238,7 +356,7 @@ async function main() {
   const result = requiresRationale({ changes, majors, prBody: process.env.PR_BODY ?? '' })
 
   if (args.includes('--json')) {
-    console.log(JSON.stringify({ majors, changes, ...result }, null, 2))
+    console.log(JSON.stringify({ majors, changes, ...result, unused }, null, 2))
   } else {
     console.log(`${result.ok ? '✓' : '✗'} dependency scope`)
     console.log('')
@@ -256,7 +374,24 @@ async function main() {
     }
   }
 
-  process.exit(result.ok ? 0 : 1)
+  // A second, independent question on the same manifest: is anything here unused?
+  //
+  // Reported on every run and folded into the exit status, because unlike the escalation
+  // check this one is always answerable from the head commit alone — it needs no base ref
+  // and no PR body. Its failure names the package and the fix.
+  const unused = unusedDependencies(
+    JSON.parse(fs.readFileSync(path.join(ROOT, MANIFEST), 'utf8')).dependencies ?? {},
+    importedSpecifiersUnder(path.join(ROOT, 'src'))
+  )
+
+  if (!args.includes('--json')) {
+    console.log('')
+    console.log(`${unused.ok ? '✓' : '✗'} unused dependencies`)
+    console.log('')
+    console.log(unused.summary)
+  }
+
+  process.exit(result.ok && unused.ok ? 0 : 1)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

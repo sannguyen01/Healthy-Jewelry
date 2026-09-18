@@ -7,7 +7,7 @@
     "reads that configuration from its own source of truth. Prose is a claim; a probe is evidence.",
     "",
     "JSON rather than YAML on purpose. This repo has no YAML parser dependency, so a YAML",
-    "registry would need a hand-written one \u2014 and a hand-written parser that silently matches",
+    "registry would need a hand-written one — and a hand-written parser that silently matches",
     "nothing is exactly the failure this registry exists to catch. A registry whose own reader",
     "could quietly return an empty set would be the joke writing itself.",
     "",
@@ -21,7 +21,7 @@
       "claims": "main requires both CI check runs to pass before a pull request can merge",
       "status": "not-configured",
       "requiredContexts": [
-        "Lint \u00b7 Type-check \u00b7 Unit tests \u00b7 Build",
+        "Lint · Type-check · Unit tests · Build",
         "Dependency scope",
         "E2E tests (Playwright)"
       ],
@@ -29,12 +29,12 @@
       "probe": "scripts/probe-branch-protection.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": true,
-      "knownLimit": "The probe reports; it cannot enable protection, and it deliberately still exits 0 on an honestly-documented absence \u2014 failing a scheduled audit over a console action nobody in CI can perform would make the audit a permanent red that people learn to ignore. What changed is that the finding now reaches a person: the audit opens and updates one merge-gate-unenforced issue when the acceptance goes stale, or when ADR 015's own precondition is met. Until 2026-08-31 this probe's finding went into a log file and stopped, which made it the only control here whose result nothing carried.",
-      "humanAction": "GitHub \u2192 Settings \u2192 Branches \u2192 add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` \u2014 those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
+      "knownLimit": "The probe reports; it cannot enable protection, and it deliberately still exits 0 on an honestly-documented absence — failing a scheduled audit over a console action nobody in CI can perform would make the audit a permanent red that people learn to ignore. What changed is that the finding now reaches a person: the audit opens and updates one merge-gate-unenforced issue when the acceptance goes stale, or when ADR 015's own precondition is met. Until 2026-08-31 this probe's finding went into a log file and stopped, which made it the only control here whose result nothing carried.",
+      "humanAction": "GitHub → Settings → Branches → add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` — those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
-      "acceptedSince": "2026-08-31",
-      "acceptedWhy": "Restated after the 2026-08-29 blackout, which is what this gap costs when it is called: eleven consecutive CI runs on main died at Install dependencies, every check after reported skipped, and eleven pull requests were merged by hand against a gate that had not run. ADR 015 said protection was only reasonable once a passing run existed to enforce against; the last four runs on main are green, so that blocker is gone and the gap is now a choice rather than a wait. It stays accepted only because enabling protection is a GitHub console action nobody in CI can perform \u2014 and it no longer stays quiet: probe-branch-protection.mjs escalates it under the merge-gate-unenforced label."
+      "acceptedSince": "2026-09-15",
+      "acceptedWhy": "Restated 2026-09-15 by the defects review, and still a deliberate choice. The original acceptance stands on its own terms: the 2026-08-29 blackout is what this gap costs when it is called — eleven consecutive CI runs on main died at Install dependencies, every check after reported skipped, and eleven pull requests were merged by hand against a gate that had not run. ADR 015 said protection was only reasonable once a passing run existed to enforce against; that blocker is gone. It stays accepted only because enabling protection is a GitHub console action nobody in CI can perform, and probe-branch-protection.mjs escalates it under the merge-gate-unenforced label rather than letting it go quiet. What changed today is where the staleness of this line is enforced: it was asserted inside the merge gate itself, so on 2026-10-01 it would have turned every pull request red over a console action no diff can affect — the same severity misplacement ADR 029 records. The age check now runs in control-audit.yml and opens an issue; the gate keeps only the structural assertions a diff can actually break."
     },
     {
       "id": "smoke-secret-isolation",
@@ -43,12 +43,24 @@
       "probe": "scripts/preflight-secrets.mjs",
       "probeRunsIn": ".github/workflows/production-smoke.yml",
       "selfMonitoring": true,
-      "humanAction": "GitHub \u2192 Settings \u2192 Environments \u2192 production-readonly: put the five secrets there and set the variable SMOKE_SECRETS_SOURCE=environment. Never set that marker at repository scope \u2014 it is what distinguishes isolated from merely green.",
-      "knownLimit": "A convention, not an enforcement. GitHub gives a job no way to ask where a secret came from, so setting the marker at repository scope defeats it. Recorded rather than overclaimed \u2014 ADR 006.",
+      "humanAction": "GitHub → Settings → Environments → production-readonly: put the five secrets there and set the variable SMOKE_SECRETS_SOURCE=environment. Never set that marker at repository scope — it is what distinguishes isolated from merely green.",
+      "knownLimit": "A convention, not an enforcement. GitHub gives a job no way to ask where a secret came from, so setting the marker at repository scope defeats it. Recorded rather than overclaimed — ADR 006.",
       "adr": "docs/adr/006-controls-must-fail-loudly.md",
       "backstop": "human:weekly",
-      "acceptedSince": "2026-08-15",
-      "acceptedWhy": "Issue #24. SHOPIFY_ADMIN_ACCESS_TOKEN holds the wrong kind of token; only a human with Shopify Admin can replace it."
+      "acceptedSince": "2026-09-15",
+      "acceptedWhy": "Restated 2026-09-15 by the defects review, and corrected: the previous reason named the wrong blocker. Issue #24 is that SHOPIFY_ADMIN_ACCESS_TOKEN holds a token of the wrong kind, which is a different fact from this control, and citing it here made an unmet isolation requirement read as a downstream consequence of a credential problem. This control is about scope, not validity: the five smoke secrets must sit on the production-readonly GitHub Environment with the SMOKE_SECRETS_SOURCE=environment marker, because this repository is public and forkable and repository-scoped secrets are readable by every workflow. Correcting the token would not close this gap; moving the secrets would, whatever the token holds. It stays accepted because both are GitHub console actions nobody in CI can perform, and preflight-secrets.mjs asserts the marker so the difference between isolated and merely green stays observable."
+    },
+    {
+      "id": "control-acceptance-freshness",
+      "claims": "every deliberately-accepted control gap is re-decided within 30 days, and a person is told when one is not",
+      "status": "configured",
+      "probe": "scripts/probe-accepted-gap.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Nothing watches this probe. probe-ci-liveness.mjs watches ci.yml and probe-smoke-liveness.mjs watches production-smoke.yml, but no probe watches control-audit.yml — so if that workflow stops executing, this check goes silent and its silence is indistinguishable from an all-clear. That is the exact shape ADR 022 names, one tier up, and it is stated here rather than implied because an unstated limit is how the merge gate stayed dark for eleven runs. The weekly human backstop is what covers it today.",
+      "humanAction": "None while this reads green. When it opens a control-acceptance-stale issue, the action is to re-decide the named gap in docs/controls.json — either close it, or update acceptedSince and acceptedWhy to say it is still a deliberate choice. Never bump the date without re-reading the reason: that is the snooze this control exists to make visible.",
+      "adr": "docs/adr/029-a-governance-clock-is-not-a-merge-gate.md",
+      "backstop": "human:weekly"
     },
     {
       "id": "workflow-pipefail",
@@ -58,6 +70,16 @@
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
       "adr": "docs/adr/010-a-control-that-cannot-fail.md",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "test-coverage-threshold",
+      "claims": "the 80% coverage thresholds in vitest.config.ts are evaluated by the merge gate and applied to every file, not merely declared over an average",
+      "status": "configured",
+      "probe": "src/tests/unit/coverage-gate-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Scoped to src/lib, src/store and src/config on purpose — the UI layer is covered by E2E, and e2e/COVERAGE.md is the compensating control for it. Within that scope the floor is now per-file with no glob exemptions: the aggregate form of this threshold hid five files below 80% behind a 91% total on 2026-09-15, customer/client.ts at 0% among them, which is what issue 14 of that review recorded and what perFile: true closed on 2026-09-18.",
       "backstop": "control:merge-gate"
     },
     {
@@ -77,7 +99,7 @@
       "probe": "src/tests/unit/pnpm-version-contract.test.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Covers this repository's declarations only. Dependabot resolves lockfiles on its own infrastructure and honours `packageManager`, but nothing here can prove it did \u2014 the evidence is that the regenerated lockfile still carries its `overrides:` block, which `--frozen-lockfile` checks on every run.",
+      "knownLimit": "Covers this repository's declarations only. Dependabot resolves lockfiles on its own infrastructure and honours `packageManager`, but nothing here can prove it did — the evidence is that the regenerated lockfile still carries its `overrides:` block, which `--frozen-lockfile` checks on every run.",
       "backstop": "control:merge-gate"
     },
     {
@@ -87,7 +109,7 @@
       "probe": "src/tests/unit/node-version-contract.test.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Covers this repository's declarations only. Vercel reads `engines.node` from its own build image and nothing here can prove which patch it resolved \u2014 the guarantee is that it reads the same field, and the same major, as CI does. Playwright is deliberately outside this control: `ci.yml` derives the browser version from the installed `@playwright/test` package and keys its cache on it, so the lockfile is already that tool's single authority and a second declaration would be the regression.",
+      "knownLimit": "Covers this repository's declarations only. Vercel reads `engines.node` from its own build image and nothing here can prove which patch it resolved — the guarantee is that it reads the same field, and the same major, as CI does. Playwright is deliberately outside this control: `ci.yml` derives the browser version from the installed `@playwright/test` package and keys its cache on it, so the lockfile is already that tool's single authority and a second declaration would be the regression.",
       "backstop": "control:merge-gate"
     },
     {
@@ -97,7 +119,7 @@
       "probe": "scripts/audit-dependency-scope.mjs",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "It reports; it does not block, because main has no branch protection and a red X sits beside a merge button anyone can still press. Registered as configured because the check itself runs and fails correctly \u2014 what is missing is the merge-gate control it would hang from, which is why that is its backstop rather than human:weekly. It also reads the package.json diff only: a major arriving through a transitive dependency, or through pnpm.overrides, is outside it. And `hasWrittenRationale` asks whether somebody wrote a paragraph under a heading, not whether the paragraph is any good \u2014 bounded coverage, stated rather than claimed (ADR 007).",
+      "knownLimit": "It reports; it does not block, because main has no branch protection and a red X sits beside a merge button anyone can still press. Registered as configured because the check itself runs and fails correctly — what is missing is the merge-gate control it would hang from, which is why that is its backstop rather than human:weekly. It also reads the package.json diff only: a major arriving through a transitive dependency, or through pnpm.overrides, is outside it. And `hasWrittenRationale` asks whether somebody wrote a paragraph under a heading, not whether the paragraph is any good — bounded coverage, stated rather than claimed (ADR 007).",
       "backstop": "control:merge-gate"
     },
     {
@@ -107,19 +129,28 @@
       "probe": "src/tests/unit/install-command-contract.test.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Asserts what this repository declares, not what Vercel executes. A project-level Install Command set in the Vercel dashboard overrides vercel.json, and nothing here can read that \u2014 the same blind spot smoke-secret-isolation records for GitHub environment scoping. Verify it once in the dashboard and re-verify when the project is reconfigured; this check covers every other consumer, and covers the file a reviewer would read to answer the question.",
+      "knownLimit": "Asserts what this repository declares, not what Vercel executes. A project-level Install Command set in the Vercel dashboard overrides vercel.json, and nothing here can read that — the same blind spot smoke-secret-isolation records for GitHub environment scoping. Verify it once in the dashboard and re-verify when the project is reconfigured; this check covers every other consumer, and covers the file a reviewer would read to answer the question.",
       "backstop": "control:merge-gate"
     },
     {
       "id": "smoke-escalation",
-      "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours",
+      "claims": "a production-smoke failure repeating the same diagnosis escalates once instead of commenting every six hours, and the comparison that decides \"same diagnosis\" is a pure function with fixture tests rather than a string inside a YAML file",
       "status": "configured",
-      "probe": ".github/workflows/production-smoke.yml",
-      "probeRunsIn": ".github/workflows/production-smoke.yml",
-      "selfMonitoring": false,
-      "knownLimit": "The escalation logic lives inline in a github-script step and has no unit test. Issue #24 shows it working \u2014 escalated and labelled human-required on 2026-08-22 \u2014 but that is evidence from one occurrence, not a standing check.",
+      "probe": "src/tests/unit/escalation-decision.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
       "adr": "docs/adr/011-repeated-identical-failures-must-escalate.md",
       "backstop": "control:smoke-liveness"
+    },
+    {
+      "id": "workflow-inline-script-budget",
+      "claims": "no github-script step in any workflow holds a decision: each is within a 45-line transport budget, and the four blocks that exceed it today are frozen at their current size and may not grow",
+      "status": "configured",
+      "probe": "src/tests/unit/workflow-inline-script-budget.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "adr": "docs/adr/030-an-equivalence-relation-is-the-control.md",
+      "backstop": "control:merge-gate"
     },
     {
       "id": "premise-detectors",
@@ -129,18 +160,18 @@
       "probeRunsIn": ".github/workflows/production-smoke.yml",
       "probeLibrary": "scripts/lib/premise-checks.mjs",
       "selfMonitoring": true,
-      "knownLimit": "Runs only inside production-smoke, whose real checks have not executed since 2026-08-15. A detector downstream of a failing preflight is a detector that is not running \u2014 which is what the smoke-liveness control exists to say out loud.",
+      "knownLimit": "Runs only inside production-smoke, whose real checks have not executed since 2026-08-15. A detector downstream of a failing preflight is a detector that is not running — which is what the smoke-liveness control exists to say out loud.",
       "adr": "docs/adr/008-decisions-need-premise-detectors.md",
       "backstop": "control:smoke-liveness"
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting twelve named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting seventeen named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
-      "knownLimit": "Covers twelve declared sentinels, not the whole suite. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move \u2014 which is why the probe reports `unapplicable` loudly rather than skipping.",
+      "knownLimit": "Covers seventeen declared sentinels, not the whole suite. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move — which is why the probe reports `unapplicable` loudly rather than skipping.",
       "adr": "docs/adr/020-a-test-that-cannot-fail-is-documentation.md",
       "backstop": "human:weekly"
     },
@@ -151,18 +182,18 @@
       "probe": "scripts/probe-smoke-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
-      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that \u2014 the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark.",
+      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that — the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark.",
       "adr": "docs/adr/022-absence-needs-its-own-alarm.md",
       "backstop": "human:weekly"
     },
     {
       "id": "ci-liveness",
-      "claims": "if CI runs on main stop evaluating the repository, an issue says so \u2014 a run that dies in setup reports every check as skipped, which from outside is indistinguishable from success",
+      "claims": "if CI runs on main stop evaluating the repository, an issue says so — a run that dies in setup reports every check as skipped, which from outside is indistinguishable from success",
       "status": "configured",
       "probe": "scripts/probe-ci-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": true,
-      "knownLimit": "Keys on the `Lint` step alone. A run whose lint executed has evaluated the repository, so an ordinary red build reads as `lit` \u2014 deliberately, because demanding that every check ran would alarm on each genuinely broken pull request and become a muted channel (ADR 011). It follows that a gate broken *after* lint, between lint and build, is not covered here; the merge gate's own red X carries that.",
+      "knownLimit": "Keys on the `Lint` step alone. A run whose lint executed has evaluated the repository, so an ordinary red build reads as `lit` — deliberately, because demanding that every check ran would alarm on each genuinely broken pull request and become a muted channel (ADR 011). It follows that a gate broken *after* lint, between lint and build, is not covered here; the merge gate's own red X carries that.",
       "adr": "docs/adr/022-absence-needs-its-own-alarm.md",
       "backstop": "human:weekly"
     },
@@ -195,6 +226,46 @@
       "selfMonitoring": true,
       "adr": "docs/adr/017-a-box-that-could-not-be-both.md",
       "backstop": "control:merge-gate"
+    },
+    {
+      "id": "coverage-manifest-truthfulness",
+      "claims": "every route excused from E2E in e2e/COVERAGE.md names a test that exists and covers it",
+      "status": "configured",
+      "probe": "src/tests/unit/coverage-manifest-truthfulness.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Checks that a cited test exists and mentions the route, not that its assertions still mean anything — that is the fossil question, answered by control:assertion-liveness. Two of the nine exceptions were wrong the first time this ran: /api/version cited a file that tests the version-literal scan and never imports the route, leaving that route with no test at all, and /api/shopify cited an E2E spec that does not touch it.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "failure-mode-registry",
+      "claims": "every failure mode the code enumerates as a type is documented in docs/failure-modes.md with what detects it and what covers it",
+      "status": "configured",
+      "probe": "src/tests/unit/failure-mode-registry.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Reconciles the seven registered union types in both directions; a failure mode with no type cannot be found by it. Those are listed in the document’s final table by hand, which is the part of the registry that can still go stale — a new un-enumerated degradation is invisible to this check in exactly the way an undocumented union member is not.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "rate-limit-bucket-isolation",
+      "claims": "no two rate limiters share a Redis key prefix, so no two budgets silently merge",
+      "status": "configured",
+      "probe": "src/tests/unit/rate-limit-prefix-uniqueness.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Static by necessity, not by preference. With Upstash unconfigured — every test environment today — the in-memory fallback allocates a fresh Map per limiter and ignores the prefix entirely, so a collision is invisible to any test that drives requests through a route and appears only in production. A prefix built from a constant rather than written inline would also be missed, which is why the check asserts it found at least five limiters.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "unit-env-parity",
+      "claims": "the unit suite runs under the same environment locally and in the merge gate, so a green local run is evidence about the gate",
+      "status": "configured",
+      "probe": "src/tests/unit/vitest-env-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Reconciles the declared environments, not the measured coverage. A module whose branch count depends on some *other* ambient difference — a locale, a TZ, a Node minor — is outside it. The real defence against that class is a test stubbing both arms, as config-env-branches.test.ts does for src/config; this control only removes the one difference that had already cost three red CI runs on 2026-09-18 while every local run was clean.",
+      "backstop": "control:merge-gate"
     }
   ],
   "$decisionAdrsComment": [
@@ -219,9 +290,9 @@
     "docs/adr/018-a-claim-about-a-control-is-not-a-control.md": "The rule this registry implements. It is the frame, not an entry in it.",
     "docs/adr/021-a-metric-with-only-one-direction.md": "A rule about how sizes are written, and the audit that enforces it runs in the fast gate and fails by name. Its absence would be visible, which is what makes it a guardrail rather than a control.",
     "docs/adr/019-an-unclassified-entry-is-an-unverified-one.md": "A rule about how enumerations are written, like ADR 007 is about how guardrails are written. Its three reconciliation tests run in the fast gate and fail by name, so their absence would be visible; that is what makes them guardrails rather than controls.",
-    "docs/adr/023-the-last-link-is-a-person.md": "States where the verification regress terminates. It is the frame the backstop field implements, not an entry in it \u2014 and its enforcement is a registry test that fails loudly in the fast gate.",
+    "docs/adr/023-the-last-link-is-a-person.md": "States where the verification regress terminates. It is the frame the backstop field implements, not an entry in it — and its enforcement is a registry test that fails loudly in the fast gate.",
     "docs/adr/024-a-tool-never-pointed-at-a-known-answer.md": "A rule about how verification tools are built and admitted to this registry. Like ADR 007, it constrains the entries rather than being one.",
-    "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible \u2014 a guardrail, not a control.",
+    "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible — a guardrail, not a control.",
     "docs/adr/028-a-fixture-is-the-input-you-thought-of.md": "A rule about how verification tools are tested before being relied upon, like ADR 007 is about how guardrails are written and ADR 024 about pointing them at a known answer. It constrains the entries rather than being one, and its enforcement is parser-fuzz.test.ts, which fails by name in the fast gate.",
     "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
   },
@@ -231,13 +302,13 @@
     "`control:<id>` points at another entry. `human:<cadence>` is the floor. There is no third form,",
     "and a cycle is a failure: two controls backstopping each other is a chain with no bottom.",
     "",
-    "This exists because the bottom rung broke on arrival. control-audit.yml \u2014 the tier that watches",
-    "every other control \u2014 was invalid YAML from the commit that created it and produced three runs",
+    "This exists because the bottom rung broke on arrival. control-audit.yml — the tier that watches",
+    "every other control — was invalid YAML from the commit that created it and produced three runs",
     "with zero jobs. Nothing in this repository noticed. A human reading the Actions tab did.",
     "",
     "ADR 022 conceded the audit cannot detect its own death and left it there. This says where the",
     "regress stops instead: docs/weekly-verification.md, five minutes, once a week, regardless of what",
-    "any dashboard says \u2014 because the premise is that the dashboards may be lying.",
+    "any dashboard says — because the premise is that the dashboards may be lying.",
     "",
     "See docs/adr/023-the-last-link-is-a-person.md."
   ],
@@ -245,12 +316,12 @@
     "A `not-configured` control names when its gap was accepted and why.",
     "",
     "probe-branch-protection.mjs exits 0 while the registry honestly says not-configured, so an",
-    "accepted gap raises no alarm \u2014 correctly, since a six-hourly alarm about a state only a human can",
+    "accepted gap raises no alarm — correctly, since a six-hourly alarm about a state only a human can",
     "change is the channel ADR 011 says people learn to mute.",
     "",
     "But silence has its own failure: `accepted` decays into `forgotten`, and nothing marks the moment.",
     "So the acceptance expires instead of the alarm firing. control-registry.test.ts fails when an",
     "acceptance is older than ACCEPTED_GAP_MAX_AGE_DAYS, which forces a person to restate it or close",
-    "it \u2014 once, in a diff a reviewer sees, rather than every six hours in a channel nobody reads."
+    "it — once, in a diff a reviewer sees, rather than every six hours in a channel nobody reads."
   ]
 }

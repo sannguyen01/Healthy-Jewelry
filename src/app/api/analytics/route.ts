@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAnalyticsEventName, sanitiseQuery, MAX_QUERY_LENGTH } from '@/lib/analytics/events'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
+import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
 /**
  * Where storefront events land.
@@ -37,7 +38,15 @@ export const dynamic = 'force-dynamic'
 // Generous. A browsing session legitimately fires an event every few seconds, and
 // this bucket exists to stop abuse rather than to budget real use — the same
 // posture as /api/shopify, which is unauthenticated for the same reason.
-const limiter = createRateLimiter({ limit: 120, window: '1 m', prefix: 'hj:analytics' })
+// `onError: 'allow'`. This is measurement. Dropping a beacon because Redis is
+// unreachable would lose the data *and* spend a 500 telling a customer's browser
+// about it — and this route already answers 204 to everything by design.
+const limiter = createRateLimiter({
+  limit: 120,
+  window: '1 m',
+  prefix: 'hj:analytics',
+  onError: 'allow',
+})
 
 /** Small by design. A legitimate event is a few hundred bytes. */
 const MAX_BODY_BYTES = 2_048
@@ -84,16 +93,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 })
   }
 
-  const contentLength = request.headers.get('content-length')
-  if (contentLength !== null && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
-    return new NextResponse(null, { status: 204 })
-  }
+  // Same shared reader as /api/shopify and /api/contact — real bytes, bounded
+  // before allocation. Every refusal here stays 204: this route answers a
+  // fire-and-forget beacon, and an oversize payload is not something a
+  // customer's browser should hear about or retry.
+  const body = await readBoundedBody(request, MAX_BODY_BYTES)
+  if (!body.ok) return new NextResponse(null, { status: 204 })
 
   let parsed: unknown
   try {
-    const raw = await request.text()
-    if (raw.length > MAX_BODY_BYTES) return new NextResponse(null, { status: 204 })
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(body.text)
   } catch {
     return new NextResponse(null, { status: 204 })
   }

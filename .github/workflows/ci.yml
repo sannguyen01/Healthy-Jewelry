@@ -119,8 +119,19 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # `--coverage`, which this step did not have until 2026-09-15.
+      #
+      # vitest.config.ts has declared `thresholds: { lines: 80, functions: 80, branches:
+      # 80, statements: 80 }` for as long as coverage has been configured, and CLAUDE.md
+      # asserts the 80% standard twice. Nothing evaluated any of it: `grep -rn coverage
+      # .github/workflows/` returned zero matches, and `test:coverage` in package.json had
+      # no callers. A regression to 40% would have passed this gate and merged.
+      #
+      # Costs ~10s (measured: 46.8s -> 56.6s on this suite). `coverage-gate-contract.test.ts`
+      # holds the flag against the config in both directions, so removing either the
+      # thresholds or this flag fails rather than going quiet. See ADR 018.
       - name: Unit tests
-        run: pnpm exec vitest run
+        run: pnpm exec vitest run --coverage
         env:
           NEXT_PUBLIC_SITE_URL: https://healthyjewellery.com
 

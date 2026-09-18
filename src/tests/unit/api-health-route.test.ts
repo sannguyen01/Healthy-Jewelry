@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 /**
  * Upstash is mocked at the module boundary rather than at `fetch`.
@@ -55,7 +57,24 @@ interface HealthBody {
   hint?: string
 }
 
-/** Load the route fresh so its module-scope limiter is built under this env. */
+/**
+ * A request for the route to read a caller IP from.
+ *
+ * The IP varies per call by default. These tests assert the route's *verdict*,
+ * and a shared IP would mean each `describe` block silently spends the same
+ * 30/min bucket — so a test added later would fail for a reason that has nothing
+ * to do with what it asserts. Pass a fixed IP explicitly where the limiter
+ * itself is the subject.
+ */
+let ipCounter = 0
+function healthRequest(ip?: string): Request {
+  ipCounter += 1
+  return new Request('http://localhost/api/health', {
+    headers: { 'x-forwarded-for': ip ?? `10.0.0.${ipCounter % 250}` },
+  })
+}
+
+/** Load the route fresh so its module-scope limiter and verdict cache are new. */
 async function loadRoute() {
   vi.resetModules()
   const { GET } = await import('@/app/api/health/route')
@@ -98,7 +117,7 @@ describe('GET /api/health', () => {
     stubUpstash(false)
     const GET = await loadRoute()
 
-    const res = await GET()
+    const res = await GET(healthRequest())
     const body = (await res.json()) as HealthBody
 
     expect(body.rateLimitDistributed).toBe(false)
@@ -118,7 +137,7 @@ describe('GET /api/health', () => {
     upstashLimit.mockRejectedValue(new Error('ECONNREFUSED'))
     const GET = await loadRoute()
 
-    const res = await GET()
+    const res = await GET(healthRequest())
     const body = (await res.json()) as HealthBody
 
     expect(body.rateLimitDistributed).toBe(true)
@@ -133,7 +152,7 @@ describe('GET /api/health', () => {
     upstashLimit.mockResolvedValue({ success: true })
     const GET = await loadRoute()
 
-    const res = await GET()
+    const res = await GET(healthRequest())
     const body = (await res.json()) as HealthBody
 
     expect(body.rateLimitDistributed).toBe(true)
@@ -152,7 +171,7 @@ describe('GET /api/health', () => {
     resendApiKeysList.mockResolvedValue({ data: [], error: null })
     const GET = await loadRoute()
 
-    const raw = await (await GET()).text()
+    const raw = await (await GET(healthRequest())).text()
 
     expect(raw).not.toContain('example.upstash.io')
     expect(raw).not.toContain('test-token')
@@ -172,7 +191,7 @@ describe('GET /api/health', () => {
     stubResend(null)
     const GET = await loadRoute()
 
-    const body = (await (await GET()).json()) as HealthBody
+    const body = (await (await GET(healthRequest())).json()) as HealthBody
 
     expect(body.resend).toBe('not-configured')
     expect(resendApiKeysList).not.toHaveBeenCalled()
@@ -185,7 +204,7 @@ describe('GET /api/health', () => {
     resendApiKeysList.mockResolvedValue({ data: [], error: null })
     const GET = await loadRoute()
 
-    const body = (await (await GET()).json()) as HealthBody
+    const body = (await (await GET(healthRequest())).json()) as HealthBody
 
     expect(body.resend).toBe('ok')
   })
@@ -203,7 +222,7 @@ describe('GET /api/health', () => {
     })
     const GET = await loadRoute()
 
-    const body = (await (await GET()).json()) as HealthBody
+    const body = (await (await GET(healthRequest())).json()) as HealthBody
 
     expect(body.resend).toBe('unreachable')
   })
@@ -215,7 +234,7 @@ describe('GET /api/health', () => {
     resendApiKeysList.mockRejectedValue(new Error('ECONNREFUSED'))
     const GET = await loadRoute()
 
-    const body = (await (await GET()).json()) as HealthBody
+    const body = (await (await GET(healthRequest())).json()) as HealthBody
 
     expect(body.resend).toBe('unreachable')
   })
@@ -233,7 +252,7 @@ describe('GET /api/health', () => {
     })
     const GET = await loadRoute()
 
-    const res = await GET()
+    const res = await GET(healthRequest())
     const body = (await res.json()) as HealthBody
 
     expect(body.resend).toBe('unreachable')
@@ -246,6 +265,121 @@ describe('GET /api/health', () => {
     stubUpstash(false)
     const GET = await loadRoute()
 
-    expect((await GET()).headers.get('Cache-Control')).toContain('no-store')
+    expect((await GET(healthRequest())).headers.get('Cache-Control')).toContain('no-store')
+  })
+})
+
+/**
+ * **The composition, not any one decision, was the defect.**
+ *
+ * Each choice on this route reviewed clean in isolation: spend a real round-trip
+ * so "configured" cannot pass for "working"; never gate the probe, so it cannot
+ * refuse a real caller; stay public, because a health endpoint nobody can reach
+ * answers nobody. Together they made an unauthenticated amplifier — one Upstash
+ * command and one **authenticated, paid** Resend API call per GET, with a limiter
+ * of 1,000,000/min in front of it.
+ *
+ * Resend enforces per-account rate limits, so the reachable consequence was not
+ * only a bill: tripping them degrades `/api/contact`, a route this project has
+ * already had to fix once for silently dropping customer inquiries.
+ */
+describe('GET /api/health — the amplification is bounded', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs()
+    upstashLimit.mockReset()
+    resendApiKeysList.mockReset()
+  })
+
+  it('spends one Resend call for many requests, not one per request', async () => {
+    stubUpstash(true)
+    stubResend('re_test_key')
+    upstashLimit.mockResolvedValue({ success: true })
+    resendApiKeysList.mockResolvedValue({ data: [], error: null })
+
+    const GET = await loadRoute()
+    for (let i = 0; i < 10; i++) await GET(healthRequest())
+
+    // Ten requests, one computation. Before the verdict cache this was ten
+    // authenticated calls to a paid third party, on a public endpoint.
+    expect(resendApiKeysList).toHaveBeenCalledTimes(1)
+  })
+
+  it('serves the same verdict from the cache, not a fresh guess', async () => {
+    stubUpstash(true)
+    stubResend('re_test_key')
+    upstashLimit.mockResolvedValue({ success: true })
+    resendApiKeysList.mockResolvedValue({ data: [], error: null })
+
+    const GET = await loadRoute()
+    const first = (await (await GET(healthRequest())).json()) as HealthBody
+    const second = (await (await GET(healthRequest())).json()) as HealthBody
+
+    expect(second).toEqual(first)
+  })
+
+  it('refuses past the limit rather than serving a cached answer', async () => {
+    // A caller past 30/min is not asking in good faith, and handing them the
+    // cache would still be work done on their behalf.
+    stubUpstash(false)
+    stubResend(null)
+
+    const GET = await loadRoute()
+    const ip = '203.0.113.99'
+    let refused: Response | null = null
+    for (let i = 0; i < 40; i++) {
+      const res = await GET(healthRequest(ip))
+      if (res.status === 429) {
+        refused = res
+        break
+      }
+    }
+
+    expect(refused, 'the limiter never refused across 40 requests from one IP').not.toBeNull()
+    expect(refused?.headers.get('Retry-After')).toBe('60')
+  })
+
+  it('counts each caller separately, so one abuser cannot deny everyone else', async () => {
+    stubUpstash(false)
+    stubResend(null)
+
+    const GET = await loadRoute()
+    for (let i = 0; i < 40; i++) await GET(healthRequest('198.51.100.1'))
+
+    const other = await GET(healthRequest('198.51.100.2'))
+    expect(other.status).not.toBe(429)
+  })
+})
+
+/**
+ * The TTL cannot be raised until it fossilises the check that reads this route.
+ *
+ * `production-smoke.yml` asserts `/api/health` on a six-hourly cron. If the
+ * cached verdict's lifetime ever approached that interval, a scheduled run would
+ * read an answer computed for somebody else — and a check that cannot observe
+ * the thing it checks is documentation (ADR 020).
+ *
+ * Asserted against the smoke schedule's own exported constant rather than a
+ * number typed here a second time, so the relationship is checked rather than
+ * restated. A number in prose is a claim like any other (ADR 025).
+ */
+describe('the verdict TTL stays far below the interval that reads it', () => {
+  it('is at most a hundredth of the smoke cron interval', async () => {
+    const { SMOKE_CRON_INTERVAL_HOURS } = await import('../../../scripts/lib/smoke-schedule.mjs')
+    const source = readFileSync(
+      resolve(__dirname, '../../app/api/health/route.ts'),
+      'utf8'
+    )
+    const declared = Number(source.match(/const VERDICT_TTL_MS = ([\d_]+)/)?.[1]?.replace(/_/g, ''))
+
+    expect(Number.isFinite(declared), 'VERDICT_TTL_MS not found in the route').toBe(true)
+
+    const intervalMs = SMOKE_CRON_INTERVAL_HOURS * 60 * 60 * 1000
+    expect(
+      declared,
+      `VERDICT_TTL_MS is ${declared}ms against a ${SMOKE_CRON_INTERVAL_HOURS}h smoke ` +
+        `interval. Raising it toward that interval would let a scheduled run read a ` +
+        `verdict computed for another caller, which is a check that cannot observe ` +
+        `what it checks.`
+    ).toBeLessThanOrEqual(intervalMs / 100)
   })
 })

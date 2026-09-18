@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useCartStore } from '@/store/cart'
+import { useCartStore, checkoutHandoff } from '@/store/cart'
 import { useCheckoutUrl, useCartIsLoading, useCheckoutError } from '@/lib/hooks/useCart'
 import { checkoutMessage, supportMailto, ORDER_CONFIRMATION } from '@/lib/utils/checkoutMessages'
 
@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   const hasHydrated = useCartStore((state) => state.hasHydrated)
   const beginCheckout = useCartStore((state) => state.beginCheckout)
   const justCompleted = useCartStore((state) => state.justCompleted)
+  const syncedThisLoad = useCartStore((state) => state.syncedThisLoad)
 
   // Waits for the persisted bag to be read back before acting. The previous
   // version ran once on mount with an empty dependency array, so it always saw
@@ -48,15 +49,36 @@ export default function CheckoutPage() {
     syncWithShopify()
   }, [hasHydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // `checkoutHandoff`, not `if (checkoutUrl)`.
+  //
+  // This effect used to fire on the URL alone. `checkoutUrl` is persisted and
+  // zustand's localStorage rehydration is synchronous, so the first render
+  // already carried a value stored on a previous visit — and this effect sent the
+  // customer off-origin before the sync effect above it had resolved.
+  //
+  // The worst case is a customer returning after paying. They still have `items`,
+  // `justCompleted` is still false, and the stored URL points at the cart Shopify
+  // **deleted on order creation**. The sync that would have found `cart-gone`,
+  // matched `pendingCheckoutCartId` and shown them their confirmation never got
+  // to finish. The whole ADR 002 mechanism lost a race to a sibling effect.
+  //
+  // `CartDrawer` has always done this correctly, imperatively; the shared verdict
+  // is what stops the two from disagreeing again.
   useEffect(() => {
-    if (checkoutUrl) {
-      // Record which cart is being paid for before leaving the origin — see
-      // `beginCheckout`. Shopify deletes the cart on order creation, so this is
-      // the only evidence that distinguishes "they paid" from "it expired".
-      beginCheckout()
-      window.location.href = checkoutUrl
-    }
-  }, [checkoutUrl, beginCheckout])
+    const verdict = checkoutHandoff({
+      syncedThisLoad,
+      checkoutUrl,
+      checkoutError,
+      justCompleted,
+    })
+    if (!verdict.go) return
+
+    // Record which cart is being paid for before leaving the origin — see
+    // `beginCheckout`. Shopify deletes the cart on order creation, so this is
+    // the only evidence that distinguishes "they paid" from "it expired".
+    beginCheckout()
+    window.location.href = verdict.url
+  }, [syncedThisLoad, checkoutUrl, checkoutError, justCompleted, beginCheckout])
 
   const itemSummary = items
     .map((item) => `${item.quantity} × ${item.product.title}`)

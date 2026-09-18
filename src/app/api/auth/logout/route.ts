@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildLogoutUrl } from '@/lib/shopify/customer/oauth'
-import { isCustomerAccountsConfigured } from '@/lib/shopify/customer/config'
-import { SESSION_COOKIE } from '@/lib/shopify/customer/session'
+import { customerAccountConfig, isCustomerAccountsConfigured } from '@/lib/shopify/customer/config'
+import { openSession, SESSION_COOKIE } from '@/lib/shopify/customer/session'
 
 /**
  * Sign out here **and** at Shopify.
@@ -23,10 +23,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let destination = home
   if (isCustomerAccountsConfigured()) {
     try {
-      // No `id_token_hint`: this project never stores the ID token, only the
-      // access and refresh tokens. Shopify accepts the request without it and
-      // shows a confirmation instead of logging out silently.
-      destination = await buildLogoutUrl(null, home)
+      // `id_token_hint`, now that there is one to send. This used to pass `null`
+      // with a comment explaining that the project never stored the ID token —
+      // which was true, and was the same omission that left the login nonce
+      // unverifiable. Without the hint Shopify shows the customer a "do you want
+      // to sign out?" confirmation instead of ending the session, so a logout
+      // that looks like it worked leaves them signed in at Shopify.
+      //
+      // `openSession` returns null for anything it cannot open, and a session
+      // sealed before `idToken` existed simply has none — both reduce to
+      // `undefined` here, which is the old behaviour rather than a failure.
+      const session = openSession(
+        request.cookies.get(SESSION_COOKIE)?.value,
+        customerAccountConfig.sessionSecret
+      )
+      destination = await buildLogoutUrl(session?.idToken, home)
     } catch (err) {
       // Local sign-out still happens below. Failing to reach Shopify must not
       // leave the customer signed in *here* as well.

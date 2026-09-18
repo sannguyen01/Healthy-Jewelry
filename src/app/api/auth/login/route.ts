@@ -4,6 +4,7 @@ import {
   buildAuthorizationUrl,
   callbackUrl,
   randomToken,
+  NONCE_COOKIE,
   STATE_COOKIE,
   STATE_MAX_AGE_SECONDS,
 } from '@/lib/shopify/customer/oauth'
@@ -50,5 +51,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   )
 
   response.cookies.set(STATE_COOKIE, state, sessionCookieOptions(STATE_MAX_AGE_SECONDS))
+  // The nonce needs storing for the same reason the state does, and for the same
+  // length of time. It was previously generated, sent to Shopify, and dropped on
+  // the floor — so the ID token it was supposed to bind had nothing to be bound
+  // to. Same cookie options, so the two cannot drift apart in `sameSite` or
+  // `secure` and leave one of them silently absent on the callback.
+  response.cookies.set(NONCE_COOKIE, nonce, sessionCookieOptions(STATE_MAX_AGE_SECONDS))
   return response
 }

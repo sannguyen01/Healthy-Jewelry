@@ -2,7 +2,19 @@
 
 export const SITE_NAME = 'Healthy Jewelry'
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://healthyjewellery.com'
+/**
+ * `||`, not `??`.
+ *
+ * `??` falls back only on `null` and `undefined`, so an environment variable
+ * that exists and is **empty** — which is what a Vercel project setting looks
+ * like when somebody clears the value rather than deleting the row — resolved
+ * `SITE_URL` to `''`. Line 25 then evaluates `new URL('')`, which throws
+ * `TypeError: Invalid URL` at module load; and because this module is imported
+ * by the root layout, that is not a broken page but a deployment that does not
+ * start. The failure surfaced from a coverage test written against the fallback
+ * branch, which is the branch nothing had ever taken.
+ */
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://healthyjewellery.com'
 
 // The domain is spelled with a double "l" ("jewellery") because the single-L
 // ".com" is owned by an unrelated third party — parked for resale (nameservers

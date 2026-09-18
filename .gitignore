@@ -45,3 +45,7 @@ next-env.d.ts
 
 # Written by scripts/probe-branch-protection.mjs on every run (control-audit reads it as data).
 /merge-gate.json
+
+# Written by scripts/probe-accepted-gap.mjs on every run, for the same reason: the
+# reporting step reads a verdict as data rather than scraping the probe's prose.
+/accepted-gap.json

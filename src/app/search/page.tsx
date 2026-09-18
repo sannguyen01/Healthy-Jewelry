@@ -5,7 +5,9 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductCard } from '@/components/product/ProductCard'
+import { headers } from 'next/headers'
 import { searchProducts } from '@/lib/shopify'
+import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { TrackView } from '@/components/analytics/TrackView'
 
 export const metadata: Metadata = {
@@ -26,11 +28,45 @@ interface SearchPageProps {
  * 22 products actually for sale. `searchProducts()` had been sitting in
  * `src/lib/shopify/index.ts` fully implemented and called from nowhere.
  */
+/**
+ * The ceiling on search, and why it is on the page rather than on a route.
+ *
+ * `/api/search` used to exist as a public JSON endpoint doing exactly what this
+ * component does, with no limiter, no query cap and no cache — and **no
+ * callers**: this page has always called `searchProducts` directly. It was
+ * deleted rather than hardened, because an untested, uncalled, unlimited
+ * endpoint that spends the store's Shopify quota is surface area with negative
+ * value. `e2e/COVERAGE.md` had it classified as "exercised through the /search
+ * page", which was not true in either direction.
+ *
+ * Deleting it does not close the exposure, though — this page has the same
+ * property. `/search` is dynamic by construction (it reads `searchParams`), so
+ * every distinct query is a Shopify round-trip. Caching (60s, keyed on the
+ * normalised query) turns that from one call per visitor into one call per
+ * distinct query per minute; this limiter is what bounds the number of distinct
+ * queries one caller can mint.
+ *
+ * `onError: 'allow'`. If Upstash cannot be consulted, a customer who cannot
+ * search is a worse outcome than quota spent on one who can.
+ */
+const searchLimiter = createRateLimiter({
+  limit: 30,
+  window: '1 m',
+  prefix: 'hj:search',
+  onError: 'allow',
+})
+
 async function SearchResults({ query }: { query: string }) {
   // `searchProducts` treats an empty query as "match everything" and returns
   // the whole static catalogue, so the empty case is answered here instead —
   // preserving the "Start typing to search" state this page has always had.
-  const results = query.trim().length === 0 ? [] : await searchProducts(query)
+  const isRealQuery = query.trim().length > 0
+
+  // Only a real query is metered. The empty state costs nothing and refusing it
+  // would turn a navigation into an error.
+  const throttled = isRealQuery && (await searchLimiter.isLimited(clientIp(await headers())))
+
+  const results = !isRealQuery || throttled ? [] : await searchProducts(query)
 
   return (
     <>
@@ -41,7 +77,7 @@ async function SearchResults({ query }: { query: string }) {
         description. Only reported for a real query; the empty state is not a
         search.
       */}
-      {query.trim().length > 0 && (
+      {isRealQuery && !throttled && (
         <TrackView event={{ name: 'search_performed', query, resultCount: results.length }} />
       )}
       <main
@@ -116,9 +152,11 @@ async function SearchResults({ query }: { query: string }) {
                 marginTop: '16px',
               }}
             >
-              {results.length === 0
-                ? `No results for "${query}"`
-                : `${results.length} result${results.length === 1 ? '' : 's'} for "${query}"`}
+              {throttled
+                ? 'Too many searches just now'
+                : results.length === 0
+                  ? `No results for "${query}"`
+                  : `${results.length} result${results.length === 1 ? '' : 's'} for "${query}"`}
             </p>
           )}
         </section>
@@ -160,6 +198,47 @@ async function SearchResults({ query }: { query: string }) {
               >
                 Try &ldquo;titanium rings&rdquo;, &ldquo;niobium&rdquo;, &ldquo;earrings&rdquo;, or
                 &ldquo;surgical steel&rdquo;.
+              </p>
+              <Link href="/shop" className="btn-ghost">
+                Browse All Products
+              </Link>
+            </div>
+          ) : throttled ? (
+            /*
+             * Refused, not empty — and the distinction is the whole point.
+             *
+             * Falling through to "No results" here would tell a customer the
+             * product does not exist when the truth is that we declined to look.
+             * That is the exact defect `searchProducts` was already fixed for:
+             * it used to return `[]` on a Shopify failure, which rendered as a
+             * confident `No results for "titanium"`. Re-creating it one layer up,
+             * in the same file, would be a poor trade for a rate limiter.
+             */
+            <div style={{ textAlign: 'center', padding: '60px 0' }}>
+              <p
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'var(--text-xl)',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink)',
+                  margin: '0 0 16px',
+                }}
+              >
+                Too many searches just now
+              </p>
+              <p
+                style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 'var(--text-base)',
+                  color: 'var(--graphite)',
+                  fontWeight: 300,
+                  margin: '0 0 32px',
+                }}
+              >
+                We have not looked for &ldquo;{query}&rdquo; — this is a limit on how often
+                searches run, not a statement about the catalogue. Try again in a moment, or
+                browse the full collection.
               </p>
               <Link href="/shop" className="btn-ghost">
                 Browse All Products

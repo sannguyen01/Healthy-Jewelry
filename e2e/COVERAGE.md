@@ -21,15 +21,36 @@ check too: a stale exception is an assertion nobody re-examined.
 ```coverage-exceptions
 /api/health — Verified by src/tests/unit/api-health-route.test.ts against the real handler, including the Resend and Redis probes. A browser adds nothing: there is no UI.
 /api/revalidate — Verified by src/tests/unit/api-revalidate-route.test.ts, which exercises the secret check and the cache-tag contract directly.
-/api/version — Verified by src/tests/unit/api-version-contract.test.ts, which asserts the pinned Shopify API version against the client rather than against a fixture.
+/api/version — Verified by src/tests/unit/api-version-route.test.ts, which drives the handler directly: the stale-bundle comparison in both directions, the no-secrets contract, and an AST guard that the runtime env read stays an indexed lookup rather than a literal Next would inline.
 /api/sitemap — Verified by src/tests/unit/sitemap-completeness.test.ts, which renders the XML and holds it against the app router's real route list.
 /api/webhooks/shopify — Verified by src/tests/unit/api-webhooks-shopify-route.test.ts and webhook-signature-contract.test.ts. Driving it from a browser would mean forging a signature in the spec, duplicating the script that already does it.
-/api/search — Exercised through the /search page, which e2e/metadata.spec.ts navigates to with a query. The handler has no behaviour the page does not surface.
 /api/analytics — e2e/analytics.spec.ts asserts the beacons this route receives, from the page side. The route itself is a sink; asserting it twice adds nothing.
 /api/contact — e2e/contact.spec.ts intercepts it to drive the form's success, failure and 503 states, and src/tests/unit/api-contact-route.test.ts exercises the handler. Between them both sides of the contract are covered.
-/api/shopify — e2e/cart.spec.ts and e2e/checkout.spec.ts intercept it to drive cart state; src/tests/unit/api-shopify-route.test.ts covers the proxy and its rate limiting.
+/api/shopify — e2e/checkout.spec.ts intercepts it to drive cart state; src/tests/unit/api-shopify-route.test.ts covers the proxy, and src/tests/unit/shopify-proxy-buckets.test.ts covers the separate read and write rate-limit budgets.
 /api/auth/logout — e2e/account.spec.ts calls it directly via request.post and asserts the session is cleared.
 ```
+
+## The reasons are checked too
+
+`src/tests/unit/coverage-manifest-truthfulness.test.ts` reads every line above and
+requires it to name at least one test file, requires each named file to exist, and
+requires each to mention the route it vouches for. An exception is a claim, and
+[ADR 018](../docs/adr/018-a-claim-about-a-control-is-not-a-control.md) applies to it like
+any other.
+
+Two lines were wrong the first time it ran, on 2026-09-18:
+
+- **`/api/version`** cited `api-version-contract.test.ts`, which tests the version-literal
+  scan across `@/lib/shopify/api-version` and `scripts/lib/api-version.mjs` and never
+  imports the route. The route — whose whole job is the stale-bundle comparison that
+  nothing else in a deployment reveals — had no test at all.
+- **`/api/shopify`** cited `e2e/cart.spec.ts` alongside `checkout.spec.ts`. Only the
+  second touches the route.
+
+Both had read as complete justifications for as long as they had existed. Note that a
+reason is read by a machine: naming a file to say it is *no longer* the evidence makes it
+a citation like any other, so history belongs in this section rather than in the block
+above.
 
 ## What this manifest does not claim
 

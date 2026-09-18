@@ -170,4 +170,91 @@ describe('shopifyFetch', () => {
       VALID_TOKEN
     )
   })
+
+  /**
+   * **The caching options, which decide whether a page is ever revalidated.**
+   *
+   * These six branches were the last uncovered ones in this file, and the file
+   * was sitting at exactly 80.0% branch coverage — passing the new per-file
+   * floor by zero margin, so the next unrelated edit would have failed the gate
+   * for nobody's mistake. They are also not cosmetic: `next.tags` is what the
+   * Shopify webhook's `revalidateTag` calls act on, so a request that fails to
+   * register its tags is a page that no webhook can ever refresh.
+   */
+  describe('cache options reach fetch in the shape Next expects', () => {
+    // The enclosing `beforeEach` only *clears* stubs — each test in this file
+    // sets its own, so these cases set theirs too rather than relying on a
+    // sibling having run first.
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', VALID_DOMAIN)
+      vi.stubEnv('SHOPIFY_STOREFRONT_ACCESS_TOKEN', VALID_TOKEN)
+    })
+
+    async function callWith(options?: {
+      cache?: RequestCache
+      revalidate?: number
+      tags?: string[]
+    }) {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: shopifyHeaders(),
+        json: async () => ({ data: { shop: { name: 'HJ' } } }),
+      })
+      vi.stubGlobal('fetch', mockFetch)
+      const { shopifyFetch } = await import('@/lib/shopify/client')
+      await shopifyFetch('{ shop { name } }', undefined, options)
+      return (mockFetch.mock.calls[0] as [string, RequestInit])[1]
+    }
+
+    it('sets next.revalidate alone when only a window is given', async () => {
+      const init = await callWith({ revalidate: 3600 })
+      expect(init.next).toEqual({ revalidate: 3600 })
+      expect(init.cache).toBeUndefined()
+    })
+
+    it('sets next.tags alone when only tags are given', async () => {
+      const init = await callWith({ tags: ['products'] })
+      expect(init.next).toEqual({ tags: ['products'] })
+    })
+
+    it('sets both when both are given', async () => {
+      const init = await callWith({ revalidate: 60, tags: ['products', 'product:arc-band'] })
+      expect(init.next).toEqual({ revalidate: 60, tags: ['products', 'product:arc-band'] })
+    })
+
+    it('honours revalidate: 0, which `!== undefined` exists to distinguish from absent', async () => {
+      // `0` is falsy. A truthiness check here would silently drop "never cache
+      // this" and fall through to the `cache` branch instead.
+      const init = await callWith({ revalidate: 0 })
+      expect(init.next).toEqual({ revalidate: 0 })
+    })
+
+    it('falls through to cache only when neither revalidate nor tags is given', async () => {
+      const init = await callWith({ cache: 'no-store' })
+      expect(init.cache).toBe('no-store')
+      expect(init.next).toBeUndefined()
+    })
+
+    it('ignores cache when a revalidate window is also given', async () => {
+      // Next rejects `cache` and `next.revalidate` together; sending both is the
+      // configuration error this branch ordering exists to prevent.
+      const init = await callWith({ cache: 'no-store', revalidate: 3600 })
+      expect(init.next).toEqual({ revalidate: 3600 })
+      expect(init.cache).toBeUndefined()
+    })
+
+    it('sends neither when no options are given at all', async () => {
+      const init = await callWith()
+      expect(init.next).toBeUndefined()
+      expect(init.cache).toBeUndefined()
+    })
+
+    it('sends an empty variables object rather than omitting the field', async () => {
+      // Shopify rejects a GraphQL request whose `variables` is absent for an
+      // operation that declares any, and `?? {}` is what stops that.
+      const init = await callWith()
+      expect(JSON.parse(String(init.body)).variables).toEqual({})
+    })
+  })
 })

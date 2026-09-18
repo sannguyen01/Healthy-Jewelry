@@ -85,10 +85,6 @@ const INTENTIONAL_IMPLICIT_SUCCESS: Record<string, Record<string, string>> = {
   },
 }
 
-type Step = { name?: string; if?: unknown }
-type Job = { if?: unknown; steps?: Step[] }
-type Workflow = { jobs?: Record<string, Job> }
-
 function workflowFiles(): string[] {
   return readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f))
 }
