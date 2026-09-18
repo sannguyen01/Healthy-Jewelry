@@ -256,6 +256,16 @@
       "selfMonitoring": true,
       "knownLimit": "Static by necessity, not by preference. With Upstash unconfigured — every test environment today — the in-memory fallback allocates a fresh Map per limiter and ignores the prefix entirely, so a collision is invisible to any test that drives requests through a route and appears only in production. A prefix built from a constant rather than written inline would also be missed, which is why the check asserts it found at least five limiters.",
       "backstop": "control:merge-gate"
+    },
+    {
+      "id": "unit-env-parity",
+      "claims": "the unit suite runs under the same environment locally and in the merge gate, so a green local run is evidence about the gate",
+      "status": "configured",
+      "probe": "src/tests/unit/vitest-env-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Reconciles the declared environments, not the measured coverage. A module whose branch count depends on some *other* ambient difference — a locale, a TZ, a Node minor — is outside it. The real defence against that class is a test stubbing both arms, as config-env-branches.test.ts does for src/config; this control only removes the one difference that had already cost three red CI runs on 2026-09-18 while every local run was clean.",
+      "backstop": "control:merge-gate"
     }
   ],
   "$decisionAdrsComment": [
