@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const { classifyProbeResult } = await import('../../../scripts/probe-assertion-liveness.mjs')
+const { classifyProbeResult, anchorUsable, baselineUsable } = await import(
+  '../../../scripts/probe-assertion-liveness.mjs'
+)
 const { SENTINELS } = await import('../../../scripts/lib/sentinels.mjs')
 
 /**
@@ -152,6 +154,67 @@ describe('every sentinel still anchors to exactly one place', () => {
   )
 
   it('the sentinel set has not quietly shrunk', () => {
-    expect(SENTINELS.length).toBeGreaterThanOrEqual(12)
+    expect(SENTINELS.length).toBeGreaterThanOrEqual(17)
+  })
+})
+
+describe('the pre-mutation guards answer their own questions', () => {
+  /**
+   * **The probe never ran a single mutation, and exited 0 every time.**
+   *
+   * Both guards used to be written as calls to `classifyProbeResult` with
+   * `mutated: null`:
+   *
+   * ```js
+   * const baseline = runTests(sentinel)
+   * if (classifyProbeResult({ occurrences, baseline, mutated: null }).state === 'unevaluable') {
+   *   return { state: 'unevaluable', detail: `${specs} already fails …` }
+   * }
+   * ```
+   *
+   * `classifyProbeResult` returns `unevaluable` whenever `mutated` is null —
+   * correctly, for its own contract. So that condition was **true on every run,
+   * for every sentinel, whatever the baseline did.** From PR #44 until
+   * 2026-09-18 the probe applied no mutations at all, reported everything
+   * `unevaluable`, and exited 0.
+   *
+   * The instructive part is where the defect went. The decision was extracted
+   * precisely so it could be pointed at known answers, and every case in this
+   * file did that — with a real `mutated`, because that is what the function is
+   * for. Extracting the decision made the decision testable and left the
+   * **composition** untested, which is the only place it could then hide.
+   */
+  it('a green baseline is usable', () => {
+    expect(baselineUsable(green)).toEqual({ usable: true })
+  })
+
+  it('a red baseline is not, and says which kind of not', () => {
+    expect(baselineUsable(red)).toEqual({ usable: false, reason: 'already-red' })
+    expect(baselineUsable(null)).toEqual({ usable: false, reason: 'not-run' })
+  })
+
+  it('an anchor occurring exactly once is usable, and any other count is not', () => {
+    expect(anchorUsable(1)).toEqual({ usable: true })
+    for (const n of [0, 2, 7]) expect(anchorUsable(n)).toEqual({ usable: false })
+  })
+
+  it('classifyProbeResult refuses to answer without a mutated run', () => {
+    // A throw rather than a state, so the misuse above cannot recur silently: a
+    // crash is unmissable where a plausible-looking verdict was invisible for
+    // weeks. The message names the functions that *do* answer the guard
+    // questions, because the next person to reach for this one will be asking
+    // one of those.
+    expect(() =>
+      classifyProbeResult({ occurrences: 1, baseline: green, mutated: null })
+    ).toThrow(/mutated. is required/)
+  })
+
+  it('the guards and the verdict disagree about a green baseline with no mutation', () => {
+    // Stated as an assertion rather than a comment, because this exact
+    // disagreement is the bug. The guard says "go ahead and mutate"; the verdict
+    // function says "there is nothing to report yet". Both are right, and using
+    // either to answer the other's question is what broke the probe.
+    expect(baselineUsable(green).usable).toBe(true)
+    expect(() => classifyProbeResult({ occurrences: 1, baseline: green, mutated: null })).toThrow()
   })
 })

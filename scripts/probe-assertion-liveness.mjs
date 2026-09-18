@@ -141,12 +141,80 @@ export function classifyProbeResult({ occurrences, baseline, mutated }) {
   if (occurrences !== 1) return { state: 'unapplicable' }
   if (!baseline) return { state: 'unevaluable' }
   if (baseline.failed) return { state: 'unevaluable' }
-  if (!mutated) return { state: 'unevaluable' }
+  if (!mutated) {
+    // **A throw, not a state.** This function answers "did the tests notice the
+    // mutation?", and with no mutated run there is no answer — only the absence
+    // of one. Returning `unevaluable` here made the absence indistinguishable
+    // from a genuine finding, and the call site exploited that by asking this
+    // function two questions it does not answer. See `baselineUsable`.
+    throw new Error(
+      'classifyProbeResult: `mutated` is required. Use anchorUsable()/baselineUsable() ' +
+        'for the pre-mutation guards — this function reports the post-mutation verdict ' +
+        'and has no meaningful answer without one.'
+    )
+  }
   return {
     state: mutated.failed ? 'alive' : 'dead',
     exitCode: mutated.exitCode,
     viaBuild: mutated.viaBuild ?? false,
   }
+}
+
+/**
+ * Can this sentinel's mutation be applied at all?
+ *
+ * @param {number} occurrences Times the anchor text appears in the file.
+ * @returns {{ usable: boolean }}
+ */
+export function anchorUsable(occurrences) {
+  return { usable: occurrences === 1 }
+}
+
+/**
+ * Is the unmutated run a usable baseline?
+ *
+ * ## The bug this function exists to have made impossible
+ *
+ * Both pre-mutation guards used to be written as calls to `classifyProbeResult`
+ * with `mutated: null`:
+ *
+ * ```js
+ * const baseline = runTests(sentinel)
+ * if (classifyProbeResult({ occurrences, baseline, mutated: null }).state === 'unevaluable') {
+ *   return { state: 'unevaluable', detail: `${specs} already fails without the mutation …` }
+ * }
+ * ```
+ *
+ * `classifyProbeResult` returns `unevaluable` for a null `mutated` — correctly,
+ * for its own contract — so **that condition was true on every run, for every
+ * sentinel, whatever the baseline did.** The probe never applied a single
+ * mutation after the refactor that introduced it (PR #44). It reported all
+ * seventeen sentinels `unevaluable` and exited 0.
+ *
+ * Three things kept it invisible for weeks, and each is worth naming separately:
+ *
+ *   · **`unevaluable` is not a failure.** The run exited 0 and the weekly
+ *     verification passed.
+ *   · **The message blamed the wrong thing.** It said the specs "already fail
+ *     without the mutation (exit 0)" and told the reader to fix the suite or the
+ *     environment. The suite was green; `exit 0` is printed right there in the
+ *     sentence and contradicts the claim around it.
+ *   · **The extracted decision was unit-tested and correct.** Every case in
+ *     `probe-liveness-decision.test.ts` passes a real `mutated`, because that is
+ *     what the function is for. Extracting the decision made the decision
+ *     testable and left the *composition* untested — which is where the defect
+ *     went.
+ *
+ * `classifyProbeResult` now throws on a null `mutated`, so the misuse cannot
+ * recur silently: it is a crash rather than a plausible-looking verdict.
+ *
+ * @param {{ failed: boolean, exitCode: number } | null} baseline
+ * @returns {{ usable: boolean, reason?: 'not-run' | 'already-red' }}
+ */
+export function baselineUsable(baseline) {
+  if (!baseline) return { usable: false, reason: 'not-run' }
+  if (baseline.failed) return { usable: false, reason: 'already-red' }
+  return { usable: true }
 }
 
 /**
@@ -170,7 +238,7 @@ function probe(sentinel) {
   const original = fs.readFileSync(file, 'utf8')
 
   const occurrences = original.split(sentinel.find).length - 1
-  if (classifyProbeResult({ occurrences, baseline: null, mutated: null }).state === 'unapplicable') {
+  if (!anchorUsable(occurrences).usable) {
     // Not a dead assertion — a broken sentinel, and a different finding. A mutation that
     // does not apply proves nothing, and reporting it as "green under mutation" would be
     // a false accusation against a test that may be perfectly alive.
@@ -194,17 +262,21 @@ function probe(sentinel) {
   try {
     // Baseline first. A test that is already failing tells us nothing when it fails again.
     const baseline = runTests(sentinel)
-    if (classifyProbeResult({ occurrences, baseline, mutated: null }).state === 'unevaluable') {
+    const usable = baselineUsable(baseline)
+    if (!usable.usable) {
       return {
         id: sentinel.id,
         state: 'unevaluable',
         invariant: sentinel.invariant,
         specs: sentinel.specs,
         detail:
-          `${sentinel.specs.join(', ')} already fails without the mutation (exit ` +
-          `${baseline.exitCode}). Until it passes, a red result under mutation proves ` +
-          `nothing — the tests would have been red either way. Fix the suite, or the ` +
-          `environment, then re-run.`,
+          usable.reason === 'already-red'
+            ? `${sentinel.specs.join(', ')} already fails without the mutation (exit ` +
+              `${baseline.exitCode}). Until it passes, a red result under mutation proves ` +
+              `nothing — the tests would have been red either way. Fix the suite, or the ` +
+              `environment, then re-run.`
+            : `The baseline run for ${sentinel.specs.join(', ')} produced no result, so ` +
+              `there is nothing to compare a mutated run against.`,
       }
     }
 
@@ -286,7 +358,26 @@ function main() {
 
   // An unapplicable sentinel is a real finding — a check that cannot run is not a check —
   // but it is a different one from a dead assertion, and only the second means a test has
-  // stopped carrying information.
+  // stopped carrying information. One sentinel whose anchor moved does not invalidate the
+  // sixteen that ran.
+  //
+  // **Zero evaluated is a different fact entirely**, and it now fails. That is the state
+  // this probe was actually in from PR #44 until 2026-09-18: every sentinel reported
+  // `unevaluable`, nothing was ever mutated, and the run exited 0 — a control reporting
+  // that it had measured nothing, in the voice of one reporting that all was well. It is
+  // ADR 010's own distinction ("this check failed" versus "this check could not run")
+  // applied to the probe as a whole rather than to one sentinel, and this file already
+  // records the same class of mistake happening inside it once before.
+  const evaluated = results.filter((r) => r.state === 'alive' || r.state === 'dead')
+  if (evaluated.length === 0 && results.length > 0) {
+    console.log(
+      `\nNot one of ${results.length} sentinels could be evaluated. The probe measured ` +
+        `nothing, which is a failure of the probe rather than a clean bill of health for ` +
+        `the suite.`
+    )
+    process.exit(1)
+  }
+
   process.exit(dead.length > 0 ? 1 : 0)
 }
 

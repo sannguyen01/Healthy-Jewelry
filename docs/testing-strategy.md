@@ -127,7 +127,7 @@ structurally cannot:
 | Probe | Question |
 |---|---|
 | `probe-branch-protection.mjs` | Does `main` actually require the checks five documents said it did? |
-| `probe-assertion-liveness.mjs` | If these twelve invariants broke, would anything go red? |
+| `probe-assertion-liveness.mjs` | If these seventeen invariants broke, would anything go red? |
 | `probe-smoke-liveness.mjs` | Has anything looked at the live store in the last 26 hours? |
 | `probe-ci-liveness.mjs` | Has the merge gate on `main` evaluated anything in the last 48 hours? |
 

@@ -20,11 +20,17 @@
  * A sentinel whose mutation leaves the suite green is a **dead assertion**: the code is
  * exercised and nothing depends on the result.
  *
- * ## Why these twelve
+ * ## Why these seventeen
  *
  * Every one is somewhere this repository has actually been burned, so the set is a
- * regression list rather than a sample. Adding a thirteenth is cheap; the value is in
+ * regression list rather than a sample. Adding an eighteenth is cheap; the value is in
  * each one being a real scar.
+ *
+ * Five were added on 2026-09-18 with the defects review, and they are the five whose
+ * invariants had **no test at all** when that review began: a rate limiter that threw into
+ * the request path, a byte budget measured in UTF-16 code units, a cart reconciliation
+ * that could empty a bag, a checkout handed off on a URL from a previous page load, and an
+ * OAuth nonce that was generated and never compared.
  *
  * ## Two runners
  *
@@ -161,6 +167,60 @@ export const SENTINELS = [
     specs: ['src/tests/unit/webhook-signature-script.test.ts'],
     invariant: 'a payload signed with the wrong secret is rejected by the deployed route',
     scar: 'The old verification procedure was to place a real order and read Vercel logs — one-shot, costly, and leaving no repeatable artifact.',
+  },
+
+  // ── Added 2026-09-18 with the defects review. Each is an invariant that had no
+  //    test at all when this review started, so every one is a scar this repository
+  //    had already taken and not yet noticed.
+  {
+    id: 'rate-limit-failure-posture',
+    runner: 'vitest',
+    file: 'src/lib/utils/rateLimit.ts',
+    find: "        return policy.onError === 'deny'",
+    replace: '        throw err',
+    specs: ['src/tests/unit/rateLimit.test.ts', 'src/tests/unit/api-health-route.test.ts'],
+    invariant: 'a limiter that cannot be consulted resolves to its declared posture and never throws into the request path',
+    scar: "`upstash.limit()` rejects on any Redis failure and nothing caught it, so a rate-limiter outage became a 500 on every cart mutation site-wide — while /api/health reported, in as many words, 'Rate limits are failing open.' They were failing 500, at the till.",
+  },
+  {
+    id: 'body-budget-in-bytes',
+    runner: 'vitest',
+    file: 'src/lib/http/readBoundedBody.ts',
+    find: '      bytes += value.byteLength',
+    replace: '      bytes += 0',
+    specs: ['src/tests/unit/readBoundedBody.test.ts', 'src/tests/unit/webhook-body-bounds.test.ts'],
+    invariant: 'a budget named in bytes is measured in bytes, and counted while the body is still arriving',
+    scar: "Two routes declared MAX_BODY_BYTES and compared it against String.prototype.length — UTF-16 code units — so the effective budget was up to 3x its stated value on the multi-byte input a VND storefront receives as a matter of course. And the check ran after `await request.text()` had already materialised the whole body.",
+  },
+  {
+    id: 'cart-removal-ordering',
+    runner: 'vitest',
+    file: 'src/store/cart.tsx',
+    find: "  // Last, deliberately. Removing first is what could leave the cart empty.\n  if (plan.removals.length > 0) {",
+    replace: "  if (false) {",
+    specs: ['src/tests/unit/cart-sync.test.ts'],
+    invariant: 'a cart reconciliation issues removals last, so a mid-flight failure leaves a superset rather than an empty bag',
+    scar: 'The sync removed every existing line and then re-added, so a failure at the add step left the customer with an empty Shopify cart and no compensation — and the post-sync check only looked for lines that were missing, never for lines that should not have been there.',
+  },
+  {
+    id: 'checkout-handoff-freshness',
+    runner: 'vitest',
+    file: 'src/store/cart.tsx',
+    find: "  if (!state.syncedThisLoad) return { go: false, reason: 'not-synced' }",
+    replace: '  // handoff freshness disabled',
+    specs: ['src/tests/unit/checkout-journey.test.ts'],
+    invariant: 'a customer is never handed to Shopify on a checkout URL this page load did not produce',
+    scar: 'checkoutUrl is persisted, so a returning visitor could be sent to a hosted checkout built from a bag they no longer had — paying for a cart they could not see.',
+  },
+  {
+    id: 'oauth-nonce-verified',
+    runner: 'vitest',
+    file: 'src/lib/shopify/customer/oauth.ts',
+    find: "  if (typeof nonce !== 'string' || !safeEquals(nonce, params.expectedNonce)) {",
+    replace: '  if (false) {',
+    specs: ['src/tests/unit/customer-oauth.test.ts', 'src/tests/unit/customer-discovery.test.ts'],
+    invariant: 'the ID token returned by the token endpoint answers this browser\u2019s login attempt and no other',
+    scar: "/api/auth/login generated a nonce, sent it to Shopify and discarded it. Nothing stored it, nothing compared it, and buildAuthorizationUrl's own doc comment claimed it 'ties the returned ID token to it' — ADR 018's shape, in the authentication flow.",
   },
 
   // ── Playwright: need a production build, so opt-in via --with-e2e ──
