@@ -266,7 +266,6 @@ describe('syncWithShopify — resync with an existing shopifyCartId', () => {
     // addition first, it fails, and no removal is ever sent — the customer's
     // remote cart still holds what it held. With removals first, the removal
     // would have succeeded before anything failed.
-    const variantId = mockProduct.defaultVariantId
     const calledOps: string[] = []
 
     mockFetch.mockImplementation(async (_url, init) => {
