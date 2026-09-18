@@ -3,7 +3,39 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { shopifyConfig } from '@/config/shopify'
 import { PRODUCTS_TAG, productTag, collectionTag } from '@/lib/shopify/cacheTags'
+import { readBoundedBytes } from '@/lib/http/readBoundedBody'
 import { HANDLED_TOPIC_PREFIXES } from '@/lib/webhooks/retrySafety'
+
+/**
+ * The most body this endpoint will read.
+ *
+ * ## Why this route needs the bound most, and could have it least
+ *
+ * Every other public route in this codebase authenticates or rate-limits before
+ * it spends anything. This one cannot: the HMAC is computed *over the body*, so
+ * the body must be fully read before the sender is known. `await
+ * req.arrayBuffer()` therefore let an entirely unauthenticated caller decide how
+ * much memory a Lambda allocated — no secret, no signature, no shop domain, just
+ * a POST. It is the one place where the usual ordering is impossible, which is
+ * exactly why the ceiling has to be explicit instead of absent.
+ *
+ * ## Why one mebibyte
+ *
+ * The largest realistic delivery is an `orders/*` payload, which carries a
+ * `line_items` array; a very large order runs to a few hundred kilobytes. A
+ * mebibyte clears that with room and is still four orders of magnitude below
+ * what an unbounded read permits.
+ *
+ * ## Why an oversize body gets 413 rather than 202
+ *
+ * 413 is non-2xx, so Shopify retries — and a genuinely oversize delivery will
+ * keep failing until somebody raises this number. That is the intended cost. The
+ * alternative is answering 2xx to a body this endpoint never processed, and this
+ * file already states the rule it would be breaking: "Answering 200 to work you
+ * did not do is a lie to Shopify's delivery log." A retry loop is visible in
+ * that log and in the error line below; a silent drop is visible nowhere.
+ */
+const MAX_WEBHOOK_BODY_BYTES = 1_048_576
 
 /**
  * Topics this endpoint is built to handle, and why re-delivery of each is harmless, live in
@@ -76,7 +108,28 @@ function readHandle(rawBody: Buffer): string | undefined {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const rawBody = Buffer.from(await req.arrayBuffer())
+  // Bytes, not text. The signature is over the exact octets Shopify sent;
+  // decoding to a string and re-encoding is lossless only for well-formed UTF-8,
+  // and a signature that silently depends on an encoding round-trip is the kind
+  // of accidental correctness the comment at the top of this file exists to
+  // remove.
+  const body = await readBoundedBytes(req, MAX_WEBHOOK_BODY_BYTES)
+  if (!body.ok) {
+    if (body.reason === 'too-large') {
+      console.error(
+        `[webhooks/shopify] refused a body over ${MAX_WEBHOOK_BODY_BYTES} bytes. ` +
+          'If this is a real delivery, raise MAX_WEBHOOK_BODY_BYTES — Shopify will keep ' +
+          'retrying until it succeeds or its retry window closes.'
+      )
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
+    }
+    // A transport that died mid-read. Non-2xx so Shopify retries, because unlike
+    // an unparseable payload this one may well succeed next time.
+    console.warn('[webhooks/shopify] body could not be read to completion')
+    return NextResponse.json({ error: 'Could not read request body' }, { status: 400 })
+  }
+  const rawBody = Buffer.from(body.bytes)
+
   const hmacHeader = req.headers.get('x-shopify-hmac-sha256') ?? ''
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET
 
@@ -134,6 +187,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const handle = readHandle(rawBody)
     if (handle) {
       revalidateTag(productTag(handle))
+    } else {
+      // Not fatal and not silent. The listing pages above were invalidated, so
+      // the shop and homepage refresh — but `/products/[handle]` is cached under
+      // its own tag and nothing here can name it, so that page serves stale
+      // copy for the rest of its 3600s window. A partial invalidation that
+      // reports nothing is indistinguishable from a complete one.
+      console.warn(
+        `[webhooks/shopify] ${topic} carried no usable handle — the product detail page ` +
+          'was not invalidated and will stay stale until its own revalidate window closes.'
+      )
     }
   }
 
@@ -151,6 +214,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const handle = readHandle(rawBody)
     if (handle) {
       revalidateTag(collectionTag(handle))
+    } else {
+      console.warn(
+        `[webhooks/shopify] ${topic} carried no usable handle — that collection's own cache ` +
+          'tag was not invalidated and will stay stale until its revalidate window closes.'
+      )
     }
   }
 

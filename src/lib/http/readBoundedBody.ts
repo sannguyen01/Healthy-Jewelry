@@ -1,8 +1,10 @@
 // Healthy Jewelry — reading a request body without trusting its size
 //
-// One implementation, three callers. The guard it replaces existed twice,
-// verbatim, in `/api/shopify` and `/api/analytics` — and not at all in
-// `/api/contact`, which parses JSON and then calls a paid email API.
+// One implementation, four callers. The guard it replaces existed twice,
+// verbatim, in `/api/shopify` and `/api/analytics` — not at all in
+// `/api/contact`, which parses JSON and then calls a paid email API, and not at
+// all in `/api/webhooks/shopify`, which is the only route in the codebase that
+// must read the whole body *before* it can authenticate the sender.
 
 /**
  * The outcome of a bounded read.
@@ -14,9 +16,107 @@
  * [ADR 010](../../../docs/adr/010-a-control-that-cannot-fail.md) is about,
  * applied to a request body.
  */
-export type BoundedBody =
-  | { ok: true; text: string; bytes: number }
-  | { ok: false; reason: 'too-large' | 'unreadable' }
+export type BoundedFailure = { ok: false; reason: 'too-large' | 'unreadable' }
+
+export type BoundedBody = { ok: true; text: string; bytes: number } | BoundedFailure
+
+/**
+ * The same read, handed back as bytes.
+ *
+ * Text is the wrong currency for a signature. `/api/webhooks/shopify` computes
+ * an HMAC over the request body, and decoding to a JavaScript string and
+ * re-encoding is lossless only while the body is well-formed UTF-8 — any byte
+ * sequence that is not becomes U+FFFD, and the signature then fails for a reason
+ * no log would explain. Shopify sends UTF-8 JSON, so the round-trip would work;
+ * "works in practice" is how that file's own header describes the state it was
+ * fixed out of ("that was true *by accident* until something said so").
+ */
+export type BoundedBytes = { ok: true; bytes: Uint8Array } | BoundedFailure
+
+/**
+ * The shared read. Both public functions are this plus a way of spending the
+ * chunks, so the byte accounting, the `content-length` fast path, the
+ * cancel-on-overflow and the no-stream fallback exist once.
+ */
+type Collected = { ok: true; chunks: Uint8Array[]; bytes: number } | BoundedFailure
+
+async function collectBounded(request: Request, maxBytes: number): Promise<Collected> {
+  const declared = Number.parseInt(request.headers.get('content-length') ?? '', 10)
+  // `Number.isFinite` rather than a bare comparison: NaN fails every comparison,
+  // so a malformed header would otherwise take the "small enough" path by
+  // default rather than by decision.
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    return { ok: false, reason: 'too-large' }
+  }
+
+  const stream = request.body
+
+  // No stream to read. Either there is genuinely no body, or this runtime does
+  // not expose one — some fetch implementations and test doubles do not. Falling
+  // back to `arrayBuffer()` keeps the byte accounting exact in both cases; what
+  // it cannot do is refuse before allocating, which is why it is the fallback
+  // and not the path.
+  if (!stream) {
+    try {
+      const buffer = new Uint8Array(await request.arrayBuffer())
+      return buffer.byteLength > maxBytes
+        ? { ok: false, reason: 'too-large' }
+        : { ok: true, chunks: [buffer], bytes: buffer.byteLength }
+    } catch {
+      return { ok: false, reason: 'unreadable' }
+    }
+  }
+
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  let bytes = 0
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+
+      bytes += value.byteLength
+      if (bytes > maxBytes) {
+        // Stop pulling. The rest of the body is never allocated, which is the
+        // whole point of reading it this way.
+        await reader.cancel().catch(() => {})
+        return { ok: false, reason: 'too-large' }
+      }
+
+      chunks.push(value)
+    }
+
+    return { ok: true, chunks, bytes }
+  } catch {
+    return { ok: false, reason: 'unreadable' }
+  }
+}
+
+/**
+ * Read a request body as raw bytes, refusing anything past `maxBytes`.
+ *
+ * Everything `readBoundedBody` documents below about the unit, the ordering and
+ * `content-length` applies identically — this is the same read without the
+ * decode. Use it wherever the exact bytes matter, which today means one caller:
+ * the Shopify webhook's HMAC.
+ */
+export async function readBoundedBytes(
+  request: Request,
+  maxBytes: number
+): Promise<BoundedBytes> {
+  const collected = await collectBounded(request, maxBytes)
+  if (!collected.ok) return collected
+
+  const out = new Uint8Array(collected.bytes)
+  let offset = 0
+  for (const chunk of collected.chunks) {
+    out.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return { ok: true, bytes: out }
+}
 
 /**
  * Read a request body, refusing anything past `maxBytes`.
@@ -60,60 +160,18 @@ export type BoundedBody =
  * @param maxBytes hard ceiling, in real UTF-8 bytes
  */
 export async function readBoundedBody(request: Request, maxBytes: number): Promise<BoundedBody> {
-  const declared = Number.parseInt(request.headers.get('content-length') ?? '', 10)
-  // `Number.isFinite` rather than a bare comparison: NaN fails every comparison,
-  // so a malformed header would otherwise take the "small enough" path by
-  // default rather than by decision.
-  if (Number.isFinite(declared) && declared > maxBytes) {
-    return { ok: false, reason: 'too-large' }
-  }
+  const collected = await collectBounded(request, maxBytes)
+  if (!collected.ok) return collected
 
-  const stream = request.body
-
-  // No stream to read. Either there is genuinely no body, or this runtime does
-  // not expose one — some fetch implementations and test doubles do not. Falling
-  // back to `text()` keeps the byte accounting correct in both cases; what it
-  // cannot do is refuse before allocating, which is why it is the fallback and
-  // not the path.
-  if (!stream) {
-    try {
-      const text = await request.text()
-      const bytes = new TextEncoder().encode(text).length
-      return bytes > maxBytes ? { ok: false, reason: 'too-large' } : { ok: true, text, bytes }
-    } catch {
-      return { ok: false, reason: 'unreadable' }
-    }
-  }
-
-  const reader = stream.getReader()
+  // `stream: true` on every chunk but the flush, so a multi-byte character split
+  // across two chunks is decoded correctly rather than becoming a replacement
+  // character. This is not hypothetical on a VND storefront: `₫` is three bytes.
   const decoder = new TextDecoder('utf-8')
-  let bytes = 0
   let text = ''
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (!value) continue
-
-      bytes += value.byteLength
-      if (bytes > maxBytes) {
-        // Stop pulling. The rest of the body is never allocated, which is the
-        // whole point of reading it this way.
-        await reader.cancel().catch(() => {})
-        return { ok: false, reason: 'too-large' }
-      }
-
-      // `stream: true` so a multi-byte character split across two chunks is
-      // decoded correctly rather than becoming a replacement character. This is
-      // not hypothetical on a VND storefront: `₫` is three bytes.
-      text += decoder.decode(value, { stream: true })
-    }
-
-    // Flush whatever the streaming decoder was holding.
-    text += decoder.decode()
-    return { ok: true, text, bytes }
-  } catch {
-    return { ok: false, reason: 'unreadable' }
+  for (const chunk of collected.chunks) {
+    text += decoder.decode(chunk, { stream: true })
   }
+  text += decoder.decode()
+
+  return { ok: true, text, bytes: collected.bytes }
 }
