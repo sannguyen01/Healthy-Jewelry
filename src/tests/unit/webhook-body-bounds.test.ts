@@ -1,6 +1,7 @@
 import { createHmac } from 'crypto'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import { PURGE_NOW } from '@/lib/shopify/cacheTags'
 
 /**
  * **The one route that must read before it can authenticate.**
@@ -149,7 +150,10 @@ describe('the signature is computed over bytes, not over a decoded string', () =
     const res = await POST(signed(body))
 
     expect(res.status).toBe(200)
-    expect(revalidateTag).toHaveBeenCalledWith(expect.stringContaining('vong-tay-titanium'))
+    expect(revalidateTag).toHaveBeenCalledWith(
+      expect.stringContaining('vong-tay-titanium'),
+      PURGE_NOW
+    )
   })
 
   it('still rejects a body whose bytes were altered after signing', async () => {

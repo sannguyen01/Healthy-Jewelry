@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { shopifyConfig } from '@/config/shopify'
-import { PRODUCTS_TAG, productTag, collectionTag } from '@/lib/shopify/cacheTags'
+import { PRODUCTS_TAG, productTag, collectionTag, PURGE_NOW } from '@/lib/shopify/cacheTags'
 import { readBoundedBytes } from '@/lib/http/readBoundedBody'
 import { HANDLED_TOPIC_PREFIXES } from '@/lib/webhooks/retrySafety'
 
@@ -182,11 +182,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // the product that changed instead of every generated product page.
     revalidatePath('/', 'page')
     revalidatePath('/shop', 'page')
-    revalidateTag(PRODUCTS_TAG)
+    revalidateTag(PRODUCTS_TAG, PURGE_NOW)
 
     const handle = readHandle(rawBody)
     if (handle) {
-      revalidateTag(productTag(handle))
+      revalidateTag(productTag(handle), PURGE_NOW)
     } else {
       // Not fatal and not silent. The listing pages above were invalidated, so
       // the shop and homepage refresh — but `/products/[handle]` is cached under
@@ -213,7 +213,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Scoping was an explicit decision the previous tests already guarded.
     const handle = readHandle(rawBody)
     if (handle) {
-      revalidateTag(collectionTag(handle))
+      revalidateTag(collectionTag(handle), PURGE_NOW)
     } else {
       console.warn(
         `[webhooks/shopify] ${topic} carried no usable handle — that collection's own cache ` +
