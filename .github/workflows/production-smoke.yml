@@ -294,19 +294,52 @@ jobs:
       #
       # Dedup + escalate, not just comment (ADR 011).
       #
-      # Issue #24 reached 24 byte-identical "Still failing" comments over six days —
-      # same secret, same wrong prefix, every six hours — because this step compared
-      # nothing: every failing run appended a comment regardless of whether the
-      # diagnosis had changed since the last one. A channel that says the same thing
-      # 24 times is a channel people mute, which is the exact failure ADR 006 and
-      # ADR 010 already named for other controls in this file.
+      # ──────────────────────────────────────────────────────────────────────
+      # THE DECISION IS NOT HERE. It is `scripts/lib/escalation.mjs`.
       #
-      # So: compare the new diagnosis to the last comment's. Unchanged → skip the
-      # comment and count the streak instead. At 3 unchanged in a row and not yet
-      # escalated → one escalation comment, a `human-required` label, and a title
-      # prefix, then silence until the diagnosis actually changes or it recovers.
-      # Changed (including the first failure) → comment as before, which also
-      # resets the streak implicitly since the new comment becomes the last one.
+      # It used to be here: ~110 lines of JavaScript inside this YAML string,
+      # deciding whether a production failure reaches a person. It had no tests
+      # and could not have had any — a function in a string literal is not
+      # importable, so the only way to exercise it was to break production and
+      # wait six hours for the next scheduled run.
+      #
+      # It was broken the whole time, in three independent ways.
+      #
+      # ONE. The comparison that answers "is this the same failure as last
+      # time?" read the raw tail of each step's log, and the storefront log
+      # carries a figure measured on that run:
+      #
+      #     ✓ Open Graph image renders within the crawler budget
+      #       176ms cold, 17KB (budget 2500ms)
+      #
+      # Nine consecutive comments on issue #24 read 176, 99, 145, 106, 186,
+      # 129, 209, 137, 194. Two identical failures therefore never compared
+      # equal, the streak never left 1, and the escalation branch was
+      # unreachable from the day it was written. #24 reached 100 comments over
+      # ~124 runs and escalated zero times — the "channel people mute" ADR 011
+      # exists to prevent, wearing ADR 011's own fix.
+      #
+      # TWO, eleven lines from the first: the streak counted trailing identical
+      # comments, while the same branch suppressed the comment whenever the
+      # diagnosis was identical. The count could never exceed the one comment
+      # that had been let through, so `streak < 3` held forever even for a
+      # diagnosis that never moved. The counter now lives in the standing
+      # comment and the quiet path edits it in place — GitHub sends no mail for
+      # an edit, so "quiet" still means quiet, and the threshold is reachable.
+      #
+      # THREE. `listComments({ per_page: 100 })` with no pagination, then
+      # `comments[comments.length - 1]`. GitHub returns page one, so past a
+      # hundred comments "the last comment" is the hundredth *oldest* and the
+      # diagnosis is compared against a month-old one forever. #24 sat at
+      # exactly 100 comments when this was rewritten, one short of the cliff.
+      #
+      # What remains below is a transport: read the logs, call the decision,
+      # apply whatever it hands back. It composes no sentence of its own,
+      # because a sentence inside a YAML string literal is a sentence no test
+      # can read — and that is how a hundred of them came to be written. Every
+      # branch above is now a case in `src/tests/unit/escalation-decision.test.ts`.
+      # See docs/adr/030-an-equivalence-relation-is-the-control.md.
+      # ──────────────────────────────────────────────────────────────────────
       - name: Report failure as an issue
         if: failure() && steps.preflight.outputs.configured == 'true'
         continue-on-error: true
@@ -314,150 +347,48 @@ jobs:
         with:
           script: |
             const fs = require('fs')
-            const label = 'production-smoke'
-            const escalationLabel = 'human-required'
-            const escalationThreshold = 3
-            const title = 'Production smoke is failing'
-            const runUrl =
-              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
-              `/actions/runs/${context.runId}`
+            // Absolute, and a file: URL. github-script evaluates this block through
+            // `new AsyncFunction`, where a relative specifier has no referrer module to
+            // resolve against. Asserted in escalation-decision.test.ts, because a typo
+            // here would surface at 03:59 UTC in a scheduled job and nowhere else.
+            const lib = `file://${process.env.GITHUB_WORKSPACE}/scripts/lib/escalation.mjs`
+            const { SMOKE_LABEL, composeDiagnosis, escalationDecision } = await import(lib)
 
-            // The reason the run failed, carried into the notification.
-            //
-            // Issue #18 said the cause might be "a Shopify incident, an expired
-            // credential, or a configuration change". It was none of those — five
-            // named secrets were unset, and the preflight had already printed
-            // exactly that, in the log this issue merely linked to. A notification
-            // that makes its reader open the run to learn anything is a
-            // notification that sends them looking in the wrong place first.
-            const MAX_LOG = 3000
-            const logs = ['preflight', 'storefront', 'webhook']
-              .map((name) => {
-                let text
-                try {
-                  text = fs.readFileSync(`${name}.log`, 'utf-8').trim()
-                } catch {
-                  return null // step did not run — not worth a heading
-                }
-                if (!text) return null
-                // Tail, not head: the verdict and the failing check are at the end.
-                const clipped =
-                  text.length > MAX_LOG
-                    ? `…(truncated, see the run)\n${text.slice(-MAX_LOG)}`
-                    : text
-                return `<details><summary><code>${name}</code></summary>\n\n\`\`\`\n${clipped}\n\`\`\`\n</details>`
-              })
-              .filter(Boolean)
+            const repo = { owner: context.repo.owner, repo: context.repo.repo }
+            const runUrl = `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`
 
-            // The part of the comment that identifies *why* it failed — everything
-            // except the run URL, which is different on every run by construction
-            // and must not defeat the comparison below.
-            const diagnosis =
-              logs.length > 0
-                ? ['**What failed:**', '', ...logs].join('\n')
-                : 'No step produced output — the run failed before the checks started.'
+            const read = (name) => {
+              try { return { name, text: fs.readFileSync(`${name}.log`, 'utf-8') } } catch { return null }
+            }
+            const logs = ['preflight', 'storefront', 'webhook'].map(read).filter(Boolean)
 
-            const body = [
-              'The scheduled production smoke run failed.',
-              '',
-              `Run: ${runUrl}`,
-              '',
-              diagnosis,
-              '',
-              'This checks the **live** store and deployment, so it can fail for reasons',
-              'unrelated to any commit — a Shopify incident, an expired credential, or a',
-              'configuration change. It is deliberately not part of branch protection.',
-              '',
-              'See `docs/go-live-runbook.md` and `docs/credential-inventory.md`.',
-            ].join('\n')
+            const { data: open } = await github.rest.issues.listForRepo({ ...repo, state: 'open', labels: SMOKE_LABEL })
+            const issue = open[0] ?? null
+            // paginate, not per_page. See THREE above.
+            const comments = issue
+              ? await github.paginate(github.rest.issues.listComments, { ...repo, issue_number: issue.number, per_page: 100 })
+              : []
 
-            const { data: open } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: label,
+            const decision = escalationDecision({
+              issue, comments, diagnosis: composeDiagnosis(logs), labels: issue?.labels ?? [], runUrl,
             })
+            core.info(`${decision.action}: ${decision.reason}`)
 
-            if (open.length === 0) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body,
-                labels: [label],
-              })
+            if (decision.action === 'create') {
+              await github.rest.issues.create({ ...repo, title: decision.title, body: decision.body, labels: decision.labels })
               return
             }
 
-            const issue = open[0]
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              per_page: 100,
-            })
-
-            // Every "Still failing" comment this step has ever written carries its
-            // diagnosis after a blank line following the run URL — strip that
-            // prefix so two comments about the same cause compare equal regardless
-            // of which run produced them.
-            const diagnosisOf = (commentBody) =>
-              commentBody.replace(/^Still failing\.\n\nRun: [^\n]*\n\n/, '').trim()
-
-            const last = comments[comments.length - 1]
-            const unchanged = last && diagnosisOf(last.body) === diagnosis.trim()
-
-            if (!unchanged) {
-              // First failure, or the diagnosis moved — always worth a comment,
-              // and this becomes the new baseline the next run compares against.
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body: [`Still failing.`, '', `Run: ${runUrl}`, '', diagnosis].join('\n'),
-              })
-              return
+            const issue_number = issue.number
+            if (decision.refresh) {
+              await github.rest.issues.updateComment({ ...repo, comment_id: decision.refresh.commentId, body: decision.refresh.body })
             }
-
-            // Diagnosis unchanged. Count how many trailing comments already say the
-            // same thing, including this run, to decide whether to stay silent or
-            // escalate once.
-            let streak = 1
-            for (let i = comments.length - 2; i >= 0; i--) {
-              if (diagnosisOf(comments[i].body) === diagnosis.trim()) streak++
-              else break
+            if (decision.issueUpdate) {
+              await github.rest.issues.update({ ...repo, issue_number, ...decision.issueUpdate })
             }
-
-            const alreadyEscalated = issue.labels.some(
-              (l) => (typeof l === 'string' ? l : l.name) === escalationLabel,
-            )
-
-            if (streak < escalationThreshold || alreadyEscalated) {
-              return // same cause, already said or already escalated — stay quiet
+            if (decision.body) {
+              await github.rest.issues.createComment({ ...repo, issue_number, body: decision.body })
             }
-
-            await github.rest.issues.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              title: `[escalated] ${issue.title.replace(/^\[escalated\]\s*/, '')}`,
-              labels: [...issue.labels.map((l) => (typeof l === 'string' ? l : l.name)), escalationLabel],
-            })
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              body: [
-                `Same diagnosis for ${streak} consecutive runs — escalating instead of`,
-                'repeating the comment. This is a console configuration problem, not',
-                'something a future run or a code change will resolve on its own. See the',
-                'diagnosis above and `docs/go-live-runbook.md`. This issue stays quiet now',
-                'until the diagnosis changes or the run recovers.',
-                '',
-                `Run: ${runUrl}`,
-              ].join('\n'),
-            })
 
       # Premise drift is reported separately from failure, and never as failure.
       #
