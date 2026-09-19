@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { seedBag, openBag } from './support/seedBag'
 
 /**
  * Checkout hand-off to Shopify.
@@ -260,10 +261,10 @@ test.describe('Checkout — the price quoted is the price charged', () => {
 
 test.describe('Checkout — the bag itself', () => {
   test.beforeEach(async ({ page }) => {
+    // Seeded: Add to Bag has been removed. See e2e/support/seedBag.ts.
+    await seedBag(page, ['7'])
     await page.goto(PRODUCT_URL)
-    await page.getByRole('button', { name: /ring size 7/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
+    await openBag(page)
   })
 
   test('checkout button is present in the cart drawer with an item', async ({ page }) => {

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { seedBag, openBag } from './support/seedBag'
 
 /**
  * Visual-asset visibility.
@@ -332,15 +333,12 @@ test.describe('Product imagery is visible on every surface', () => {
   test('the cart thumbnail renders a visible mark too', async ({ page }) => {
     // The cart is the one surface where an invisible thumbnail would be seen by a
     // customer who has already decided to buy.
+    // Seeded: Add to Bag has been removed. See e2e/support/seedBag.ts.
+    await seedBag(page, ['7'])
     await page.goto('/products/arc-band-titanium')
-    // Arc Band is a ring: Add to Bag stays disabled until a size is chosen, and
-    // the accessible name is "Add — <price> to Bag", so an anchored /add to bag/
-    // never matches it. Same two steps every other spec takes.
-    await page.getByRole('button', { name: /ring size 7/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
+    await openBag(page)
 
     const drawer = page.getByRole('dialog', { name: /shopping bag/i })
-    await expect(drawer).toBeVisible()
 
     const mark = drawer.locator('img, svg').first()
     await expect(mark).toBeVisible()

@@ -58,27 +58,10 @@ test.describe('Account — not configured', () => {
 })
 
 test.describe('Account — navigation', () => {
-  test('the nav offers a route to it', async ({ page }) => {
-    // Account lives in two places depending on width, and this file runs at both
-    // project defaults — 1280px in `chromium`, 412px in `mobile`. Below 769px the
-    // header sheds Search and Account into the full-screen overlay, because four
-    // text controls in a 64px bar need 435px of width and no phone is that wide
-    // (see e2e/header-fit.spec.ts). Resolving the link by where it actually is
-    // keeps this test about *reaching the account page* rather than about the
-    // breakpoint.
-    await page.goto('/')
-    const inHeader = page.locator('header').getByRole('link', { name: /your account/i })
-    let link = inHeader
-    if (!(await inHeader.isVisible())) {
-      await page.getByRole('button', { name: /open menu/i }).click()
-      link = page
-        .getByRole('dialog', { name: /mobile navigation/i })
-        .getByRole('link', { name: /your account/i })
-    }
-    await expect(link).toBeVisible()
-    await link.click()
-    await expect(page).toHaveURL(/\/account$/)
-  })
+  // The 'nav offers a route to it' test was removed with the Account control itself.
+  // /account still exists and still answers; nothing links to it any more, which is the
+  // first half of retiring it. The route's own disposition — a redirect to /contact —
+  // comes with the rest of the commerce excision.
 
   test('signing out is a POST, so no other site can trigger it', async ({ page }) => {
     // A GET logout can be fired by an <img> tag on any page on the internet.

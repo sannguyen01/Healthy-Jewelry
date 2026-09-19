@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import { ProductDetail } from '@/components/product/ProductDetail'
-import { useCartStore } from '@/store/cart'
 import type { HJProduct } from '@/lib/shopify/types'
 
 const money = (amount: string) => ({ amount, currencyCode: 'USD' })
@@ -91,15 +90,19 @@ const braceletProduct: HJProduct = {
   })),
 }
 
-beforeEach(() => {
-  useCartStore.setState({
-    items: [],
-    isOpen: false,
-    shopifyCartId: null,
-    checkoutUrl: null,
-    isLoading: false,
-  })
-})
+/**
+ * No cart-store reset here any more.
+ *
+ * This file used to reset `useCartStore` before every test because a third of them
+ * clicked Add to Bag and asserted on what landed in the bag. That control has been
+ * removed, so none of them do — and a `beforeEach` maintaining state nothing reads is
+ * how a fixture outlives the thing it was for.
+ *
+ * What survives is what the page still shows: title, price, description, spec, material
+ * name, badge, compare-at price, the size picker, the Sold Out badge and the trust
+ * signals. The sold-out *button* assertions went with the button; the sold-out *badge*
+ * assertion stayed, because the badge is still rendered.
+ */
 
 describe('ProductDetail', () => {
   describe('product info', () => {
@@ -197,119 +200,7 @@ describe('ProductDetail', () => {
     })
   })
 
-  describe('add to bag — unsized product (earrings)', () => {
-    it('renders "Add to Bag" button, enabled, with no size selection', () => {
-      render(<ProductDetail product={earringProduct} />)
-      const button = screen.getByRole('button', { name: /add disc studs to bag/i })
-      expect(button).toBeTruthy()
-      expect(button).not.toBeDisabled()
-    })
-
-    it('clicking Add to Bag adds the default variant to the cart', () => {
-      render(<ProductDetail product={earringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /add disc studs to bag/i }))
-      const items = useCartStore.getState().items
-      expect(items).toHaveLength(1)
-      expect(items[0].product.id).toBe('hj-009')
-      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-009-default')
-    })
-
-    it('clicking Add to Bag opens the cart drawer', () => {
-      render(<ProductDetail product={earringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /add disc studs to bag/i }))
-      expect(useCartStore.getState().isOpen).toBe(true)
-    })
-  })
-
-  describe('add to bag — sized product (rings)', () => {
-    it('shows "Select a Size" and disables the button before a size is chosen', () => {
-      render(<ProductDetail product={ringProduct} />)
-      const button = screen.getByRole('button', { name: /select a size/i })
-      expect(button).toBeDisabled()
-    })
-
-    it('clicking the disabled button does not add anything to the cart', () => {
-      render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /select a size/i }))
-      expect(useCartStore.getState().items).toHaveLength(0)
-    })
-
-    it('enables "Add to Bag" once a size is selected', () => {
-      render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
-      const button = screen.getByRole('button', { name: /add arc band to bag/i })
-      expect(button).not.toBeDisabled()
-    })
-
-    it('adds the variant matching the selected size, not the first variant', () => {
-      render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
-      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
-
-      const items = useCartStore.getState().items
-      expect(items).toHaveLength(1)
-      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-001-size-9')
-      // Guards against the regression this test exists to prevent: silently
-      // defaulting to the first variant (size 5) regardless of selection.
-      expect(items[0].variantId).not.toBe('gid://shopify/ProductVariant/hj-001-size-5')
-    })
-
-    it('picking a different size before adding resolves the newly selected variant', () => {
-      render(<ProductDetail product={ringProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /ring size 7/i }))
-      fireEvent.click(screen.getByRole('button', { name: /ring size 11/i }))
-      fireEvent.click(screen.getByRole('button', { name: /add arc band to bag/i }))
-
-      const items = useCartStore.getState().items
-      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-001-size-11')
-    })
-  })
-
-  describe('add to bag — sized product (bracelets)', () => {
-    it('resolves the correct variant for the selected bracelet size', () => {
-      render(<ProductDetail product={braceletProduct} />)
-      fireEvent.click(screen.getByRole('button', { name: /bracelet size m/i }))
-      fireEvent.click(screen.getByRole('button', { name: /add cable cuff to bag/i }))
-
-      const items = useCartStore.getState().items
-      expect(items[0].variantId).toBe('gid://shopify/ProductVariant/hj-013-size-M')
-    })
-  })
-
   describe('sold out', () => {
-    it('disables Add to Bag and shows "Sold Out" for an unsized product with no availability', () => {
-      const soldOutEarring = {
-        ...earringProduct,
-        variants: earringProduct.variants.map((v) => ({ ...v, availableForSale: false })),
-      }
-      render(<ProductDetail product={soldOutEarring} />)
-      const button = screen.getByRole('button', { name: /disc studs is sold out/i })
-      expect(button).toBeDisabled()
-    })
-
-    it('clicking the sold-out button does not add anything to the cart', () => {
-      const soldOutEarring = {
-        ...earringProduct,
-        variants: earringProduct.variants.map((v) => ({ ...v, availableForSale: false })),
-      }
-      render(<ProductDetail product={soldOutEarring} />)
-      fireEvent.click(screen.getByRole('button', { name: /disc studs is sold out/i }))
-      expect(useCartStore.getState().items).toHaveLength(0)
-    })
-
-    it('disables Add to Bag for a sold-out size once selected, on a sized product', () => {
-      const soldOutSize9 = {
-        ...ringProduct,
-        variants: ringProduct.variants.map((v) =>
-          v.selectedOptions.some((o) => o.value === '9') ? { ...v, availableForSale: false } : v
-        ),
-      }
-      render(<ProductDetail product={soldOutSize9} />)
-      fireEvent.click(screen.getByRole('button', { name: /ring size 9/i }))
-      const button = screen.getByRole('button', { name: /arc band is sold out/i })
-      expect(button).toBeDisabled()
-    })
-
     it('shows the Sold Out badge instead of the promotional badge when every variant is unavailable', () => {
       const soldOutRing = {
         ...ringProduct,

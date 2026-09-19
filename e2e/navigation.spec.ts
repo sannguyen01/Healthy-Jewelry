@@ -4,9 +4,11 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
  * The search control lives in two places depending on width, and these tests run
  * at both project defaults — 1280px in `chromium`, 412px in `mobile`.
  *
- * Below 769px the header sheds Search and Account into the full-screen overlay,
- * because keeping four text controls in a 64px bar needs 435px of content and no
- * phone is that wide (see `e2e/header-fit.spec.ts`). Resolving the control by
+ * Below 769px the header sheds Search into the full-screen overlay, because keeping
+ * four text controls in a 64px bar needed 435px of content and no phone is that wide
+ * (see `e2e/header-fit.spec.ts`). Account used to move with it and has since been
+ * removed outright, which leaves the header narrower than that measurement — the
+ * breakpoint stays because the composition choice is still right. Resolving the control by
  * where it actually is, rather than pinning a viewport, keeps these tests
  * testing *search* rather than testing the breakpoint — which is what
  * `header-fit.spec.ts` is for.

@@ -163,28 +163,6 @@ export function Nav({ cartCount }: NavProps) {
             </svg>
           </button>
 
-          {/* Account — a link, not a button: it is a navigation, and it has to
-              work before any JavaScript runs. `/account` decides for itself
-              whether to show the signed-in or signed-out state, so the nav does
-              not need to know and cannot get it wrong. */}
-          <Link
-            href="/account"
-            aria-label="Your account"
-            className="hj-desktop-only"
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.68rem',
-              letterSpacing: '0.16em',
-              textTransform: 'uppercase',
-              color: 'var(--ink)',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            Account
-          </Link>
-
           {/* BAG button */}
           <button
             aria-label={`Open bag — ${count} item${count !== 1 ? 's' : ''}`}
@@ -282,11 +260,12 @@ export function Nav({ cartCount }: NavProps) {
               {link.label}
             </Link>
           ))}
-          {/* Search and Account are hidden from the header below 769px, so they
-              live here. Account was never in this overlay at all — on a phone it
-              was reachable only through a 10.88px word crammed against the edge
-              of the viewport, which is where this whole change started.
-              `e2e/header-fit.spec.ts` asserts both are present, so a control
+          {/* Search is hidden from the header below 769px, so it lives here.
+              Account used to sit beside it. Both controls came into this overlay
+              because on a phone Account was reachable only through a 10.88px word
+              crammed against the edge of the viewport — see ADR 016 — and that
+              reasoning still holds for Search, which is why Search stays.
+              `e2e/header-fit.spec.ts` asserts Search is present here, so a control
               removed from the header cannot quietly cease to exist. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginTop: '8px' }}>
             <button
@@ -309,22 +288,6 @@ export function Nav({ cartCount }: NavProps) {
             >
               Search
             </button>
-            <Link
-              href="/account"
-              aria-label="Your account"
-              onClick={() => setMenuOpen(false)}
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: '0.85rem',
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                color: 'var(--titanium)',
-                textDecoration: 'none',
-                padding: '10px 4px',
-              }}
-            >
-              Account
-            </Link>
           </div>
 
           <p
@@ -345,9 +308,10 @@ export function Nav({ cartCount }: NavProps) {
       <style>{`
         @media (max-width: 768px) {
           .hj-desktop-nav { display: none !important; }
-          /* Search and Account move into the full-screen overlay below this
-             width. Without it the header needs 435px of content to lay out and
-             every phone is narrower than that — see e2e/header-fit.spec.ts. */
+          /* Search moves into the full-screen overlay below this width (Account
+             did too, until it was removed). Without this the header needed 435px
+             of content to lay out and every phone is narrower than that — see
+             e2e/header-fit.spec.ts, which re-measures rather than assuming. */
           .hj-desktop-only { display: none !important; }
         }
         @media (min-width: 769px) {
