@@ -5,7 +5,7 @@ import path from 'node:path'
 import { ProductCard } from '@/components/product/ProductCard'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { productJsonLd } from '@/components/seo/JsonLd'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 /**
  * Every price the customer sees must be denominated in the currency Shopify

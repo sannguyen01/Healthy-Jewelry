@@ -11,7 +11,7 @@ import {
 } from './queries/products'
 import { PRODUCTS_TAG, productTag, collectionTag } from './cacheTags'
 import { parseMaterial, parseSvgType, parseCollection, isHJCollectionHandle } from './tags'
-import type { HJProduct, HJCollection, Product } from './types'
+import type { HJProduct, HJCollection, Product } from '@/lib/catalog/types'
 import {
   getAllProducts as staticGetAllProducts,
   getProductByHandle as staticGetProductByHandle,

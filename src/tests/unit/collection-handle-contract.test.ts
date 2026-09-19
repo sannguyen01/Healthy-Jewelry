@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { HJ_COLLECTION_HANDLES } from '@/lib/shopify/types'
+import { HJ_COLLECTION_HANDLES } from '@/lib/catalog/types'
 import { parseCollection, isHJCollectionHandle } from '@/lib/shopify/tags'
 import { hjCollections } from '@/lib/data/hj-data'
 import { parseSource, walk } from '@/lib/analysis/tsAstScan'

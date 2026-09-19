@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { HJProduct, HJCollectionHandle } from '@/lib/shopify/types'
+import type { HJProduct, HJCollectionHandle } from '@/lib/catalog/types'
 import { ProductCard } from '@/components/product/ProductCard'
 
 interface ProductGridProps {

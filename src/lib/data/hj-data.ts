@@ -5,7 +5,7 @@ import type {
   HJCollectionHandle,
   ProductVariant,
   Money,
-} from '@/lib/shopify/types'
+} from '@/lib/catalog/types'
 import type { CurrencyCode } from '@/lib/utils/formatPrice'
 
 /**

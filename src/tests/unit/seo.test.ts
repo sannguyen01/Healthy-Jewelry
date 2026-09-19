@@ -4,7 +4,7 @@ import {
   generateCollectionMetadata,
   generatePageMetadata,
 } from '@/lib/utils/seo'
-import type { HJProduct, HJCollection } from '@/lib/shopify/types'
+import type { HJProduct, HJCollection } from '@/lib/catalog/types'
 
 const mockProduct: HJProduct = {
   id: 'gid://shopify/Product/hj-001',

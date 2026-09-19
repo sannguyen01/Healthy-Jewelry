@@ -1,7 +1,7 @@
 // Healthy Jewelry — JSON-LD structured data components
 // dangerouslySetInnerHTML is safe here: data is server-generated structured data, never user input.
 
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 import { SITE_NAME, SITE_URL, CONTACT_EMAIL, SOCIAL_LINKS } from '@/config/site'
 import { productSeo } from '@/lib/seo/productSeo'
 import type { BreadcrumbItem } from './Breadcrumbs'

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useCartStore } from '@/store/cart'
 import { checkoutMessage, supportMailto, SUPPORT_EMAIL } from '@/lib/utils/checkoutMessages'
 import type { CheckoutError } from '@/store/cart'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 /**
  * Every one of these failures used to end at the same place: a null

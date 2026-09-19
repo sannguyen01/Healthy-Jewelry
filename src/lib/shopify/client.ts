@@ -1,6 +1,6 @@
 import { shopifyConfig } from '@/config/shopify'
 import { reportApiVersionDrift } from './api-version'
-import type { ShopifyResponse } from './types'
+import type { ShopifyResponse } from '@/lib/catalog/types'
 
 // ── Environment validation ─────────────────────────────────────────────────
 

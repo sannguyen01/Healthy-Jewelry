@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { useCartStore } from '@/store/cart'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 vi.mock('next/link', () => ({
   default: ({

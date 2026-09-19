@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useCartStore } from '@/store/cart'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 /**
  * The end of the purchase journey.

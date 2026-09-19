@@ -6,7 +6,7 @@ import {
   parseCollection,
   isHJCollectionHandle,
 } from '@/lib/shopify/tags'
-import type { HJCollectionHandle } from '@/lib/shopify/types'
+import type { HJCollectionHandle } from '@/lib/catalog/types'
 
 /**
  * The store's vocabulary must match the code's.

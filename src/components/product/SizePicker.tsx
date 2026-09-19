@@ -1,6 +1,6 @@
 'use client'
 
-import type { HJCollectionHandle } from '@/lib/shopify/types'
+import type { HJCollectionHandle } from '@/lib/catalog/types'
 
 interface SizePickerProps {
   collection: HJCollectionHandle

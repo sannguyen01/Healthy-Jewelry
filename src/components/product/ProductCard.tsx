@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 import { ProductImage } from '@/components/product/ProductImage'
 import { ProductBadge } from '@/components/product/ProductBadge'
 import { formatPrice } from '@/lib/utils/formatPrice'

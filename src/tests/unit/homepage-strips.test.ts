@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { stripByMaterial, duplicateAcrossStrips, dedupeInOrder } from '@/lib/utils/homepageStrips'
-import type { HJMaterialHandle, HJProduct } from '@/lib/shopify/types'
+import type { HJMaterialHandle, HJProduct } from '@/lib/catalog/types'
 import { hjProducts } from '@/lib/data/hj-data'
 
 /**

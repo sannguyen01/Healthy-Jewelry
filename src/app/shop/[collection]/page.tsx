@@ -9,7 +9,7 @@ import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import { hjCollections } from '@/lib/data/hj-data'
 import { getProductsByCollection } from '@/lib/shopify'
 import { TrackView } from '@/components/analytics/TrackView'
-import type { HJCollectionHandle } from '@/lib/shopify/types'
+import type { HJCollectionHandle } from '@/lib/catalog/types'
 
 const VALID_COLLECTIONS: HJCollectionHandle[] = [
   'rings',
