@@ -130,7 +130,18 @@ this file is the one place an orphan is visible.
 | `SHOPIFY_ADMIN_ACCESS_TOKEN` | Shopify custom app | Admin API | Optional; unset in normal operation |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Vercel env | Rate-limit store | **Unset** — `/api/health` reports 503 while so |
 | `RESEND_API_KEY` | Vercel env | Contact-form email | **Unset** |
+| `SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID` | Vercel env | Customer Account OAuth client identity | Not secret; inert while the other two are unset |
+| `SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET` | Vercel env | **OAuth client secret** for the Customer Account API | Feature built, never switched on |
+| `SHOPIFY_CUSTOMER_ACCOUNT_SESSION_SECRET` | Vercel env | Keys the **AES-256-GCM** session cookie. Rotating it signs everyone out, which is the only bulk revocation available | Feature built, never switched on |
 | Shopify Storefront token (automation copy) | To be added to the GitHub environment | Same as above | Copy the Vercel value; do not mint a second |
+
+**The three `SHOPIFY_CUSTOMER_ACCOUNT_*` rows were missing from this file until 2026-09-19.**
+They are read by `src/lib/shopify/customer/config.ts` and documented in `.env.local.example`, and
+one of them is an OAuth client secret — so for as long as customer accounts have existed, the
+document whose stated purpose is *"the one place an orphan is visible"* could not see them. Found
+by `src/tests/unit/decommission-inventory.test.ts` on its first run, which is the argument for
+that test: this file is hand-maintained, its own header says the count in it is a claim rather
+than a measurement, and nothing compared it to anything until now.
 
 **Do not mint a second Storefront token for CI.** A second credential is a second thing to
 rotate and a second thing to forget — which is the failure this document exists to prevent.
