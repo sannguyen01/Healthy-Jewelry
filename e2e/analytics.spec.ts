@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { seedBag, openBag } from './support/seedBag'
 
 /**
  * **Nothing is measured until someone says yes.**
@@ -43,16 +44,20 @@ test.describe('Analytics consent', () => {
     const hits = recordAnalyticsRequests(page)
 
     // A full browsing session — the events that would fire if the gate leaked.
+    // `product_viewed` fires on load; opening a seeded bag exercises the drawer too.
+    // The add-to-bag click is gone with the control, but this test was never about
+    // that one event: it asserts the transport sends *nothing at all* pre-consent.
+    await seedBag(page, ['7'])
     await page.goto('/products/arc-band-titanium')
     await page.getByRole('button', { name: /ring size 7/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
+    await openBag(page)
 
     expect(hits, 'analytics fired before consent was given').toEqual([])
   })
 
   test('still sends nothing after Decline', async ({ page }) => {
     const hits = recordAnalyticsRequests(page)
+    await seedBag(page, ['7'])
 
     await page.goto('/')
     await page.getByRole('dialog', { name: /analytics consent/i })
@@ -61,7 +66,7 @@ test.describe('Analytics consent', () => {
 
     await page.goto('/products/arc-band-titanium')
     await page.getByRole('button', { name: /ring size 7/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
+    await openBag(page)
 
     expect(hits, 'analytics fired after the visitor declined').toEqual([])
   })
@@ -140,9 +145,9 @@ test.describe('Analytics consent', () => {
   test('the banner never covers the checkout button in the bag', async ({ page }) => {
     // Both are fixed to the bottom of the viewport. A consent banner sitting over
     // Checkout would be a conversion bug caused by a compliance control.
+    await seedBag(page, ['7'])
     await page.goto('/products/arc-band-titanium')
-    await page.getByRole('button', { name: /ring size 7/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
+    await openBag(page)
 
     const checkout = page.getByRole('dialog', { name: /shopping bag/i }).getByRole('button', {
       name: /checkout/i,

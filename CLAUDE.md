@@ -90,14 +90,20 @@ homepage hero is the one exception, since it owns `--text-hero`.
 - Cards: image + name + price only (minimal)
 
 ### Header composition — two layouts, breakpoint at 768px
-- **≥769px**: brand lockup · centred primary links · Search · Account · Bag.
-- **≤768px**: brand lockup · Bag · Menu. **Search and Account move into the full-screen
-  overlay** (`.hj-desktop-only`), which also carries the three primary links. They are not
-  duplicated — the header copies are `display: none` down here.
+- **≥769px**: brand lockup · centred primary links · Search · Bag.
+- **≤768px**: brand lockup · Bag · Menu. **Search moves into the full-screen
+  overlay** (`.hj-desktop-only`), which also carries the three primary links. It is not
+  duplicated — the header copy is `display: none` down here.
 - The header **must fit 320px**. It did not: with four controls in the bar it required 414px
   empty and 435px with a bag badge, so on every phone the MENU button — the only route to
   navigation there is — was cut off at the viewport edge. See
   [ADR 016](docs/adr/016-fit-is-a-measurement-nobody-took.md).
+- **Those two widths are historical, measured 2026-08 against a four-control header.** The
+  Account control was removed on 2026-09-19 and the bar now carries three, so the real
+  numbers are lower. They are not re-measured here on purpose: they are the record of what
+  the defect cost, and replacing them with today's figures would falsify that account rather
+  than correct it. The live number is the one `e2e/header-fit.spec.ts` prints on every run
+  as a `minimum fitting width` annotation — read that, not this line.
 - **The brand gives, the controls never do.** The brand link is `flex: 0 1 auto; min-width: 0`
   and the wordmark ellipsises; the control cluster is `flexShrink: 0`. A truncated wordmark is
   a cosmetic loss, an unreachable control is a functional one. This is why the 768px breakpoint

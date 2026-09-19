@@ -74,14 +74,24 @@ const MAX_MARK_EXTENT = 0.75
 const MAX_EXTENT_SPREAD = 1.15
 
 /**
- * How far down the page the buy control may sit at 390x844.
+ * How far down the page the foot of the detail column may sit at 390x844.
  *
- * Measured on the ring — the worst case, because rings carry a size picker. Before this
- * change: 1054px. After: 992px. The bound guards the geometry regression rather than
- * expressing a target, so if page copy legitimately grows past it, raise it deliberately
- * and say why; do not raise it to make a red test green.
+ * Measured on the ring — the worst case, because rings carry a size picker. Before the
+ * tile was bounded: 1054px. After: 992px.
+ *
+ * **Those two numbers were measured against the Add to Bag button, which no longer
+ * exists.** The anchor is now the trust-signal row, which used to sit *below* the button
+ * and has moved up by roughly the button's own height — so the value is retained rather
+ * than re-derived, and it is a carried-over bound until the first green E2E run confirms
+ * it. If that run shows real headroom, tighten it deliberately and record the new
+ * measurement here; ADR 025's rule is that a number in prose is a claim, and this one is
+ * currently a claim about a different anchor.
+ *
+ * The bound guards the geometry regression rather than expressing a target, so if page
+ * copy legitimately grows past it, raise it deliberately and say why; never raise it to
+ * make a red test green.
  */
-const MAX_ADD_TO_BAG_Y = 1020
+const MAX_COLUMN_FOOT_Y = 1020
 
 interface Measurement {
   tile: { x: number; y: number; width: number; height: number }
@@ -288,21 +298,32 @@ test.describe('every illustration reads at a comparable size', () => {
   })
 })
 
-test.describe('the buy control stays reachable', () => {
-  test('Add to Bag is not pushed down the page by the tile', async ({ page }) => {
+test.describe('the detail column stays reachable', () => {
+  /**
+   * Re-anchored, not deleted.
+   *
+   * This measured how far down the page the Add to Bag control sat, because an
+   * over-tall tile pushed it there — 480px of tile on a 342px column. The control has
+   * been removed, but the defect it detected is a property of the *tile*, not of the
+   * button, and it is still live: nothing else in this suite would notice the tile
+   * growing again and shoving the rest of the column below the fold.
+   *
+   * So the probe moves to whatever is now last in the column — the trust signals. Deleting
+   * it along with its old subject would have retired a working detector because the thing
+   * it happened to point at went away, which is the ADR 020 failure in reverse.
+   */
+  test('the tile does not push the column down the page', async ({ page }) => {
     for (const { handle, svgType } of REPRESENTATIVES) {
       await visit(page, handle, 390)
-      const button = page.getByRole('button', {
-        name: /add .* to bag|select a size|is sold out/i,
-      })
-      const box = await button.first().boundingBox()
-      if (box === null) throw new Error(`/products/${handle}: no buy control found to measure`)
+      const anchor = page.getByText('·IMPLANT GRADE·')
+      const box = await anchor.first().boundingBox()
+      if (box === null) throw new Error(`/products/${handle}: no trust signals found to measure`)
       const y = box.y + (await page.evaluate(() => window.scrollY))
       expect(
         y,
-        `on ${svgType} the buy control sits ${y.toFixed(0)}px down the page. The tile used ` +
-          'to be 480px tall on a 342px column, which is what put it there.'
-      ).toBeLessThanOrEqual(MAX_ADD_TO_BAG_Y)
+        `on ${svgType} the foot of the detail column sits ${y.toFixed(0)}px down the page. ` +
+          'The tile used to be 480px tall on a 342px column, which is what put it there.'
+      ).toBeLessThanOrEqual(MAX_COLUMN_FOOT_Y)
     }
   })
 })

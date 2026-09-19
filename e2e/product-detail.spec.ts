@@ -1,19 +1,23 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
+
+/**
+ * What a product page shows, now that it no longer sells anything.
+ *
+ * The Add to Bag control was removed, and with it six tests that drove it: the button's
+ * presence, its size gate, the drawer it opened, and the three cart assertions that
+ * followed a click. They are deleted rather than skipped — the control does not exist, so
+ * there is nothing for them to be pending on.
+ *
+ * The size picker stays and stays covered. It still tells a visitor which sizes a piece
+ * comes in and which one they have picked; it simply no longer has to resolve that choice
+ * to a purchasable variant. `selectRingSize` went with the deleted tests, as the only
+ * caller of it here.
+ */
 
 // Use a known product from the static data catalog
 const RING_HANDLE = 'arc-band-titanium'
 const EARRING_HANDLE = 'disc-studs-titanium'
 const BRACELET_HANDLE = 'cable-cuff-titanium'
-
-/**
- * Rings keep "Add to Bag" disabled until a size is chosen, so every add-to-bag
- * journey has to pass through the size picker first. Named rather than inlined
- * so the requirement is stated once — `cart.spec.ts` and `checkout.spec.ts`
- * carry the same step.
- */
-async function selectRingSize(page: Page, size = 7): Promise<void> {
-  await page.getByRole('button', { name: `Ring size ${size}` }).click()
-}
 
 test.describe('Product detail — ring', () => {
   test.beforeEach(async ({ page }) => {
@@ -65,53 +69,6 @@ test.describe('Product detail — ring', () => {
     await expect(sizeButtons.first()).toBeVisible()
   })
 
-  test('"Add to Bag" button is present', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /add.*to bag/i })).toBeVisible()
-  })
-
-  test('"Add to Bag" is gated until a size is chosen', async ({ page }) => {
-    // The gate is a feature, not an obstacle — a ring cannot be added without a
-    // size. It is asserted here so the size-selection steps in the tests below
-    // read as deliberate rather than as incidental setup.
-    const addToBag = page.getByRole('button', { name: /add.*to bag/i })
-    await expect(addToBag).toBeDisabled()
-    await expect(addToBag).toHaveAttribute('aria-label', /select a size/i)
-
-    await selectRingSize(page)
-    await expect(addToBag).toBeEnabled()
-  })
-
-  test('clicking "Add to Bag" opens the cart drawer', async ({ page }) => {
-    await selectRingSize(page)
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
-  })
-
-  test('cart shows product after adding to bag', async ({ page }) => {
-    // Get the product title first
-    const title = await page.getByRole('heading', { level: 1 }).textContent()
-    await selectRingSize(page)
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    if (title) {
-      await expect(dialog.getByText(title)).toBeVisible()
-    }
-  })
-
-  test('cart shows non-zero item count after adding', async ({ page }) => {
-    await selectRingSize(page)
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    // Bag button count should be > 0
-    const bagButton = page.getByRole('button', { name: /open bag/i })
-    await expect(bagButton).not.toHaveAttribute('aria-label', /0 item/)
-  })
-
-  test('Checkout button is present in cart after adding item', async ({ page }) => {
-    await selectRingSize(page)
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    await expect(dialog.getByRole('button', { name: /checkout/i })).toBeVisible()
-  })
 })
 
 test.describe('Product detail — earring', () => {

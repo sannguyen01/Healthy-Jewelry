@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { seedBag, openBag } from './support/seedBag'
 
 test.describe('Cart drawer', () => {
   test.beforeEach(async ({ page }) => {
@@ -49,13 +50,12 @@ test.describe('Cart drawer', () => {
 
 test.describe('Cart — with items', () => {
   test.beforeEach(async ({ page }) => {
-    // Add a product to cart via the product page
+    // Seeded rather than added through the UI: Add to Bag has been removed, so a
+    // pre-existing persisted bag is the only way this state now occurs. See
+    // e2e/support/seedBag.ts.
+    await seedBag(page, ['7'])
     await page.goto('/products/arc-band-titanium')
-    // Arc Band is a ring — Add to Bag stays disabled until a size is chosen.
-    await page.getByRole('button', { name: /ring size 7/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    // Cart drawer opens automatically — wait for it
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
+    await openBag(page)
   })
 
   test('cart shows product after adding', async ({ page }) => {
@@ -133,18 +133,12 @@ test.describe('Cart — with items', () => {
 // tests are the regression guard for that collapse.
 test.describe('Cart — two sizes of the same product', () => {
   test.beforeEach(async ({ page }) => {
+    // Both sizes seeded in one persisted bag. The regression under test is how the
+    // store *keys* two lines of one product, which is a property of the persisted
+    // shape — not of the two clicks that used to create it.
+    await seedBag(page, ['7', '9'])
     await page.goto('/products/arc-band-titanium')
-    await page.getByRole('button', { name: /ring size 7/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    const dialog = page.getByRole('dialog', { name: /shopping bag/i })
-    await expect(dialog).toBeVisible()
-    // Close the drawer to reach the size picker for a second, different size.
-    await page.mouse.click(100, 300)
-    await expect(dialog).not.toBeVisible()
-
-    await page.getByRole('button', { name: /ring size 9/i }).click()
-    await page.getByRole('button', { name: /add.*to bag/i }).click()
-    await expect(dialog).toBeVisible()
+    await openBag(page)
   })
 
   test('creates two distinct lines, not one merged line', async ({ page }) => {

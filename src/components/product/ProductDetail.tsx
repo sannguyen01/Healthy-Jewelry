@@ -7,7 +7,6 @@ import { ProductImage } from '@/components/product/ProductImage'
 import { ProductBadge } from '@/components/product/ProductBadge'
 import { SizePicker } from '@/components/product/SizePicker'
 import { formatPrice } from '@/lib/utils/formatPrice'
-import { useCartStore } from '@/store/cart'
 import { track } from '@/lib/analytics'
 
 interface ProductDetailProps {
@@ -25,8 +24,6 @@ const TRUST_SIGNALS = ['·IMPLANT GRADE·', '·HYPOALLERGENIC·', '·MRI SAFE·'
 export function ProductDetail({ product }: ProductDetailProps) {
   const [selectedSize, setSelectedSize] = useState<string | undefined>(undefined)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
-  const addItem = useCartStore((s) => s.addItem)
-  const openCart = useCartStore((s) => s.openCart)
 
   // One view per mount. The ref guards React's development double-invoke, which
   // would otherwise double every page-view number and teach everyone to halve it.
@@ -57,29 +54,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
    */
   const activeImage = product.images[activeImageIndex] ?? product.images[0] ?? product.featuredImage
 
-  // Rings and bracelets are sized — a size must resolve to a real Shopify
-  // variant before the correct item can be added to the cart.
-  const requiresSize = product.collection === 'rings' || product.collection === 'bracelets'
-  const selectedVariant = selectedSize
-    ? product.variants.find((v) =>
-        v.selectedOptions.some((o) => o.name === 'Size' && o.value === selectedSize)
-      )
-    : undefined
-  // Unsized products carry exactly one ('Default') variant — that one stands
-  // in for "the product" when checking availability outside a size context.
-  const relevantVariant = requiresSize ? selectedVariant : product.variants[0]
+  // `isSoldOut` is the only variant-derived value left, and it feeds the badge below.
+  //
+  // Everything else that used to live here — `requiresSize`, `selectedVariant`,
+  // `relevantVariant`, `variantSoldOut`, `canAddToBag` — existed solely to decide whether
+  // the Add to Bag button could be pressed and which of its three labels to show. The
+  // button is gone, so resolving a size to a Shopify variant answers no question this page
+  // still asks. Left in place they would be unread state that a reader has to walk before
+  // discovering it goes nowhere.
+  //
+  // The size picker stays and stays interactive: it tells a visitor what sizes exist and
+  // which one they picked. It simply no longer has to map that choice onto a variant id.
   const isSoldOut =
     product.variants.length > 0 && product.variants.every((v) => !v.availableForSale)
-  const variantSoldOut = relevantVariant !== undefined && !relevantVariant.availableForSale
-  const canAddToBag = requiresSize
-    ? selectedVariant !== undefined && !variantSoldOut
-    : !variantSoldOut
-
-  function handleAddToBag() {
-    if (!canAddToBag) return
-    addItem(product, 1, selectedVariant?.id)
-    openCart()
-  }
 
   const materialName = MATERIAL_FULL_NAMES[product.material] ?? product.material
 
@@ -278,49 +265,6 @@ export function ProductDetail({ product }: ProductDetailProps) {
             onSelect={setSelectedSize}
             selected={selectedSize}
           />
-
-          {/* Add to Bag */}
-          <button
-            onClick={handleAddToBag}
-            disabled={!canAddToBag}
-            style={{
-              width: '100%',
-              padding: '18px',
-              backgroundColor: canAddToBag ? 'var(--ink)' : 'var(--ash)',
-              color: 'var(--bg)',
-              fontFamily: 'var(--font-display)',
-              fontSize: '1rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.14em',
-              border: 'none',
-              cursor: canAddToBag ? 'pointer' : 'not-allowed',
-              transition: `background-color var(--duration-fast) var(--ease)`,
-              marginTop: '8px',
-            }}
-            onMouseEnter={(e) => {
-              if (canAddToBag) {
-                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--mid)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (canAddToBag) {
-                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--ink)'
-              }
-            }}
-            aria-label={
-              requiresSize && !selectedVariant
-                ? `Select a size before adding ${product.title} to bag`
-                : variantSoldOut
-                  ? `${product.title} is sold out`
-                  : `Add ${product.title} to bag`
-            }
-          >
-            {requiresSize && !selectedVariant
-              ? 'Select a Size'
-              : variantSoldOut
-                ? 'Sold Out'
-                : 'Add to Bag'}
-          </button>
 
           {/* Trust signals */}
           <div

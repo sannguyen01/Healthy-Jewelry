@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { mainNav } from '../src/config/navigation'
+import { seedBag } from './support/seedBag'
 import {
   describeOffenders,
   minimumFittingWidth,
@@ -53,22 +54,6 @@ const SWEEP = { from: SUPPORTED_FLOOR_PX, to: 1440, step: 8 }
 const DEVICE_WIDTHS = [320, 360, 375, 390, 412, 414, 768, 769, 1024, 1440]
 
 const headerFits: FitProbe = (page) => offendersPastViewport(page, 'header')
-
-/**
- * Puts a real item in the bag through the UI rather than by writing
- * `localStorage`, so the badge under test is the one the store actually
- * produces. It is worth +21px of header width, and the production screenshot
- * that prompted this spec was a `BAG (4)` state — a fit test run only on an
- * empty bag measures the header 21px narrower than visitors experience it.
- */
-async function seedBag(page: Page): Promise<void> {
-  await page.goto('/products/arc-band-titanium')
-  // Arc Band is a ring: Add to Bag stays disabled until a size is chosen.
-  await page.getByRole('button', { name: /ring size 7/i }).click()
-  await page.getByRole('button', { name: /add.*to bag/i }).click()
-  await expect(page.getByRole('button', { name: /open bag — 1 item/i })).toBeVisible()
-  await page.keyboard.press('Escape')
-}
 
 /**
  * Loads the homepage with a seeded bag and waits for the badge to actually be
@@ -141,7 +126,7 @@ test.describe('Header fit', () => {
           `to serve there is ${ceiling}px. The header is sized by its own contents — the brand ` +
           `wordmark, the control labels, the letter-spacing, and whether the bag badge is ` +
           `showing — so this usually means a label got longer or a control was added. Either ` +
-          `shorten it, move it into the mobile overlay as Search and Account already are, or ` +
+          `shorten it, move it into the mobile overlay as Search already is, or ` +
           `make the change deliberately in src/components/layout/Nav.tsx. Measured: ` +
           report.join(' · ')
       ).toBeLessThanOrEqual(ceiling)
@@ -194,10 +179,12 @@ test.describe('Header fit', () => {
   })
 
   test('the mobile overlay carries everything the header sheds', async ({ page }) => {
-    // Search and Account are hidden from the header below 769px. That is only
-    // safe if they are somewhere else, and nothing else in the suite would
-    // notice a control that quietly stopped existing on phones — the overlay
-    // shipped for months with no account entry at all.
+    // Search is hidden from the header below 769px. That is only safe if it is
+    // somewhere else, and nothing else in the suite would notice a control that
+    // quietly stopped existing on phones — the overlay shipped for months with no
+    // account entry at all, which is the defect this assertion was written for.
+    // Account itself has since been removed outright; Search is what remains to
+    // protect, and the shape of the protection is unchanged.
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     await page.getByRole('button', { name: /open menu/i }).click()
@@ -211,10 +198,6 @@ test.describe('Header fit', () => {
         `the mobile overlay is missing "${link.label}"`
       ).toBeVisible()
     }
-    await expect(
-      overlay.getByRole('link', { name: /account/i }),
-      'Account is hidden from the header below 769px and must be reachable in the overlay'
-    ).toBeVisible()
     await expect(
       overlay.getByRole('button', { name: /search/i }),
       'Search is hidden from the header below 769px and must be reachable in the overlay'
