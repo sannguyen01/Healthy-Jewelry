@@ -209,6 +209,14 @@ jobs:
     name: Dependency scope
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    # Declared at job scope, and only here. This is the one job in the workflow that
+    # spends the token, and `permissions:` at workflow scope would have silently narrowed
+    # the other two as well. `pull-requests: read` is what `gh api .../pulls/N` needs;
+    # `contents: read` is what `actions/checkout` needs, and naming one drops every scope
+    # not named.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -223,17 +231,52 @@ jobs:
         with:
           node-version-file: package.json
 
+      # **The description as it is now, not as it was when the event fired.**
+      #
+      # This step replaces `PR_BODY: ${{ github.event.pull_request.body }}`, which froze
+      # the description into the webhook payload. `pull_request` fires on `opened`,
+      # `synchronize` and `reopened` — none of them is "somebody edited the description"
+      # — and a re-run replays the original payload rather than re-reading anything. So a
+      # rationale written in answer to this check's own failure message was invisible to
+      # it: not on save, and not on re-run either. The check demanded an action it could
+      # not observe, which is ADR 018's shape arriving through a workflow input instead of
+      # through code. PR #73 is the worked example.
+      #
+      # Adding `types: [… edited]` would have been the smaller diff and the wrong one.
+      # This workflow's concurrency group is `${{ github.workflow }}-${{ github.ref }}`
+      # with `cancel-in-progress: true`, so an `edited` event on the same ref **cancels
+      # the verify and E2E run already in flight** — editing a description mid-build would
+      # kill the build. Guarding those jobs with an `if:` does not help: the cancellation
+      # happens at the concurrency group, before any job condition is evaluated, and the
+      # replacement run then reports the merge gate as `skipped`, which from outside is
+      # indistinguishable from passing (the `merge-gate-dark` failure mode, ADR 011).
+      # Reading the live body costs one API call and leaves the gate alone.
+      #
+      # The body is written to a file and handed on as a **path**. A description is text
+      # anyone can write: `${{ github.event.pull_request.body }}` inside a `run:` line is
+      # a shell injection with a friendly name, and writing it into `$GITHUB_ENV` is the
+      # same injection one layer down — a body containing the heredoc delimiter rewrites
+      # the environment of every later step. Only the path crosses the boundary.
+      - name: Read the pull request description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""' \
+            > "${RUNNER_TEMP}/pr-body.md"
+          echo "PR_BODY_FILE=${RUNNER_TEMP}/pr-body.md" >> "$GITHUB_ENV"
+
       - name: Does this pull request smuggle a major bump?
         env:
-          # Through the environment, never interpolated into the `run:` line. A pull
-          # request description is text anyone can write, and
-          # `${{ github.event.pull_request.body }}` inside a shell command is an injection
-          # with a friendly name.
-          PR_BODY: ${{ github.event.pull_request.body }}
+          # Both refs through the environment rather than interpolated into the `run:`
+          # line. `base_ref` is constrained to main/develop by this workflow's `branches:`
+          # filter and `head.sha` is hexadecimal, so neither is exploitable today — but
+          # "safe because of a filter three screens up" is a property a future edit
+          # removes silently, and quoting an environment variable costs nothing.
+          BASE_REF: origin/${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          node scripts/audit-dependency-scope.mjs \
-            --base "origin/${{ github.base_ref }}" \
-            --head "${{ github.event.pull_request.head.sha }}"
+          node scripts/audit-dependency-scope.mjs --base "$BASE_REF" --head "$HEAD_SHA"
 
   e2e:
     name: E2E tests (Playwright)

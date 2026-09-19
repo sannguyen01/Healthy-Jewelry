@@ -73,11 +73,19 @@ const EXEMPT = new Set([
   'GITHUB_REPOSITORY',
   'GITHUB_API_URL',
 
-  // Set by `ci.yml` from the pull request event, never by a contributor. It is passed
-  // through the environment rather than interpolated into the `run:` line precisely
-  // because it is attacker-controlled text; putting it in .env.local.example would
-  // suggest it is something a person configures.
+  // Set by `ci.yml` around the dependency-scope audit, never by a contributor. Neither is
+  // interpolated into a `run:` line: the description is attacker-controlled text, so
+  // `ci.yml` fetches it into a file and passes only the *path* in `PR_BODY_FILE`, while
+  // `PR_BODY` remains the local-invocation and unit-test route. Putting either in
+  // .env.local.example would suggest it is something a person configures.
+  //
+  // `PR_BODY_FILE` is listed although `envReads` cannot currently see it — `resolvePrBody`
+  // takes its environment as a parameter, so the access is `env.PR_BODY_FILE` rather than
+  // `process.env.PR_BODY_FILE`. Listing it anyway keeps this table a true statement about
+  // the repository rather than a true statement about the parser, and means the day that
+  // function is refactored to read the global directly, nothing breaks.
   'PR_BODY',
+  'PR_BODY_FILE',
 ])
 
 describe('.env.local.example completeness', () => {

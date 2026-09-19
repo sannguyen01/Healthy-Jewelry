@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { parse } from 'yaml'
 
 const {
   classifyManifestChange,
@@ -9,6 +11,7 @@ const {
   majorOf,
   hasWrittenRationale,
   requiresRationale,
+  resolvePrBody,
   unusedDependencies,
   importedSpecifiersUnder,
   NOT_IMPORTED_BY_DESIGN,
@@ -301,5 +304,298 @@ describe('additions and removals are named, not classified as bumps', () => {
   it('a removal is reported as removed', () => {
     const changes = classifyManifestChange({ dependencies: { react: '^19.2.8' } }, {})
     expect(changes[0]).toMatchObject({ name: 'react', bump: 'removed' })
+  })
+})
+
+/**
+ * **Which description did the check read?**
+ *
+ * ## The defect
+ *
+ * Every assertion above this block passed throughout the period during which this check
+ * could not be cleared by any pull request that actually flagged a major. That is the
+ * interesting part: the logic was right and the *input* was wrong, and no unit test of
+ * the logic can see an input a workflow supplies. It also went unnoticed for the most
+ * ordinary reason there is — between shipping on 2026-08-31 and PR #73 on 2026-09-18,
+ * nothing tripped it, so the failing path was never walked.
+ *
+ * `PR_BODY` came from `${{ github.event.pull_request.body }}` — the description frozen
+ * into the webhook payload at the moment the event fired. `pull_request` fires on
+ * `opened`, `synchronize` and `reopened`; none of those is "somebody edited the
+ * description", and a re-run replays the original payload verbatim. So the one action
+ * this check's failure message asks for — write a `## Rationale` section — was an action
+ * it could not observe. Not on save, because nothing fires. Not on re-run, because the
+ * re-run reads the same frozen bytes.
+ *
+ * The only sequence that ever cleared it was *edit the description, then push a commit*,
+ * which nobody would guess and nothing said. PR #73 is the worked example: the rationale
+ * was written, `hasWrittenRationale` accepted it locally, and the check stayed red.
+ *
+ * A control that demands something it cannot observe is a claim about a control rather
+ * than a control ([ADR 018](../../../docs/adr/018-a-claim-about-a-control-is-not-a-control.md)).
+ * These tests pin both halves of the repair: the resolver's precedence and refusal
+ * behaviour here, and the fact that `ci.yml` actually hands it the live body, below.
+ */
+describe('resolvePrBody reads the description that exists now', () => {
+  it('prefers the file — the live body — over the frozen payload', () => {
+    const resolved = resolvePrBody(
+      { PR_BODY_FILE: '/tmp/body.md', PR_BODY: 'the description before the edit' },
+      () => 'the description after the edit'
+    )
+    expect(resolved).toEqual({ body: 'the description after the edit', source: 'api' })
+  })
+
+  it('falls back to the payload when no file is named', () => {
+    expect(resolvePrBody({ PR_BODY: '## Rationale\nbecause' }, () => 'unreachable')).toEqual({
+      body: '## Rationale\nbecause',
+      source: 'payload',
+    })
+  })
+
+  it('treats an empty PR_BODY as a real, empty description rather than an absent one', () => {
+    // `''` is what GitHub sends for a pull request opened with no description. It is an
+    // answer, not a missing answer, and reporting it as `absent` would put a diagnostic
+    // in the log that points at the workflow instead of at the contributor.
+    expect(resolvePrBody({ PR_BODY: '' }, () => 'unreachable')).toEqual({
+      body: '',
+      source: 'payload',
+    })
+  })
+
+  it('reports `absent` when neither variable is set', () => {
+    expect(resolvePrBody({}, () => 'unreachable')).toEqual({ body: '', source: 'absent' })
+  })
+
+  it('ignores a PR_BODY_FILE that is blank or whitespace', () => {
+    // An unset workflow output interpolates to the empty string rather than disappearing,
+    // so `PR_BODY_FILE: ''` is the shape a half-wired step produces. Reading `''` as a
+    // path would throw EISDIR or ENOENT and blame the contributor for it.
+    for (const file of ['', '   ']) {
+      expect(resolvePrBody({ PR_BODY_FILE: file, PR_BODY: 'payload' }, () => 'unreachable')).toEqual(
+        { body: 'payload', source: 'payload' }
+      )
+    }
+  })
+
+  it('throws rather than reporting a broken fetch as a missing rationale', () => {
+    // The distinction ADR 010 draws between "failed" and "could not run". Falling back to
+    // `''` here would print "no written rationale" at somebody who had written one —
+    // precisely the failure this whole change repairs, reintroduced one layer down.
+    expect(() =>
+      resolvePrBody({ PR_BODY_FILE: '/tmp/gone.md', PR_BODY: '' }, () => {
+        throw new Error('ENOENT: no such file or directory')
+      })
+    ).toThrow(/cannot be read/)
+  })
+
+  it('names the unreadable file and says which kind of problem it is', () => {
+    // A stack trace that says only "ENOENT" sends the reader to the audit script. The
+    // message has to send them to the workflow step that was supposed to write the file.
+    expect(() =>
+      resolvePrBody({ PR_BODY_FILE: '/tmp/gone.md' }, () => {
+        throw new Error('ENOENT')
+      })
+    ).toThrow(/\/tmp\/gone\.md[\s\S]*broken workflow step, not a missing rationale/)
+  })
+
+  it('does not fall back to the payload once a file has been named', () => {
+    // The dangerous near-miss: a fetch that failed, a frozen payload that happens to
+    // carry a stale rationale, and a check that goes green on the wrong evidence.
+    expect(() =>
+      resolvePrBody({ PR_BODY_FILE: '/tmp/gone.md', PR_BODY: RATIONALE }, () => {
+        throw new Error('ENOENT')
+      })
+    ).toThrow()
+  })
+
+  it('reads process.env when called with no arguments', () => {
+    // The production call site passes nothing. A resolver that only worked against an
+    // injected object would be tested and unused.
+    const previous = process.env.PR_BODY
+    try {
+      process.env.PR_BODY = '## Rationale\nread from the real environment'
+      delete process.env.PR_BODY_FILE
+      expect(resolvePrBody()).toEqual({
+        body: '## Rationale\nread from the real environment',
+        source: 'payload',
+      })
+    } finally {
+      if (previous === undefined) delete process.env.PR_BODY
+      else process.env.PR_BODY = previous
+    }
+  })
+
+  it('accepts the CRLF line endings the API actually returns', () => {
+    // GitHub normalises pull request bodies to `\r\n`, and this is the first time that
+    // matters: the old path carried the same bytes, so nothing about the change is a
+    // regression — but the read is new, and "the heading matched in the fixture" is not
+    // evidence about "the heading matches what the API sends". `\s*$` absorbs the `\r`
+    // before the multiline `$`, and `line.trim()` strips it off the prose beneath.
+    const crlf = RATIONALE.split('\n').join('\r\n')
+    expect(hasWrittenRationale(crlf)).toBe(true)
+
+    const { body } = resolvePrBody({ PR_BODY_FILE: '/tmp/body.md' }, () => crlf)
+    const changes = classifyManifestChange(PR60_BASE, PR60_HEAD)
+    expect(requiresRationale({ changes, majors, prBody: body }).ok).toBe(true)
+  })
+
+  it('still rejects a CRLF heading with nothing under it', () => {
+    // The paired negative. Without it the assertion above would also pass on a resolver
+    // that returned `true` for every string containing the word "Rationale".
+    expect(hasWrittenRationale('## Rationale\r\n\r\ntoo short\r\n')).toBe(false)
+  })
+
+  it('the resolved body is what requiresRationale then judges', () => {
+    // End to end across the seam that broke: a rationale added after the last push, read
+    // from the live file, clears a flagged major that the frozen payload would not have.
+    const changes = classifyManifestChange(PR60_BASE, PR60_HEAD)
+    const frozen = resolvePrBody({ PR_BODY: 'Bumps next from 15.5.24 to 16.3.3.' })
+    const live = resolvePrBody({ PR_BODY_FILE: '/tmp/body.md' }, () => RATIONALE)
+
+    expect(requiresRationale({ changes, majors, prBody: frozen.body }).ok).toBe(false)
+    expect(requiresRationale({ changes, majors, prBody: live.body }).ok).toBe(true)
+  })
+})
+
+describe('ci.yml hands the audit the live description, not the frozen one', () => {
+  /**
+   * Structural, not behavioural, and deliberately so. Nothing in a unit suite can make a
+   * webhook fire, so the only thing assertable here is that the workflow still wires the
+   * resolver to the API rather than to the event payload. That is exactly the line whose
+   * silent reversion re-breaks the check, so it is the line worth pinning.
+   *
+   * **Read through the YAML parser, never as text.** The first draft of this block
+   * grepped the file and failed on its own explanation: the comments above the step
+   * *name* `github.event.pull_request.body` and `types: [… edited]` in order to say why
+   * neither is used, and a text scan cannot tell a citation from a use. That is ADR 007's
+   * unknown coverage arriving in the test rather than in the thing tested — and the
+   * cheaper fix, deleting the comments, is the one that would have made the file worse.
+   */
+  const workflow = parse(readFileSync(join(ROOT, '.github/workflows/ci.yml'), 'utf8'))
+  const job = workflow.jobs['dependency-scope']
+  const steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> = job.steps
+
+  it('found the job to read', () => {
+    // Without this, every assertion below is a statement about an empty array.
+    expect(job.name).toBe('Dependency scope')
+    expect(steps.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('no step is handed the frozen event payload', () => {
+    const frozen = steps.flatMap((step) =>
+      Object.entries(step.env ?? {})
+        .filter(([, value]) => String(value).includes('github.event.pull_request.body'))
+        .map(([key]) => `${step.name ?? '(unnamed)'} → ${key}`)
+    )
+    expect(
+      frozen,
+      'ci.yml is back to reading `github.event.pull_request.body`. That is the description ' +
+        'frozen into the webhook payload: a rationale written in answer to this check is ' +
+        'invisible to it, on save and on re-run alike, and the check becomes unsatisfiable ' +
+        'by the action it asks for.'
+    ).toEqual([])
+  })
+
+  it('fetches the body from the pull requests API and passes it on as a path', () => {
+    const fetchStep = steps.find((step) => (step.run ?? '').includes('gh api'))
+    expect(fetchStep, 'no step fetches the live description').toBeDefined()
+    expect(fetchStep?.run).toMatch(/gh api "repos\/\$\{GITHUB_REPOSITORY\}\/pulls\/\$\{PR_NUMBER\}"/)
+    expect(fetchStep?.run).toContain('PR_BODY_FILE=')
+    expect(Object.keys(fetchStep?.env ?? {})).toEqual(
+      expect.arrayContaining(['GH_TOKEN', 'PR_NUMBER'])
+    )
+  })
+
+  it('runs the audit against that path', () => {
+    const auditStep = steps.find((step) => (step.run ?? '').includes('audit-dependency-scope.mjs'))
+    expect(auditStep?.run).toMatch(/--base "\$BASE_REF"/)
+    expect(auditStep?.run).toMatch(/--head "\$HEAD_SHA"/)
+  })
+
+  it('holds the token scope that fetch needs, and no more', () => {
+    // `permissions:` at job scope drops every scope it does not name, so the checkout's
+    // `contents: read` has to be spelled out beside `pull-requests: read` or the job
+    // cannot clone itself. Asserted as an exact object: a later `write` added here would
+    // otherwise pass a containment check silently.
+    expect(job.permissions).toEqual({ contents: 'read', 'pull-requests': 'read' })
+  })
+
+  it('never interpolates attacker-reachable text into a run: line', () => {
+    // The body, the base ref and the head SHA all cross into the shell as quoted
+    // environment variables. A `${{ }}` inside `run:` is string substitution performed
+    // before bash ever sees the line, which is a shell injection with a friendly name.
+    const interpolating = steps
+      .filter((step) => (step.run ?? '').includes('${{'))
+      .map((step) => step.name ?? '(unnamed)')
+    expect(interpolating, `steps interpolating into run:\n${interpolating.join('\n')}`).toEqual([])
+  })
+
+  it('does not fire CI on a description edit', () => {
+    // The smaller diff that was rejected, pinned so it is not reached for again.
+    // `concurrency.cancel-in-progress` is keyed on the ref, so an `edited` event cancels
+    // the verify/E2E run already in flight — editing a description mid-build would kill
+    // the build — and the replacement run reports the merge gate as `skipped`, which from
+    // outside is indistinguishable from passing (ADR 011's merge-gate-dark). Reading the
+    // live body costs one API call and leaves the gate alone.
+    const types: string[] = workflow.on.pull_request?.types ?? []
+    expect(
+      types,
+      'ci.yml now fires on a pull_request `edited` event. That cancels the in-flight ' +
+        'verify/E2E run through the concurrency group and replaces the merge gate with a ' +
+        '`skipped` nobody can distinguish from a pass. The live API read in ' +
+        'dependency-scope exists so this trigger is not needed.'
+    ).not.toContain('edited')
+  })
+
+  it('leaves the merge-gate jobs unconditioned on the event action', () => {
+    // The other half of the same rejected design: `if:` guards on verify/e2e would not
+    // have helped, because cancellation happens at the concurrency group before any job
+    // condition is evaluated. Their absence is the evidence that nothing here quietly
+    // grew one.
+    for (const id of ['verify', 'e2e']) {
+      expect(workflow.jobs[id].if, `${id} has grown an \`if:\``).toBeUndefined()
+    }
+  })
+})
+
+/**
+ * `HEAD` on **both** ends, deliberately.
+ *
+ * The first draft passed `--base HEAD` alone, which compares the committed manifest to
+ * the one in the working tree — so the test asserted "this checkout has no uncommitted
+ * dependency change", which is a fact about the developer's afternoon and not about the
+ * script. It failed the moment the same branch repaired `package.json`, which is the
+ * best possible demonstration of why: a contributor editing a dependency would have been
+ * told their edit broke a JSON serialiser.
+ *
+ * Comparing a commit to itself yields the empty change set on any checkout, at any time,
+ * which is what a test of the *output mode* should depend on.
+ */
+const ARGV = [join(ROOT, 'scripts/audit-dependency-scope.mjs'), '--base', 'HEAD', '--head', 'HEAD', '--json']
+
+describe('--json is a mode that runs', () => {
+  it('reports the unused-dependency result alongside the scope verdict', () => {
+    // It did not. `unused` was declared *below* the branch that referenced it — a temporal
+    // dead zone, so every `--json` invocation died with `ReferenceError: Cannot access
+    // 'unused' before initialization`. The human-readable arm never touched it, which is
+    // why the mode CI runs was fine and the mode a person reaches for when debugging CI
+    // was the broken one. A flag nothing exercises is a flag nothing tests.
+    const out = execFileSync(process.execPath, ARGV, {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, PR_BODY: '', PR_BODY_FILE: '' },
+    })
+    const parsed = JSON.parse(out)
+    expect(parsed).toMatchObject({ ok: true, unused: { ok: expect.any(Boolean) } })
+    expect(parsed.majors).toEqual(majors)
+  })
+
+  it('records which description it read, so a regression is visible in the output', () => {
+    const out = execFileSync(process.execPath, ARGV, {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, PR_BODY_FILE: '', PR_BODY: '## Rationale\n' + 'x'.repeat(60) },
+    })
+    expect(JSON.parse(out).prBodySource).toBe('payload')
   })
 })
