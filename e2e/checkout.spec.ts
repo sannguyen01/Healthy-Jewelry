@@ -1,5 +1,4 @@
 import { test, expect, type Page } from '@playwright/test'
-import { seedBag, openBag } from './support/seedBag'
 
 /**
  * Checkout hand-off to Shopify.
@@ -261,10 +260,17 @@ test.describe('Checkout — the price quoted is the price charged', () => {
 
 test.describe('Checkout — the bag itself', () => {
   test.beforeEach(async ({ page }) => {
-    // Seeded: Add to Bag has been removed. See e2e/support/seedBag.ts.
-    await seedBag(page, ['7'])
+    // Seeded rather than added through the UI: Add to Bag has been removed.
+    //
+    // Uses this file's own `seedBag`, not the shared `e2e/support/seedBag.ts`. The two
+    // fixtures are not interchangeable and both are needed: this one carries a **real
+    // Shopify variant id**, because the store refuses to sync the bundled catalogue's
+    // placeholder ids, which is the whole subject of this spec. The shared helper carries
+    // the **real catalogue product**, because the specs that use it render the drawer.
+    await seedBagWithRealVariant(page)
     await page.goto(PRODUCT_URL)
-    await openBag(page)
+    await page.getByRole('button', { name: /open bag/i }).click()
+    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
   })
 
   test('checkout button is present in the cart drawer with an item', async ({ page }) => {

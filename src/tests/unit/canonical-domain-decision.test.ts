@@ -40,8 +40,30 @@ const APEX = 'healthyjewellery.com'
 const WWW = `www.${APEX}`
 const COMMIT = 'a'.repeat(40)
 
+/**
+ * Mirrors `HostObservation` in the probe's JSDoc.
+ *
+ * Restated here because the module is dependency-free `.mjs` and carries its types in
+ * JSDoc, so there is no exported type to import. Written out rather than inferred so the
+ * literal unions survive: `transport: 'ok'` inside an untyped object literal widens to
+ * `string`, which is not assignable to the union the decision function takes — a real
+ * type error this file shipped with until `tsc` ran on it.
+ */
+type Obs = {
+  host: string
+  transport: 'ok' | 'not-resolved' | 'unreachable'
+  detail?: string
+  status?: number
+  chain?: string[]
+  server?: string | null
+  version?: {
+    build?: { commit?: string | null; vercelEnv?: string | null }
+    runtime?: { vercelEnv?: string | null }
+  } | null
+}
+
 /** A healthy observation, with an escape hatch for the one field a test is about. */
-function ok(host: string, over: Record<string, unknown> = {}) {
+function ok(host: string, over: Partial<Obs> = {}): Obs {
   return {
     host,
     transport: 'ok',
