@@ -113,13 +113,25 @@
       "backstop": "control:merge-gate"
     },
     {
+      "id": "manifest-integrity",
+      "claims": "package.json declares each key once, and its ranges agree with pnpm-lock.yaml, checked before the install that both files break",
+      "status": "configured",
+      "probe": "scripts/audit-manifest-integrity.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Two questions, one of them newly answered and one newly *named*. Duplicate keys in package.json is the half nothing else asks: JSON permits them, JSON.parse takes the last occurrence silently, and on 2026-09-18 main carried five of them while every tool read one value from a file that stated two. Manifest/lockfile divergence is already detected by `pnpm install --frozen-lockfile` — what this adds is that the failure arrives as a named red check with a package and two version strings, instead of as a dead install step that leaves every later check reporting `skipped` (ADR 011). It does **not** check pnpm-lock.yaml for duplicate keys: that needs a YAML parser, which is a dependency, and this runs before dependencies exist — pnpm already refuses such a lockfile outright. It reads the root importer only, so a workspace package would be outside it, and it compares declared ranges rather than resolved versions.",
+      "adr": "docs/adr/031-a-clean-merge-is-not-a-correct-merge.md",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "dependency-scope-gate",
       "claims": "a pull request cannot raise the major of next, react, react-dom or any @shopify/* package without a written rationale in its description",
       "status": "configured",
       "probe": "scripts/audit-dependency-scope.mjs",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "It reports; it does not block, because main has no branch protection and a red X sits beside a merge button anyone can still press. Registered as configured because the check itself runs and fails correctly — what is missing is the merge-gate control it would hang from, which is why that is its backstop rather than human:weekly. It also reads the package.json diff only: a major arriving through a transitive dependency, or through pnpm.overrides, is outside it. And `hasWrittenRationale` asks whether somebody wrote a paragraph under a heading, not whether the paragraph is any good — bounded coverage, stated rather than claimed (ADR 007).",
+      "knownLimit": "It reports; it does not block, because main has no branch protection and a red X sits beside a merge button anyone can still press. Registered as configured because the check itself runs and fails correctly — what is missing is the merge-gate control it would hang from, which is why that is its backstop rather than human:weekly. It also reads the package.json diff only: a major arriving through a transitive dependency, or through pnpm.overrides, is outside it. And `hasWrittenRationale` asks whether somebody wrote a paragraph under a heading, not whether the paragraph is any good — bounded coverage, stated rather than claimed (ADR 007). Until 2026-09-18 it read the description **frozen into the webhook payload** (`github.event.pull_request.body`), which made it unsatisfiable by the one action it demands: `pull_request` does not fire when a description is edited, and a re-run replays the original payload, so a `## Rationale` written in answer to this check's own failure message was invisible to it. The only sequence that cleared it was edit the description *then push a commit*. It now reads the body live from the pull requests API, so re-running the job is the remedy. What remains bounded is that nothing re-evaluates it automatically when the description changes — adding `pull_request: types: [edited]` would cancel the in-flight merge-gate run through ci.yml's ref-keyed concurrency group and replace it with a `skipped` indistinguishable from a pass, so the one click is the deliberate trade.",
+      "humanAction": "When this check fails and the rationale has since been written: re-run the `Dependency scope` job (Checks → Dependency scope → Re-run jobs). It reads the description live, so no commit on top is needed. If it still fails, the `## Rationale` heading is missing or the prose under it is under 40 characters — run `node scripts/audit-dependency-scope.mjs --base origin/main --json` to see exactly what it read and from where.",
       "backstop": "control:merge-gate"
     },
     {

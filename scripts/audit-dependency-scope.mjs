@@ -33,10 +33,11 @@
  *
  *   node scripts/audit-dependency-scope.mjs --base <ref> [--head <ref>] [--json]
  *
- * The pull request description is read from `PR_BODY` in the environment — never
- * interpolated into a shell command, because a PR body is attacker-controlled text and
- * `${{ github.event.pull_request.body }}` inside a `run:` is a shell injection with a
- * friendly name.
+ * The pull request description is read from the file named by `PR_BODY_FILE`, falling
+ * back to `PR_BODY` in the environment — never interpolated into a shell command, because
+ * a PR body is attacker-controlled text and `${{ github.event.pull_request.body }}` inside
+ * a `run:` is a shell injection with a friendly name. See `resolvePrBody` for why the file
+ * exists and why the environment variable alone made this check unsatisfiable.
  *
  * Exits 0 when nothing needs escalating or every escalation is justified; 1 otherwise.
  */
@@ -48,6 +49,18 @@ import path from 'node:path'
 const ROOT = path.resolve(import.meta.dirname, '..')
 const MANIFEST = 'package.json'
 const CONSTRAINTS = 'loop-constraints.md'
+
+/**
+ * How each `resolvePrBody` source reads in the run log. Printed on every run, passing or
+ * failing: "which description did you read" is the question this check got wrong, and the
+ * answer costs one line. A regression to the frozen payload then shows up as a sentence in
+ * the log rather than as a check that mysteriously will not clear.
+ */
+const PR_BODY_SOURCES = {
+  api: 'the GitHub API (live — reflects edits made since the last push)',
+  payload: 'the webhook event payload (frozen at the event — edits since are invisible)',
+  absent: 'nowhere — neither PR_BODY_FILE nor PR_BODY was set',
+}
 
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']
 
@@ -164,6 +177,82 @@ export function hasWrittenRationale(body) {
   return after
     .split('\n')
     .some((line) => line.trim().length >= 40 && !line.trim().startsWith('#'))
+}
+
+/**
+ * Where the pull request description is read from, and from which of the two possible
+ * pull request descriptions.
+ *
+ * ## The defect this exists because of
+ *
+ * There is only one description, but there are two readings of it, and from the day this
+ * check shipped (2026-08-31) to the day it was first called on (2026-09-18) it took the
+ * wrong one — which nothing noticed, because until PR #73 no pull request had actually
+ * flagged a major. `PR_BODY` was set from `${{ github.event.pull_request.body }}`
+ * — the description **as it stood when the event fired**, frozen into the webhook payload.
+ * A `pull_request` workflow fires on `opened`, `synchronize` and `reopened`, none of which
+ * is "somebody edited the description", and a *re-run replays the original payload*
+ * verbatim rather than re-reading anything.
+ *
+ * Compose those two facts and the check is **unsatisfiable by the one action it asks
+ * for**. It prints "write a `## Rationale` section"; you write one; nothing re-reads it.
+ * Not on save, because no event fires. Not on re-run, because the re-run is the same
+ * frozen payload. The only sequence that ever cleared it was *edit the description, then
+ * push a commit* — which nobody would guess and nothing said. PR #73 met this exactly: the
+ * rationale was written, `hasWrittenRationale` accepted it locally, and the check stayed
+ * red through a re-run because it was still reading the body from before the edit.
+ *
+ * A control that cannot observe the thing it demands is the shape
+ * [ADR 018](../docs/adr/018-a-claim-about-a-control-is-not-a-control.md) names — a claim
+ * about a control rather than a control. It arrived here through a workflow input rather
+ * than through the logic, which is why every unit test of `hasWrittenRationale` passed
+ * while the check was, in production, incapable of going green.
+ *
+ * ## Why a file rather than a bigger environment variable
+ *
+ * The live body is fetched in the workflow and handed over as a **path**. A description is
+ * attacker-controlled text: interpolating it into a `run:` line is a shell injection with
+ * a friendly name, and writing it into `$GITHUB_ENV` is the same injection one layer down
+ * — a body containing the heredoc delimiter rewrites the environment of every later step.
+ * A path is runner-controlled and fixed-shape; the bytes never pass through a shell.
+ *
+ * ## Why a named-but-unreadable file throws
+ *
+ * Falling back to `''` would convert a *broken fetch* into a *missing rationale*: the
+ * check would print "no written rationale" at somebody who had written one, which is the
+ * failure it was just repaired for. Naming a file is a statement that the file is there.
+ *
+ * Typed as a plain string record rather than `NodeJS.ProcessEnv`: this repository
+ * augments that interface with required keys (`NODE_ENV` among them), and demanding them
+ * of a caller that only supplies the two variables under test would make the parameter a
+ * type nobody can construct. The function reads two optional keys and nothing else, which
+ * is exactly what the signature should say.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @param {(p: string) => string} [readFile]
+ * @returns {{ body: string, source: 'api' | 'payload' | 'absent' }}
+ */
+export function resolvePrBody(env = process.env, readFile = (p) => fs.readFileSync(p, 'utf8')) {
+  const file = env.PR_BODY_FILE
+  if (typeof file === 'string' && file.trim() !== '') {
+    try {
+      return { body: readFile(file), source: 'api' }
+    } catch (error) {
+      throw new Error(
+        `PR_BODY_FILE is set to ${file}, which cannot be read: ${error.message}. That is a ` +
+          'broken workflow step, not a missing rationale — refusing to report one as the ' +
+          'other.'
+      )
+    }
+  }
+
+  // The event-payload path, kept for a local invocation (`PR_BODY="..." node …`) and for
+  // the unit suite. In CI the workflow sets PR_BODY_FILE and this branch is not reached;
+  // `source` is reported on every run so a regression to the frozen body is visible in the
+  // log rather than inferred from a check that mysteriously will not clear.
+  if (typeof env.PR_BODY === 'string') return { body: env.PR_BODY, source: 'payload' }
+
+  return { body: '', source: 'absent' }
 }
 
 /**
@@ -353,36 +442,48 @@ async function main() {
     manifestAt(base),
     head ? manifestAt(head) : JSON.parse(fs.readFileSync(path.join(ROOT, MANIFEST), 'utf8'))
   )
-  const result = requiresRationale({ changes, majors, prBody: process.env.PR_BODY ?? '' })
-
-  if (args.includes('--json')) {
-    console.log(JSON.stringify({ majors, changes, ...result, unused }, null, 2))
-  } else {
-    console.log(`${result.ok ? '✓' : '✗'} dependency scope`)
-    console.log('')
-    console.log(result.summary)
-    if (!result.ok) {
-      console.log('')
-      console.log(
-        'A major-version bump on one of these packages needs a `## Rationale` section in ' +
-          'the pull request description saying why this major, why now, and what was ' +
-          'checked against it.\n\n' +
-          'If this arrived bundled with a security advisory: patch the CVE inside the ' +
-          'current major and open the migration separately. That is what PR #61 did, and ' +
-          'it is the reason this check exists.'
-      )
-    }
-  }
+  const { body: prBody, source: prBodySource } = resolvePrBody()
+  const result = requiresRationale({ changes, majors, prBody })
 
   // A second, independent question on the same manifest: is anything here unused?
   //
   // Reported on every run and folded into the exit status, because unlike the escalation
   // check this one is always answerable from the head commit alone — it needs no base ref
   // and no PR body. Its failure names the package and the fix.
+  //
+  // Computed **before** the branch below, not after it. It was declared underneath and
+  // referenced inside the `--json` arm, which is a temporal dead zone: every `--json`
+  // invocation died with `ReferenceError: Cannot access 'unused' before initialization`.
+  // The human-readable arm never touched it, so the mode CI runs was fine and the mode a
+  // person reaches for when debugging CI was the broken one.
   const unused = unusedDependencies(
     JSON.parse(fs.readFileSync(path.join(ROOT, MANIFEST), 'utf8')).dependencies ?? {},
     importedSpecifiersUnder(path.join(ROOT, 'src'))
   )
+
+  if (args.includes('--json')) {
+    console.log(JSON.stringify({ majors, changes, prBodySource, ...result, unused }, null, 2))
+  } else {
+    console.log(`${result.ok ? '✓' : '✗'} dependency scope`)
+    console.log('')
+    console.log(result.summary)
+    console.log('')
+    console.log(`Pull request description read from: ${PR_BODY_SOURCES[prBodySource]}`)
+    if (!result.ok) {
+      console.log('')
+      console.log(
+        'A major-version bump on one of these packages needs a `## Rationale` section in ' +
+          'the pull request description saying why this major, why now, and what was ' +
+          'checked against it.\n\n' +
+          'Then **re-run this job** — it reads the description live from the API, so a ' +
+          'rationale written after the last push is picked up without needing a commit ' +
+          'on top of it.\n\n' +
+          'If this arrived bundled with a security advisory: patch the CVE inside the ' +
+          'current major and open the migration separately. That is what PR #61 did, and ' +
+          'it is the reason this check exists.'
+      )
+    }
+  }
 
   if (!args.includes('--json')) {
     console.log('')
