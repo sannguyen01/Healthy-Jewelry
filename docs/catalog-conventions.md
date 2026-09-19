@@ -53,7 +53,7 @@ svg:necklace-drop
 svg:bracelet-cuff
 ```
 
-Valid values are the `HJSvgType` union in `src/lib/shopify/types.ts`: `ring-arc`,
+Valid values are the `HJSvgType` union in `src/lib/catalog/types.ts`: `ring-arc`,
 `ring-dome`, `ring-flat`, `ring-split`, `necklace-disc`, `necklace-bar`, `necklace-drop`,
 `necklace-chain`, `earring-stud`, `earring-hoop`, `earring-drop`, `earring-cone`,
 `bracelet-cuff`, `bracelet-bangle`, `bracelet-link`, `charm-classic`, `charm-disc`.

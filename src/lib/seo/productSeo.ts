@@ -1,5 +1,5 @@
 import { SEO_DEFAULTS } from '@/config/site'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 /**
  * The text that describes a product to anything that is not the page itself:

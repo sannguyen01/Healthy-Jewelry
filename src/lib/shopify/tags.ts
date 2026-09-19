@@ -20,8 +20,8 @@
 // indistinguishable from a tag that is absent. Parsing lives here, in one
 // place, so it can be tested against fixtures captured from the real store.
 
-import { HJ_SVG_TYPES, HJ_COLLECTION_HANDLES } from './types'
-import type { HJCollectionHandle, HJMaterialHandle, HJSvgType } from './types'
+import { HJ_SVG_TYPES, HJ_COLLECTION_HANDLES } from '@/lib/catalog/types'
+import type { HJCollectionHandle, HJMaterialHandle, HJSvgType } from '@/lib/catalog/types'
 
 // ── Materials ──────────────────────────────────────────────────────────────
 

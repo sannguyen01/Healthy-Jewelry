@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useCartStore, cartItemVariantLabel } from '@/store/cart'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 const mockProduct: HJProduct = {
   id: 'hj-001',

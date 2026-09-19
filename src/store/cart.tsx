@@ -9,7 +9,7 @@ import { shopifyPublicConfig } from '@/config/shopify-public'
 import { track } from '@/lib/analytics'
 import { cartCurrencyCode } from '@/lib/utils/formatPrice'
 import { isPlaceholderVariantId } from '@/lib/shopify/variant-id'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

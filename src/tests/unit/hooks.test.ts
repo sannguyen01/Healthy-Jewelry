@@ -4,7 +4,7 @@ import { useScrolled } from '@/lib/hooks/useScrolled'
 import { useMedia, useIsMobile, useIsTablet } from '@/lib/hooks/useMedia'
 import { useCartItem, useIsInCart, useCartItemQuantity } from '@/lib/hooks/useCart'
 import { useCartStore } from '@/store/cart'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 // ── useScrolled ────────────────────────────────────────────────────────────
 

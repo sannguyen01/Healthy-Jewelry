@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import type { HJSvgType } from '@/lib/shopify/types'
+import type { HJSvgType } from '@/lib/catalog/types'
 
 const COLLECTION_PHOTOS: Partial<Record<string, string>> = {
   charms: '/images/collections/charms.jpg',

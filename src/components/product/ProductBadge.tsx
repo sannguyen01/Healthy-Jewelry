@@ -1,4 +1,4 @@
-import type { HJBadge } from '@/lib/shopify/types'
+import type { HJBadge } from '@/lib/catalog/types'
 
 interface ProductBadgeProps {
   badge: HJBadge

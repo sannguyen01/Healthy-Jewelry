@@ -2,7 +2,7 @@
    HEALTHY JEWELRY — Content Layer Types
    ═══════════════════════════════════════════
    Canonical product/cart types live in:
-     @/lib/shopify/types  →  HJProduct, HJCollection (Shopify shape)
+     @/lib/catalog/types  →  HJProduct, HJCollection (Shopify shape)
      @/store/cart         →  CartItem, CartState
    The types below are for the CMS/content layer only.
    ═══════════════════════════════════════════ */

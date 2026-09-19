@@ -1,4 +1,4 @@
-import { HJ_SVG_TYPES, type HJSvgType } from '@/lib/shopify/types'
+import { HJ_SVG_TYPES, type HJSvgType } from '@/lib/catalog/types'
 
 /**
  * The coordinate space each illustration is drawn in.

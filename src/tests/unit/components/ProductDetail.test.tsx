@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductDetail } from '@/components/product/ProductDetail'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 const money = (amount: string) => ({ amount, currencyCode: 'USD' })
 

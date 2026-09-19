@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import type { HJProduct } from '@/lib/shopify/types'
+import type { HJProduct } from '@/lib/catalog/types'
 
 /**
  * A product's picture: its photograph when Shopify has one, its illustration when not.

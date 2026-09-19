@@ -1,4 +1,4 @@
-import type { HJMaterialHandle, HJProduct } from '@/lib/shopify/types'
+import type { HJMaterialHandle, HJProduct } from '@/lib/catalog/types'
 
 /**
  * The homepage runs three `HorizontalScroll` strips that are the same component with the

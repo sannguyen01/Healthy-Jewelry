@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { SITE_NAME, SITE_URL, SITE_DESCRIPTION } from '@/config/site'
-import type { HJProduct, HJCollection } from '@/lib/shopify/types'
+import type { HJProduct, HJCollection } from '@/lib/catalog/types'
 
 // ── Product metadata ───────────────────────────────────────────────────────
 

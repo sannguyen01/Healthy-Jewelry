@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductImage } from '@/components/product/ProductImage'
-import type { HJProduct, Image } from '@/lib/shopify/types'
+import type { HJProduct, Image } from '@/lib/catalog/types'
 
 /**
  * **Both branches, because for a long while only one of them could ever run.**
