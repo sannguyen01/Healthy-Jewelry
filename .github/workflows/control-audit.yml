@@ -638,6 +638,74 @@ jobs:
               })
             }
 
+      - name: Canonical domain — is the brand domain bound to production?
+        id: canonical-domain
+        continue-on-error: true
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: node scripts/probe-canonical-domain.mjs 2>&1 | tee canonical-domain.log
+
+      # Its own label and its own issue, per ADR 011: a channel carrying two different
+      # facts is a channel people learn to skip.
+      #
+      # Keyed on the probe's own verdict rather than on the step outcome, because the
+      # probe exits 0 for `unevaluable` on purpose — a runner that cannot reach the
+      # public web must not file an issue claiming the domain broke.
+      - name: Report an unbound canonical domain
+        # `always() &&` for the reason in ADR 027: an `if:` naming no status function has
+        # `success()` ANDed onto it, which would make this alarm depend on every earlier
+        # step having passed rather than on what it actually asks.
+        if: always() && steps.canonical-domain.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // The decision lives in scripts/lib/canonical-domain.mjs, not here. This block
+            // reads a file, lists issues, and applies what the decision returns — ADR 030,
+            // and the budget this step failed at 64 lines before the extraction.
+            //
+            // GITHUB_WORKSPACE, because github-script resolves a bare specifier against the
+            // action's own node_modules and has no repository path to resolve against.
+            // Asserted in canonical-domain-decision.test.ts, because a typo here would
+            // surface only in a scheduled job at 03:59 UTC.
+            const fs = require('fs')
+            const lib = `file://${process.env.GITHUB_WORKSPACE}/scripts/lib/canonical-domain.mjs`
+            const { domainIssuePlan, DOMAIN_ISSUE_LABEL, DOMAIN_ISSUE_TITLE } = await import(lib)
+
+            const repo = { owner: context.repo.owner, repo: context.repo.repo }
+            const runUrl = `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`
+
+            let probe = null
+            try {
+              probe = JSON.parse(fs.readFileSync('canonical-domain.json', 'utf-8'))
+            } catch {
+              core.info('No canonical-domain.json — the probe produced no verdict.')
+            }
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              ...repo,
+              state: 'open',
+              labels: DOMAIN_ISSUE_LABEL,
+            })
+
+            const plan = domainIssuePlan({ probe, openIssues, runUrl })
+
+            for (const issue_number of plan.close) {
+              await github.rest.issues.createComment({ ...repo, issue_number, body: plan.closeComment })
+              await github.rest.issues.update({ ...repo, issue_number, state: 'closed' })
+            }
+            if (plan.update !== null) {
+              await github.rest.issues.update({ ...repo, issue_number: plan.update, body: plan.body })
+            }
+            if (plan.create) {
+              await github.rest.issues.create({
+                ...repo,
+                title: DOMAIN_ISSUE_TITLE,
+                body: plan.body,
+                labels: [DOMAIN_ISSUE_LABEL],
+              })
+            }
+
       - name: Audit summary
         if: always()
         run: |
@@ -650,8 +718,9 @@ jobs:
             echo "| Assertion liveness (12 sentinels) | ${{ steps.liveness.outcome }} |"
             echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
             echo "| Merge gate liveness (is CI evaluating?) | ${{ steps.ci-liveness.outcome }} |"
+            echo "| Canonical domain bound to production | ${{ steps.canonical-domain.outcome }} |"
             echo ""
-            for log in merge-gate liveness smoke-liveness ci-liveness; do
+            for log in merge-gate liveness smoke-liveness ci-liveness canonical-domain; do
               if [ -s "$log.log" ]; then
                 echo "<details><summary>$log</summary>"
                 echo ""

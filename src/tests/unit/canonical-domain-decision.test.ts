@@ -19,8 +19,8 @@
  *     from a broken domain.
  */
 
-import { describe, expect, it } from 'vitest'
-import fs from 'node:fs'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import fs, { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { SITE_URL } from '@/config/site'
@@ -35,6 +35,12 @@ const {
   classifyTransportFailure,
   decideCanonicalDomain,
 } = await import('../../../scripts/lib/canonical-domain.mjs')
+
+// The probe itself, imported for its transport half. Safe because the script guards its
+// own `main()` behind an `import.meta.url` check — without that, importing it here would
+// fire real requests and call `process.exit`.
+const { observe, MAX_REDIRECTS } = await import('../../../scripts/probe-canonical-domain.mjs')
+const { domainIssuePlan, DOMAIN_ISSUE_LABEL } = await import('../../../scripts/lib/canonical-domain.mjs')
 
 const APEX = 'healthyjewellery.com'
 const WWW = `www.${APEX}`
@@ -287,5 +293,189 @@ describe('apexHostFromSiteConfig', () => {
   it('returns null rather than guessing when the literal is absent', () => {
     expect(apexHostFromSiteConfig('export const SITE_URL = process.env.WHATEVER')).toBeNull()
     expect(apexHostFromSiteConfig('nothing here at all')).toBeNull()
+  })
+})
+
+describe('observe — the redirect walk', () => {
+  /**
+   * Stub `fetch` with a hostname → response map.
+   *
+   * The transport half had no coverage at all until now, and it is where the defect this
+   * probe shipped with actually lived: a proxy's bare 403 read as an answer from the
+   * origin. `decideCanonicalDomain` was never wrong about it — it was handed an
+   * observation that already said `transport: 'ok'`.
+   */
+  function stubFetch(routes: Record<string, { status: number; location?: string; body?: unknown; server?: string | null }>) {
+    return vi.fn(async (url: string | URL) => {
+      const { hostname } = new URL(String(url))
+      const route = routes[hostname]
+      if (!route) throw Object.assign(new Error('fetch failed'), { cause: Object.assign(new Error('nope'), { code: 'ENOTFOUND' }) })
+      return {
+        status: route.status,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'location'
+              ? (route.location ?? null)
+              : name.toLowerCase() === 'server'
+                ? (route.server === undefined ? 'Vercel' : route.server)
+                : null,
+        },
+        json: async () => {
+          if (route.body === undefined) throw new Error('not json')
+          return route.body
+        },
+      } as unknown as Response
+    })
+  }
+
+  const healthy = { build: { commit: 'a'.repeat(40), vercelEnv: 'production' }, runtime: { vercelEnv: 'production' } }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('records only the hostnames a redirect actually crosses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({
+        'www.example.com': { status: 308, location: 'https://example.com/api/version' },
+        'example.com': { status: 200, body: healthy },
+      })
+    )
+    const result = await observe('www.example.com')
+    expect(result.transport).toBe('ok')
+    expect(result.status).toBe(200)
+    expect(result.chain).toEqual(['www.example.com', 'example.com'])
+  })
+
+  it('records a hop that leaves the brand, so the decision can see it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({
+        'example.com': { status: 301, location: 'https://shops.myshopify.com/' },
+        'shops.myshopify.com': { status: 200, body: healthy },
+      })
+    )
+    const result = await observe('example.com')
+    expect(result.chain?.[result.chain.length - 1]).toBe('shops.myshopify.com')
+  })
+
+  it('refuses to attribute a bare 403 to the origin', async () => {
+    // The regression test for the defect found by running the probe: this sandbox's proxy
+    // answers blocked hosts with a 403 and no `server` header, and the first version
+    // reported five confident findings about a domain it had never reached.
+    vi.stubGlobal('fetch', stubFetch({ 'example.com': { status: 403, server: null } }))
+    const result = await observe('example.com')
+    expect(result.transport).toBe('unreachable')
+    expect(result.detail).toMatch(/did not demonstrably reach the origin/i)
+  })
+
+  it('still reports a 403 that identifies its server', async () => {
+    vi.stubGlobal('fetch', stubFetch({ 'example.com': { status: 403, server: 'Vercel' } }))
+    const result = await observe('example.com')
+    expect(result.transport).toBe('ok')
+    expect(result.status).toBe(403)
+  })
+
+  it('reports an unparseable body rather than inventing one', async () => {
+    vi.stubGlobal('fetch', stubFetch({ 'example.com': { status: 200 } }))
+    const result = await observe('example.com')
+    expect(result.transport).toBe('ok')
+    expect(result.version).toBeNull()
+  })
+
+  it('classifies a name that does not resolve as an answer, not a failure to answer', async () => {
+    vi.stubGlobal('fetch', stubFetch({}))
+    const result = await observe('example.com')
+    expect(result.transport).toBe('not-resolved')
+  })
+
+  it('stops walking rather than following a redirect loop forever', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stubFetch({
+        'a.example.com': { status: 302, location: 'https://b.example.com/' },
+        'b.example.com': { status: 302, location: 'https://a.example.com/' },
+      })
+    )
+    const result = await observe('a.example.com')
+    // Bounded: the walk gives up instead of hanging, and says so with a status no origin
+    // would send, so the decision reports `not-ok` rather than silently passing.
+    expect(result.transport).toBe('ok')
+    expect(result.status).toBe(310)
+    expect(MAX_REDIRECTS).toBeLessThanOrEqual(5)
+  })
+})
+
+describe('domainIssuePlan — what the audit does with a verdict', () => {
+  const runUrl = 'https://github.com/o/r/actions/runs/1'
+  const drifted = {
+    state: 'drifted',
+    summary: 'healthyjewellery.com: 2 problems with the production domain binding.',
+    action: 'Vercel -> Settings -> Domains.',
+    findings: [{ code: 'not-production', detail: 'serving a preview' }],
+  }
+
+  it('opens one issue when nothing is open', () => {
+    const plan = domainIssuePlan({ probe: drifted, openIssues: [], runUrl })
+    expect(plan.create).toBe(true)
+    expect(plan.update).toBeNull()
+    expect(plan.body).toContain('not-production')
+    expect(plan.body).toContain(runUrl)
+  })
+
+  it('rewrites the existing issue in place rather than commenting on it', () => {
+    // ADR 011: issue #24 took 111 identical comments and taught everyone to mute it.
+    const plan = domainIssuePlan({ probe: drifted, openIssues: [{ number: 7 }], runUrl })
+    expect(plan.update).toBe(7)
+    expect(plan.create).toBe(false)
+    expect(plan.close).toEqual([])
+  })
+
+  it('closes the issue once the domain is bound again', () => {
+    const plan = domainIssuePlan({
+      probe: { state: 'bound', summary: 'healthyjewellery.com is bound.' },
+      openIssues: [{ number: 7 }, { number: 9 }],
+      runUrl,
+    })
+    expect(plan.close).toEqual([7, 9])
+    expect(plan.closeComment).toContain('bound')
+    expect(plan.create).toBe(false)
+  })
+
+  it('does nothing at all when the probe could not look', () => {
+    // The load-bearing case. A runner with no public-web egress must not file an issue
+    // saying the domain broke — and must not close a standing one either, because being
+    // unable to look is not evidence the problem went away.
+    const plan = domainIssuePlan({
+      probe: { state: 'unevaluable', summary: 'no host answered' },
+      openIssues: [{ number: 7 }],
+      runUrl,
+    })
+    expect(plan).toEqual({ close: [], closeComment: '', update: null, create: false, body: '' })
+  })
+
+  it('does nothing when there is no verdict file to read', () => {
+    expect(domainIssuePlan({ probe: null, openIssues: [{ number: 7 }], runUrl }).create).toBe(false)
+    expect(domainIssuePlan({ probe: {}, openIssues: [], runUrl }).create).toBe(false)
+  })
+})
+
+describe('the audit workflow reaches the decision it claims to', () => {
+  it('imports the module by the path that exists, under the label it filters on', () => {
+    // A typo in either would surface only in a scheduled job, six hours after the push
+    // that caused it, with the step reporting success. Same reason
+    // escalation-decision.test.ts pins production-smoke.yml's import.
+    const workflow = readFileSync(
+      path.resolve(import.meta.dirname, '../../../.github/workflows/control-audit.yml'),
+      'utf8'
+    )
+    expect(workflow).toContain('scripts/lib/canonical-domain.mjs')
+    expect(workflow).toContain('node scripts/probe-canonical-domain.mjs')
+    expect(workflow).toContain('domainIssuePlan')
+    expect(DOMAIN_ISSUE_LABEL).toBe('domain-unbound')
+    expect(
+      existsSync(path.resolve(import.meta.dirname, '../../../scripts/lib/canonical-domain.mjs'))
+    ).toBe(true)
   })
 })

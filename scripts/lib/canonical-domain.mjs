@@ -342,3 +342,85 @@ export function apexHostFromSiteConfig(source) {
     return null
   }
 }
+
+// ── Reporting ────────────────────────────────────────────────────────────────────────────
+//
+// What the audit workflow should do with a verdict, decided here rather than in YAML.
+//
+// `workflow-inline-script-budget.test.ts` rejected the first version of that step at 64
+// lines against a 45-line budget, and it was right to: choosing when to open, update or
+// close an issue is a decision, and a decision inside a YAML string cannot be imported, so
+// no test can reach it. That is how the production-smoke escalation shipped three bugs and
+// posted a hundred comments without ever escalating (ADR 030). The block left behind reads
+// a file, lists issues, calls this, and applies what it returns.
+
+export const DOMAIN_ISSUE_LABEL = 'domain-unbound'
+export const DOMAIN_ISSUE_TITLE = 'The brand domain is not bound to the production deployment'
+
+/**
+ * @typedef {object} DomainIssuePlan
+ * @property {number[]} close issue numbers to comment on and close
+ * @property {string} closeComment the recovery note, when `close` is non-empty
+ * @property {number | null} update an issue number to rewrite in place, or null
+ * @property {boolean} create whether to open a new issue
+ * @property {string} body the issue body, when updating or creating
+ */
+
+/**
+ * Decide what the audit should do about a domain verdict.
+ *
+ * Updates in place rather than commenting, per ADR 011: issue #24 accumulated 111 identical
+ * comments and taught everyone to mute the channel. One issue, rewritten.
+ *
+ * **Only `drifted` opens anything.** `unevaluable` deliberately does not: the probe exits 0
+ * when it could not reach the public web, and a runner without egress must never file an
+ * issue claiming the domain broke. It also does not *close* a standing issue, because not
+ * being able to look is not evidence that the problem went away.
+ *
+ * @param {object} input
+ * @param {{ state?: string, summary?: string, action?: string | null,
+ *           findings?: { code: string, detail: string }[] } | null} input.probe
+ *        parsed canonical-domain.json, or null when the probe produced none
+ * @param {{ number: number }[]} input.openIssues currently-open issues carrying the label
+ * @param {string} input.runUrl
+ * @returns {DomainIssuePlan}
+ */
+export function domainIssuePlan({ probe, openIssues = [], runUrl }) {
+  const idle = { close: [], closeComment: '', update: null, create: false, body: '' }
+
+  // No verdict at all — the probe died before deciding. Say nothing; the step's own
+  // outcome is what reports that, and inventing a domain finding from a missing file
+  // would be the laundering this whole probe exists to avoid.
+  if (!probe || typeof probe.state !== 'string') return idle
+  if (probe.state === 'unevaluable') return idle
+
+  if (probe.state !== 'drifted') {
+    return {
+      ...idle,
+      close: openIssues.map((i) => i.number),
+      closeComment: `Resolved: ${probe.summary ?? 'the canonical domain is bound again.'}\n\nRun: ${runUrl}`,
+    }
+  }
+
+  const body = [
+    probe.summary ?? 'The canonical domain is not bound as expected.',
+    '',
+    'This is a configuration fact, not an outage: a correct deployment on the wrong hostname',
+    'and a correct hostname on the wrong deployment both render a working shop. See',
+    '`docs/adr/032-the-canonical-domain-is-a-claim-nothing-checked.md`.',
+    '',
+    ...(probe.findings ?? []).map((f) => `- **${f.code}** — ${f.detail}`),
+    '',
+    probe.action ?? '',
+    '',
+    `Run: ${runUrl}`,
+  ].join('\n')
+
+  return {
+    close: [],
+    closeComment: '',
+    update: openIssues.length > 0 ? openIssues[0].number : null,
+    create: openIssues.length === 0,
+    body,
+  }
+}

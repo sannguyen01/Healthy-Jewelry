@@ -51,6 +51,18 @@
       "acceptedWhy": "Restated 2026-09-15 by the defects review, and corrected: the previous reason named the wrong blocker. Issue #24 is that SHOPIFY_ADMIN_ACCESS_TOKEN holds a token of the wrong kind, which is a different fact from this control, and citing it here made an unmet isolation requirement read as a downstream consequence of a credential problem. This control is about scope, not validity: the five smoke secrets must sit on the production-readonly GitHub Environment with the SMOKE_SECRETS_SOURCE=environment marker, because this repository is public and forkable and repository-scoped secrets are readable by every workflow. Correcting the token would not close this gap; moving the secrets would, whatever the token holds. It stays accepted because both are GitHub console actions nobody in CI can perform, and preflight-secrets.mjs asserts the marker so the difference between isolated and merely green stays observable."
     },
     {
+      "id": "canonical-domain-binding",
+      "claims": "something asks, every six hours, whether healthyjewellery.com and its www host both reach this project's production deployment on the same commit — and reports the answer whatever it is",
+      "status": "configured",
+      "probe": "scripts/probe-canonical-domain.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Two limits, both deliberate. First, nothing watches control-audit.yml, so if that workflow stops executing this check goes silent and its silence is indistinguishable from an all-clear — the same shape control-acceptance-freshness records one tier up, and the weekly human backstop is what covers it. Second, this entry claims that something *asks*, not that the domain is currently bound: the live verdict is the probe's output, in canonical-domain.json and in one domain-unbound issue, and is deliberately not copied into this file. A hand-edited registry holding a live fact is a second copy that drifts from the first, which is the shape ADR 018 exists to refuse.",
+      "humanAction": "None while this reads green. When it opens a domain-unbound issue, the action is in Vercel -> Project -> Settings -> Domains: both hostnames attached to this project and assigned to Production, with www permanently redirecting to the apex. Never change DNS at Shopify — docs/dns-domain-setup.md records why a ssl.com CAA record would block Vercel's own certificate renewal.",
+      "adr": "docs/adr/032-the-canonical-domain-is-a-claim-nothing-checked.md",
+      "backstop": "human:weekly"
+    },
+    {
       "id": "control-acceptance-freshness",
       "claims": "every deliberately-accepted control gap is re-decided within 30 days, and a person is told when one is not",
       "status": "configured",

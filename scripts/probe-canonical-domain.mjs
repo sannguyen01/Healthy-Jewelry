@@ -54,12 +54,12 @@ import {
   decideCanonicalDomain,
 } from './lib/canonical-domain.mjs'
 
-const SITE_CONFIG = path.resolve(import.meta.dirname, '../src/config/site.ts')
+export const SITE_CONFIG = path.resolve(import.meta.dirname, '../src/config/site.ts')
 const OUTPUT = 'canonical-domain.json'
 /** Enough to catch a slow cold start, short enough that six hostnames cannot stall a job. */
-const TIMEOUT_MS = 15_000
+export const TIMEOUT_MS = 15_000
 /** A redirect chain longer than this is a loop, not a policy. */
-const MAX_REDIRECTS = 3
+export const MAX_REDIRECTS = 3
 
 /**
  * Follow redirects by hand.
@@ -71,7 +71,7 @@ const MAX_REDIRECTS = 3
  * @param {string} host
  * @returns {Promise<import('./lib/canonical-domain.mjs').HostObservation>}
  */
-async function observe(host) {
+export async function observe(host) {
   const chain = [host]
   let url = `https://${host}/api/version`
 
@@ -240,4 +240,10 @@ async function main() {
   process.exit(verdict.state === 'drifted' ? 1 : 0)
 }
 
-await main()
+// Guarded so the module can be imported. `canonical-domain-decision.test.ts` imports
+// `observe` to drive the redirect walk and the interception guard against a stubbed
+// `fetch`; without this it would execute the probe — network and `process.exit` included —
+// on import. Same shape as probe-branch-protection.mjs and probe-accepted-gap.mjs.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  await main()
+}
