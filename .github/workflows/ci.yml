@@ -73,6 +73,26 @@ jobs:
           node-version-file: package.json
           cache: 'pnpm'
 
+      # **Before the install, because this is a check on the thing the install reads.**
+      #
+      # On 2026-09-18 GitHub's "Update branch" button text-merged `pnpm-lock.yaml` on
+      # Dependabot PR #72 and `package.json` on PR #73. Both times two dependency changes
+      # sat on adjacent lines, git interleaved them, and no conflict marker was written.
+      # `main` ended the day with ten duplicated keys in the lockfile and five in the
+      # manifest.
+      #
+      # The lockfile half made `pnpm install` refuse outright, so every check after it
+      # reported `skipped` — indistinguishable from passing, which is ADR 011's whole
+      # finding. The manifest half made nothing happen at all: JSON permits duplicate keys
+      # and `JSON.parse` takes the last, so the toolchain read `next: ^15.5.24` from a file
+      # that also said `^16.3.4`, beside a source tree written for Next 16.
+      #
+      # A check placed after `pnpm install` would not have run on either commit. This one
+      # needs no dependencies — `node:fs` and nothing else — for the same reason the
+      # control-audit probes do not: it cannot be installed by the manifest it inspects.
+      - name: Manifest and lockfile integrity
+        run: node scripts/audit-manifest-integrity.mjs
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

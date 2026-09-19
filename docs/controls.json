@@ -113,6 +113,17 @@
       "backstop": "control:merge-gate"
     },
     {
+      "id": "manifest-integrity",
+      "claims": "package.json declares each key once, and its ranges agree with pnpm-lock.yaml, checked before the install that both files break",
+      "status": "configured",
+      "probe": "scripts/audit-manifest-integrity.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Two questions, one of them newly answered and one newly *named*. Duplicate keys in package.json is the half nothing else asks: JSON permits them, JSON.parse takes the last occurrence silently, and on 2026-09-18 main carried five of them while every tool read one value from a file that stated two. Manifest/lockfile divergence is already detected by `pnpm install --frozen-lockfile` — what this adds is that the failure arrives as a named red check with a package and two version strings, instead of as a dead install step that leaves every later check reporting `skipped` (ADR 011). It does **not** check pnpm-lock.yaml for duplicate keys: that needs a YAML parser, which is a dependency, and this runs before dependencies exist — pnpm already refuses such a lockfile outright. It reads the root importer only, so a workspace package would be outside it, and it compares declared ranges rather than resolved versions.",
+      "adr": "docs/adr/031-a-clean-merge-is-not-a-correct-merge.md",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "dependency-scope-gate",
       "claims": "a pull request cannot raise the major of next, react, react-dom or any @shopify/* package without a written rationale in its description",
       "status": "configured",
