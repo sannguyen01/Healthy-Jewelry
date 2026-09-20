@@ -1,0 +1,26 @@
+{
+  "handle": "drop-pendant-surgical-steel",
+  "title": "Teardrop Pendant",
+  "collection": "necklaces",
+  "material": "surgical-steel",
+  "materialLabel": "316L Surgical Steel",
+  "description": "316L surgical steel. Polished teardrop form.",
+  "specification": "Drop 24 mm · chain 20\"",
+  "sizes": [],
+  "availability": "ask-an-ambassador",
+  "badge": "new",
+  "media": {
+    "kind": "illustration",
+    "svgType": "necklace-drop"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

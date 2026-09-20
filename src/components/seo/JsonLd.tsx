@@ -16,6 +16,40 @@ const MATERIAL_NAMES: Record<string, string> = {
 
 // ── Helper: productJsonLd ──────────────────────────────────────────────────
 
+/**
+ * The public catalogue entry for a product. **No `offers` block.**
+ *
+ * ## The claim that had stopped being true
+ *
+ * This emitted an `Offer` carrying `price`, `priceCurrency`, a purchase `url`, and
+ * `availability: https://schema.org/InStock`. That was correct for a storefront with a
+ * checkout, and its currency handling was correct for the same reason — a hardcoded USD
+ * here would have published dollar prices for a VND store to Google Shopping.
+ *
+ * PR #75 removed the Add to Bag control. From that merge onward there has been **no way to
+ * buy anything on this site**, and the structured data has been telling every search engine
+ * that all seventeen products are in stock, at a price, at a purchase URL. Not a stale
+ * field: an assertion, to the one audience that reads structured data instead of the page,
+ * that a transaction is available which is not.
+ *
+ * So this is a correction rather than a step of the decommission that could wait for the
+ * data source to change. `schema.org/Product` without an `offers` block is valid, and it is
+ * the honest description of a catalogue you cannot buy from.
+ *
+ * ## What stays, and what is left out and why
+ *
+ * `name`, `description`, `brand` and `material` stay: they are claims about the object,
+ * and they remain true. `url` is the product's own page — `Product.url` is "URL of the
+ * item", not a purchase link, which was `offers.url` and is gone with it.
+ *
+ * **No `image`.** The decommission brief's example carries one, and every product here is
+ * drawn rather than photographed, so there is no image URL that would not be invented.
+ * When photography exists (see the `photo` arm of the catalogue's media union) this is
+ * where it goes.
+ *
+ * `browse-only-smoke`'s `commerce-offer-jsonld`, `commerce-price-jsonld` and
+ * `commerce-availability-jsonld` findings are the live check on all of this.
+ */
 export function productJsonLd(product: HJProduct): Record<string, unknown> {
   return {
     '@context': 'https://schema.org',
@@ -27,23 +61,7 @@ export function productJsonLd(product: HJProduct): Record<string, unknown> {
       name: SITE_NAME,
     },
     material: MATERIAL_NAMES[product.material] ?? product.material,
-    offers: {
-      '@type': 'Offer',
-      price: product.price,
-      // Must match what Shopify charges. A hardcoded USD here would publish
-      // dollar prices for a VND store to Google Shopping and every rich
-      // result — wrong in the one place a customer sees a price before they
-      // ever reach the site.
-      priceCurrency: product.currencyCode,
-      // Same "every variant unavailable" rule the UI uses (ProductCard,
-      // ProductDetail) — empty variants means no signal, not confirmed
-      // out of stock, so it still reads InStock.
-      availability:
-        product.variants.length > 0 && product.variants.every((v) => !v.availableForSale)
-          ? 'https://schema.org/OutOfStock'
-          : 'https://schema.org/InStock',
-      url: `${SITE_URL}/products/${product.handle}`,
-    },
+    url: `${SITE_URL}/products/${product.handle}`,
   }
 }
 

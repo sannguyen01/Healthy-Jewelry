@@ -2,11 +2,45 @@ import type { NextConfig } from 'next'
 // Relative, not the `@/` alias: next.config.ts is loaded by Next's own config
 // loader, which does not apply tsconfig path mappings.
 import { warnIfShopifyUnconfigured } from './src/lib/shopify/env-check'
+// Importing the reader *is* the validation: every catalogue record is parsed through its
+// Zod schema at module load, and a malformed one throws. See the block below.
+import { getAllProducts } from './src/lib/catalog'
 
 // Runs once per build (and once on `next start`), so a deployment that will
 // serve a catalog nobody can buy from says so in the build log rather than
 // looking perfectly healthy until a customer clicks Checkout.
 warnIfShopifyUnconfigured()
+
+/**
+ * **Invalid catalogue content stops the build.**
+ *
+ * `src/lib/catalog` validates every record in `src/content/catalog/**` against its Zod
+ * schema when the module first loads, and throws on the first bad set. Importing it here
+ * makes that happen once per build, before a single page is generated.
+ *
+ * The import alone would do it, and the call is here anyway for a reason worth writing
+ * down: a bare `import './src/lib/catalog'` for its side effect is exactly the shape a
+ * later "unused import" cleanup deletes, taking the guarantee with it and leaving nothing
+ * that fails. Reading the length makes the dependency visible to a human and to eslint.
+ *
+ * This is deliberately a **throw** and not the `warn` immediately above it. The two guard
+ * different things: Shopify being unconfigured degrades to a working site, whereas a
+ * malformed product record renders a page with a hole in it — a customer-visible lie that
+ * no check downstream of the build would catch. `warnIfShopifyUnconfigured` exists because
+ * a hard failure there would break the architecture it protects; nothing here protects
+ * anything by continuing.
+ *
+ * Note the ordering constraint this creates: `manifest.ts` imports its JSON with relative
+ * paths, not the `@/` alias, because this file is loaded by Next's own config loader, which
+ * does not apply tsconfig path mappings (see the comment on the first import).
+ */
+if (getAllProducts().length === 0) {
+  throw new Error(
+    'The catalogue is empty. src/content/catalog/products/ has no valid records, or ' +
+      'src/lib/catalog/manifest.ts lists none. A build that serves no products would ' +
+      'deploy a shop with nothing in it and report success.'
+  )
+}
 
 /**
  * Build-time facts, promoted to `NEXT_PUBLIC_*` so they are inlined into the

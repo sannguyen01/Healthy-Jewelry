@@ -1,5 +1,17 @@
 # Shopify Activation Runbook
 
+> **Superseded, 2026-09-20 — kept as the record of a system being dismantled.**
+>
+> It describes how to switch Shopify **on**. The decommission is switching it off — see the credential ledger in `docs/shopify-decommission-inventory.md` for the order revocation must follow, which is the reverse of this document and is not negotiable.
+>
+> The replacement is [ADR 034](docs/adr/034-the-catalogue-is-the-source.md): `src/content/catalog/**`
+> is the product data source and `src/lib/catalog/**` is the only layer that may read it.
+> `docs/browse-only-masterplan.md` is the plan of record.
+>
+> This file is **not deleted**, deliberately. Several of the rules below are the only written
+> record of *why* a mapping behaves as it does, and WS-4 has to read them before the code they
+> describe goes. Delete it when the last of them has a home in the new schema.
+
 This site builds and runs completely without Shopify — `src/lib/data/hj-data.ts` is a
 full static catalog and every fetch in `src/lib/shopify/index.ts` falls back to it. That
 is a feature: it's why the site is always deployable. It also means an unconfigured

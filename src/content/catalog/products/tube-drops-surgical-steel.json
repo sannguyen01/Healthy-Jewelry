@@ -1,0 +1,26 @@
+{
+  "handle": "tube-drops-surgical-steel",
+  "title": "Tube Drops",
+  "collection": "earrings",
+  "material": "surgical-steel",
+  "materialLabel": "316L Surgical Steel",
+  "description": "Suspended tube drops on 316L steel ear wires.",
+  "specification": "Tube 18 mm drop length",
+  "sizes": [],
+  "availability": "ask-an-ambassador",
+  "badge": null,
+  "media": {
+    "kind": "illustration",
+    "svgType": "earring-drop"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

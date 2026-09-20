@@ -471,7 +471,7 @@ better information.
 | Owns | `scripts/probe-smoke-liveness.mjs`, `scripts/lib/liveness.mjs`, `scripts/preflight-secrets.mjs`, `.github/workflows/production-smoke.yml` |
 | Blocked by | nothing |
 | Done when | a de-configuration is reported within one scheduled run, and the test proving it can be made to fail |
-| Status | **first half landed** — `stopped` verdict, ADR 033. Browse-only smoke still to do. |
+| Status | **both halves landed.** `stopped` verdict (ADR 033) and the browse-only smoke, reporting into the six-hourly audit. |
 
 Two jobs.
 
@@ -498,11 +498,52 @@ no workflow change and no inline-script budget spent.
 
 The second job below is still open.
 
-**Second, replace the Shopify smoke with a browse-only smoke.** Once WS-4 lands there is no
-store to check, and the checks that remain are: the canonical domain serves the current
-commit; every active catalogue handle returns 200; an unknown handle returns a true 404;
-retired routes return their declared codes; no response references a Shopify host. Retire the
-Shopify smoke steps only when the replacement is green, and never in the same change.
+**Second, replace the Shopify smoke with a browse-only smoke — written, tested, wired to
+report.** `verify-production.mjs` asks seventeen questions about a headless storefront, and
+after the decommission none of them has a subject. `scripts/verify-browse-only.mjs` asks the
+questions a browse-only site can fail: does every catalogue handle serve, does an unknown one
+return a **true** 404, does any response reference a Shopify host, does any page still emit
+commerce semantics, and does the sitemap agree with the repository.
+
+**Pointed at the running application, it returns 52 findings and every one is true:**
+
+| finding | count at first run | now | whose work |
+|---|---|---|---|
+| `commerce-offer-jsonld` | 17 | **0** | WS-5a — done |
+| `commerce-price-jsonld` | 17 | **0** | WS-5a — done |
+| `commerce-availability-jsonld` | 17 | **0** | WS-5a — done |
+| `unknown-not-404` | 1 | 1 | WS-4 |
+
+**52 findings down to 1**, measured against a real production server before and after.
+WS-5a removed the `offers` block from the product JSON-LD; the remaining finding is
+WS-4's.
+
+That last one is **documented and deliberate today**.
+`/products/<unknown>` answers HTTP 200 with `not-found.tsx` rendered and
+`robots: noindex`, because — in the page's own words — "this route cannot use
+`dynamicParams = false` without 404ing products newly added in Shopify". Acceptance
+criterion 4 is therefore not merely unmet; it is unmet *on purpose*, for a reason the
+decommission deletes. Once the repository is the catalogue, `generateStaticParams` is
+exhaustive and `dynamicParams = false` becomes correct. It is a premise with an expiry date
+([ADR 008](adr/008-decisions-need-premise-detectors.md)) and WS-4 is the date.
+
+**It reports into the audit summary and files no issue.** A six-hourly issue that cannot be
+closed for weeks is the shape ADR 011 records costing this repository a month of unread
+escalations. The issue-filing step and `status: configured` arrive together, once WS-4 and
+WS-5 land and a manual `pnpm verify:browse-only` comes back clean. Retire the Shopify smoke
+steps only then, and never in the same change.
+
+Two bugs worth recording, both found by running the probe rather than reading it:
+
+- **The attribution guard was wrong while citing the exact failure it was written for.** It
+  accepted "a `server` header *or any body at all*", and the interception this repository
+  runs behind answers with a 78-byte `text/plain` denial — a body. Seventeen confident
+  findings about a site never reached. Attribution now needs evidence of a web application:
+  a `server` header, or an HTML body.
+- **It guessed `/sitemap.xml`.** This site serves `/api/sitemap`, which `robots.txt` has
+  always said. A false `sitemap-unreadable` against a working sitemap is the failure
+  direction that gets a monitor muted, so the path is now read out of `robots.txt` and the
+  two cannot drift.
 
 ### WS-7 — Credential revocation and the checkout hostname
 

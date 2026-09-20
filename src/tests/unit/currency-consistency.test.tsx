@@ -99,9 +99,26 @@ describe('currency reaches the customer', () => {
     expect(screen.getByText(/₫/).textContent).not.toMatch(/[.,]\d{2}$/)
   })
 
-  it('Product JSON-LD publishes the store currency, not USD', () => {
-    const offer = productJsonLd(vndProduct).offers as Record<string, unknown>
-    expect(offer.priceCurrency).toBe('VND')
+  it('Product JSON-LD publishes no currency at all, which is stronger', () => {
+    // This asserted `priceCurrency === 'VND'` — that a VND store must not advertise
+    // dollars to Google Shopping. The concern was right and is now served better by
+    // publishing no price: PR #75 removed Add to Bag, so an `Offer` claiming a price and
+    // `InStock` was telling search engines a transaction exists that does not. The whole
+    // block is gone; see the doc comment on `productJsonLd`.
+    const jsonLd = productJsonLd(vndProduct)
+    expect(jsonLd.offers).toBeUndefined()
+    expect(JSON.stringify(jsonLd)).not.toMatch(/₫|VND|USD|priceCurrency|InStock/)
+  })
+
+  it('Product JSON-LD still says what the object is', () => {
+    // Removing the commerce claims must not hollow out the entry: name, brand and material
+    // are claims about the object and remain true.
+    const jsonLd = productJsonLd(vndProduct)
+    expect(jsonLd['@type']).toBe('Product')
+    expect(jsonLd.name).toBeTruthy()
+    expect(jsonLd.description).toBeTruthy()
+    expect(jsonLd.material).toBeTruthy()
+    expect((jsonLd.brand as Record<string, unknown>).name).toBeTruthy()
   })
 
   it('a USD product still renders dollars — the fix is not a blanket swap', () => {
@@ -316,9 +333,22 @@ describe('no surface hardcodes a currency', () => {
     ).toEqual([])
   })
 
-  it('JSON-LD takes priceCurrency from the product', () => {
+  it('JSON-LD carries no commerce claim at all', () => {
+    // The inverse of what this asserted. It required `priceCurrency: product.currencyCode`
+    // — the right demand while an `Offer` existed, since a hardcoded USD would have
+    // published dollar prices for a VND store. There is no Offer now, and the source-level
+    // guard is more useful pointed at the whole family: a future edit reintroducing any of
+    // them turns this red rather than quietly re-advertising a checkout that does not
+    // exist.
     const source = readFileSync(path.join(SRC, 'components/seo/JsonLd.tsx'), 'utf8')
-    expect(source).toMatch(/priceCurrency:\s*product\.currencyCode/)
+    const productBlock = source.slice(
+      source.indexOf('export function productJsonLd'),
+      source.indexOf('export function organizationJsonLd')
+    )
+    expect(productBlock.length).toBeGreaterThan(100) // the slice actually found the function
+    for (const forbidden of ['offers:', 'priceCurrency', 'availability', 'schema.org/InStock']) {
+      expect(productBlock, `productJsonLd reintroduced ${forbidden}`).not.toContain(forbidden)
+    }
   })
 
   it('mapShopifyProduct carries the Storefront currency through', () => {

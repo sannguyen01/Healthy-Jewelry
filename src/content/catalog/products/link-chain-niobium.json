@@ -1,0 +1,26 @@
+{
+  "handle": "link-chain-niobium",
+  "title": "Fine Link Chain",
+  "collection": "necklaces",
+  "material": "niobium",
+  "materialLabel": "Niobium",
+  "description": "Anodized niobium belcher chain. No clasp allergens.",
+  "specification": "2.4 mm links · 18\"",
+  "sizes": [],
+  "availability": "ask-an-ambassador",
+  "badge": null,
+  "media": {
+    "kind": "illustration",
+    "svgType": "necklace-chain"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

@@ -1,0 +1,35 @@
+{
+  "handle": "split-ring-titanium",
+  "title": "Split Ring",
+  "collection": "rings",
+  "material": "titanium",
+  "materialLabel": "Grade 23 Titanium",
+  "description": "Open split design. Adjustable fit. Brushed titanium.",
+  "specification": "Adjustable · 2.1 g",
+  "sizes": [
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12"
+  ],
+  "availability": "ask-an-ambassador",
+  "badge": null,
+  "media": {
+    "kind": "illustration",
+    "svgType": "ring-split"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

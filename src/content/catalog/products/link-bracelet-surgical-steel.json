@@ -1,0 +1,32 @@
+{
+  "handle": "link-bracelet-surgical-steel",
+  "title": "Link Bracelet",
+  "collection": "bracelets",
+  "material": "surgical-steel",
+  "materialLabel": "316L Surgical Steel",
+  "description": "316L surgical steel square links. Lobster clasp.",
+  "specification": "8 mm links · 18 cm",
+  "sizes": [
+    "XS (155mm)",
+    "S (165mm)",
+    "M (175mm)",
+    "L (185mm)",
+    "XL (195mm)"
+  ],
+  "availability": "ask-an-ambassador",
+  "badge": null,
+  "media": {
+    "kind": "illustration",
+    "svgType": "bracelet-link"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

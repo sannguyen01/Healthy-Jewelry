@@ -706,6 +706,28 @@ jobs:
               })
             }
 
+      # ─────────────────────────────────────────────────────────────────────────
+      # Reports into the job summary and files no issue, deliberately.
+      #
+      # Run against production today this returns `findings` with 52 entries, every one of
+      # them true: 17 products x 3 surviving commerce markers, plus /products/<unknown>
+      # answering 200 rather than 404. Those belong to WS-5 and WS-4 of
+      # docs/browse-only-masterplan.md, not to this audit.
+      #
+      # A six-hourly issue that cannot be closed for weeks is the shape ADR 011 records
+      # costing this repository a month of unread escalations, so this reports a number and
+      # nothing else until the replacement can pass. `continue-on-error` keeps its exit 1
+      # from failing the audit; the issue-filing step and `status: configured` arrive
+      # together, once a manual `pnpm verify:browse-only` comes back clean.
+      #
+      # No PRODUCTION_SITE_URL here: the probe reads the apex out of src/config/site.ts,
+      # the same join probe-canonical-domain.mjs uses, so it cannot hold production to a
+      # hostname the application has stopped believing in.
+      - name: Browse-only catalogue — is the site serving what the repository holds?
+        id: browse-only
+        continue-on-error: true
+        run: node scripts/verify-browse-only.mjs 2>&1 | tee browse-only.log
+
       - name: Audit summary
         if: always()
         run: |
@@ -719,8 +741,9 @@ jobs:
             echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
             echo "| Merge gate liveness (is CI evaluating?) | ${{ steps.ci-liveness.outcome }} |"
             echo "| Canonical domain bound to production | ${{ steps.canonical-domain.outcome }} |"
+            echo "| Browse-only catalogue (reports only) | ${{ steps.browse-only.outcome }} |"
             echo ""
-            for log in merge-gate liveness smoke-liveness ci-liveness canonical-domain; do
+            for log in merge-gate liveness smoke-liveness ci-liveness canonical-domain browse-only; do
               if [ -s "$log.log" ]; then
                 echo "<details><summary>$log</summary>"
                 echo ""
