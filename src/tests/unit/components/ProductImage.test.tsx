@@ -1,56 +1,31 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductImage } from '@/components/product/ProductImage'
-import type { HJProduct, Image } from '@/lib/catalog/types'
+import {
+  makePendingMediaProduct,
+  makePhotoProduct,
+  makeProduct,
+} from '@/tests/support/catalogFixtures'
 
 /**
- * **Both branches, because for a long while only one of them could ever run.**
+ * **Three states, because two could not tell two different things apart.**
  *
- * `PRODUCT_FRAGMENT` requested no image field and `HJProduct` had nowhere to put
- * one, so the storefront was structurally incapable of showing a photograph — a
- * jewellery site that could not render jewellery. Every surface hardcoded
- * `<JewelrySVG>`, not as a fallback but as the only option.
+ * `featuredImage: null` used to mean both *this piece is drawn, deliberately* and
+ * *nobody has decided what this piece looks like*. One of those needs nothing and the
+ * other is work, and a nullable field could not say which — so the content debt was
+ * uncountable and the "deliberate illustration" decision was indistinguishable from an
+ * oversight.
  *
- * Today every product on the connected store still has zero media, so the
- * illustration branch is the one production actually exercises and the photograph
- * branch is the one nothing would notice breaking. That is the ADR 002 shape
- * exactly — the branch that never runs locally is the one that breaks — so both
- * are pinned here, and `verify-production.mjs` checks the live direction that
- * matters most: a product that *has* a photo in Shopify must show it on its page.
+ * The catalogue's media union splits them into `illustration`, `illustration-pending`
+ * and `photo`, and `ProductImage` switches exhaustively over all three. Each arm is
+ * pinned here, including the one production does not exercise: every product in the
+ * catalogue today is an `illustration` or an `illustration-pending`, so the photograph
+ * branch is the one nothing would notice breaking. That is ADR 002's shape exactly — the
+ * branch that never runs locally is the one that breaks.
  */
 
-const photo: Image = {
-  url: 'https://cdn.shopify.com/s/files/1/0000/arc-band.jpg',
-  altText: 'Arc Band in brushed titanium',
-  width: 1200,
-  height: 1200,
-}
-
-function makeProduct(overrides: Partial<HJProduct> = {}): HJProduct {
-  return {
-    id: 'gid://shopify/Product/1',
-    defaultVariantId: 'gid://shopify/ProductVariant/1',
-    handle: 'arc-band-titanium',
-    title: 'Arc Band',
-    collection: 'rings',
-    material: 'titanium',
-    tags: [],
-    price: '1450000',
-    compareAtPrice: null,
-    currencyCode: 'VND',
-    badge: null,
-    description: 'A titanium ring.',
-    spec: '',
-    svgType: 'ring-arc',
-    featuredImage: null,
-    images: [],
-    variants: [],
-    ...overrides,
-  }
-}
-
-describe('ProductImage — no photograph', () => {
-  it('draws the illustration, which is what every live product renders today', () => {
+describe('ProductImage — illustration', () => {
+  it('draws the illustration, which is what almost every catalogue record renders', () => {
     const { container } = render(<ProductImage product={makeProduct()} sizes="100vw" />)
     expect(container.querySelector('svg')).not.toBeNull()
     expect(container.querySelector('img')).toBeNull()
@@ -65,9 +40,12 @@ describe('ProductImage — no photograph', () => {
     expect(container.querySelector('svg')?.getAttribute('style')).toContain('60%')
   })
 
-  it('draws the product\'s own illustration, not a generic one', () => {
+  it("draws the product's own illustration, not a generic one", () => {
     const { container } = render(
-      <ProductImage product={makeProduct({ svgType: 'charm-star' })} sizes="100vw" />
+      <ProductImage
+        product={makeProduct({ media: { kind: 'illustration', svgType: 'charm-star' } })}
+        sizes="100vw"
+      />
     )
     // svg-coverage.test.tsx owns which mark each type draws; what matters here is
     // that the type reaches JewelrySVG rather than being dropped.
@@ -75,55 +53,77 @@ describe('ProductImage — no photograph', () => {
   })
 })
 
+/**
+ * The state that did not exist before the catalogue: *nobody has chosen an illustration
+ * for this piece yet*.
+ *
+ * It renders nothing on purpose. A default drawing on a real product is a claim about
+ * the object made by a fallback, and a wrong claim is worse than an empty frame — the
+ * same reasoning that removed the Sold Out badge when the inventory signal went away.
+ */
+describe('ProductImage — illustration pending', () => {
+  it('renders neither an illustration nor a photograph', () => {
+    const { container } = render(
+      <ProductImage product={makePendingMediaProduct()} sizes="100vw" />
+    )
+    expect(container.querySelector('svg')).toBeNull()
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('keeps the caller class so the tile geometry survives', () => {
+    // The tile is `aspect-ratio: 1 / 1` (CLAUDE.md). An element that vanishes entirely
+    // would collapse the box and reflow the grid around an absence.
+    const { container } = render(
+      <ProductImage product={makePendingMediaProduct()} sizes="100vw" className="tile-media" />
+    )
+    expect(container.querySelector('.tile-media')).not.toBeNull()
+  })
+
+  it('is hidden from assistive technology rather than announced as an empty image', () => {
+    const { container } = render(
+      <ProductImage product={makePendingMediaProduct()} sizes="100vw" className="tile-media" />
+    )
+    expect(container.querySelector('.tile-media')?.getAttribute('aria-hidden')).toBe('true')
+  })
+})
+
 describe('ProductImage — photograph present', () => {
   it('renders the photograph instead of the illustration', () => {
-    const { container } = render(
-      <ProductImage product={makeProduct({ featuredImage: photo })} sizes="100vw" />
-    )
+    const { container } = render(<ProductImage product={makePhotoProduct()} sizes="100vw" />)
     expect(container.querySelector('svg')).toBeNull()
     expect(screen.getByRole('img')).toBeInTheDocument()
   })
 
-  it('points at the Shopify CDN URL', () => {
-    render(<ProductImage product={makeProduct({ featuredImage: photo })} sizes="100vw" />)
+  it('points at the catalogue record’s own src', () => {
+    render(<ProductImage product={makePhotoProduct()} sizes="100vw" />)
     // next/image rewrites the src through /_next/image, so the original is
     // encoded inside it rather than being the attribute value.
     expect(decodeURIComponent(screen.getByRole('img').getAttribute('src') ?? '')).toContain(
-      'cdn.shopify.com'
+      '/images/products/arc-band-titanium.jpg'
     )
   })
 
-  it('uses Shopify alt text when the merchant wrote some', () => {
-    render(<ProductImage product={makeProduct({ featuredImage: photo })} sizes="100vw" />)
+  it('uses the alt text the record carries', () => {
+    render(<ProductImage product={makePhotoProduct()} sizes="100vw" />)
     expect(screen.getByAltText('Arc Band in brushed titanium')).toBeInTheDocument()
   })
 
   /**
-   * An empty `alt` tells a screen reader the image is decorative — a lie about the
-   * one thing on the page the customer is buying. Shopify's `altText` is unset far
-   * more often than it is set, so this is the common path, not the edge case.
+   * **The alt-text fallback is gone, and its absence is the stronger guarantee.**
+   *
+   * There used to be four assertions here covering `altText` being `null`, `''` and
+   * `'   '`, each checking that the component substituted the product title. They were
+   * the common path, because Shopify's `altText` is unset far more often than set.
+   *
+   * The catalogue schema declares `alt: z.string().min(1)` inside the `photo` arm, so a
+   * record with an empty alt **fails the build** rather than reaching a component that
+   * papers over it. The fallback was a runtime repair for a data problem; the constraint
+   * is the data problem not existing. `catalog-schema.test.ts` owns the rejection; what
+   * remains here is that the component does not invent an alt of its own.
    */
-  it.each([null, '', '   '])('falls back to the product title when altText is %p', (altText) => {
-    render(
-      <ProductImage
-        product={makeProduct({ featuredImage: { ...photo, altText } })}
-        sizes="100vw"
-      />
-    )
-    expect(screen.getByAltText('Arc Band')).toBeInTheDocument()
-  })
-
   it('never renders an empty alt attribute', () => {
-    for (const altText of [null, '', '  ']) {
-      const { container, unmount } = render(
-        <ProductImage
-          product={makeProduct({ featuredImage: { ...photo, altText } })}
-          sizes="100vw"
-        />
-      )
-      expect(container.querySelector('img')?.getAttribute('alt')).toBeTruthy()
-      unmount()
-    }
+    const { container } = render(<ProductImage product={makePhotoProduct()} sizes="100vw" />)
+    expect(container.querySelector('img')?.getAttribute('alt')).toBeTruthy()
   })
 
   /**
@@ -131,17 +131,13 @@ describe('ProductImage — photograph present', () => {
    * is required of every caller rather than defaulted, so this checks the value
    * actually reaches the element.
    */
-  it('passes the caller\'s sizes hint through', () => {
-    const { container } = render(
-      <ProductImage product={makeProduct({ featuredImage: photo })} sizes="280px" />
-    )
+  it("passes the caller's sizes hint through", () => {
+    const { container } = render(<ProductImage product={makePhotoProduct()} sizes="280px" />)
     expect(container.querySelector('img')?.getAttribute('sizes')).toContain('280px')
   })
 
   it('contains rather than crops, so a necklace does not lose its ends', () => {
-    const { container } = render(
-      <ProductImage product={makeProduct({ featuredImage: photo })} sizes="100vw" />
-    )
+    const { container } = render(<ProductImage product={makePhotoProduct()} sizes="100vw" />)
     expect(container.querySelector('img')?.getAttribute('style')).toContain('contain')
   })
 })

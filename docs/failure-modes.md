@@ -38,25 +38,47 @@ that would fail if the handling broke. A mode with no `covered by` is not permit
 
 ---
 
-## Catalogue reads — `FallbackReason` (`src/lib/shopify/index.ts`)
+## Catalogue reads — no failure mode left to enumerate
 
-The storefront falls back to the bundled catalogue rather than failing, which is correct
-and is also the single reason failures here stayed invisible for so long: an unconfigured
-deployment renders every page, returns 200 everywhere, and looks completely healthy right
-up until somebody tries to buy something Shopify has never heard of.
+**This section held a six-row table for `FallbackReason` in `src/lib/shopify/index.ts`, and
+both the type and the file are gone.** WS-4c removed the Shopify read path;
+[ADR 034](adr/034-the-catalogue-is-the-source.md) makes `src/content/catalog/**` the source
+and `src/lib/catalog/**` its only reader.
 
-| mode | what happened | customer sees | detected by | covered by |
-|---|---|---|---|---|
-| `not-configured` | `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` or the storefront token is absent | the bundled catalogue; checkout refuses with `not-configured` | `console.error` naming the fetcher, plus `/api/version`'s `shopify.configured` | `shopify-index.test.ts`, `api-version-route.test.ts` |
-| `empty-response` | Shopify answered successfully with zero products | the bundled catalogue | `console.error` naming the fetcher | `shopify-index.test.ts` |
-| `fetch-failed` | a `ShopifyFetchError` — network, non-2xx, GraphQL errors, or a retired API version | the bundled catalogue | `console.error` carrying the error message | `shopify-index.test.ts`, `shopify-pagination.test.ts` |
-| `collection-not-found` | the handle matched no Shopify collection (handle drift between the router and Shopify Admin) | that collection's bundled products | `console.error` naming the handle | `shopify-index.test.ts` |
-| `malformed-response` | a 200 carrying neither `data` nor `errors`, or any non-`ShopifyFetchError` throw inside the fetcher | the bundled catalogue | `console.error` naming the shape or the exception | `shopify-pagination.test.ts` |
-| `pagination-stalled` | `hasNextPage: true` with no edges, or a cursor the server did not advance | whatever was collected before the stall, or the bundled catalogue | `console.error` naming the request number and the stall kind | `shopify-pagination.test.ts` |
+The rows are not moved or rewritten, because every one of them described a *degradation*
+and degradation is no longer possible here. They were, as prose rather than as a table —
+`failure-mode-registry.test.ts` reads every table row in this file as a live claim and
+requires each to name a test that exists, and none of these tests exists any more:
 
-Neither `malformed-response` nor `pagination-stalled` existed before 2026-09-18. The first
-arrived as `TypeError: Cannot read properties of undefined` into a `catch` that reported
-only `ShopifyFetchError`; the second did not terminate.
+- **`not-configured`** — `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` or the storefront token was
+  absent; the customer got the bundled catalogue.
+- **`empty-response`** — Shopify answered successfully with zero products; the bundled
+  catalogue.
+- **`fetch-failed`** — a `ShopifyFetchError`: network, non-2xx, GraphQL errors, or a retired
+  API version; the bundled catalogue.
+- **`collection-not-found`** — the handle matched no Shopify collection, through handle
+  drift between the router and Shopify Admin; that collection's bundled products.
+- **`malformed-response`** — a 200 carrying neither `data` nor `errors`; the bundled
+  catalogue.
+- **`pagination-stalled`** — `hasNextPage: true` with no edges, or a cursor the server did
+  not advance; whatever had been collected before the stall.
+
+Each was a *remote read* that could answer wrongly and be papered over with local data, and
+the paper was the problem: an unconfigured deployment rendered every page, returned 200
+everywhere, and looked completely healthy right up until somebody tried to buy something
+Shopify had never heard of. Two of the six — `malformed-response` and `pagination-stalled` —
+did not exist before 2026-09-18 and were found by looking, not by failing.
+
+There is no remote read now. `getAllProducts()` returns an array that was validated against
+its Zod schema when the module loaded, in the same process, from files in this repository.
+The failure mode that replaces all six is **a malformed record**, and it is not a degradation
+at all: it throws, and `next.config.ts` imports the reader so that the throw happens once per
+build, before a single page is generated. A build that would serve a catalogue with a hole in
+it does not complete. Covered by `catalog-schema.test.ts` and `catalog-content.test.ts`.
+
+The blank this leaves is deliberate and is the honest shape: a table row saying "the
+catalogue cannot fail" would be a claim about a control where no control exists, which is
+[ADR 018](adr/018-a-claim-about-a-control-is-not-a-control.md) exactly.
 
 ## Rate limiting — `RateLimitFailurePosture` and `RateLimiterHealth` (`src/lib/utils/rateLimit.ts`)
 
@@ -93,7 +115,12 @@ cannot find them, which makes them the ones most likely to be forgotten.
 |---|---|---|
 | A cached build serving stale `NEXT_PUBLIC_*` values | `/api/version`'s `bundleIsStale` — two fingerprints, one inlined at build time and one computed at request time | `api-version-route.test.ts` |
 | A webhook payload with no usable handle, so only the listing pages are invalidated | `console.warn` naming the topic and what stayed stale | `webhook-body-bounds.test.ts` |
-| `getProducts` stopping at a budget with more products available | `console.warn` naming the counts and both ceilings | `shopify-pagination.test.ts` |
 | A limiter sharing a Redis prefix with another, silently merging their budgets | an AST scan of every `createRateLimiter` call — invisible at runtime, because the in-memory fallback ignores the prefix entirely | `rate-limit-prefix-uniqueness.test.ts` |
 | A sentinel whose mutation can no longer be applied, or whose baseline is red | `scripts/probe-assertion-liveness.mjs`, which now exits non-zero when *nothing* could be evaluated | `probe-liveness-decision.test.ts` |
 | The unit suite measuring different branches locally than in the merge gate, because a config module's `process.env` fallbacks depend on the ambient environment | `vitest.config.ts`'s `test.env`, reconciled against `ci.yml` | `vitest-env-contract.test.ts`, `config-env-branches.test.ts` |
+
+A row left this table on 2026-09-20: *`getProducts` stopping at a budget with more products
+available*, covered by `shopify-pagination.test.ts`. Both the fetcher and its spec were
+deleted with the Shopify read path. It is named here rather than silently dropped, for the
+same reason `e2e/COVERAGE.md` keeps its two wrong exceptions on the record: a table that
+loses a row is indistinguishable from a table nobody maintains.

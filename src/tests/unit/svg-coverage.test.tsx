@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import { HJ_SVG_TYPES } from '@/lib/catalog/types'
-import { isHJSvgType, parseSvgType } from '@/lib/shopify/tags'
+import { HJ_SVG_TYPES } from '@/lib/svg/types'
+import { getAllProducts } from '@/lib/catalog'
 
 /**
  * Every illustration a product can ask for must actually draw something.
@@ -14,12 +14,17 @@ import { isHJSvgType, parseSvgType } from '@/lib/shopify/tags'
  * satisfied), not lint, not any test, and not the visual-assets E2E spec, which
  * checks `<img>` elements rather than inline SVG.
  *
- * The live Shopify catalog then made it worse. Nine products carry `svg:` tags
+ * The live Shopify catalog then made it worse. Nine products carried `svg:` tags
  * for shapes the union never contained (`ring-halo`, `charm-star`, …), and the
- * old mapper cast the tag straight to `HJSvgType`. A tag anyone can type in
+ * old mapper cast the tag straight to `HJSvgType`. A tag anyone could type in
  * Shopify Admin could blank out a product tile with no error anywhere.
  *
- * This is the cheapest possible guard against both: walk the list, render each
+ * That second failure mode is gone with the tag parser: `svgType` is a field in a
+ * reviewed JSON record now, not a free-text tag from an admin console. What replaces the
+ * parser check is the last block in this file — every `svgType` the *catalogue* names must
+ * be a type `JewelrySVG` draws. The channel changed; the question did not.
+ *
+ * This is the cheapest possible guard against all of it: walk the list, render each
  * one, insist on real geometry.
  */
 
@@ -69,55 +74,48 @@ describe('an unknown type can never render nothing', () => {
   })
 })
 
-describe('parseSvgType validates rather than casts', () => {
-  it('accepts every real Shopify tag in the live catalog', () => {
-    // Captured from the connected store. These are the exact tag values on the
-    // 22 published products; nine of them named shapes the union did not have.
-    const liveTags = [
-      'ring-arc',
-      'ring-halo',
-      'ring-facet',
-      'ring-split',
-      'necklace-disc',
-      'necklace-bar',
-      'earring-stud',
-      'earring-hoop',
-      'earring-threader',
-      'bracelet-cuff',
-      'bracelet-chain',
-      'bracelet-bead',
-      'charm-anchor',
-      'charm-star',
-      'charm-disc',
-      'charm-heart',
-    ]
-    for (const tag of liveTags) {
-      expect(isHJSvgType(tag), `"${tag}" is tagged in Shopify but not a known type`).toBe(true)
-      expect(parseSvgType([`svg:${tag}`], 'rings').matched).toBe(true)
+/**
+ * **The catalogue's side of the same question.**
+ *
+ * The blocks above prove every *declared* type draws. This proves every *used* type is
+ * declared — the direction the old `parseSvgType` tests covered, asked of the channel that
+ * replaced Shopify tags.
+ *
+ * Both directions are needed and neither implies the other. A type declared and never used
+ * is dead artwork, which is harmless; a type used and never declared renders the fallback
+ * mark on a real product page, which is the defect that shipped nine times.
+ */
+describe('every illustration the catalogue names is one JewelrySVG draws', () => {
+  const named = getAllProducts()
+    .map((product) => (product.media.kind === 'illustration' ? product.media.svgType : null))
+    .filter((svgType): svgType is string => svgType !== null)
+
+  it('finds illustrations in the catalogue to check', () => {
+    // Without this the assertion below is vacuously green on an empty list — the same
+    // failure `cache-tag-contract.test.ts` records from reading a file by name.
+    expect(named.length).toBeGreaterThan(0)
+  })
+
+  it.each([...new Set(named)])('%s is a declared type', (svgType) => {
+    expect(
+      (HJ_SVG_TYPES as readonly string[]).includes(svgType),
+      `A catalogue record names svgType "${svgType}", which JewelrySVG does not draw. ` +
+        `It would render the fallback mark on a real product page. Either add the ` +
+        `illustration and a measured viewBox entry, or correct the record.`
+    ).toBe(true)
+  })
+
+  it('renders real geometry for every illustration the catalogue actually uses', () => {
+    // The end-to-end version: not "is this string in a list" but "does this product's
+    // tile draw something". Cheap, and it is the assertion a reader of a blank tile would
+    // have wanted to exist.
+    for (const svgType of new Set(named)) {
+      const { container } = render(<JewelrySVG type={svgType} />)
+      expect(drawnShapeCount(container), `${svgType} is blank`).toBeGreaterThan(0)
+      expect(
+        container.querySelector('[data-svg-fallback]'),
+        `${svgType} fell through to the fallback mark`
+      ).toBeNull()
     }
-  })
-
-  it('falls back to the collection, not to a ring, for an unknown tag', () => {
-    const result = parseSvgType(['svg:necklace-invented'], 'necklaces')
-    expect(result.matched).toBe(false)
-    expect(result.unknownTag).toBe('necklace-invented')
-    expect(result.svgType).toBe('necklace-drop')
-  })
-
-  it('reports the collection fallback for each collection', () => {
-    expect(parseSvgType([], 'rings').svgType).toBe('ring-arc')
-    expect(parseSvgType([], 'necklaces').svgType).toBe('necklace-drop')
-    expect(parseSvgType([], 'earrings').svgType).toBe('earring-hoop')
-    expect(parseSvgType([], 'bracelets').svgType).toBe('bracelet-cuff')
-    expect(parseSvgType([], 'charms').svgType).toBe('charm-classic')
-  })
-
-  it('still reads the handle when no tag is present', () => {
-    expect(parseSvgType([], 'rings', 'orbit-pendant-necklace').svgType).toBe('necklace-drop')
-    expect(parseSvgType([], 'rings', 'star-charm-titanium').svgType).toBe('charm-classic')
-  })
-
-  it('is case-insensitive — Shopify tags are free text', () => {
-    expect(parseSvgType(['SVG:Ring-Halo'], 'rings').svgType).toBe('ring-halo')
   })
 })

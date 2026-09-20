@@ -9,10 +9,12 @@ No stones. No gemstones. No healing crystals. No chakras. Pure material science.
 Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 
 ## Tech Stack
-- Framework: Next.js 15, App Router, TypeScript (strict mode)
+- Framework: Next.js 16, App Router, TypeScript (strict mode)
 - Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`)
 - Fonts: Barlow Condensed (display) + DM Sans (UI + body)
-- State: Zustand (cart store)
+- State: **none.** This said "Zustand (cart store)" until 2026-09-20; `src/store/` and the
+  dependency both went with the bag. Nothing on this site holds client state across a
+  navigation, which is a property worth keeping rather than an absence to fill.
 - Package manager: pnpm
 - Deployment: Vercel (auto-deploy on push to `main`)
 - Testing: Vitest + Testing Library (80%+ coverage required)
@@ -170,11 +172,33 @@ ways, clipping, spread across ratios, buy-control position) and
 
 ## Architecture Principles
 - Server Components by default; `'use client'` only for interactive elements
-- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer/CartDrawer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
-- Data: `src/lib/data/hj-data.ts` — typed product catalog (static, Shopify-ready)
-- Shopify: `src/lib/shopify/` — client, queries, mutations, types
-- Store: `src/store/cart.ts` — Zustand cart with persist
+- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
+- **Content**: `src/content/catalog/**` — 17 product records and 5 collection records, as
+  reviewed JSON. This is the **only** product data source.
+- **Reader**: `src/lib/catalog/**` — the only runtime access layer. `schema.ts` validates
+  every record through Zod at module load, so a malformed one **fails the build**
+  (`next.config.ts` imports the reader to make that happen once per build). No page,
+  component, API route, script or test may import a raw record; enforced through the
+  TypeScript compiler by `catalog-import-boundary.test.ts`, not by a grep.
+  See [ADR 034](docs/adr/034-the-catalogue-is-the-source.md), which supersedes ADR 004.
+- `src/lib/data/hj-data.ts` — **materials copy only** (three metals). Not a catalogue: a
+  metal has no handle, URL, sizes or photograph. `hj-data.test.ts` asserts its export
+  surface is exactly `hjMaterials`.
+- **Shopify**: the read path is gone. What survives is `src/lib/shopify/cacheTags.ts` and
+  `api-version.ts`, kept only because `/api/webhooks/shopify`, `/api/revalidate` and
+  `/api/version` still import them — and those three routes are held back on purpose. The
+  webhook subscriptions must be deleted in Shopify Admin *before* the endpoint is removed,
+  or Shopify retries against a failing route for its full backoff schedule. That is the
+  masterplan's WS-7 ordering and the connector is currently `needs_reconnect`.
 - Hooks: `src/lib/hooks/useReveal.ts` — IntersectionObserver scroll-reveal hook, returns `[ref, visible]` tuple, triggers once then disconnects
+
+### No prices, anywhere
+Nothing on this site can be bought, so no surface may render a price, a currency symbol or
+a currency code. `formatPrice` has no caller; JSON-LD emits `Product` with **no** `offers`,
+`price`, `availability` or purchase `url`; the OG card carries a name and a material and
+nothing else. Enforced from both ends by
+`src/tests/unit/price-absence-contract.test.tsx` — rendered output *and* a source scan —
+and over HTTP by `scripts/verify-browse-only.mjs`.
 
 ### Animations
 Keyframes defined in `globals.css`:
@@ -186,7 +210,8 @@ Keyframes defined in `globals.css`:
 CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 
 ## Content Data (NO STONES/GEMS)
-- `src/lib/data/hj-data.ts` — 17 products, 5 collections, 3 materials
+- `src/content/catalog/products/*.json` — 17 products · `collections/*.json` — 5 collections
+- `src/lib/data/hj-data.ts` — 3 materials
 - Collections: rings, necklaces, earrings, bracelets, charms
 - Materials: Grade 23 Titanium, Niobium, 316L Surgical Steel
 
@@ -195,7 +220,6 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - `/shop` → All products with filter
 - `/shop/[collection]` → Per-collection (rings/necklaces/earrings/bracelets/charms)
 - `/products/[handle]` → Product detail page
-- `/cart` → Cart page
 - `/about` → Brand story
 - `/materials` → Materials science page
 - `/search` → Search results

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getAllProducts } from '@/lib/data/hj-data'
+import { getAllProducts } from '@/lib/catalog'
 
 const {
   FALLBACK_ONLY_HANDLES,

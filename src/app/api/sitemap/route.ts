@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getProducts } from '@/lib/shopify'
+import { getAllProducts } from '@/lib/catalog'
 import { STATIC_PAGES } from '@/lib/seo/sitemapPages'
 import { SITE_URL } from '@/config/site'
 
@@ -14,7 +14,7 @@ import { SITE_URL } from '@/config/site'
  * `globals.css` instead of restating the palette.
  */
 export async function GET(): Promise<NextResponse> {
-  const products = await getProducts()
+  const products = getAllProducts()
 
   const productPages = products.map((p) => ({
     loc: `/products/${p.handle}`,

@@ -16,14 +16,14 @@
 // every source of traffic are invisible to it. Conversion rate is currently
 // uncomputable — the numerator lives in Shopify and the denominator lives nowhere.
 
-import type { CurrencyCode } from '@/lib/utils/formatPrice'
-
-/** Money as an event carries it: the amount and what it is denominated in. */
-interface Priced {
-  /** Minor-unit-free decimal string, as `HJProduct.price` holds it. */
-  value: string
-  currency: CurrencyCode
-}
+/*
+ * `Priced` was here — `{ value, currency }`, the money an event carried.
+ *
+ * It existed so a VND store could not report dollar amounts, which was a real defect.
+ * There are no prices to report now. `product_viewed` keeps `ProductRef` (handle,
+ * collection, material), because *which* piece someone looked at is still a fact worth
+ * counting; what it cost is not a fact this site has.
+ */
 
 interface ProductRef {
   handle: string
@@ -39,7 +39,7 @@ interface ProductRef {
  * a silently dropped case.
  */
 export type AnalyticsEvent =
-  | ({ name: 'product_viewed' } & ProductRef & Priced)
+  | ({ name: 'product_viewed' } & ProductRef)
   | { name: 'collection_viewed'; collection: string; productCount: number }
   | { name: 'search_performed'; query: string; resultCount: number }
 /*

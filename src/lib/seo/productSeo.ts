@@ -1,5 +1,5 @@
 import { SEO_DEFAULTS } from '@/config/site'
-import type { HJProduct } from '@/lib/catalog/types'
+import type { CatalogProduct } from '@/lib/catalog'
 
 /**
  * The text that describes a product to anything that is not the page itself:
@@ -56,7 +56,7 @@ export const NOT_FOUND_SEO = {
   robots: { index: false, follow: false },
 } as const
 
-export function productSeo(product: HJProduct): ProductSeo {
+export function productSeo(product: CatalogProduct): ProductSeo {
   // A Shopify product with an empty description is legitimate — it just must
   // not become an empty meta description, which reads to a crawler as a page
   // with nothing on it.

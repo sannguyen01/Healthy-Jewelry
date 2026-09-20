@@ -59,7 +59,10 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       // Scope to business-logic layer only — UI components are verified via E2E
-      include: ['src/lib/**/*.ts', 'src/store/**/*.ts', 'src/store/**/*.tsx', 'src/config/**/*.ts'],
+      // `src/store/**` was here and is gone with the cart. A glob matching nothing is not
+      // an error — v8 simply reports no files for it — which is the problem: it reads as
+      // coverage of a directory that does not exist. See ADR 035.
+      include: ['src/lib/**/*.ts', 'src/config/**/*.ts'],
       exclude: [
         'src/lib/shopify/queries/**',
         'src/lib/shopify/mutations/**',

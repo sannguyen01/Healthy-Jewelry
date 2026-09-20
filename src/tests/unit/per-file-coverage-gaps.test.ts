@@ -109,11 +109,14 @@ describe('BeaconSink — the analytics transport nothing exercised', () => {
 
 describe('productSeo — the fallback branch, not the happy one', () => {
   it('substitutes the site description for an empty product description', async () => {
-    // A Shopify product with no description is legitimate. An empty meta
-    // description is not: it reads to a crawler as a page with nothing on it.
+    // The catalogue schema requires a non-empty description, so this branch is no
+    // longer reachable from content — which is exactly why it is worth pinning here
+    // rather than deleting. `productSeo` is also called by the OG image route and the
+    // JSON-LD builder, and an empty meta description reads to a crawler as a page with
+    // nothing on it. The guard costs one `||` and removes a whole class of outcome.
     const { productSeo } = await import('@/lib/seo/productSeo')
     const { SEO_DEFAULTS } = await import('@/config/site')
-    const { getAllProducts } = await import('@/lib/data/hj-data')
+    const { getAllProducts } = await import('@/lib/catalog')
     const base = getAllProducts()[0]
 
     for (const description of ['', '   ', '\n\t ', undefined]) {
@@ -126,7 +129,7 @@ describe('productSeo — the fallback branch, not the happy one', () => {
 
   it('keeps a real description, trimmed of nothing but its own edges', async () => {
     const { productSeo } = await import('@/lib/seo/productSeo')
-    const { getAllProducts } = await import('@/lib/data/hj-data')
+    const { getAllProducts } = await import('@/lib/catalog')
     const base = getAllProducts()[0]
 
     const seo = productSeo({ ...base, description: 'Grade 23 titanium. Nothing else.' })

@@ -1,4 +1,5 @@
-import type { HJMaterialHandle, HJProduct } from '@/lib/catalog/types'
+import type { MaterialHandle } from '@/lib/catalog/schema'
+import type { CatalogProduct } from '@/lib/catalog'
 
 /**
  * The homepage runs three `HorizontalScroll` strips that are the same component with the
@@ -26,21 +27,25 @@ import type { HJMaterialHandle, HJProduct } from '@/lib/catalog/types'
 /**
  * Products of one material, in catalogue order, excluding anything already shown.
  *
- * Filtering the already-fetched catalogue rather than adding a query is deliberate: material
- * is not a Shopify-side facet — it is parsed from tags by `parseMaterial` — so there is no
- * server query to defer to, and `src/tests/unit/homepage-fetch-budget.test.ts` pins the
- * homepage at four fetches.
+ * `alreadyShown` is the whole point and the parameter most likely to be dropped as
+ * redundant: without it this returns titanium bestsellers the visitor has already scrolled
+ * past two strips ago. `src/tests/unit/homepage-composition-contract.test.ts` asserts the
+ * homepage still passes it.
  *
- * The contrast with `getBestsellers`/`getNewArrivals` is intentional and worth stating: those
- * stay Shopify-side queries because deriving them here would move their *ordering* from
- * Shopify's query into our filter. A material strip has no such ordering to lose.
+ * **A note on what changed under this function.** It used to carry a justification for
+ * filtering in memory rather than adding a Shopify query — material was not a Shopify-side
+ * facet, it was parsed out of tags — and a contrast with `getBestsellers`/`getNewArrivals`,
+ * which stayed server-side so their *ordering* came from Shopify's query rather than our
+ * filter. None of that survives [ADR 034](../../../docs/adr/034-the-catalogue-is-the-source.md):
+ * all three read the same seventeen in-memory records, and catalogue order is manifest order.
+ * The function is unchanged; only the reason it is shaped this way is.
  */
 export function stripByMaterial(
-  catalogue: readonly HJProduct[],
-  material: HJMaterialHandle,
-  alreadyShown: readonly HJProduct[],
+  catalogue: readonly CatalogProduct[],
+  material: MaterialHandle,
+  alreadyShown: readonly CatalogProduct[],
   limit = 8
-): HJProduct[] {
+): CatalogProduct[] {
   const seen = new Set(alreadyShown.map((product) => product.handle))
   return catalogue
     .filter((product) => product.material === material && !seen.has(product.handle))
@@ -50,24 +55,29 @@ export function stripByMaterial(
 /**
  * The same strips with every product kept only where it first appears.
  *
- * `stripByMaterial` closes the duplication the *static* catalogue could produce. It does not
- * close the one the live store can, and the difference is worth spelling out because it is
- * invisible to every test in this repo:
+ * ## Why this is not redundant with `stripByMaterial`
  *
- *   - The first two strips come from two independent Shopify queries, `tag:bestseller` and
- *     `tag:new` (`GET_BESTSELLERS` / `GET_NEW_ARRIVALS`). A product carrying both tags is
- *     returned by both, so it renders in both strips — and `badge` collapses to a single
- *     value with bestseller winning (`src/lib/shopify/index.ts`), so it shows the *same*
- *     "Bestseller" pill in both places. Precisely the `orbit-pendant-titanium` defect, one
- *     data source over.
- *   - On the static fallback that cannot happen: `badge` is one scalar field, so
- *     `badge === 'Bestseller'` and `badge === 'New'` are disjoint by construction. Which
- *     means `e2e/homepage-composition.spec.ts` — running against `mock.myshopify.com` — can
- *     never observe this case, however carefully it asks.
+ * `stripByMaterial` closes one direction — the material strip cannot repeat what the badge
+ * strips already showed. This closes the general case: any strip against any other, whatever
+ * produced them.
  *
- * So the fixture proves the parts and cannot prove the whole, which is the failure this
- * whole change is about. The guard therefore lives in the code path rather than only in the
- * assertion: earlier strips win, because the page's order is its priority order.
+ * The case it was *written* for no longer exists, and that is worth recording rather than
+ * quietly leaving the docstring describing it. BESTSELLING and NEW ARRIVALS used to be two
+ * independent Shopify queries, `tag:bestseller` and `tag:new`. A product carrying both tags
+ * came back from both, and `badge` collapsed to one value with bestseller winning — so it
+ * rendered the *same* "Bestseller" pill in two strips. That was `orbit-pendant-titanium`,
+ * one data source over. It was also unobservable from E2E, because the static fallback the
+ * mock store fell back to had a single scalar `badge` and could not reproduce it.
+ *
+ * After [ADR 034](../../../docs/adr/034-the-catalogue-is-the-source.md) the scalar `badge`
+ * *is* the catalogue: `bestseller` and `new` are disjoint by construction and
+ * `catalog-content.test.ts` asserts it directly, so those two strips can no longer collide
+ * at all.
+ *
+ * It stays for the reason the guard was put in the code path rather than in an assertion:
+ * the next strip is the one nobody has thought about yet — a curated list, a collection, a
+ * second material — and the page's order is its priority order, so earlier strips win
+ * without anyone having to decide again.
  */
 export function dedupeInOrder<T extends { handle: string }>(
   strips: ReadonlyArray<readonly T[]>
@@ -76,8 +86,10 @@ export function dedupeInOrder<T extends { handle: string }>(
   return strips.map((strip) => {
     const kept: T[] = []
     for (const item of strip) {
-      // Also collapses a product repeated *within* one strip, which a paginated or
-      // hand-curated Shopify collection can produce on its own.
+      // Also collapses a product repeated *within* one strip. The manifest cannot produce
+      // that — `catalog-content.test.ts` asserts handles are unique — but a hand-curated
+      // strip built by concatenating two lists can, and that is the kind of list a future
+      // strip is most likely to be.
       if (seen.has(item.handle)) continue
       seen.add(item.handle)
       kept.push(item)
@@ -95,7 +107,7 @@ export function dedupeInOrder<T extends { handle: string }>(
  * future strip cannot reintroduce it unnoticed.
  */
 export function duplicateAcrossStrips(
-  strips: ReadonlyArray<{ label: string; products: readonly HJProduct[] }>
+  strips: ReadonlyArray<{ label: string; products: readonly CatalogProduct[] }>
 ): Array<{ handle: string; labels: string[] }> {
   const places = new Map<string, string[]>()
   for (const strip of strips) {

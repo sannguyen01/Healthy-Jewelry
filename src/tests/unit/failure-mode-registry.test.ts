@@ -49,8 +49,19 @@ const REGISTRY = join(ROOT, 'docs/failure-modes.md')
  * A type added here with no rows fails immediately, which is the intended way to
  * register a new one: write the entry, watch it fail, then document the modes.
  */
+/*
+ * `{ file: 'src/lib/shopify/index.ts', type: 'FallbackReason' }` was the first row here and
+ * is gone with the module. Its six documented modes were all *degradations of a remote
+ * read* — not configured, empty response, fetch failed, collection not found, malformed
+ * response, pagination stalled — and every one of them resolved by falling back to the
+ * bundled catalogue.
+ *
+ * After ADR 034 the bundled catalogue is not a fallback, it is the source, so there is
+ * nothing to fall back *from*. `docs/failure-modes.md` records the removal in place of the
+ * table rather than deleting the section, because a failure-mode document that quietly
+ * loses six rows is indistinguishable from one nobody maintained.
+ */
 const REGISTERED: { file: string; type: string }[] = [
-  { file: 'src/lib/shopify/index.ts', type: 'FallbackReason' },
   { file: 'src/lib/utils/rateLimit.ts', type: 'RateLimitFailurePosture' },
   { file: 'src/lib/utils/rateLimit.ts', type: 'RateLimiterHealth' },
   { file: 'src/lib/http/readBoundedBody.ts', type: 'BoundedFailure' },
@@ -103,11 +114,20 @@ describe('the registry parses', () => {
     // this set, and every "is it documented?" assertion below would then fail
     // loudly rather than pass vacuously — but the reverse direction would pass,
     // so this is asserted rather than assumed.
+    //
+    // The floor was 15 and is 10. It moved because the document genuinely lost seven rows
+    // on 2026-09-20: six for `FallbackReason` and one for the pagination budget, all of
+    // them describing degradations of a Shopify read that WS-4c removed. Lowering a
+    // tripwire to accommodate a change is usually the wrong move, so it is worth being
+    // exact about what this number is for — it exists to catch the *parser* silently
+    // returning nothing, not to ratchet the document's size. Twelve rows survive; ten
+    // leaves room for a legitimate removal and still fails hard on a syntax change, which
+    // would take the count to zero rather than to nine.
     expect(
       rows.length,
       'No table rows parsed out of docs/failure-modes.md. The table syntax changed and ' +
         'this reconciliation is reading nothing.'
-    ).toBeGreaterThan(15)
+    ).toBeGreaterThan(10)
   })
 
   it('names every registered type in the prose, so a reader can find the source', () => {

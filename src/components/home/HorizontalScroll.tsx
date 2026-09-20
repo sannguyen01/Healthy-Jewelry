@@ -1,15 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import type { HJProduct } from '@/lib/catalog/types'
+import type { CatalogProduct } from '@/lib/catalog'
 import { ProductImage } from '@/components/product/ProductImage'
 import { Badge } from '@/components/ui/Badge'
 import { useReveal } from '@/lib/hooks/useReveal'
-import { formatPrice } from '@/lib/utils/formatPrice'
 
 interface HorizontalScrollProps {
   label: string
-  products: HJProduct[]
+  products: readonly CatalogProduct[]
   viewAllHref?: string
 }
 
@@ -88,7 +87,7 @@ export function HorizontalScroll({
       >
         {products.map((product) => (
           <Link
-            key={product.id}
+            key={product.handle}
             href={`/products/${product.handle}`}
             style={{
               display: 'block',
@@ -136,15 +135,13 @@ export function HorizontalScroll({
               />
               {product.badge && (
                 <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
-                  <Badge
-                    variant={
-                      product.badge === 'Bestseller'
-                        ? 'bestseller'
-                        : product.badge === 'New'
-                          ? 'new'
-                          : 'sale'
-                    }
-                  />
+                  {/*
+                    The badge value *is* the variant now — both are handles. The old
+                    three-way ternary mapped display strings ('Bestseller') onto variants
+                    and fell through to 'sale' for anything unrecognised, which is how an
+                    unknown badge would have rendered as a sale that did not exist.
+                  */}
+                  <Badge variant={product.badge} />
                 </div>
               )}
             </div>
@@ -174,23 +171,22 @@ export function HorizontalScroll({
                   margin: '0 0 6px',
                 }}
               >
-                {product.material === 'surgical-steel'
-                  ? '316L Surgical Steel'
-                  : product.material === 'niobium'
-                    ? 'Niobium'
-                    : 'Grade 23 Titanium'}
+                {/*
+                  The published label off the record. This was a three-way ternary on
+                  `product.material` whose final arm was an unguarded `: 'Grade 23
+                  Titanium'` — so a material the chain did not recognise rendered as
+                  titanium rather than as nothing, which is a metallurgy claim made by a
+                  fallback on a brand whose entire promise is knowing which metal touches
+                  your skin. `schema.ts` keeps `material` and `materialLabel` as separate
+                  fields precisely so the claim lives in content.
+                */}
+                {product.materialLabel}
               </p>
-              <p
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  fontWeight: 300,
-                  fontSize: '0.9rem',
-                  color: 'var(--ink)',
-                  margin: 0,
-                }}
-              >
-                {formatPrice(product.price, product.currencyCode)}
-              </p>
+              {/*
+                The price was here. A browse-only strip shows what a piece is and what
+                it is made of; what it costs is a conversation, not a number the site
+                can stand behind.
+              */}
             </div>
           </Link>
         ))}

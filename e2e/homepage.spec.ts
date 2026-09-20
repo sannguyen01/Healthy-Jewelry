@@ -68,9 +68,28 @@ test.describe('Homepage', () => {
   })
 
   test('horizontal scroll strip shows product cards', async ({ page }) => {
-    // At least one product card link should exist on the homepage
-    const productLinks = page.getByRole('link').filter({ hasText: /\$/ })
+    // A product card is identified by where it goes, not by a price on it.
+    //
+    // This used to filter links by `hasText: /\$/`, which found a card only because every
+    // card quoted a dollar amount. That is two assertions wearing one coat: *a strip
+    // exists* and *cards carry prices*. When the second stopped being true the first
+    // reported a missing strip, which is not what changed.
+    //
+    // Matched on `href` rather than on a contained `<article>`: the strip's card is a
+    // `<Link>` wrapping two `<div>`s (`HorizontalScroll.tsx`), while `/shop`'s card is a
+    // `<Link>` wrapping an `<article>` (`ProductCard.tsx`). The destination is the one
+    // property both have, and it is the property that makes a card a card.
+    const productLinks = page.locator('a[href^="/products/"]')
     await expect(productLinks.first()).toBeVisible()
+    await expect(await productLinks.count()).toBeGreaterThan(1)
+  })
+
+  test('the homepage quotes no prices', async ({ page }) => {
+    // The other half, asserted deliberately rather than left as the absence that broke
+    // the test above. `src/tests/unit/price-absence-contract.test.tsx` owns this at the
+    // component level; this is the rendered page, which is where a price would actually
+    // be read by a customer.
+    await expect(page.getByText(/[$€£¥₫]\s?[\d,]+/)).toHaveCount(0)
   })
 
   test('collection grid has all 5 collection links', async ({ page }) => {

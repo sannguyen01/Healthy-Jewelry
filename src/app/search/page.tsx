@@ -5,7 +5,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ProductCard } from '@/components/product/ProductCard'
 import { headers } from 'next/headers'
-import { searchProducts } from '@/lib/shopify'
+import { searchProducts } from '@/lib/catalog'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { TrackView } from '@/components/analytics/TrackView'
 
@@ -19,34 +19,41 @@ interface SearchPageProps {
 }
 
 /**
- * A server component now, because this page used to search
- * `getAllProducts()` — the *static* catalogue — from the browser.
+ * A server component, because this page used to search the static catalogue from the
+ * browser while the rest of the site read Shopify.
  *
- * The static and Shopify catalogues are nearly disjoint, so site search
- * returned products that 404 on click and could not find a single one of the
- * 22 products actually for sale. `searchProducts()` had been sitting in
- * `src/lib/shopify/index.ts` fully implemented and called from nowhere.
+ * The two catalogues were nearly disjoint, so site search returned products that 404'd on
+ * click and could not find a single one of the 22 products actually for sale.
+ * `searchProducts()` sat in `src/lib/shopify/index.ts` fully implemented and called from
+ * nowhere. It reads `@/lib/catalog` now — the same seventeen records every other surface
+ * reads ([ADR 034](../../../docs/adr/034-the-catalogue-is-the-source.md)) — so the class of
+ * defect is closed rather than moved: there is one catalogue to disagree with.
  */
 /**
- * The ceiling on search, and why it is on the page rather than on a route.
+ * The ceiling on search, kept, with its reason restated because the original expired.
  *
- * `/api/search` used to exist as a public JSON endpoint doing exactly what this
- * component does, with no limiter, no query cap and no cache — and **no
- * callers**: this page has always called `searchProducts` directly. It was
- * deleted rather than hardened, because an untested, uncalled, unlimited
- * endpoint that spends the store's Shopify quota is surface area with negative
- * value. `e2e/COVERAGE.md` had it classified as "exercised through the /search
- * page", which was not true in either direction.
+ * `/api/search` used to exist as a public JSON endpoint doing exactly what this component
+ * does, with no limiter, no query cap and no cache — and **no callers**: this page has
+ * always called `searchProducts` directly. It was deleted rather than hardened, because an
+ * untested, uncalled, unlimited endpoint that spends the store's Shopify quota is surface
+ * area with negative value. `e2e/COVERAGE.md` had it classified as "exercised through the
+ * /search page", which was not true in either direction.
  *
- * Deleting it does not close the exposure, though — this page has the same
- * property. `/search` is dynamic by construction (it reads `searchParams`), so
- * every distinct query is a Shopify round-trip. Caching (60s, keyed on the
- * normalised query) turns that from one call per visitor into one call per
- * distinct query per minute; this limiter is what bounds the number of distinct
- * queries one caller can mint.
+ * **The quota argument is gone.** This limiter existed because `/search` is dynamic by
+ * construction — it reads `searchParams` — so every distinct query was a Shopify round
+ * trip, and the limiter bounded how many distinct queries one caller could mint. Search is
+ * now `Array.prototype.filter` over seventeen in-memory records. There is no external quota
+ * left to protect.
  *
- * `onError: 'allow'`. If Upstash cannot be consulted, a customer who cannot
- * search is a worse outcome than quota spent on one who can.
+ * It stays, and the honest reason is narrower than the old one: `/search` is the **only
+ * dynamic route this site still serves**. Every other page is prerendered, so it is the one
+ * URL where a caller chooses how much server work happens per request. That is a smaller
+ * risk than a metered third-party API and it is not nothing, and removing a rate limit is a
+ * decision that deserves its own change rather than a rider on a decommission.
+ *
+ * `onError: 'allow'` is unchanged and is now clearly right: a customer who cannot search
+ * because Upstash is unreachable would be paying for a protection against a cost that no
+ * longer exists.
  */
 const searchLimiter = createRateLimiter({
   limit: 30,
@@ -56,16 +63,18 @@ const searchLimiter = createRateLimiter({
 })
 
 async function SearchResults({ query }: { query: string }) {
-  // `searchProducts` treats an empty query as "match everything" and returns
-  // the whole static catalogue, so the empty case is answered here instead —
-  // preserving the "Start typing to search" state this page has always had.
+  // The empty case is answered here as well as in `searchProducts`, and the duplication is
+  // deliberate. The reader returns `[]` for an empty query — an earlier implementation
+  // treated it as "match everything" and returned the whole catalogue — but this page needs
+  // to tell *no query* apart from *no results*: one shows "Start typing to search", the
+  // other shows "Nothing matched". An empty array cannot carry that difference.
   const isRealQuery = query.trim().length > 0
 
   // Only a real query is metered. The empty state costs nothing and refusing it
   // would turn a navigation into an error.
   const throttled = isRealQuery && (await searchLimiter.isLimited(clientIp(await headers())))
 
-  const results = !isRealQuery || throttled ? [] : await searchProducts(query)
+  const results = !isRealQuery || throttled ? [] : searchProducts(query)
 
   return (
     <>
@@ -302,7 +311,7 @@ async function SearchResults({ query }: { query: string }) {
               }}
             >
               {results.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.handle} product={product} />
               ))}
             </div>
           )}

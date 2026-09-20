@@ -29,10 +29,18 @@ test.describe('Shop page', () => {
     await expect(cardLink).toHaveAttribute('href', /\/products\//)
   })
 
-  test('each product card shows a price', async ({ page }) => {
-    // Currency-agnostic on purpose — see product-detail.spec.ts.
+  test('each product card shows what the piece is, not what it costs', async ({ page }) => {
+    // A card carries a title and a material. It used to carry a price too, and this test
+    // asserted the price — so it was the only thing on the card anyone had pinned.
     const firstCard = page.locator('article').first()
-    await expect(firstCard.getByText(/[$€£₫]\s?[\d,]+/)).toBeVisible()
+    await expect(firstCard.getByText(/titanium|niobium|surgical steel/i).first()).toBeVisible()
+    await expect(firstCard.getByText(/[$€£¥₫]\s?[\d,]+/)).toHaveCount(0)
+  })
+
+  test('no card anywhere on /shop quotes a price', async ({ page }) => {
+    // Every card, not the first — a single-card assertion passes while sixteen others
+    // print money.
+    await expect(page.getByText(/[$€£¥₫]\s?[\d,]+/)).toHaveCount(0)
   })
 
   test('shows all 5 collection filter options', async ({ page }) => {

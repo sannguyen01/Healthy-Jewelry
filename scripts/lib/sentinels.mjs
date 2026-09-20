@@ -90,9 +90,19 @@ export const SENTINELS = [
   {
     id: 'collection-handle-contract',
     runner: 'vitest',
-    file: 'src/lib/data/hj-data.ts',
-    find: "    handle: 'charms',",
-    replace: "    handle: 'charm',",
+    // Was `src/lib/data/hj-data.ts`, mutating a collection record's own handle. Collections
+    // moved to `src/content/catalog/collections/*.json` in WS-4b, and the schema is now
+    // where the vocabulary is declared.
+    //
+    // The mutation moved with it rather than following the data, and that is the more
+    // faithful target: editing a JSON record's handle to 'charm' would fail
+    // `collectionSchema`'s `z.enum` before the contract test ran, so the probe would prove
+    // the schema works rather than proving this invariant is still watched. Adding a
+    // *valid-looking sixth handle* to the vocabulary is the real drift — a handle a record
+    // may declare and the router will not serve.
+    file: 'src/lib/catalog/schema.ts',
+    find: "  'charms',\n] as const",
+    replace: "  'charms',\n  'pendants',\n] as const",
     specs: ['src/tests/unit/collection-handle-contract.test.ts'],
     invariant: 'every collection a product maps into is one the router will serve',
     scar: '/shop/[collection] sets dynamicParams = false, so a drifted handle is a hard 404 reached from a link the site renders itself, on a page that looks healthy.',

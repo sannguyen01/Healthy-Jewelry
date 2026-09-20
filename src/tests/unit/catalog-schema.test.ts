@@ -10,7 +10,6 @@ import {
   AVAILABILITY_STATES,
   type CatalogProduct,
 } from '@/lib/catalog/schema'
-import { HJ_COLLECTION_HANDLES } from '@/lib/catalog/types'
 import { loadCatalog } from '@/lib/catalog'
 
 /**
@@ -216,11 +215,19 @@ describe('pendingFieldCount makes content debt countable', () => {
 })
 
 describe('the vocabularies', () => {
-  it('collection handles match the ones the rest of the app still uses', () => {
-    // Restated in schema.ts rather than imported, because WS-4 deletes the Shopify wire
-    // format and a schema importing its unions would go with it. This is the join that
-    // keeps the restatement honest while both exist — delete it with `types.ts`.
-    expect([...COLLECTION_HANDLES].sort()).toEqual([...HJ_COLLECTION_HANDLES].sort())
+  it('collection handles are the five the site serves', () => {
+    // This compared `COLLECTION_HANDLES` against `HJ_COLLECTION_HANDLES` in
+    // `src/lib/catalog/types.ts` — the Shopify wire format — because the schema restated
+    // the vocabulary rather than importing it, and the restatement needed a join while
+    // both existed. WS-4c deleted that file, so the schema is now the only declaration
+    // and there is nothing left to reconcile it against here.
+    //
+    // The comparison that still matters moved to `collection-handle-contract.test.ts`,
+    // where it belongs: this union against the router's own `VALID_COLLECTIONS`, which is
+    // what decides whether a handle 404s.
+    expect([...COLLECTION_HANDLES].sort()).toEqual(
+      ['bracelets', 'charms', 'earrings', 'necklaces', 'rings']
+    )
   })
 
   it('materials are the three the brand actually makes', () => {

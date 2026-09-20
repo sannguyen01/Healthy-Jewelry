@@ -3,7 +3,7 @@ import { readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { GET } from '@/app/api/sitemap/route'
 import { STATIC_PAGES, SITEMAP_EXCLUDED } from '@/lib/seo/sitemapPages'
-import { hjCollections, getAllProducts } from '@/lib/data/hj-data'
+import { getAllCollections, getAllProducts } from '@/lib/catalog'
 
 import { pageRoutes } from '../support/parsers'
 
@@ -148,9 +148,10 @@ describe('the sitemap publishes nothing that does not exist', () => {
     // `/shop/[collection]` sets `dynamicParams = false`, so a handle outside its
     // VALID_COLLECTIONS is a hard 404 before rendering. Pattern-matching above proves
     // the shape; this proves the handle. collection-handle-contract.test.ts already
-    // holds VALID_COLLECTIONS and hjCollections together, so deriving from hjCollections
-    // is sound — that is the join this relies on, named rather than assumed.
-    const handles = hjCollections.map((c) => c.handle)
+    // holds VALID_COLLECTIONS and the catalogue's collections together, so deriving from
+    // `getAllCollections()` is sound — that is the join this relies on, named rather
+    // than assumed.
+    const handles = getAllCollections().map((c) => c.handle)
     for (const path of sitemapPaths.filter((p) => p.startsWith('/shop/'))) {
       expect(handles, `${path} is not a collection the router serves`).toContain(
         path.replace('/shop/', '')
@@ -169,20 +170,22 @@ describe('every dynamic route declares how its paths are generated', () => {
   })
 
   it('/shop/[collection] publishes every collection, and only collections', () => {
-    // Derived rather than reconciled: STATIC_PAGES maps over hjCollections, so a
+    // Derived rather than reconciled: STATIC_PAGES maps over `getAllCollections()`, so a
     // collection added to the catalogue reaches the sitemap without anyone remembering
     // this file. These five paths were written out by hand until 2026-08-28 —
-    // a second copy of hjCollections, with nothing joining them.
+    // a second copy of the collection list, with nothing joining them.
     const published = sitemapPaths.filter((p) => p.startsWith('/shop/')).sort()
-    const expected = hjCollections.map((c) => `/shop/${c.handle}`).sort()
+    const expected = getAllCollections().map((c) => `/shop/${c.handle}`).sort()
     expect(published).toEqual(expected)
   })
 
-  it('/products/[handle] publishes one entry per product the fetcher returns', async () => {
-    // Without Shopify credentials `getProducts()` degrades to the static catalogue,
-    // which is what the unit environment sees. That is the right thing to assert here:
-    // the question is whether the sitemap enumerates whatever the fetcher returns, not
-    // which catalogue answered.
+  it('/products/[handle] publishes one entry per product in the catalogue', async () => {
+    // One source now, and the assertion is stronger for it. This used to hedge — the
+    // sitemap read `getProducts()`, which degraded to the static catalogue when Shopify
+    // was unconfigured, so the test could only ask whether the sitemap enumerated
+    // "whatever the fetcher returned" without knowing which catalogue answered. After
+    // ADR 034 there is exactly one answer, and it is the same one `generateStaticParams`
+    // gives, so this is now a real reconciliation between the sitemap and the routes.
     const xml = await (await GET()).text()
     for (const product of getAllProducts()) {
       expect(xml, `no sitemap entry for /products/${product.handle}`).toContain(

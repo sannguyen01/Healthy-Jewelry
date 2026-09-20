@@ -1,9 +1,10 @@
 import Image from 'next/image'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import type { HJProduct } from '@/lib/catalog/types'
+import type { CatalogProduct } from '@/lib/catalog'
+import type { HJSvgType } from '@/lib/svg/types'
 
 /**
- * A product's picture: its photograph when Shopify has one, its illustration when not.
+ * A product's picture, driven by the catalogue's three-state media union.
  *
  * ## Why this is one component and not a conditional in five places
  *
@@ -21,19 +22,27 @@ import type { HJProduct } from '@/lib/catalog/types'
  * change, no redeploy, and no possibility of four surfaces switching over while the
  * fifth quietly keeps drawing a ring outline.
  *
+ * ## Three states, because two could not tell them apart
+ *
+ * `featuredImage: null` used to mean both *this piece is drawn, deliberately* and
+ * *nobody has decided what this looks like*. The catalogue schema splits them
+ * ([ADR 034](../../../docs/adr/034-the-catalogue-is-the-source.md)) and this switch is
+ * exhaustive over the union, so a fourth state cannot be added without every surface
+ * being told what to draw for it.
+ *
+ * `illustration-pending` renders nothing rather than guessing an illustration. A wrong
+ * drawing on a real product is a worse failure than an empty frame: it is a claim about
+ * the object, made by a default.
+ *
  * ## Presence is not visibility
  *
  * `e2e/visual-assets.spec.ts` exists because this project once shipped collection tiles
  * that were present, requested successfully, and rendered at `opacity: 0.12`. Product
- * imagery is checked the same way there, and `verify-production.mjs` asserts the
- * converse against the live store: a product that *has* a photo in Shopify must show a
- * `cdn.shopify.com` URL on its page. That direction is the one that will actually happen
- * — an upload that never reaches the page is silent and looks exactly like "no photo
- * yet".
+ * imagery is checked the same way there.
  */
 
 interface ProductImageProps {
-  product: HJProduct
+  product: CatalogProduct
   /**
    * How much of the tile the illustration fills. Photographs always fill the frame;
    * the illustrations are line art and need air around them, and each surface had
@@ -58,25 +67,32 @@ export function ProductImage({
   priority = false,
   className,
 }: ProductImageProps) {
-  const photo = product.featuredImage
+  const { media } = product
 
-  if (!photo) {
+  if (media.kind === 'illustration') {
     return (
       <JewelrySVG
-        type={product.svgType}
+        type={media.svgType as HJSvgType}
         className={className ?? ''}
         style={{ width: svgScale, height: svgScale }}
       />
     )
   }
 
+  if (media.kind === 'illustration-pending') {
+    // Nothing, deliberately. See the note above: a default illustration on a real piece
+    // is a claim about the object made by a fallback. The empty frame keeps the tile's
+    // geometry (`aspect-ratio: 1 / 1`, per CLAUDE.md) so the grid does not reflow.
+    return <div className={className} aria-hidden="true" />
+  }
+
   return (
     <Image
-      src={photo.url}
-      // Never empty. An empty alt tells a screen reader the image is decorative,
-      // which is a lie about the one thing on the page the customer is buying —
-      // and Shopify's altText is unset far more often than it is set.
-      alt={photo.altText?.trim() || product.title}
+      src={media.src}
+      // The schema refuses an empty alt, so this cannot be the empty string. An empty
+      // alt tells a screen reader the image is decorative — a lie about the one thing
+      // on the page the customer came to look at.
+      alt={media.alt}
       fill
       sizes={sizes}
       priority={priority}

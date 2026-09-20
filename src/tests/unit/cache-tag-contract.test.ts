@@ -6,9 +6,9 @@ import { parseSource, callsTo, arrayPropertyValues } from '@/lib/analysis/tsAstS
 /**
  * A cache tag is a bare string on both sides of an invalidation:
  *
- *   - `src/lib/shopify/index.ts` *registers* tags when it fetches;
- *   - `src/app/api/webhooks/shopify/route.ts` *revalidates* tags when Shopify
- *     says something changed.
+ *   - a fetcher *registers* tags when it fetches;
+ *   - `src/app/api/webhooks/shopify/route.ts` and `src/app/api/revalidate/route.ts`
+ *     *revalidate* tags when something is said to have changed.
  *
  * Nothing connects them. If the two spell a tag differently, the failure is
  * completely silent — no error, no log, no failing test. The only symptom is a
@@ -26,7 +26,36 @@ import { parseSource, callsTo, arrayPropertyValues } from '@/lib/analysis/tsAstS
  *
  * A test asserting `revalidateTag` "was called with the right string" would
  * have passed throughout, because it would have been asserting the same wrong
- * string the route used. So this checks the two files against *each other*.
+ * string the route used. So this checked the two files against *each other*.
+ *
+ * ## The registration side is gone, and this file had to be re-founded rather than deleted
+ *
+ * `src/lib/shopify/index.ts` was the only module that ever registered a tag — `tags: [...]`
+ * on a `fetch` cache-options object. WS-4c deleted it: the catalogue is seventeen validated
+ * records imported at module load
+ * ([ADR 034](../../../docs/adr/034-the-catalogue-is-the-source.md)), and an in-bundle import
+ * has no fetch cache to tag.
+ *
+ * So **every surviving `revalidateTag` call is an orphan by construction**, and the
+ * orphan check as written would now report all of them. That is not a defect in the routes:
+ * they survive on purpose. The masterplan's WS-7 ordering is *delete the Shopify webhook
+ * subscriptions before removing `/api/webhooks/shopify`*, those subscriptions can only be
+ * deleted from Shopify Admin, and the connector reads `needs_reconnect`. Removing the
+ * endpoint first would leave Shopify retrying against a failing route for its full backoff
+ * schedule.
+ *
+ * What is left to check, and what this file now checks:
+ *
+ *   1. the two revalidating routes still spell tags through the shared builders, so they
+ *      cannot drift from each other while both exist;
+ *   2. every purge still passes `PURGE_NOW` rather than a profile that keeps serving stale
+ *      copy;
+ *   3. the bare `collections` orphan has not come back;
+ *   4. **registration is still zero** — a premise detector
+ *      ([ADR 008](../../../docs/adr/008-decisions-need-premise-detectors.md)). The moment
+ *      any module registers a cache tag again, the orphan and widow checks are meaningful
+ *      again and must be restored. That test fails and says so, rather than this file
+ *      quietly staying narrow for a codebase that has moved back underneath it.
  */
 
 const ROOT = process.cwd()
@@ -62,9 +91,12 @@ function walkSources(dir: string): string[] {
 
 const SOURCE_FILES = [join(ROOT, 'src/app'), join(ROOT, 'src/lib')].flatMap(walkSources)
 
-const FETCHER_SRC = readFileSync(join(ROOT, 'src/lib/shopify/index.ts'), 'utf-8')
 const WEBHOOK_SRC = readFileSync(
   join(ROOT, 'src/app/api/webhooks/shopify/route.ts'),
+  'utf-8',
+)
+const MANUAL_PURGE_SRC = readFileSync(
+  join(ROOT, 'src/app/api/revalidate/route.ts'),
   'utf-8',
 )
 
@@ -146,14 +178,19 @@ describe('cache tag contract', () => {
     }
   }
 
-  const where = (tag: string) => (revalidatedIn.get(tag) ?? ['?']).join(', ')
+  // `where(tag)` stood here, naming the files that revalidate a tag so an orphan failure
+  // could point at the offender. Its only caller was the orphan assertion, which is
+  // suspended below — see the note there. It goes with the assertion rather than being
+  // kept as an unused helper, and comes back with it.
 
-  it('scans a plausible number of modules and finds tags on both sides', () => {
+  it('scans a plausible number of modules and finds tags to revalidate', () => {
     // A walk that silently returned nothing would make every assertion below vacuously
     // pass — the same "covered-looking and worthless" failure secret-exposure.test.ts
     // guards by asserting its graph is non-empty.
+    //
+    // `registered.size > 0` was asserted here too and is now asserted to be *zero*, in
+    // its own test below. See the note at the top of this file.
     expect(SOURCE_FILES.length).toBeGreaterThan(20)
-    expect(registered.size).toBeGreaterThan(0)
     expect(revalidated.size).toBeGreaterThan(0)
   })
 
@@ -164,7 +201,33 @@ describe('cache tag contract', () => {
     const scanned = SOURCE_FILES.map((f) => relative(ROOT, f))
     expect(scanned).toContain('src/app/api/webhooks/shopify/route.ts')
     expect(scanned).toContain('src/app/api/revalidate/route.ts')
-    expect(scanned).toContain('src/lib/shopify/index.ts')
+  })
+
+  /**
+   * **The premise detector: nothing registers a cache tag any more.**
+   *
+   * This is the assertion that makes the narrowing above honest rather than convenient.
+   * The orphan and widow checks are not deleted below — they are *suspended*, and this is
+   * what un-suspends them: the moment any module registers a tag, a producer exists again,
+   * the two sides can drift again, and both checks have to come back.
+   *
+   * Written as an equality against zero rather than as a skipped test, because a skipped
+   * test reports nothing and this has to fail loudly. Same shape as
+   * `soft-404-premise.test.ts`, which failed the moment the product page's data source
+   * moved and named the fix in its message.
+   */
+  it('nothing registers a cache tag, which is why the orphan check is suspended', () => {
+    expect(
+      [...registered],
+      `A module registers cache tags again: ${[...registered].join(', ')}.\n\n` +
+        `That means there is a fetch cache to invalidate, so the orphan and widow checks ` +
+        `in this file are meaningful again and must be restored — they are suspended ` +
+        `only because WS-4c removed the last fetcher and left the two revalidating ` +
+        `routes standing (WS-7 deletes them, after the Shopify subscriptions go).\n\n` +
+        `Restore 'every tag the webhook revalidates is registered by some fetcher' and ` +
+        `'every tag a fetcher registers is revalidated by some topic', and delete this ` +
+        `test.`
+    ).toEqual([])
   })
 
   describe('every purge asks for immediate expiry', () => {
@@ -230,38 +293,35 @@ describe('cache tag contract', () => {
     })
   })
 
-  it('every tag the webhook revalidates is registered by some fetcher', () => {
-    // Orphans. Revalidating a tag nothing registered is a no-op that looks
-    // exactly like a successful invalidation.
-    const orphans = [...revalidated].filter((tag) => !registered.has(tag))
+  /*
+   * The orphan and widow checks stood here.
+   *
+   *   - **Orphans**: a tag revalidated but registered by no fetch. Revalidating it is a
+   *     no-op that looks exactly like a successful invalidation.
+   *   - **Widows**: a tag registered but never revalidated, so those pages are only ever
+   *     refreshed by their time-based window.
+   *
+   * Both compare `revalidated` against `registered`, and `registered` is now empty for the
+   * reason the header explains: the only module that ever registered a tag was the Shopify
+   * fetcher, and WS-4c deleted it. Run as written, the orphan check would report every
+   * surviving call and the widow check would pass vacuously — one false alarm and one
+   * false assurance, from the same missing producer.
+   *
+   * They are not deleted, because they are the substance of this contract and the
+   * conditions for them return the moment anything fetches again. The test immediately
+   * above is what notices: it asserts `registered` is empty and, when it stops being, says
+   * to restore these two by name.
+   *
+   * The `both sides import the tag names rather than spelling them inline` test went with
+   * the fetcher half of it; what survives of it is the two-route version below.
+   */
 
-    expect(
-      orphans,
-      'These tags are revalidated but no fetch registers them, so revalidating\n' +
-        'them does nothing at all:\n  ' +
-        orphans.map((t) => `${t}  (in ${where(t)})`).join('\n  '),
-    ).toEqual([])
-  })
-
-  it('every tag a fetcher registers is revalidated by some topic', () => {
-    // Widows. A registered tag nothing ever revalidates means those pages are
-    // only ever refreshed by their time-based `revalidate` window.
-    const widows = [...registered].filter((tag) => !revalidated.has(tag))
-
-    expect(
-      widows,
-      'These tags are registered by a fetch but never revalidated, so those pages\n' +
-        'stay stale for the full revalidate window no matter what changes in Shopify:\n  ' +
-        widows.join('\n  '),
-    ).toEqual([])
-  })
-
-  it('both sides import the tag names rather than spelling them inline', async () => {
-    // The contract above can only be *maintained* if there is one place to
-    // change. Two files with matching string literals agree today and drift
-    // tomorrow.
-    expect(FETCHER_SRC).toMatch(/from '\.\/cacheTags'/)
+  it('both revalidating routes import the tag names rather than spelling them inline', () => {
+    // The contract can only be *maintained* if there is one place to change. Two files
+    // with matching string literals agree today and drift tomorrow — and these two are
+    // still two files, so the rule still has work to do.
     expect(WEBHOOK_SRC).toMatch(/from '@\/lib\/shopify\/cacheTags'/)
+    expect(MANUAL_PURGE_SRC).toMatch(/from '@\/lib\/shopify\/cacheTags'/)
   })
 
   it('the tag builders produce the documented shapes', async () => {

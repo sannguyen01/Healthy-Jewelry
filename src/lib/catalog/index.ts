@@ -163,6 +163,49 @@ export function getNewArrivals(): readonly CatalogProduct[] {
 }
 
 /**
+ * The longest search query this will consider.
+ *
+ * Carried over from the Shopify search path, where it bounded a cache key and a network
+ * call. Neither exists now — the search is a filter over 17 records in memory — but the
+ * bound stays for the reason it was chosen: an unbounded query is an unbounded string from
+ * a URL, and `?q=` with a megabyte in it should cost nothing.
+ */
+export const MAX_SEARCH_QUERY_LENGTH = 100
+
+/** Lower-case, collapse whitespace, trim, bound. */
+export function normaliseSearchQuery(query: string): string {
+  return query.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+}
+
+/**
+ * Products matching a query, across the fields a shopper would search by.
+ *
+ * Replaces the Shopify Storefront `search` connection, and the substitution is closer than
+ * it sounds: that path already degraded to exactly this filter whenever Shopify was
+ * unconfigured or unreachable, so this behaviour has been the one most visitors got.
+ *
+ * An empty query returns nothing rather than everything. `/search` with no term is a page
+ * waiting for input, not a request for the whole catalogue.
+ *
+ * `materialLabel` is searched as well as `material`: somebody typing "titanium" and
+ * somebody typing "Grade 23" are asking the same question, and only one of those is the
+ * handle.
+ */
+export function searchProducts(query: string): readonly CatalogProduct[] {
+  const q = normaliseSearchQuery(query)
+  if (!q) return []
+  return products.filter(
+    (p) =>
+      p.title.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.material.toLowerCase().includes(q) ||
+      p.materialLabel.toLowerCase().includes(q) ||
+      p.specification.toLowerCase().includes(q) ||
+      p.collection.toLowerCase().includes(q)
+  )
+}
+
+/**
  * How many product fields across the whole catalogue are waiting to be authored.
  *
  * Exported so a test can ratchet it. Content debt that is counted can be burnt down;
