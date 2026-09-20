@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Nav } from '@/components/layout/Nav'
-import { useCartStore } from '@/store/cart'
 
 vi.mock('next/image', () => ({
   // eslint-disable-next-line @next/next/no-img-element
@@ -35,13 +34,6 @@ vi.mock('next/navigation', () => ({
 }))
 
 beforeEach(() => {
-  useCartStore.setState({
-    items: [],
-    isOpen: false,
-    shopifyCartId: null,
-    checkoutUrl: null,
-    isLoading: false,
-  })
 })
 
 describe('Nav', () => {
@@ -71,60 +63,6 @@ describe('Nav', () => {
     it('home link has correct aria-label', () => {
       render(<Nav />)
       expect(screen.getByRole('link', { name: /healthy jewelry.*home/i })).toBeTruthy()
-    })
-  })
-
-  describe('bag button', () => {
-    it('renders bag button with aria-label', () => {
-      render(<Nav />)
-      expect(screen.getByRole('button', { name: /open bag/i })).toBeTruthy()
-    })
-
-    it('shows count 0 when cart is empty — no count badge rendered', () => {
-      render(<Nav />)
-      const bagButton = screen.getByRole('button', { name: /open bag — 0 item/i })
-      expect(bagButton).toBeTruthy()
-    })
-
-    it('shows count badge when cart has items', () => {
-      useCartStore.setState({
-        items: [
-          {
-            product: {
-              id: 'hj-001',
-              defaultVariantId: 'gid://shopify/ProductVariant/hj-001-default',
-              handle: 'arc-band',
-              title: 'Arc Band',
-              collection: 'rings',
-              material: 'titanium',
-              tags: [],
-              price: '89.00',
-              compareAtPrice: null,
-              currencyCode: 'USD',
-              badge: null,
-              description: 'Test',
-              spec: '2mm',
-              svgType: 'ring-arc',
-              featuredImage: null,
-              images: [],
-              variants: [],
-            },
-            quantity: 3,
-            variantId: 'gid://shopify/ProductVariant/hj-001-default',
-          },
-        ],
-        isOpen: false,
-        shopifyCartId: null,
-        checkoutUrl: null,
-        isLoading: false,
-      })
-      render(<Nav />)
-      expect(screen.getByText('3')).toBeTruthy()
-    })
-
-    it('uses cartCount prop when provided, overriding store count', () => {
-      render(<Nav cartCount={7} />)
-      expect(screen.getByText('7')).toBeTruthy()
     })
   })
 

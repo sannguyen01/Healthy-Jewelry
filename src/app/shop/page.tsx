@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductGrid } from '@/components/product/ProductGrid'
 import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
@@ -57,7 +56,6 @@ export default async function ShopPage() {
         </section>
       </main>
       <Footer />
-      <CartDrawer />
     </>
   )
 }

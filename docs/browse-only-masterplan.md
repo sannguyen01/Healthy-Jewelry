@@ -390,16 +390,27 @@ events.
 
 Retired-route contract:
 
-| Route | Status | Rationale |
-|---|---|---|
-| `/cart` | 308 → `/shop` | a bag is now a shelf |
-| `/checkout` | 410 Gone | the capability is withdrawn, not moved |
-| `/order-confirmed` | 410 Gone | same |
-| `/account` | 308 → `/contact` | a person replaces the login |
-| `/api/shopify` | 404 | never a public contract |
-| `/api/webhooks/*` | 404 | " |
-| `/api/revalidate` | 404 | " |
-| `/api/auth/*` | 404 | " |
+| Route | Status | Rationale | Landed |
+|---|---|---|---|
+| `/cart` | 308 → `/shop` | a bag is now a shelf | ✅ |
+| `/checkout` | 410 Gone | the capability is withdrawn, not moved | ✅ |
+| `/account` | 308 → `/contact` | a person replaces the login | ✅ |
+| `/api/shopify` | 404 | never a public contract | ✅ |
+| `/api/auth/*` | 404 | " | ✅ |
+| `/api/webhooks/shopify` | 404 | " | **held** — see below |
+| `/api/revalidate` | 404 | " | **held** — the webhook calls it |
+
+~~`/order-confirmed` | 410 Gone~~ — **this route never existed.** The table named it from the
+brief; `find src/app -iname '*order*'` returns nothing and always would have. A retired-route
+contract naming a route that was never served is a line nothing can satisfy and nothing can
+fail, which is worse than an omission: it reads as coverage.
+
+**Two routes are deliberately held back**, and the reason is this plan's own WS-7 sequence:
+*delete the Shopify webhook subscriptions **before** removing `/api/webhooks/shopify`, or
+Shopify retries against a failing route for its full backoff schedule.* Those subscriptions
+can only be deleted from Shopify Admin, and the connector reads `needs_reconnect`. Removing
+the endpoint first would be doing the thing this document says not to do. `/api/revalidate`
+is held with it because the webhook is what calls it.
 
 **Assert the status codes over HTTP.** A Playwright `expect(page).toHaveURL()` passes on a soft
 200 that renders a "gone" message, and this repository has an ADR about precisely that family

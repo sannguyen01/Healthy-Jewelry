@@ -1,6 +1,5 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mainNav } from '../src/config/navigation'
-import { seedBag } from './support/seedBag'
 import {
   describeOffenders,
   minimumFittingWidth,
@@ -55,23 +54,6 @@ const DEVICE_WIDTHS = [320, 360, 375, 390, 412, 414, 768, 769, 1024, 1440]
 
 const headerFits: FitProbe = (page) => offendersPastViewport(page, 'header')
 
-/**
- * Loads the homepage with a seeded bag and waits for the badge to actually be
- * on screen before anything is measured.
- *
- * The wait is the whole point. The bag is persisted to `localStorage` and read
- * back after mount (`hasHydrated` in `src/store/cart.tsx`), so a sweep that
- * starts as soon as the header is visible races that read and measures the
- * empty-bag header under a seeded-bag name. The first run of this spec did
- * exactly that: it reported a 435px requirement — the empty-bag number — for
- * the case that exists specifically to measure the extra 21px.
- */
-async function gotoHomeWithSeededBag(page: Page): Promise<void> {
-  await seedBag(page)
-  await page.goto('/')
-  await expect(page.getByRole('button', { name: /open bag — 1 item/i })).toBeVisible()
-}
-
 test.describe('Header fit', () => {
   // The nav crossfades its background at scrollY > 60 and the hero staggers its
   // children in. Neither moves the header's own box, but measuring 141 widths
@@ -80,12 +62,19 @@ test.describe('Header fit', () => {
   // this exercises a path the site ships.
   test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
-  for (const state of ['empty bag', 'bag with an item'] as const) {
+  // One state, not two. There used to be an 'empty bag' / 'bag with an item' pair, because
+  // the Bag control carried a count badge worth an extra ~21px and the header had to fit
+  // with it. The Bag control is gone with the cart, so the second state cannot be reached
+  // and measuring it would assert on a header the site cannot render.
+  //
+  // CLAUDE.md's 414px/435px figures stay: they are classified HISTORICAL and are the record
+  // of what the defect cost against a four-control header. The live number is the
+  // `minimum fitting width` annotation this spec prints on every run.
+  for (const state of ['default'] as const) {
     test(`no header control leaves the viewport at any supported width — ${state}`, async ({
       page,
     }) => {
-      if (state === 'bag with an item') await gotoHomeWithSeededBag(page)
-      else await page.goto('/')
+      await page.goto('/')
       await expect(page.locator('header')).toBeVisible()
 
       const findings = await sweep(page, SWEEP, headerFits)
@@ -103,7 +92,7 @@ test.describe('Header fit', () => {
   }
 
   test('the header fits the narrowest supported phone, in every layout mode', async ({ page }) => {
-    await gotoHomeWithSeededBag(page)
+    await page.goto('/')
 
     const report: string[] = []
     for (const segment of LAYOUT_SEGMENTS) {
@@ -144,7 +133,7 @@ test.describe('Header fit', () => {
     // the control's own centre point must resolve to the control. A control
     // whose centre is off-screen is not reachable by a thumb, however green
     // Playwright's actionability check comes back.
-    await gotoHomeWithSeededBag(page)
+    await page.goto('/')
     const height = page.viewportSize()?.height ?? 844
 
     const unreachable: string[] = []

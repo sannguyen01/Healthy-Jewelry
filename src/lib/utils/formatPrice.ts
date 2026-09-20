@@ -43,84 +43,20 @@ export function formatPrice(amount: string | number, currencyCode: CurrencyCode 
   }).format(numeric)
 }
 
-/**
- * The currency a bag should be totalled in.
+/*
+ * `cartCurrencyCode`, `formatPriceVND`, `formatCompareAtPrice` and `CompareAtPriceResult`
+ * were here, and all four are gone with the commerce UI.
  *
- * A single Shopify store sells in one currency, so in practice every line
- * agrees. This exists so the answer is defined rather than assumed: an empty
- * bag falls back to USD, and a genuinely mixed bag takes the first line and
- * warns instead of silently totalling two currencies into one number.
- */
-export function cartCurrencyCode(
-  items: readonly { product: { currencyCode?: CurrencyCode } }[]
-): CurrencyCode {
-  const codes = new Set(
-    items.map((item) => item.product.currencyCode).filter((code): code is CurrencyCode => !!code)
-  )
-  if (codes.size === 0) return 'USD'
-  if (codes.size > 1) {
-    console.warn(
-      `[HJ] bag contains mixed currencies (${[...codes].join(', ')}) — totalling in ${[...codes][0]}`
-    )
-  }
-  return [...codes][0]
-}
-
-/**
- * Format a price in VND.
+ * `cartCurrencyCode` answered "what currency is this bag denominated in" for a bag that no
+ * longer exists. `formatCompareAtPrice` and its result type computed sale status from a
+ * compare-at price, which is also what the `Sale` badge was derived from — both went when
+ * there were no prices to be below. `formatPriceVND` had no caller at all.
  *
- * Now a thin alias for `formatPrice(amount, 'VND')` rather than a second
- * implementation. It was the only function that already knew dong is written
- * `vi-VN` with no decimals, while `formatPrice` — the one every component
- * actually calls — did not. Two functions disagreeing about how to write the
- * same currency is how a site ends up quoting two different prices for one
- * product.
+ * Deleted rather than left for WS-5b, because unreachable code does not sit still: it drags
+ * the per-file coverage floor down until somebody either writes tests for behaviour nothing
+ * uses or quietly lowers the threshold. This file failed `thresholds.perFile` at 79.36%
+ * lines the moment the cart went, which is how the four were found.
+ *
+ * `formatPrice` itself stays: prices are still rendered on cards and the detail page. It
+ * goes in WS-5b with them.
  */
-export function formatPriceVND(amount: number): string {
-  return formatPrice(amount, 'VND')
-}
-
-export interface CompareAtPriceResult {
-  price: string
-  compareAt: string | null
-  isOnSale: boolean
-  discount: number
-  discountPercent: number
-}
-
-/**
- * Compare a price against a compareAt price to determine sale status.
- * Returns formatted strings plus sale flags.
- */
-export function formatCompareAtPrice(
-  price: string | number,
-  compareAt: string | null,
-  currencyCode: CurrencyCode = 'USD'
-): CompareAtPriceResult {
-  const numericPrice = typeof price === 'string' ? parseFloat(price) : price
-
-  if (compareAt === null || compareAt === undefined) {
-    return {
-      price: formatPrice(numericPrice, currencyCode),
-      compareAt: null,
-      isOnSale: false,
-      discount: 0,
-      discountPercent: 0,
-    }
-  }
-
-  const numericCompareAt = parseFloat(compareAt)
-  const isOnSale = numericCompareAt > numericPrice
-  const discount = isOnSale ? numericCompareAt - numericPrice : 0
-  const discountPercent = isOnSale
-    ? Math.round(((numericCompareAt - numericPrice) / numericCompareAt) * 100)
-    : 0
-
-  return {
-    price: formatPrice(numericPrice, currencyCode),
-    compareAt: isOnSale ? formatPrice(numericCompareAt, currencyCode) : null,
-    isOnSale,
-    discount,
-    discountPercent,
-  }
-}

@@ -87,24 +87,16 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL(/\/contact/)
   })
 
-  test('bag button opens cart drawer', async ({ page }) => {
-    await page.getByRole('button', { name: /open bag/i }).click()
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
-  })
-
-  test('cart drawer can be closed', async ({ page }) => {
-    await page.getByRole('button', { name: /open bag/i }).click()
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
-    await page.getByRole('button', { name: /close bag/i }).click()
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).not.toBeVisible()
-  })
-
-  test('cart drawer closes on Escape key', async ({ page }) => {
-    await page.getByRole('button', { name: /open bag/i }).click()
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(page.getByRole('dialog', { name: /shopping bag/i })).not.toBeVisible()
-  })
+  /*
+   * 'bag button opens cart drawer', 'cart drawer can be closed' and 'cart drawer closes on
+   * Escape key' were here. All three went with the cart.
+   *
+   * Worth noting what they were actually covering, because it is not only the bag: the
+   * Escape-key test was the suite's only assertion that a modal dialog in this app responds
+   * to Escape at all. If a dialog is ever reintroduced — a size guide, an ambassador
+   * enquiry form — that assertion needs to come back with it. `e2e/a11y.spec.ts` covers
+   * axe rules, not keyboard dismissal.
+   */
 
   test('search button is visible', async ({ page }) => {
     await expect(await searchControl(page)).toBeVisible()

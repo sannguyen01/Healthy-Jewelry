@@ -16,13 +16,20 @@ import { hjCollections } from '@/lib/data/hj-data'
  * See docs/adr/019-an-unclassified-entry-is-an-unverified-one.md.
  */
 export const SITEMAP_EXCLUDED: Record<string, string> = {
-  '/cart': 'Transactional and per-visitor. Nothing to index; no two crawls see the same page.',
-  '/checkout':
-    'A hand-off to Shopify-hosted checkout. Indexing it would land searchers on a step that ' +
-    'only makes sense with a cart already built.',
-  '/account':
-    'Authenticated. Renders a sign-in prompt to anyone who is not the account holder, which ' +
-    'is not a page worth ranking.',
+  /*
+   * `/cart`, `/checkout` and `/account` were excluded here on the grounds that they were
+   * transactional, per-visitor or authenticated.
+   *
+   * They are not excluded now — they are **retired**, which is a stronger statement and is
+   * made somewhere a crawler actually reads. `/cart` and `/account` answer 308 to `/shop`
+   * and `/contact` (`next.config.ts`); `/checkout` answers 410 with `X-Robots-Tag:
+   * noindex` (`src/app/checkout/route.ts`). A status code retires a URL; a sitemap omission
+   * only declines to advertise it.
+   *
+   * Leaving them listed here would be worse than useless: this map is reconciled against
+   * the routes that exist, so a name with no page behind it fails
+   * `sitemap-completeness.test.ts` — which is exactly how this comment came to be written.
+   */
 }
 
 /**

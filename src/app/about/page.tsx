@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { CartDrawer } from '@/components/layout/CartDrawer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { PageHeader } from '@/components/ui/PageHeader'
 
@@ -16,7 +15,6 @@ export default function AboutPage() {
   return (
     <>
       <Nav />
-      <CartDrawer />
 
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* ── 1. Hero ────────────────────────────────────────────────── */}

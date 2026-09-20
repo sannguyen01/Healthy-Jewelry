@@ -4,22 +4,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { useCartStore } from '@/store/cart'
 import { useScrolled } from '@/lib/hooks/useScrolled'
 import { primaryNavLinks } from '@/config/navigation'
 
-interface NavProps {
-  cartCount?: number
-}
-
-export function Nav({ cartCount }: NavProps) {
+export function Nav() {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const scrolled = useScrolled(60)
-  const storeCount = useCartStore((s) => s.totalItems())
-  const openCart = useCartStore((s) => s.openCart)
-
-  const count = cartCount ?? storeCount
 
   return (
     <>
@@ -161,46 +152,6 @@ export function Nav({ cartCount }: NavProps) {
                 strokeLinecap="round"
               />
             </svg>
-          </button>
-
-          {/* BAG button */}
-          <button
-            aria-label={`Open bag — ${count} item${count !== 1 ? 's' : ''}`}
-            onClick={openCart}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.68rem',
-              letterSpacing: '0.16em',
-              textTransform: 'uppercase',
-              color: 'var(--ink)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}
-          >
-            Bag
-            {count > 0 && (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  backgroundColor: 'var(--ink)',
-                  color: 'var(--bg)',
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-ui)',
-                }}
-              >
-                {count}
-              </span>
-            )}
           </button>
 
           {/* Mobile menu toggle */}

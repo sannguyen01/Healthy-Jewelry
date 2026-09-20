@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductCard } from '@/components/product/ProductCard'
 import { headers } from 'next/headers'
 import { searchProducts } from '@/lib/shopify'
@@ -322,7 +321,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <>
       <Nav />
-      <CartDrawer />
 
       {/* Keyed on the query so navigating between searches re-suspends and
           shows the fallback, rather than holding the previous results on

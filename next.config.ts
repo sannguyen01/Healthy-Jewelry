@@ -103,6 +103,32 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      /*
+       * Retired commerce routes.
+       *
+       * 308, not 307 or 302: these are permanent, and a permanent redirect is what lets a
+       * crawler retire the old URL instead of re-checking it forever. `permanent: true` is
+       * Next's spelling of 308.
+       *
+       * Both have a successor that answers the visitor's actual question — a bag becomes
+       * the shelf it was filled from, an account becomes the person who replaces it. That
+       * is why they redirect and `/checkout` does not: a withdrawn capability has no
+       * successor, so it answers 410 from its own route handler. See
+       * `src/app/checkout/route.ts`.
+       *
+       * Asserted by status code, over HTTP, in `e2e/retired-routes.spec.ts` — `toHaveURL()`
+       * passes on a soft 200 that merely renders the destination.
+       */
+      {
+        source: '/cart',
+        destination: '/shop',
+        permanent: true,
+      },
+      {
+        source: '/account',
+        destination: '/contact',
+        permanent: true,
+      },
       {
         source: '/stones',
         destination: '/',

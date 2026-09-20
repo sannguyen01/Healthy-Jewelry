@@ -73,18 +73,6 @@ const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded';
     state: 'intrinsic',
     why: 'A pull-quote panel in a grid track. The grid row bounds it; the floor stops a two-word quote collapsing to a strip.',
   },
-  'src/components/layout/CartDrawer.tsx | minWidth | 16px': {
-    state: 'intrinsic',
-    why: 'The quantity badge. Its width is content-driven and the floor keeps a single digit circular; the content is at most three characters.',
-  },
-  'src/app/cart/page.tsx | minWidth | 20px': {
-    state: 'intrinsic',
-    why: 'Same quantity badge on the cart page. Bounded by its content for the same reason.',
-  },
-  'src/app/account/page.tsx | minWidth | 140px': {
-    state: 'intrinsic',
-    why: 'A button in a flex row. The floor keeps two buttons matching; the flex container caps the width.',
-  },
   'src/app/materials/page.tsx | minWidth | 160px': {
     state: 'intrinsic',
     why: 'A spec label column in a wrapping flex row. The floor sets the wrap point; the row caps the width.',
