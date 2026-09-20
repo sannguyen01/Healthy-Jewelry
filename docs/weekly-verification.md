@@ -23,7 +23,7 @@ as no checklist. See [ADR 023](adr/023-the-last-link-is-a-person.md).
 | # | Question | Where | Fine looks like |
 |---|---|---|---|
 | 1 | **Is the audit tier alive?** | [control-audit runs](https://github.com/sannguyen01/Healthy-Jewelry/actions/workflows/control-audit.yml) | The newest run has **at least one job**. Zero jobs means the workflow did not parse and *nothing in it ran* — including the probes that watch everything else. |
-| 2 | **Is production actually being verified?** | [production-smoke runs](https://github.com/sannguyen01/Healthy-Jewelry/actions/workflows/production-smoke.yml) | The newest run shows `Live store and storefront: success`. `skipped` means the run happened and checked nothing. A red X whose cause is the preflight is *not* fine — it means every check after it was skipped. |
+| 2 | **Is production actually being verified?** | [production-smoke runs](https://github.com/sannguyen01/Healthy-Jewelry/actions/workflows/production-smoke.yml) | The newest run shows `Browse-only catalogue: success` or `failure`. **`skipped` is the finding**: that step needs no credential and carries no gate, so it should never skip — if it does, somebody added an `if:` and re-armed the failure ADR 033 records. `Webhook signing secret: skipped` is expected while the `production-readonly` secrets are empty. |
 | 3 | **Is the merge gate on?** | Settings → Branches | A protection rule exists on `main`. There is no rule today, and `main` auto-deploys to production, so the merge button is the deploy button. |
 | 4 | **Do the probes still fire?** | `node scripts/probe-assertion-liveness.mjs` | Every sentinel `alive`. Any `dead` means a test has stopped carrying information; any `unevaluable` means the probe could not measure anything and the run proved nothing. |
 
@@ -49,7 +49,10 @@ and `acceptedWhy`. If it is not, it is time.
   claim in `docs/controls.json` about a probe running there is false until it is fixed. Start with
   `pnpm exec vitest run workflow-validity`.
 - **Check 2 fails** → open the run's summary. A leading `⚠ N of 2 live checks did not execute`
-  line means the checks were skipped rather than failed; the cause is above it.
+  line means the checks were skipped rather than failed; the cause is above it. If the skipped one
+  is `Browse-only catalogue`, that is the serious case — it needs no credential, so the only way it
+  skips is a condition somebody added. Run `pnpm exec vitest run smoke-liveness`, which asserts that
+  step's `if:` is exactly `always()`.
 - **Check 3 fails** → run `pnpm exec vitest run required-checks-contract` **first**. That test
   proves which two strings GitHub publishes as check-run contexts. Typing the job IDs `verify` and
   `e2e` instead registers two contexts nothing ever reports, which blocks every pull request

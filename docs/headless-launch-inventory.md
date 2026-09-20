@@ -1,5 +1,17 @@
 # Headless launch inventory
 
+> **⚠ Historical. Compiled 2026-08-12; the goal was abandoned on 2026-09-20.**
+>
+> This is a dated snapshot of a live Shopify store, taken through the Admin API, answering a
+> question nobody is asking any more: what stands between this store and a customer completing a
+> purchase. The answer is now *the decision not to sell online*. See
+> `docs/browse-only-masterplan.md` and [ADR 034](adr/034-the-catalogue-is-the-source.md).
+>
+> Kept rather than deleted because it is **evidence**, not instructions: it records what the store
+> actually contained on that date — 22 products, 38 variants, one written policy of four — which is
+> the reconciliation WS-2's export still has to balance against if the connector is ever restored.
+> Nothing in it should be acted on.
+
 **The direct answer to "what am I still missing to run a Shopify headless storefront on
 a Vercel-hosted domain."**
 

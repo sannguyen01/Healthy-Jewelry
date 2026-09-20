@@ -1,5 +1,40 @@
 # Testing strategy
 
+> ## ⚠ Read this first: the storefront is browse-only, and much of this document is history
+>
+> On 2026-09-20 this project finished removing Shopify. There is no cart, no checkout, no account,
+> and no price. `src/content/catalog/**` is the product data, `src/lib/catalog/**` is the only
+> module allowed to read it, and a malformed record fails the build
+> ([ADR 034](adr/034-the-catalogue-is-the-source.md), superseding ADR 004).
+>
+> **Sections below that describe Shopify fetching, the cart, checkout, currency or the live-store
+> smoke tier are kept as a record of defects this project actually shipped, and of the reasoning
+> that caught them.** They are not instructions. Rewriting them to describe today's suite would
+> destroy the evidence, which is the same argument this document makes for its own ADR corpus —
+> and deleting them would lose the lessons, which are about *how verification fails*, not about
+> Shopify.
+>
+> What is current:
+>
+> | then | now |
+> |---|---|
+> | `pnpm verify:production` — 17 live checks, all needing a Shopify credential | `pnpm verify:browse-only` — every catalogue handle served, unknown handles 404, no commerce semantics, **no credential** |
+> | `production-smoke-handles.test.ts` guarding the fallback/live discriminator | gone with the discriminator; there is one catalogue |
+> | `currency-consistency.test.tsx` — every price carries the right currency | `price-absence-contract.test.tsx` — **no price, in any currency, anywhere** |
+> | `homepage-fetch-budget.test.ts` — Shopify round trips per render | `homepage-composition-contract.test.ts` — three strips, one catalogue read |
+> | `opengraph-vnd-font.test.tsx` — the ₫ glyph rasterises | `opengraph-bundled-font.test.tsx` — every character the card can carry |
+> | coverage scoped to `src/lib`, `src/store`, `src/config` | `src/store` is gone with the cart; `src/lib` and `src/config` |
+> | six premise detectors, five of them reading Shopify | one, `SHOPIFY-API-VERSION`, and it is pure |
+>
+> [ADR 035](adr/035-a-control-outlives-its-subject.md) is the rule that governed every one of those
+> transitions: a control whose subject is deleted is re-founded, suspended behind a premise
+> detector, or deleted with the removal recorded — never narrowed to keep it green.
+>
+> Two routes and their credentials are **deliberately still here**: `/api/webhooks/shopify` and
+> `/api/version`. The Shopify webhook subscriptions must be deleted from Admin *before* the
+> endpoint goes, or Shopify retries against a failing route for its full backoff schedule. The
+> connector reads `needs_reconnect`, so that is WS-7's step and not one this repository can take.
+
 This document exists because of a fair question: *do we actually need the E2E suite for the website to
 be operational?*
 
@@ -17,14 +52,17 @@ That is also not the useful question. The useful one is what the suite is *for*,
 |---|---|---|---|
 | Lint | `pnpm lint` | ESLint + Next rules | ~10 s |
 | Types | `pnpm type-check` | `tsc --noEmit`, strict | ~15 s |
-| Unit | `pnpm exec vitest run` | `src/lib`, `src/store`, `src/config`, design tokens, and component behaviour under jsdom | ~12 s |
-| Build | `pnpm build` | Prerender of all 45 routes | ~40 s |
+| Unit | `pnpm exec vitest run` | `src/lib`, `src/config`, design tokens, and component behaviour under jsdom | ~12 s |
+| Build | `pnpm build` | Prerender of all 41 routes | ~40 s |
 | E2E | `pnpm e2e` | The rendered application in a real browser, desktop + mobile | ~3-5 min |
-| Production smoke | `pnpm verify:production` · `pnpm verify:webhook` | The **real** store and the **live** deployment, plus the premise tier below | ~10 s |
+| Production smoke | `pnpm verify:browse-only` · `pnpm verify:webhook` | The **live** deployment, plus the premise tier below. The browse-only check needs no credential and therefore cannot be skipped. | ~10 s |
 
 `vitest.config.ts` scopes **coverage** to the business-logic layer on purpose, with the comment *"UI
 components are verified via E2E"*. That single line is the whole argument: with coverage thresholds
 deliberately not applied to the rendering layer, **E2E is the only automated coverage the UI has.**
+
+The scope lost `src/store/**` on 2026-09-20 — the directory went with the cart, and a glob matching
+nothing reads as coverage of something that exists.
 
 ### The production tier, and why it had to exist
 

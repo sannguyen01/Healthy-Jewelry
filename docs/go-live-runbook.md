@@ -1,5 +1,26 @@
 # Go-live runbook
 
+> ## ⚠ Superseded on 2026-09-20 — this destination was abandoned
+>
+> **The chain below leads to a working Shopify checkout, and there is no longer going to be
+> one.** The storefront is browse-only: no cart, no checkout, no account, no price. Pieces are
+> arranged with an ambassador ([ADR 034](adr/034-the-catalogue-is-the-source.md),
+> `docs/browse-only-masterplan.md`).
+>
+> Steps 1–3 — payment provider, a real order, a webhook delivery — are not work anybody should
+> start. They are kept because the *reasoning* in them is about how a verification chain fails,
+> not about Shopify, and because deleting a runbook is how a project loses the record of what it
+> decided not to do.
+>
+> **Step 0 survives and is still worth running before anything else.**
+> `pnpm diagnose:deployment` answers "is this deployment what I think it is", which is a question
+> about Vercel and stale build caches, not about Shopify. Its two Shopify verdicts were retired in
+> WS-6 ([ADR 035](adr/035-a-control-outlives-its-subject.md)); what remains asks whether the page
+> is serving this build's own catalogue.
+>
+> What replaces the rest: `pnpm verify:browse-only`, which needs no credential and is wired into
+> `production-smoke.yml` as the `Browse-only catalogue` step.
+
 The ordered path from "architecturally operational" to "verified operational."
 
 **The order matters and is not arbitrary.** The remaining work is a dependency
