@@ -1,0 +1,35 @@
+{
+  "handle": "dome-ring-titanium",
+  "title": "Dome Ring",
+  "collection": "rings",
+  "material": "titanium",
+  "materialLabel": "Grade 23 Titanium",
+  "description": "Architectural dome profile. Brushed titanium finish.",
+  "specification": "4 mm · 2.4 g",
+  "sizes": [
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12"
+  ],
+  "availability": "ask-an-ambassador",
+  "badge": "new",
+  "media": {
+    "kind": "illustration",
+    "svgType": "ring-dome"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

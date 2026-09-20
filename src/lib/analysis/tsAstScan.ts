@@ -120,6 +120,54 @@ export function importsFrom(sourceFile: ts.SourceFile, moduleSpecifier: string):
 }
 
 /**
+ * Every module specifier a file reaches for, however it reaches.
+ *
+ * `importsFrom` answers "what does this file take from *that* module"; this answers "what
+ * modules does this file touch at all", which is the question an architectural boundary
+ * asks. The two are not the same shape and neither can be built from the other.
+ *
+ * Four forms, and the last two are why this is an AST walk rather than a list of the
+ * statements at the top of the file:
+ *
+ *   - `import … from 'm'` and bare `import 'm'`
+ *   - `export … from 'm'` re-exports
+ *   - `import('m')` dynamic import, which can appear anywhere including inside a function
+ *   - `require('m')`, which survives in config and script files
+ *
+ * A boundary that only read the static import block would be satisfied by moving one
+ * `import` into an `await import()` — a refactor that looks like a performance tweak and
+ * silently reopens the wall. See
+ * [ADR 007](../../../docs/adr/007-regex-guardrails-have-unknown-coverage.md) for why this
+ * is not a regex: `// import x from './content'` in a comment is not a node, and
+ * `from '@/content/catalog/products/a.json'` inside a template literal is not an import.
+ */
+export function moduleSpecifiers(sourceFile: ts.SourceFile): string[] {
+  const found: string[] = []
+
+  const record = (node: ts.Expression | undefined): void => {
+    if (node && ts.isStringLiteralLike(node)) found.push(node.text)
+  }
+
+  walk(sourceFile, (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      record(node.moduleSpecifier)
+      return
+    }
+    if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
+      record(node.argument.literal as ts.Expression)
+      return
+    }
+    if (!ts.isCallExpression(node)) return
+
+    const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword
+    const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require'
+    if (isDynamicImport || isRequire) record(node.arguments[0])
+  })
+
+  return found
+}
+
+/**
  * Every call to a named function, with each argument as source text.
  *
  * Formatting is irrelevant — a call split across lines is the same `CallExpression` — and

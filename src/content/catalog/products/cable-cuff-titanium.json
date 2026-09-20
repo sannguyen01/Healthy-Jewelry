@@ -1,0 +1,32 @@
+{
+  "handle": "cable-cuff-titanium",
+  "title": "Cable Cuff",
+  "collection": "bracelets",
+  "material": "titanium",
+  "materialLabel": "Grade 23 Titanium",
+  "description": "Twisted titanium cable cuff. Open-end, adjustable.",
+  "specification": "2.5 mm cable · 160 mm",
+  "sizes": [
+    "XS (155mm)",
+    "S (165mm)",
+    "M (175mm)",
+    "L (185mm)",
+    "XL (195mm)"
+  ],
+  "availability": "ask-an-ambassador",
+  "badge": null,
+  "media": {
+    "kind": "illustration",
+    "svgType": "bracelet-cuff"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

@@ -1,0 +1,26 @@
+{
+  "handle": "classic-charm-titanium",
+  "title": "Classic Charm",
+  "collection": "charms",
+  "material": "titanium",
+  "materialLabel": "Grade 23 Titanium",
+  "description": "Stackable titanium charm with clasp. Pairs with any chain or bangle.",
+  "specification": "10 mm · 0.9 g",
+  "sizes": [],
+  "availability": "ask-an-ambassador",
+  "badge": "new",
+  "media": {
+    "kind": "illustration",
+    "svgType": "charm-classic"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

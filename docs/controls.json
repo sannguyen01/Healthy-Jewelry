@@ -63,6 +63,28 @@
       "backstop": "human:weekly"
     },
     {
+      "id": "catalogue-content-validity",
+      "claims": "every record in src/content/catalog/** is parsed against its Zod schema before a single page is generated, and an invalid one fails the build",
+      "status": "configured",
+      "probe": "next.config.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "The check runs because next.config.ts imports the reader, so it is one import away from silently not running at all \u2014 and before that import existed a malformed record passed `pnpm build` cleanly. catalog-content.test.ts reads next.config.ts back out and fails if the import or its call goes, and asserts manifest.ts uses relative paths, because Next's config loader ignores tsconfig path mappings and an alias anywhere in that graph would skip the check rather than fail it. It validates shape, never truth: a product whose description is accurate JSON and inaccurate metallurgy passes.",
+      "adr": "docs/adr/034-the-catalogue-is-the-source.md",
+      "backstop": "human:weekly"
+    },
+    {
+      "id": "catalogue-import-boundary",
+      "claims": "no module outside src/lib/catalog/** imports a raw record from src/content/catalog/**, by any import form",
+      "status": "configured",
+      "probe": "src/tests/unit/catalog-import-boundary.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Resolves imports through the TypeScript compiler API rather than scanning text, so a comment and a template literal are correctly not imports and a dynamic import correctly is \u2014 but it sees only static module edges. Content reached at runtime through fs, a fetch or a generated path is invisible to it, which is one reason manifest.ts uses static imports rather than a directory walk. It also walks src/ and e2e/ only: a new top-level source directory would be outside its sweep until added.",
+      "adr": "docs/adr/034-the-catalogue-is-the-source.md",
+      "backstop": "human:weekly"
+    },
+    {
       "id": "control-acceptance-freshness",
       "claims": "every deliberately-accepted control gap is re-decided within 30 days, and a person is told when one is not",
       "status": "configured",

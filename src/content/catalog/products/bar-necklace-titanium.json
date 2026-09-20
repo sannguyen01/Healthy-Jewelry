@@ -1,0 +1,26 @@
+{
+  "handle": "bar-necklace-titanium",
+  "title": "Linear Bar",
+  "collection": "necklaces",
+  "material": "titanium",
+  "materialLabel": "Grade 23 Titanium",
+  "description": "40 mm horizontal bar on box chain. Mirror finish.",
+  "specification": "Bar 40 mm · chain 16\"",
+  "sizes": [],
+  "availability": "ask-an-ambassador",
+  "badge": null,
+  "media": {
+    "kind": "illustration",
+    "svgType": "necklace-bar"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

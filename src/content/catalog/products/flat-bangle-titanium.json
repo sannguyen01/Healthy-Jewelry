@@ -1,0 +1,32 @@
+{
+  "handle": "flat-bangle-titanium",
+  "title": "Flat Bangle",
+  "collection": "bracelets",
+  "material": "titanium",
+  "materialLabel": "Grade 23 Titanium",
+  "description": "4 mm flat bangle. Brushed outer, polished inner.",
+  "specification": "4 mm width · 63 mm ID",
+  "sizes": [
+    "XS (155mm)",
+    "S (165mm)",
+    "M (175mm)",
+    "L (185mm)",
+    "XL (195mm)"
+  ],
+  "availability": "ask-an-ambassador",
+  "badge": "bestseller",
+  "media": {
+    "kind": "illustration",
+    "svgType": "bracelet-bangle"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}

@@ -1,0 +1,26 @@
+{
+  "handle": "arc-hoops-titanium",
+  "title": "Arc Hoops",
+  "collection": "earrings",
+  "material": "titanium",
+  "materialLabel": "Grade 23 Titanium",
+  "description": "Open arc hoop with snap closure. Grade 23 titanium.",
+  "specification": "14 mm diameter · 1.2 mm wire",
+  "sizes": [],
+  "availability": "ask-an-ambassador",
+  "badge": "new",
+  "media": {
+    "kind": "illustration",
+    "svgType": "earring-hoop"
+  },
+  "careInstructions": {
+    "state": "pending"
+  },
+  "sku": {
+    "state": "pending"
+  },
+  "lastReviewed": {
+    "state": "pending"
+  },
+  "legacyRedirects": []
+}
