@@ -16,7 +16,6 @@
 // every source of traffic are invisible to it. Conversion rate is currently
 // uncomputable — the numerator lives in Shopify and the denominator lives nowhere.
 
-import type { CheckoutError } from '@/store/cart'
 import type { CurrencyCode } from '@/lib/utils/formatPrice'
 
 /** Money as an event carries it: the amount and what it is denominated in. */
@@ -43,19 +42,18 @@ export type AnalyticsEvent =
   | ({ name: 'product_viewed' } & ProductRef & Priced)
   | { name: 'collection_viewed'; collection: string; productCount: number }
   | { name: 'search_performed'; query: string; resultCount: number }
-  | ({ name: 'add_to_bag'; quantity: number } & ProductRef & Priced)
-  | ({ name: 'remove_from_bag' } & ProductRef)
-  | ({ name: 'checkout_started'; itemCount: number } & Priced)
-  /**
-   * The event that turns this project's most recurring symptom into a number.
-   *
-   * A customer hitting "Online checkout is temporarily unavailable" is currently
-   * only knowable if they email. `reason` is the typed `CheckoutError`
-   * discriminant, so `not-configured` (a deployment that cannot sell) and
-   * `lines-unavailable` (something sold out) are countable separately — they are
-   * completely different problems that render identical copy.
-   */
-  | { name: 'checkout_failed'; reason: CheckoutError; itemCount: number }
+/*
+ * `add_to_bag`, `remove_from_bag`, `checkout_started` and `checkout_failed` were here.
+ *
+ * All four are gone with the commerce UI that emitted them. `checkout_failed` is the one
+ * worth a sentence, because it was the most useful event in this file: it turned "online
+ * checkout is temporarily unavailable" from something only knowable when a customer
+ * emailed into a number, split by the typed `CheckoutError` discriminant.
+ *
+ * Deleted rather than kept as a name nothing sends. An event vocabulary that outlives its
+ * producers is a sink waiting for traffic that will never arrive, and the next reader
+ * cannot tell "nobody bought anything today" from "nothing can emit this any more".
+ */
 
 export type AnalyticsEventName = AnalyticsEvent['name']
 
@@ -70,10 +68,6 @@ export const ANALYTICS_EVENT_NAMES = [
   'product_viewed',
   'collection_viewed',
   'search_performed',
-  'add_to_bag',
-  'remove_from_bag',
-  'checkout_started',
-  'checkout_failed',
 ] as const
 
 export function isAnalyticsEventName(value: string): value is AnalyticsEventName {

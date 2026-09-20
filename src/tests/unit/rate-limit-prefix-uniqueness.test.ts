@@ -124,7 +124,7 @@ describe('rate-limiter prefixes', () => {
       'the AST scan found no createRateLimiter calls with a literal prefix. Either every ' +
         'limiter was removed, or the scan stopped matching them — check the callee name ' +
         'and whether any prefix is now built from a constant rather than written inline.'
-    ).toBeGreaterThanOrEqual(5)
+    ).toBeGreaterThanOrEqual(3)
   })
 
   it('every prefix is distinct', () => {
@@ -152,16 +152,14 @@ describe('rate-limiter prefixes', () => {
     ).toEqual([])
   })
 
-  it('/api/shopify declares two different prefixes, not one', () => {
-    // The specific case, named, because it is the one a future edit is most
-    // likely to "simplify" back into a single limiter.
-    const shopify = prefixes.filter((p) => p.file.includes('api/shopify/route.ts'))
-
-    expect(shopify.length, 'the shopify proxy no longer declares two limiters').toBe(2)
-    expect(new Set(shopify.map((p) => p.prefix)).size, 'both shopify limiters share a bucket').toBe(
-      2
-    )
-  })
+  /*
+   * '/api/shopify declares two different prefixes, not one' was here.
+   *
+   * It guarded the case that prompted this whole file: the proxy metered reads and writes
+   * out of one bucket, so a browsing session could exhaust a customer's checkout budget.
+   * The proxy is gone with the cart, and with it both limiters. The uniqueness rule below
+   * still covers every limiter that remains — which is the part that generalises.
+   */
 
   it('no prefix is empty or whitespace', () => {
     // An empty prefix is not a namespace, it is the absence of one — and every

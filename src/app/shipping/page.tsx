@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { CartDrawer } from '@/components/layout/CartDrawer'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SUPPORT_EMAIL } from '@/config/site'
 
@@ -70,7 +69,6 @@ export default function ShippingPage() {
   return (
     <>
       <Nav />
-      <CartDrawer />
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* Hero */}
         <section

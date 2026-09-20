@@ -153,9 +153,19 @@ describe('event names', () => {
     // Headless is why this matters: Shopify's own analytics sees the hosted
     // checkout only, so without a view event there is no denominator.
     expect(ANALYTICS_EVENT_NAMES).toContain('product_viewed')
-    expect(ANALYTICS_EVENT_NAMES).toContain('add_to_bag')
-    expect(ANALYTICS_EVENT_NAMES).toContain('checkout_started')
-    expect(ANALYTICS_EVENT_NAMES).toContain('checkout_failed')
+    expect(ANALYTICS_EVENT_NAMES).toContain('collection_viewed')
+    expect(ANALYTICS_EVENT_NAMES).toContain('search_performed')
+  })
+
+  it('carries no event a browse-only site cannot emit', () => {
+    // The vocabulary used to include add_to_bag, remove_from_bag, checkout_started and
+    // checkout_failed. All four went with the commerce UI. Asserted as an absence, not
+    // just removed from the list above: a name nothing can send is a sink waiting for
+    // traffic that will never arrive, and the next reader cannot tell "nobody bought
+    // anything today" from "nothing can emit this any more".
+    for (const gone of ['add_to_bag', 'remove_from_bag', 'checkout_started', 'checkout_failed']) {
+      expect(ANALYTICS_EVENT_NAMES as readonly string[]).not.toContain(gone)
+    }
   })
 })
 
@@ -189,24 +199,15 @@ describe('track never becomes load-bearing', () => {
   })
 
   it('passes non-search events through untouched', () => {
-    const event: AnalyticsEvent = { name: 'checkout_failed', reason: 'not-configured', itemCount: 2 }
+    // Was driven with `checkout_failed`, which no longer exists. `collection_viewed` is
+    // the same shape of assertion — an event with fields that must survive the boundary
+    // unmodified, unlike `search_performed`, which is deliberately sanitised.
+    const event: AnalyticsEvent = {
+      name: 'collection_viewed',
+      collection: 'rings',
+      productCount: 4,
+    }
     track(event, 'granted')
     expect(sent[0]).toEqual(event)
-  })
-
-  /**
-   * The event that turns this project's most recurring symptom into a number.
-   * `not-configured` and `lines-unavailable` render identical copy to a customer
-   * and are completely different problems.
-   */
-  it('carries the typed checkout reason so the causes stay distinguishable', () => {
-    for (const reason of ['not-configured', 'placeholder-catalog', 'lines-unavailable'] as const) {
-      track({ name: 'checkout_failed', reason, itemCount: 1 }, 'granted')
-    }
-    expect(sent.map((e) => (e as { reason: string }).reason)).toEqual([
-      'not-configured',
-      'placeholder-catalog',
-      'lines-unavailable',
-    ])
   })
 })

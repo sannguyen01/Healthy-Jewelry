@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Nav from '@/components/layout/Nav'
-import CartDrawer from '@/components/layout/CartDrawer'
 import Footer from '@/components/layout/Footer'
 import {
   Hero,
@@ -94,7 +93,6 @@ export default async function HomePage() {
         <MaterialsSection />
       </main>
       <Footer />
-      <CartDrawer />
     </>
   )
 }

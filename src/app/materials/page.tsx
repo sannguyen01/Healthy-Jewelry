@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { CartDrawer } from '@/components/layout/CartDrawer'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { hjMaterials } from '@/lib/data/hj-data'
 
@@ -45,7 +44,6 @@ export default function MaterialsPage() {
   return (
     <>
       <Nav />
-      <CartDrawer />
 
       <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* ── Page header ───────────────────────────────────────────── */}

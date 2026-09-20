@@ -1,5 +1,4 @@
 import { test, expect, type Page } from '@playwright/test'
-import { seedBag, openBag } from './support/seedBag'
 
 /**
  * Visual-asset visibility.
@@ -330,21 +329,14 @@ test.describe('Product imagery is visible on every surface', () => {
     })
   }
 
-  test('the cart thumbnail renders a visible mark too', async ({ page }) => {
-    // The cart is the one surface where an invisible thumbnail would be seen by a
-    // customer who has already decided to buy.
-    // Seeded: Add to Bag has been removed. See e2e/support/seedBag.ts.
-    await seedBag(page, ['7'])
-    await page.goto('/products/arc-band-titanium')
-    await openBag(page)
-
-    const drawer = page.getByRole('dialog', { name: /shopping bag/i })
-
-    const mark = drawer.locator('img, svg').first()
-    await expect(mark).toBeVisible()
-    const box = await mark.boundingBox()
-    expect(box?.width ?? 0).toBeGreaterThan(0)
-  })
+  /*
+   * 'the cart thumbnail renders a visible mark too' was here.
+   *
+   * It guarded the one surface where an invisible thumbnail would be seen by a customer
+   * who had already decided to buy. There is no cart and no such customer, so the test is
+   * removed rather than repointed: every other surface it would have covered — card,
+   * strip, detail page — is already asserted above, by name, in this same file.
+   */
 
   /**
    * A gallery of one is a row of one button that changes nothing — visual noise

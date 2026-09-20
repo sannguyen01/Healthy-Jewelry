@@ -51,12 +51,9 @@ const REGISTRY = join(ROOT, 'docs/failure-modes.md')
  */
 const REGISTERED: { file: string; type: string }[] = [
   { file: 'src/lib/shopify/index.ts', type: 'FallbackReason' },
-  { file: 'src/store/cart.tsx', type: 'CheckoutError' },
-  { file: 'src/store/cart.tsx', type: 'HandoffVerdict' },
   { file: 'src/lib/utils/rateLimit.ts', type: 'RateLimitFailurePosture' },
   { file: 'src/lib/utils/rateLimit.ts', type: 'RateLimiterHealth' },
   { file: 'src/lib/http/readBoundedBody.ts', type: 'BoundedFailure' },
-  { file: 'src/lib/shopify/customer/oauth.ts', type: 'IdTokenVerdict' },
 ]
 
 /** Every string literal appearing anywhere inside one type alias. */
@@ -110,7 +107,7 @@ describe('the registry parses', () => {
       rows.length,
       'No table rows parsed out of docs/failure-modes.md. The table syntax changed and ' +
         'this reconciliation is reading nothing.'
-    ).toBeGreaterThan(20)
+    ).toBeGreaterThan(15)
   })
 
   it('names every registered type in the prose, so a reader can find the source', () => {

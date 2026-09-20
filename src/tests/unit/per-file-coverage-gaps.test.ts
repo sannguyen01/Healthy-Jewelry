@@ -18,16 +18,15 @@ import { renderHook, act } from '@testing-library/react'
  */
 
 /**
- * A well-formed `add_to_bag` event.
+ * A well-formed `product_viewed` event.
  *
- * Declared once because the type is a discriminated union whose `add_to_bag`
- * arm requires `quantity`, `handle`, `collection`, `material`, `value` and
- * `currency` — spelling that out at five call sites is five chances to let one
- * drift, and the union exists precisely so a wrong payload is a compile error.
+ * Was `add_to_bag` until the commerce UI went. Declared once because the type is a
+ * discriminated union whose arms each require their own fields — spelling that out at
+ * five call sites is five chances to let one drift, and the union exists precisely so a
+ * wrong payload is a compile error.
  */
-const ADD_TO_BAG = {
-  name: 'add_to_bag',
-  quantity: 1,
+const SAMPLE_EVENT = {
+  name: 'product_viewed',
   handle: 'arc-band-titanium',
   collection: 'rings',
   material: 'Grade 23 Titanium',
@@ -55,7 +54,7 @@ describe('BeaconSink — the analytics transport nothing exercised', () => {
     vi.stubGlobal('fetch', fetchSpy)
 
     const { track } = await import('@/lib/analytics')
-    expect(track(ADD_TO_BAG, 'granted')).toBe(true)
+    expect(track(SAMPLE_EVENT, 'granted')).toBe(true)
 
     expect(sendBeacon).toHaveBeenCalledWith('/api/analytics', expect.any(Blob))
     expect(fetchSpy, 'both transports fired for one event').not.toHaveBeenCalled()
@@ -67,7 +66,7 @@ describe('BeaconSink — the analytics transport nothing exercised', () => {
     vi.stubGlobal('fetch', fetchSpy)
 
     const { track } = await import('@/lib/analytics')
-    track(ADD_TO_BAG, 'granted')
+    track(SAMPLE_EVENT, 'granted')
 
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/analytics',
@@ -81,7 +80,7 @@ describe('BeaconSink — the analytics transport nothing exercised', () => {
     vi.stubGlobal('fetch', fetchSpy)
 
     const { track } = await import('@/lib/analytics')
-    expect(() => track(ADD_TO_BAG, 'granted')).not.toThrow()
+    expect(() => track(SAMPLE_EVENT, 'granted')).not.toThrow()
     await Promise.resolve()
   })
 
@@ -95,7 +94,7 @@ describe('BeaconSink — the analytics transport nothing exercised', () => {
     })
 
     const { track } = await import('@/lib/analytics')
-    expect(() => track(ADD_TO_BAG, 'granted')).not.toThrow()
+    expect(() => track(SAMPLE_EVENT, 'granted')).not.toThrow()
   })
 
   it('sends nothing at all without consent', async () => {
@@ -103,7 +102,7 @@ describe('BeaconSink — the analytics transport nothing exercised', () => {
     vi.stubGlobal('navigator', { sendBeacon })
 
     const { track } = await import('@/lib/analytics')
-    expect(track(ADD_TO_BAG, 'denied')).toBe(false)
+    expect(track(SAMPLE_EVENT, 'denied')).toBe(false)
     expect(sendBeacon).not.toHaveBeenCalled()
   })
 })
@@ -256,99 +255,5 @@ describe('useMedia and friends', () => {
 
     renderHook(() => useIsTablet())
     expect(mm.matchMedia).toHaveBeenCalledWith('(min-width: 769px) and (max-width: 1024px)')
-  })
-})
-
-describe('useCart selectors — keyed by variant, never by product', () => {
-  // The distinction these hooks exist for: a product can hold several lines in
-  // the bag at once, one per size, so "the cart item for this product" is not a
-  // well-defined question. Five of the seven selectors were uncovered.
-  beforeEach(async () => {
-    const { useCartStore } = await import('@/store/cart')
-    useCartStore.getState().clearCart()
-  })
-
-  async function bagTwoSizes() {
-    const { useCartStore } = await import('@/store/cart')
-    const { getAllProducts } = await import('@/lib/data/hj-data')
-    const product = getAllProducts().find((p) => p.variants.length > 1) ?? getAllProducts()[0]
-    const [a, b] = product.variants
-    // `addItem(product, quantity, variantId)` — the variant is the THIRD
-    // argument. Passing it second silently reads as a quantity, which is how the
-    // first draft of this fixture produced a cart quantity of
-    // `'0gid://shopify/Product/...'`.
-    useCartStore.getState().addItem(product, 2, a.id)
-    if (b) useCartStore.getState().addItem(product, 1, b.id)
-    return { product, a, b }
-  }
-
-  it('finds the line for one variant and not for its sibling', async () => {
-    const { a, b } = await bagTwoSizes()
-    const { useCartItem } = await import('@/lib/hooks/useCart')
-
-    const { result } = renderHook(() => useCartItem(a.id))
-    expect(result.current?.variantId).toBe(a.id)
-    if (b) {
-      const other = renderHook(() => useCartItem(b.id))
-      expect(other.result.current?.variantId).toBe(b.id)
-    }
-  })
-
-  it('returns undefined for a variant that is not in the bag', async () => {
-    await bagTwoSizes()
-    const { useCartItem } = await import('@/lib/hooks/useCart')
-    const { result } = renderHook(() => useCartItem('gid://shopify/ProductVariant/not-in-bag'))
-    expect(result.current).toBeUndefined()
-  })
-
-  it('useIsInCart answers per variant', async () => {
-    const { a } = await bagTwoSizes()
-    const { useIsInCart } = await import('@/lib/hooks/useCart')
-
-    expect(renderHook(() => useIsInCart(a.id)).result.current).toBe(true)
-    expect(renderHook(() => useIsInCart('gid://nope')).result.current).toBe(false)
-  })
-
-  it('useCartItemQuantity reports 0 rather than undefined for an absent variant', async () => {
-    await bagTwoSizes()
-    const { useCartItemQuantity } = await import('@/lib/hooks/useCart')
-    expect(renderHook(() => useCartItemQuantity('gid://nope')).result.current).toBe(0)
-  })
-
-  it('useCartItemQuantity reports the line quantity for a present one', async () => {
-    const { a } = await bagTwoSizes()
-    const { useCartItemQuantity } = await import('@/lib/hooks/useCart')
-    expect(renderHook(() => useCartItemQuantity(a.id)).result.current).toBe(2)
-  })
-
-  it('useProductQuantityInCart sums across every size of one product', async () => {
-    // The one place a product-level count is the right question: a product card,
-    // which shows no size picker. Summing is what distinguishes it from the
-    // variant selectors above.
-    const { product, a, b } = await bagTwoSizes()
-    const { useProductQuantityInCart, useCartItemQuantity } = await import('@/lib/hooks/useCart')
-
-    const total = renderHook(() => useProductQuantityInCart(product.id)).result.current
-    const perVariant =
-      renderHook(() => useCartItemQuantity(a.id)).result.current +
-      (b ? renderHook(() => useCartItemQuantity(b.id)).result.current : 0)
-
-    expect(total).toBe(perVariant)
-    expect(total).toBeGreaterThanOrEqual(2)
-  })
-
-  it('useProductQuantityInCart is 0 for a product with nothing in the bag', async () => {
-    await bagTwoSizes()
-    const { useProductQuantityInCart } = await import('@/lib/hooks/useCart')
-    expect(renderHook(() => useProductQuantityInCart('no-such-product')).result.current).toBe(0)
-  })
-
-  it('exposes the sync-state selectors the drawer and checkout page read', async () => {
-    const { useCheckoutUrl, useCartIsLoading, useCheckoutError } = await import(
-      '@/lib/hooks/useCart'
-    )
-    expect(renderHook(() => useCheckoutUrl()).result.current).toBeNull()
-    expect(renderHook(() => useCartIsLoading()).result.current).toBe(false)
-    expect(renderHook(() => useCheckoutError()).result.current).toBeNull()
   })
 })

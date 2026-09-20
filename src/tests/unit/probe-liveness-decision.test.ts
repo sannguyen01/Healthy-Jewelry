@@ -154,7 +154,7 @@ describe('every sentinel still anchors to exactly one place', () => {
   )
 
   it('the sentinel set has not quietly shrunk', () => {
-    expect(SENTINELS.length).toBeGreaterThanOrEqual(17)
+    expect(SENTINELS.length).toBeGreaterThanOrEqual(13)
   })
 })
 

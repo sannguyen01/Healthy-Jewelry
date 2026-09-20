@@ -134,10 +134,15 @@ describe('currency reaches the customer', () => {
 const SRC = path.resolve(__dirname, '../..')
 
 /**
- * `formatPrice` and `formatCompareAtPrice` both default to USD, which is the
- * right default for a helper and the wrong one for a price tag. Components must
- * pass the product's own `currencyCode` (or the bag's, via `cartCurrencyCode`)
- * — never a literal, and never omit the argument.
+ * `formatPrice` defaults to USD, which is the right default for a helper and the wrong one
+ * for a price tag. Components must pass the product's own `currencyCode` — never a literal,
+ * and never omit the argument.
+ *
+ * `formatCompareAtPrice` is still in the pattern and no longer exists: it went with the
+ * commerce UI, along with `cartCurrencyCode` (the bag's currency) and the `Sale` badge that
+ * a compare-at price derived. The alternation stays because this rule outlives the helper —
+ * if a compare-at formatter ever returns, it must be held to the same contract from its
+ * first line rather than from the first time someone notices.
  */
 const FORMAT_CALL = /\bformat(?:Price|CompareAtPrice)\(/g
 

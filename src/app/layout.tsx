@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
-import { CartProvider } from '@/store/cart'
 import { SITE_URL } from '@/config/site'
 import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
@@ -105,7 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="hj-build" content={buildStamp()} />
       </head>
       <body>
-        <CartProvider>{children}</CartProvider>
+        {children}
         {/* Asks once, then never again. Nothing is measured until it is answered. */}
         <ConsentBanner />
       </body>

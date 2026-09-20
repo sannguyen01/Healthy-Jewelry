@@ -58,38 +58,6 @@ Neither `malformed-response` nor `pagination-stalled` existed before 2026-09-18.
 arrived as `TypeError: Cannot read properties of undefined` into a `catch` that reported
 only `ShopifyFetchError`; the second did not terminate.
 
-## Checkout — `CheckoutError` (`src/store/cart.tsx`)
-
-Every refusal path sets one of these through `failCheckout`, never by assigning
-`checkoutError` directly, so a failure cannot be shown to a customer without also being
-counted.
-
-| mode | what happened | customer sees | detected by | covered by |
-|---|---|---|---|---|
-| `not-configured` | the store domain was absent from the bundle at build time | "checkout is unavailable" | `failCheckout`, and `/api/version`'s `bundleIsStale` when the cause was a cached build | `checkout-errors.test.ts` |
-| `placeholder-catalog` | the bag holds a variant id Shopify never issued, from the bundled catalogue | a refusal before any request is sent | `isPlaceholderVariantId` | `checkout-errors.test.ts` |
-| `network` | the proxy could not reach Shopify, or answered 429/5xx | "try again" | HTTP status mapping in the store | `checkout-errors.test.ts` |
-| `shopify-error` | Shopify answered but returned no cart, or `userErrors` | a refusal rather than a checkout URL | `cartCreate` userErrors logged | `checkout-errors.test.ts` |
-| `lines-unavailable` | the returned cart differs from the bag in either direction | a refusal rather than a wrong basket | the bidirectional post-sync check | `cart-sync.test.ts` |
-
-`lines-unavailable` used to be checked one way only — lines sent that did not come back.
-Reordering the reconciliation to issue removals last made the *other* direction reachable:
-an unremoved line is an item the customer took out of their bag and would still be charged
-for, so asserting only that everything sent came back would have traded an empty cart for
-an over-charged one.
-
-## Handing a customer to Shopify — `HandoffVerdict` (`src/store/cart.tsx`)
-
-`checkoutUrl` is persisted, so a returning visitor could otherwise be sent to a hosted
-checkout built from a bag they no longer have.
-
-| mode | meaning | customer sees | covered by |
-|---|---|---|---|
-| `not-synced` | no successful sync in *this* page load | the bag, and a sync before anything else | `checkout-journey.test.ts` |
-| `failed` | a `checkoutError` is set | the error, not a redirect | `checkout-journey.test.ts` |
-| `completed` | the order already went through | the confirmation | `checkout-journey.test.ts` |
-| `no-url` | synced, but Shopify returned no checkout URL | a refusal | `checkout-journey.test.ts` |
-
 ## Rate limiting — `RateLimitFailurePosture` and `RateLimiterHealth` (`src/lib/utils/rateLimit.ts`)
 
 Two enumerations for two questions that must never be answered by the same code path.
@@ -115,25 +83,6 @@ thrown by the request path.
 
 Kept distinct on purpose: one is a client sending more than it may, the other is a network
 that failed. Collapsing them tells an operator a caller misbehaved when the network did.
-
-## Sign-in — `IdTokenVerdict` (`src/lib/shopify/customer/oauth.ts`)
-
-Every one of these redirects to `/account?status=failed`. The reason is named in the log
-and never to the caller: distinguishing them would tell somebody probing the endpoint
-which half of their attempt was wrong.
-
-| mode | meaning | covered by |
-|---|---|---|
-| `malformed` | not three base64url segments, or a payload that is not a JSON object | `customer-oauth.test.ts` |
-| `nonce-mismatch` | the token answers a different login attempt, or carries no nonce | `customer-oauth.test.ts`, `customer-discovery.test.ts` |
-| `audience-mismatch` | the token was minted for a different client | `customer-oauth.test.ts` |
-| `expired` | `exp` has passed, or is missing or non-numeric | `customer-oauth.test.ts` |
-
-The signature is deliberately **not** verified: the token arrives on the direct
-server-to-server TLS response to a client-secret authenticated request, which OIDC Core
-§3.1.3.7 addresses explicitly. The boundary is stated rather than blurred.
-
----
 
 ## Failure modes with no enumeration
 

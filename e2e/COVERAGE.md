@@ -25,9 +25,8 @@ check too: a stale exception is an assertion nobody re-examined.
 /api/sitemap — Verified by src/tests/unit/sitemap-completeness.test.ts, which renders the XML and holds it against the app router's real route list.
 /api/webhooks/shopify — Verified by src/tests/unit/api-webhooks-shopify-route.test.ts and webhook-signature-contract.test.ts. Driving it from a browser would mean forging a signature in the spec, duplicating the script that already does it.
 /api/analytics — e2e/analytics.spec.ts asserts the beacons this route receives, from the page side. The route itself is a sink; asserting it twice adds nothing.
+/checkout — Verified by e2e/retired-routes.spec.ts, which reads the status code rather than navigating. `page.goto('/checkout')` would assert the wrong thing: Playwright follows a 410 and renders its body, so a navigation test passes identically whether the route answers 410 or 200. The spec asserts 410 on GET and on a stale POST, the noindex header, and that the body tells a human what to do instead.
 /api/contact — e2e/contact.spec.ts intercepts it to drive the form's success, failure and 503 states, and src/tests/unit/api-contact-route.test.ts exercises the handler. Between them both sides of the contract are covered.
-/api/shopify — e2e/checkout.spec.ts intercepts it to drive cart state; src/tests/unit/api-shopify-route.test.ts covers the proxy, and src/tests/unit/shopify-proxy-buckets.test.ts covers the separate read and write rate-limit budgets.
-/api/auth/logout — e2e/account.spec.ts calls it directly via request.post and asserts the session is cleared.
 ```
 
 ## The reasons are checked too

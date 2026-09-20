@@ -113,7 +113,7 @@ describe('server-only secrets never reach a client module', () => {
     // prevent in the first place.
     expect(reachable.size).toBeGreaterThan(5)
     const relative = [...reachable].map((f) => path.relative(SRC, f))
-    expect(relative).toContain('store/cart.tsx')
+    expect(relative).toContain('components/layout/Nav.tsx')
     expect(relative).toContain('components/contact/ContactForm.tsx')
     // The transitive case: reached only *through* a client component.
     expect(relative).toContain('config/site.ts')
@@ -144,26 +144,32 @@ describe('server-only secrets never reach a client module', () => {
   })
 
   it('the public store domain is still allowed — the rule is about secrets', () => {
-    // `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` is inlined on purpose and the cart
-    // store needs it. A rule that banned every Shopify env var would be wrong
-    // and would get switched off.
-    const cart = readFileSync(path.join(SRC, 'store/cart.tsx'), 'utf8')
-    expect(cart).toContain('shopifyPublicConfig')
-    expect([...cart.matchAll(SECRET_ENV)]).toEqual([])
-
+    // `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` is inlined on purpose. A rule that banned every
+    // Shopify env var would be wrong and would get switched off.
+    //
+    // This used to read the cart store too, as the one client module that needed the public
+    // domain. The cart is gone, and with it the last *client* consumer of this file — the
+    // split ADR 003 describes now has only server-side callers. The public config is still
+    // asserted to carry no secret, because that is the property, not the caller.
     const publicConfig = readFileSync(path.join(SRC, 'config/shopify-public.ts'), 'utf8')
     expect(publicConfig).toContain('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN')
     expect([...publicConfig.matchAll(SECRET_ENV)]).toEqual([])
   })
 
-  it('the client store does not import the server config module', () => {
-    // The split only holds if the client side actually points at the public
-    // file. Importing `@/config/shopify` would re-introduce all three secrets
-    // through one line, and the graph walk above would be the only thing that
-    // noticed — this says it directly, where the failure is easiest to read.
-    const cart = readFileSync(path.join(SRC, 'store/cart.tsx'), 'utf8')
-    expect(cart).not.toMatch(/from\s+['"]@\/config\/shopify['"]/)
-  })
+  /*
+   * 'the client store does not import the server config module' was here.
+   *
+   * It said directly what the graph walk above says generally: importing `@/config/shopify`
+   * from the client would re-introduce three secrets through one line. Its subject was the
+   * cart store, which no longer exists, and there is no client module left that would
+   * plausibly reach for the server config — so a replacement would be a test pointed at
+   * nothing in particular.
+   *
+   * The general rule still holds and is still enforced: the walk above resolves the real
+   * client import graph and fails on any module in it that reads a non-public secret. If a
+   * new client module ever needs the store domain, it gets `shopify-public.ts`, and this
+   * specific assertion is worth restoring beside it.
+   */
 })
 
 describe('the removed legacy aliases stay removed', () => {
@@ -207,13 +213,14 @@ describe('customer-account secrets are inside the pattern, not beside it', () =>
     }
   })
 
-  it('the modules holding them are not client modules', () => {
-    // A `'use client'` directive added to either of these would put a client
-    // secret in the browser bundle, and the graph walk starts *from* client
-    // modules — so the file becoming one is the failure it cannot see.
-    for (const file of ['lib/shopify/customer/config.ts', 'lib/shopify/customer/session.ts']) {
-      const source = readFileSync(path.join(SRC, file), 'utf8')
-      expect(isClientModule(source), `${file} must never be a client module`).toBe(false)
-    }
-  })
+  /*
+   * 'the modules holding them are not client modules' was here.
+   *
+   * It named `src/lib/shopify/customer/config.ts`, which held the three customer-account
+   * secrets and is deleted with the OAuth feature. The secrets themselves are still in
+   * SECRET_ENV and still asserted recognisable by the test above, because they exist in
+   * Vercel until someone revokes them — see docs/shopify-decommission-inventory.md. What is
+   * gone is any module in this repository that reads them, so there is nothing left for
+   * this assertion to point at.
+   */
 })

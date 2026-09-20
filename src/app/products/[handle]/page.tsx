@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { CartDrawer } from '@/components/layout/CartDrawer'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { HorizontalScroll } from '@/components/home/HorizontalScroll'
 import { hjCollections } from '@/lib/data/hj-data'
@@ -113,7 +112,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
         {related.length > 0 && <HorizontalScroll label="YOU MAY ALSO LIKE" products={related} />}
       </main>
       <Footer />
-      <CartDrawer />
     </>
   )
 }
