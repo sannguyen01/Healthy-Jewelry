@@ -51,6 +51,20 @@
       "acceptedWhy": "Restated 2026-09-15 by the defects review, and corrected: the previous reason named the wrong blocker. Issue #24 is that SHOPIFY_ADMIN_ACCESS_TOKEN holds a token of the wrong kind, which is a different fact from this control, and citing it here made an unmet isolation requirement read as a downstream consequence of a credential problem. This control is about scope, not validity: the five smoke secrets must sit on the production-readonly GitHub Environment with the SMOKE_SECRETS_SOURCE=environment marker, because this repository is public and forkable and repository-scoped secrets are readable by every workflow. Correcting the token would not close this gap; moving the secrets would, whatever the token holds. It stays accepted because both are GitHub console actions nobody in CI can perform, and preflight-secrets.mjs asserts the marker so the difference between isolated and merely green stays observable."
     },
     {
+      "id": "browse-only-smoke",
+      "claims": "the deployed site serves every catalogue handle, 404s the ones it does not hold, references no Shopify host, and emits no commerce semantics",
+      "status": "not-configured",
+      "probe": "scripts/verify-browse-only.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "humanAction": "None yet. This probe is written, tested and deliberately unwired: run against the live site today it reports 52 true findings \u2014 51 commerce semantics that WS-5 removes and one soft 404 that WS-4 removes. Wiring it into the schedule now would create a check that is red for weeks by design, which is the shape people mute (ADR 011). Add the step once WS-4 and WS-5 land and a manual `pnpm verify:browse-only` against production comes back clean.",
+      "knownLimit": "Two. It reads expected handles from the *filenames* in src/content/catalog/products/ rather than from parsed records, because it is dependency-free .mjs and cannot import the TypeScript reader \u2014 that shortcut is licensed only by catalog-content.test.ts asserting every file is named after the handle inside it, and removing that assertion silently points this probe at URLs with no records behind them. And it judges what a response *contains*: a page that omits a price because the data is missing looks identical to one that omits it because the decommission removed the field.",
+      "adr": "docs/adr/034-the-catalogue-is-the-source.md",
+      "backstop": "human:weekly",
+      "acceptedSince": "2026-09-20",
+      "acceptedWhy": "Accepted on the day it was written, for one scheduled-run cycle rather than indefinitely. The probe is complete and its decision is covered by 32 fixture-driven assertions; what is missing is a site for it to pass against. Run against the current deployment it returns `findings` with 52 entries, every one of them true: 17 products x 3 surviving commerce markers (Offer JSON-LD, a price field, a schema.org availability claim), plus /products/<unknown> answering 200 rather than 404. Those are WS-5's and WS-4's work respectively. Scheduling a check that cannot pass until two other workstreams land trains the reader to ignore it, which is precisely what ADR 011 records costing this repository a month of unread escalations. The acceptance expires when WS-4 and WS-5 merge; probe-accepted-gap.mjs will say so if they have not."
+    },
+    {
       "id": "canonical-domain-binding",
       "claims": "something asks, every six hours, whether healthyjewellery.com and its www host both reach this project's production deployment on the same commit — and reports the answer whatever it is",
       "status": "configured",
