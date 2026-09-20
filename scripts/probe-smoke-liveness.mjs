@@ -33,7 +33,7 @@
  *
  *   GITHUB_TOKEN=… node scripts/probe-smoke-liveness.mjs [--json] [--window-hours=26]
  *
- * Exits 1 when the verification tier is dark.
+ * Exits 1 when the verification tier is dark, or has just stopped.
  */
 
 import { SMOKE_CRON_INTERVAL_HOURS } from './lib/smoke-schedule.mjs'
@@ -79,6 +79,20 @@ export { EXECUTED_CONCLUSIONS }
  * `src/tests/unit/heartbeat-window.test.ts` holds this against the workflow's own cron.
  */
 export const DEFAULT_WINDOW_HOURS = 26
+
+/**
+ * The verdicts that exit non-zero, and so open the `verification-dark` issue.
+ *
+ * Named rather than compared inline in three places. `control-audit.yml` gates its reporting
+ * step on this script's **exit code** (`steps.smoke-liveness.outcome == 'failure'`) and uses
+ * the printed output as the issue body, so adding a verdict here is the whole wiring — no
+ * workflow change, and none of the inline-script budget that
+ * [ADR 030](../docs/adr/030-an-equivalence-relation-is-the-control.md) exists to keep down.
+ *
+ * `unevaluable` is deliberately absent: an API this probe could not reach is a failure of the
+ * probe, never a finding about the tier ([ADR 010](../docs/adr/010-a-control-that-cannot-fail.md)).
+ */
+export const ALARMING_VERDICTS = ['dark', 'stopped']
 
 /**
  * The verdict, computed from run and step data alone so it can be exercised against real
@@ -128,6 +142,61 @@ export function assessLiveness({ runs, stepsByRunId, now, windowHours = DEFAULT_
   }
 
   const alive = inWindow.filter((run) => executed(run) === true)
+
+  // A tier that *stops* is news at the moment it stops, not `windowHours` later when the
+  // last executing run ages out.
+  //
+  // This gap is not hypothetical and it has a date. Production-smoke run #154
+  // (2026-09-19T15:35Z) executed the checks and reported real findings; run #155
+  // (2026-09-19T20:14Z) skipped them and reported **success**, because the five secrets in
+  // the `production-readonly` environment had been emptied in between and
+  // `preflight-secrets.mjs` reads all-absent as `not-configured` — a state it deliberately
+  // treats as "nobody has set this up yet, which is not news". At the 20:47 control audit
+  // #154 was still inside the 26h window, so `alive.length > 0` held and this function
+  // returned `lit`. Correct by its own definition, and 26 hours late.
+  //
+  // `not-configured` used to mean *never configured*. During a decommission it also means
+  // *de-configured*, which is the opposite kind of event. The evidence distinguishing them
+  // is already in the history this probe reads: a tier that never started has no executing
+  // run behind it, and a tier that stopped does.
+  //
+  // Kept separate from `dark` for the same reason `dark` is kept separate from
+  // `unevaluable` — the remedies differ. `dark` says nothing has looked for a long time and
+  // somebody should find out why. `stopped` says something changed very recently, names the
+  // last run that worked, and points at whoever made that change. Both exit non-zero and
+  // both reach the same `verification-dark` issue; only the words differ, and the words are
+  // what a reader acts on.
+  //
+  // See docs/adr/033-a-premise-that-expired-mid-decommission.md.
+  //
+  // `inWindow[0]` is the newest run because `runs` arrives newest-first from the Actions API
+  // and `filter` preserves order. That ordering was incidental before this branch and is now
+  // load-bearing, so it is stated here as well as in the `@param` — a `sort` added upstream
+  // for tidiness would silently invert this verdict, and nothing else in the function cares.
+  const newestInWindow = inWindow[0]
+  if (executed(newestInWindow) === false && alive.length > 0) {
+    const streak = darkStreak(runs, stepsByRunId, REQUIRED_STEPS)
+    return {
+      verdict: 'stopped',
+      reason: 'checks-stopped-executing',
+      windowHours,
+      runsInWindow: inWindow.length,
+      streak: streak.count,
+      lastExecutedAt: streak.lastExecutedAt,
+      summary:
+        `The most recent production-smoke run did not execute ` +
+        `${REQUIRED_STEPS.join(', ')}, and an earlier run in the last ${windowHours}h did.\n\n` +
+        `Verification has just stopped. ` +
+        (streak.lastExecutedAt
+          ? `The last run that actually checked the live store was ${streak.lastExecutedAt}; ` +
+            `${streak.count} run(s) since then have skipped it. `
+          : '') +
+        `A skipped step reports the same green as a passing one, so the workflow's own ` +
+        `conclusion will not say this. Something changed the tier's inputs — most often the ` +
+        `smoke secrets being removed or rescoped — and this is the run to look at.`,
+    }
+  }
+
   if (alive.length > 0) {
     return {
       verdict: 'lit',
@@ -194,22 +263,29 @@ async function main() {
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(result, null, 2))
   } else {
-    const mark = result.verdict === 'lit' ? '✓' : result.verdict === 'dark' ? '✗' : '?'
+    const alarming = ALARMING_VERDICTS.includes(result.verdict)
+    const mark = result.verdict === 'lit' ? '✓' : alarming ? '✗' : '?'
     console.log(`${mark} production verification: ${result.verdict}`)
     console.log('')
     console.log(result.summary)
-    if (result.verdict === 'dark') {
+    if (alarming) {
       console.log('')
       console.log(
-        'This is not the same finding as "production smoke is failing". That issue names a\n' +
-          'credential. This one names the fact that nothing has looked at the live store\n' +
-          'since it broke — which is why it gets its own channel rather than a 33rd comment\n' +
-          'on a thread people have already learned to skip.'
+        result.verdict === 'stopped'
+          ? 'This is not the same finding as "production smoke is failing". That issue names a\n' +
+              'credential. This one names the moment verification stopped happening at all —\n' +
+              'a change the workflow\'s own green conclusion cannot report, because a skipped\n' +
+              'step and a passing one look identical from outside. Start with whatever changed\n' +
+              'the tier\'s inputs just before the run above.'
+          : 'This is not the same finding as "production smoke is failing". That issue names a\n' +
+              'credential. This one names the fact that nothing has looked at the live store\n' +
+              'since it broke — which is why it gets its own channel rather than a 33rd comment\n' +
+              'on a thread people have already learned to skip.'
       )
     }
   }
 
-  process.exit(result.verdict === 'dark' ? 1 : 0)
+  process.exit(ALARMING_VERDICTS.includes(result.verdict) ? 1 : 0)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

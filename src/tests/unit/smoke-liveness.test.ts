@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
-const { assessLiveness, REQUIRED_STEPS, DEFAULT_WINDOW_HOURS } = await import(
-  '../../../scripts/probe-smoke-liveness.mjs'
-)
+const { assessLiveness, REQUIRED_STEPS, DEFAULT_WINDOW_HOURS, ALARMING_VERDICTS } =
+  await import('../../../scripts/probe-smoke-liveness.mjs')
 
 /**
  * **The dead-man's switch, exercised against this repository's real history.**
@@ -167,15 +166,34 @@ describe('the healthy case', () => {
     expect(result.verdict).toBe('lit')
   })
 
-  it('one good run in the window is enough — this is a liveness check, not a pass rate', () => {
-    // A tier that failed once and recovered is not dark. Conflating the two would make
-    // this a duplicate of the smoke workflow's own failure channel, which is the mistake
-    // ADR 011 is about.
+  it('a good run behind a skipped newest one is a stop, not a healthy tier', () => {
+    // This fixture is unchanged and its verdict is not. It asserted `lit` until the
+    // `stopped` verdict existed, and that was wrong on its own terms: `REAL_RUNS` is
+    // newest-first, so setting index 1 lit and leaving index 0 dark encodes *the good run
+    // came first and then the checks stopped* — which is the 2026-09-19 shape exactly, and
+    // the opposite of the "failed once and recovered" case the old comment claimed.
+    //
+    // Both readings passed because `assessLiveness` was order-blind: it asked whether any
+    // run in the window had looked, and never which one. The recovery case the old comment
+    // meant is now covered explicitly, with the newest run as the executing one, in
+    // 'does not fire when the newest run is the one that looked' below.
+    //
     // Index 1, not a deeper one: at NOW the 26h window reaches back to 2026-08-27T05:45Z,
     // so runs [0] and [1] are inside it and everything older is not. Picking [3] here
     // first — 43h old — failed, correctly, and is worth the comment: a liveness window
     // that silently included stale runs would report a stopped tier healthy.
     const stepsByRunId = { ...allDark, [REAL_RUNS[1].id]: STEPS_OF_A_LIT_RUN }
+    const result = assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW })
+    expect(result.verdict).toBe('stopped')
+    expect(result.lastExecutedAt).toBe(REAL_RUNS[1].created_at)
+  })
+
+  it('one good run in the window is enough, when it is the most recent one', () => {
+    // The claim the test above used to make, with a fixture that actually makes it: a tier
+    // that failed once and recovered is not dark. Conflating the two would make this a
+    // duplicate of the smoke workflow's own failure channel, which is the mistake ADR 011
+    // is about.
+    const stepsByRunId = { ...allDark, [REAL_RUNS[0].id]: STEPS_OF_A_LIT_RUN }
     expect(assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW }).verdict).toBe('lit')
   })
 })
@@ -229,5 +247,181 @@ describe('the required steps are the ones that look at production', () => {
 
   it('the window is a documented constant, not a literal in the probe', () => {
     expect(DEFAULT_WINDOW_HOURS).toBe(26)
+  })
+})
+
+/**
+ * **The de-configuration, captured the day after it happened.**
+ *
+ * Everything in this block is verbatim from the Actions API on 2026-09-20, read back over
+ * the two production-smoke runs either side of the event. No fixture was invented, for the
+ * reason the header of this file already gives.
+ *
+ * What happened: between 15:35 and 20:14 UTC on 2026-09-19 the five secrets in the
+ * `production-readonly` GitHub Environment were emptied. Run #154 had them and executed the
+ * live checks (reporting real failures). Run #155 did not, so `preflight-secrets.mjs`
+ * returned `not-configured`, exited 0, and skipped both real steps — and the run concluded
+ * **success**.
+ *
+ * `assessLiveness` called that `lit` at the 20:47 control audit, because #154 was still
+ * inside the 26h window and the function only asked whether *anything* had looked. It was
+ * right by its own definition and 26 hours late, which is the gap `stopped` closes.
+ *
+ * The `not-configured` branch was written when all-secrets-absent could only mean "nobody
+ * has set this up yet". A decommission removes credentials on purpose, so it now also means
+ * "somebody took them away" — the same observation, the opposite event. See
+ * docs/adr/033-a-premise-that-expired-mid-decommission.md.
+ */
+
+/** Verbatim from `GET /actions/runs/105921386282` — run #154, the last one that looked. */
+const STEPS_OF_RUN_154 = [
+  { name: 'Set up job', conclusion: 'success' },
+  { name: 'Run actions/checkout@v4', conclusion: 'success' },
+  { name: 'Set up Node.js', conclusion: 'success' },
+  { name: 'Preflight — secrets present and environment-scoped', conclusion: 'failure' },
+  { name: 'Live store and storefront', conclusion: 'failure' },
+  { name: 'Webhook signing secret', conclusion: 'failure' },
+  { name: 'Write the run receipt', conclusion: 'success' },
+  { name: 'Upload the run receipt', conclusion: 'success' },
+  { name: 'Job summary', conclusion: 'success' },
+  { name: 'Report failure as an issue', conclusion: 'success' },
+  { name: 'Report premise drift', conclusion: 'success' },
+  { name: 'Close the failure issue on recovery', conclusion: 'skipped' },
+  { name: 'Complete job', conclusion: 'success' },
+]
+
+/**
+ * Verbatim from `GET /actions/runs/105960406584` — run #155.
+ *
+ * Note the preflight: `success`. This is not the 2026-08 shape, where the preflight went red
+ * and took the checks down with it. Here everything the reader can see is green and the two
+ * steps that touch production did not run.
+ */
+const STEPS_OF_RUN_155 = [
+  { name: 'Set up job', conclusion: 'success' },
+  { name: 'Run actions/checkout@v4', conclusion: 'success' },
+  { name: 'Set up Node.js', conclusion: 'success' },
+  { name: 'Preflight — secrets present and environment-scoped', conclusion: 'success' },
+  { name: 'Live store and storefront', conclusion: 'skipped' },
+  { name: 'Webhook signing secret', conclusion: 'skipped' },
+  { name: 'Write the run receipt', conclusion: 'success' },
+  { name: 'Upload the run receipt', conclusion: 'success' },
+  { name: 'Job summary', conclusion: 'success' },
+  { name: 'Report failure as an issue', conclusion: 'skipped' },
+  { name: 'Report premise drift', conclusion: 'success' },
+  { name: 'Close the failure issue on recovery', conclusion: 'skipped' },
+  { name: 'Complete job', conclusion: 'success' },
+]
+
+const RUN_154 = { id: 35452275777, created_at: '2026-09-19T15:35:16Z', conclusion: 'failure' }
+const RUN_155 = { id: 35466761323, created_at: '2026-09-19T20:14:14Z', conclusion: 'success' }
+
+/** Newest first, as the API returns them. */
+const RUNS_ACROSS_THE_EVENT = [RUN_155, RUN_154]
+const STEPS_ACROSS_THE_EVENT = {
+  [RUN_154.id]: STEPS_OF_RUN_154,
+  [RUN_155.id]: STEPS_OF_RUN_155,
+}
+
+/** The control audit that ran 33 minutes after #155, and reported `lit`. */
+const AT_THE_CONTROL_AUDIT = new Date('2026-09-19T20:47:53Z')
+
+describe('a tier that has just stopped is not a tier that is lit', () => {
+  it('reports `stopped` at the moment it stopped, not a window later', () => {
+    const result = assessLiveness({
+      runs: RUNS_ACROSS_THE_EVENT,
+      stepsByRunId: STEPS_ACROSS_THE_EVENT,
+      now: AT_THE_CONTROL_AUDIT,
+    })
+
+    // Before this verdict existed, the same inputs returned `lit` — because #154 was inside
+    // the window and `alive.length > 0`. That is the regression under test.
+    expect(result.verdict).toBe('stopped')
+    expect(result.reason).toBe('checks-stopped-executing')
+  })
+
+  it('names the last run that actually looked, so the change can be dated', () => {
+    const result = assessLiveness({
+      runs: RUNS_ACROSS_THE_EVENT,
+      stepsByRunId: STEPS_ACROSS_THE_EVENT,
+      now: AT_THE_CONTROL_AUDIT,
+    })
+    expect(result.lastExecutedAt).toBe(RUN_154.created_at)
+    expect(result.streak).toBe(1)
+  })
+
+  it('exits non-zero, so the existing reporting step picks it up unchanged', () => {
+    // `control-audit.yml` gates on this script's exit code and pastes its output into the
+    // issue. Adding the verdict to this set is the whole wiring; the YAML is untouched.
+    expect(ALARMING_VERDICTS).toContain('stopped')
+    expect(ALARMING_VERDICTS).toContain('dark')
+    expect(ALARMING_VERDICTS).not.toContain('unevaluable')
+    expect(ALARMING_VERDICTS).not.toContain('lit')
+  })
+
+  it('a run whose conclusion is `success` is exactly the case that needs catching', () => {
+    // Run #155 concluded `success`. Nothing that reads job conclusions can see this.
+    expect(RUN_155.conclusion).toBe('success')
+    expect(
+      STEPS_OF_RUN_155.find((s) => s.name === 'Live store and storefront')?.conclusion
+    ).toBe('skipped')
+  })
+
+  it('does not fire when the newest run is the one that looked', () => {
+    // The ordinary recovery shape: secrets restored, newest run executes again. Reversing
+    // the order must return `lit` — otherwise the alarm would latch and never clear.
+    const result = assessLiveness({
+      runs: [
+        { ...RUN_155, created_at: '2026-09-19T21:00:00Z' },
+        { ...RUN_154, created_at: '2026-09-19T20:14:14Z' },
+      ],
+      stepsByRunId: {
+        [RUN_155.id]: STEPS_OF_RUN_154, // newest executed
+        [RUN_154.id]: STEPS_OF_RUN_155, // older skipped
+      },
+      now: AT_THE_CONTROL_AUDIT,
+    })
+    expect(result.verdict).toBe('lit')
+  })
+
+  it('a steady dark tier stays `dark`, not `stopped`', () => {
+    // Both runs skipped: nothing has looked in the window at all. That is the 2026-08 shape
+    // and it keeps its own verdict, because the remedies differ — `dark` says go and find
+    // out why nothing has looked for a long time, `stopped` says something changed just now.
+    const result = assessLiveness({
+      runs: RUNS_ACROSS_THE_EVENT,
+      stepsByRunId: {
+        [RUN_154.id]: STEPS_OF_RUN_155,
+        [RUN_155.id]: STEPS_OF_RUN_155,
+      },
+      now: AT_THE_CONTROL_AUDIT,
+    })
+    expect(result.verdict).toBe('dark')
+    expect(result.reason).toBe('checks-not-executed')
+  })
+
+  it('unknown step data on the newest run is never `stopped`', () => {
+    // `didExecute` returns null for a run whose steps could not be read. Treating that as
+    // "did not execute" would manufacture a stop out of an API hiccup — ADR 010 again.
+    const result = assessLiveness({
+      runs: RUNS_ACROSS_THE_EVENT,
+      stepsByRunId: { [RUN_154.id]: STEPS_OF_RUN_154 },
+      now: AT_THE_CONTROL_AUDIT,
+    })
+    expect(result.verdict).not.toBe('stopped')
+    expect(result.verdict).toBe('lit')
+  })
+
+  it('the summary says what changed, not just that something is wrong', () => {
+    const result = assessLiveness({
+      runs: RUNS_ACROSS_THE_EVENT,
+      stepsByRunId: STEPS_ACROSS_THE_EVENT,
+      now: AT_THE_CONTROL_AUDIT,
+    })
+    // A reader opening the issue needs the date of the last good run and a first place to
+    // look. "The tier is dark" alone sends them to the wrong five weeks of history.
+    expect(result.summary).toContain(RUN_154.created_at)
+    expect(result.summary).toMatch(/just stopped/i)
+    expect(result.summary).toMatch(/secrets/i)
   })
 })

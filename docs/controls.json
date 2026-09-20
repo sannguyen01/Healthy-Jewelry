@@ -201,12 +201,12 @@
     },
     {
       "id": "smoke-liveness",
-      "claims": "something has actually verified the live store within the last 26 hours",
+      "claims": "something has actually verified the live store within the last 26 hours, and that it has not just stopped doing so",
       "status": "configured",
       "probe": "scripts/probe-smoke-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
-      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that — the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark.",
+      "knownLimit": "Cannot detect its own death. If control-audit.yml stops running, nothing reports that — the honest end of any monitoring chain, recorded rather than closed with a fourth watcher (ADR 006's precedent). It is also blind to a run whose step data the Actions API will not return, which it reports as unevaluable rather than as dark. The `stopped` verdict (ADR 033) needs one executing run inside the window to compare against, so a tier that was already dark when its secrets were removed reports `dark` and never `stopped` \u2014 correct, and it means the removal itself is not separately dated.",
       "adr": "docs/adr/022-absence-needs-its-own-alarm.md",
       "backstop": "human:weekly"
     },
@@ -317,6 +317,7 @@
     "docs/adr/023-the-last-link-is-a-person.md": "States where the verification regress terminates. It is the frame the backstop field implements, not an entry in it — and its enforcement is a registry test that fails loudly in the fast gate.",
     "docs/adr/024-a-tool-never-pointed-at-a-known-answer.md": "A rule about how verification tools are built and admitted to this registry. Like ADR 007, it constrains the entries rather than being one.",
     "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible — a guardrail, not a control.",
+    "docs/adr/033-a-premise-that-expired-mid-decommission.md": "A rule about when a monitor must report a transition rather than a level, and about where an expired premise is repaired \u2014 at the evidence, not at the assumption. It refines the smoke-liveness control rather than adding one: the `stopped` verdict lives in that control's existing probe, its claims line now says so, and a second entry naming the same probe would be two answers to one question. Its enforcement is smoke-liveness.test.ts, eight assertions shown to fail against three mutations, which fail by name in the fast gate.",
     "docs/adr/028-a-fixture-is-the-input-you-thought-of.md": "A rule about how verification tools are tested before being relied upon, like ADR 007 is about how guardrails are written and ADR 024 about pointing them at a known answer. It constrains the entries rather than being one, and its enforcement is parser-fuzz.test.ts, which fails by name in the fast gate.",
     "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
   },

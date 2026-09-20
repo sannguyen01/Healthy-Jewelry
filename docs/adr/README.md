@@ -52,6 +52,7 @@ pointer; the reasoning lives here once.
 | [030](030-an-equivalence-relation-is-the-control.md) | An equivalence relation is the control | Issue #24 took 100 identical comments across ~124 runs and escalated zero times, because the decision lived in a YAML string nothing could import; spans `production-smoke.yml`, `scripts/lib/escalation.mjs`, its test, and the inline-script budget |
 | [031](031-a-clean-merge-is-not-a-correct-merge.md) | A clean merge is not a correct merge | `main` was left un-installable twice in one day by merges git reported as successful; spans `package.json`, `pnpm-lock.yaml`, `scripts/lib/manifest-integrity.mjs` and the `verify` job's first step |
 | [032](032-the-canonical-domain-is-a-claim-nothing-checked.md) | The canonical domain is a claim nothing checked | Every live check asserts things about a hostname handed to it, and none can tell whether that hostname is the one bound to production; spans `probe-canonical-domain.mjs`, `scripts/lib/canonical-domain.mjs`, `control-audit.yml`, `docs/controls.json` and `docs/dns-domain-setup.md` |
+| [033](033-a-premise-that-expired-mid-decommission.md) | A premise that expired mid-decommission | `not-configured` meant "nobody has set this up" until a decommission emptied the secrets and a green run checked nothing; spans `probe-smoke-liveness.mjs`, `preflight-secrets.mjs`, `smoke-liveness.test.ts` and `control-audit.yml` |
 
 ## Format
 
