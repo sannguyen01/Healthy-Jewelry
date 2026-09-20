@@ -1,5 +1,17 @@
 # Catalog Conventions
 
+> **Superseded, 2026-09-20 — kept as the record of a system being dismantled.**
+>
+> These are rules for editing products in **Shopify Admin**. After the decommission a product is a reviewed JSON file in `src/content/catalog/products/`, and the conventions that survive are enforced by a Zod schema rather than by this prose.
+>
+> The replacement is [ADR 034](adr/034-the-catalogue-is-the-source.md): `src/content/catalog/**`
+> is the product data source and `src/lib/catalog/**` is the only layer that may read it.
+> `docs/browse-only-masterplan.md` is the plan of record.
+>
+> This file is **not deleted**, deliberately. Several of the rules below are the only written
+> record of *why* a mapping behaves as it does, and WS-4 has to read them before the code they
+> describe goes. Delete it when the last of them has a home in the new schema.
+
 Rules for adding or editing products in Shopify Admin so they render correctly on the
 site. `src/lib/shopify/index.ts` (`mapShopifyProduct`) is the authoritative mapping —
 this doc explains what it expects and what happens when a product doesn't provide it.

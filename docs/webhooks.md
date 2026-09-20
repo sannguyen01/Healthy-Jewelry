@@ -1,5 +1,17 @@
 # Shopify Webhooks
 
+> **Superseded, 2026-09-20 — kept as the record of a system being dismantled.**
+>
+> Every subscription here is scheduled for deletion, and the order matters: delete the Shopify subscriptions **before** removing `/api/webhooks/shopify`, or Shopify retries against a failing route for its full backoff schedule during the transition.
+>
+> The replacement is [ADR 034](adr/034-the-catalogue-is-the-source.md): `src/content/catalog/**`
+> is the product data source and `src/lib/catalog/**` is the only layer that may read it.
+> `docs/browse-only-masterplan.md` is the plan of record.
+>
+> This file is **not deleted**, deliberately. Several of the rules below are the only written
+> record of *why* a mapping behaves as it does, and WS-4 has to read them before the code they
+> describe goes. Delete it when the last of them has a home in the new schema.
+
 Handler: `src/app/api/webhooks/shopify/route.ts`. Endpoint: `POST /api/webhooks/shopify`.
 
 ## Verification
