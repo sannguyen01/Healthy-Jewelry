@@ -41,7 +41,7 @@ flag it if you see:
 
 ## Testing baseline
 
-The suite spans **86 unit spec files** and **15 E2E spec files**.
+The suite spans **87 unit spec files** and **15 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
@@ -52,8 +52,8 @@ them by hand to make a check pass — re-measure, and if the number really moved
 than in a diff.** The Shopify decommission deleted seven specs whose subjects no longer
 exist — `shopify-index`, `shopify-pagination`, `shopify-client`, `shopify-env-check`,
 `shopify-mapping`, `formatPrice` and `seo` (the last covering `src/lib/utils/seo.ts`, which
-had no application caller at all) — and added two: `catalog-fixture-contract` and
-`catalog-search`. Three more were re-founded in place under new names:
+had no application caller at all) — and added three: `catalog-fixture-contract`,
+`catalog-search` and `browse-only-copy`. Three more were re-founded in place under new names:
 `currency-consistency` → `price-absence-contract`, `homepage-fetch-budget` →
 `homepage-composition-contract`, `opengraph-vnd-font` → `opengraph-bundled-font`.
 

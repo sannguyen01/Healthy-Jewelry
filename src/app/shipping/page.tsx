@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
+import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { SUPPORT_EMAIL } from '@/config/site'
+import { ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Shipping & Returns',
@@ -114,10 +115,26 @@ export default function ShippingPage() {
             gap: '56px',
           }}
         >
+          <BrowseOnlyNotice />
+
           {/* Shipping */}
           <div>
             <h2 style={sectionHeadStyle}>Shipping</h2>
-            <p style={bodyStyle}>All orders ship free. No minimum order value, no handling fees.</p>
+            {/*
+              Every commitment on this page survives the decommission and should. A piece
+              arranged with an ambassador is still shipped, still returnable within thirty
+              days, still exchangeable. What changed is only where the arrangement comes
+              from, which is why the notice above is one component rather than three
+              paragraphs — see BrowseOnlyNotice.
+
+              "All orders ship free" stays, with "placed" replaced by "arranged": the
+              original read as though an order could be placed here, which is the single
+              false implication on an otherwise accurate page.
+            */}
+            <p style={bodyStyle}>
+              Shipping is free on every piece, wherever it is going. No minimum, no handling
+              fees.
+            </p>
 
             <table style={tableStyle}>
               <thead>
@@ -137,13 +154,13 @@ export default function ShippingPage() {
             </table>
 
             <p style={bodyStyle}>
-              Orders are processed within 1 business day. You will receive a shipping confirmation
-              email with a tracking number once your order ships.{' '}
+              A confirmed arrangement is dispatched within 1 business day. Your ambassador
+              sends a shipping confirmation with a tracking number once it is on its way.
             </p>
             <p style={bodyStyle}>
-              International orders may be subject to customs duties and import taxes levied by the
-              destination country. These charges are the responsibility of the recipient and are not
-              included in our free shipping offer.
+              International shipments may be subject to customs duties and import taxes levied
+              by the destination country. These charges are the responsibility of the
+              recipient and are not included in free shipping.
             </p>
           </div>
 
@@ -151,8 +168,9 @@ export default function ShippingPage() {
           <div>
             <h2 style={sectionHeadStyle}>Returns</h2>
             <p style={bodyStyle}>
-              We accept returns within <strong>30 days</strong> of delivery. Items must be unworn,
-              in original condition, and in original packaging.
+              We accept returns within <strong>30 days</strong> of delivery, on any piece
+              however it was arranged. Items must be unworn, in original condition, and in
+              original packaging.
             </p>
             <ul style={listStyle}>
               <li>
@@ -163,12 +181,12 @@ export default function ShippingPage() {
                 >
                   {SUPPORT_EMAIL}
                 </a>{' '}
-                with your order number.
+                with {ORDER_REFERENCE_HINT}.
               </li>
               <li>We will provide a prepaid return label for all returns.</li>
               <li>
-                Once we receive and inspect the returned item, your refund will be processed to your
-                original payment method within 5–7 business days.
+                Once we receive and inspect the returned item, your refund is processed by
+                the same method you paid, within 5–7 business days.
               </li>
               <li>Piercing jewelry that has been worn cannot be returned for hygiene reasons.</li>
             </ul>
@@ -198,7 +216,7 @@ export default function ShippingPage() {
               >
                 {SUPPORT_EMAIL}
               </a>{' '}
-              with your order number and the item you would like instead.
+              with {ORDER_REFERENCE_HINT} and the item you would like instead.
             </p>
           </div>
 

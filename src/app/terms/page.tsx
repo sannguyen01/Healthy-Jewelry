@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
+import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { CONTACT_EMAIL, SITE_DOMAIN } from '@/config/site'
+import { CONTACT_EMAIL, ORDER_REFERENCE_HINT, SITE_DOMAIN } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
@@ -76,13 +77,15 @@ export default function TermsPage() {
             gap: '48px',
           }}
         >
+          <BrowseOnlyNotice />
+
           {/* 1. Acceptance */}
           <div>
             <h2 style={sectionHeadStyle}>Acceptance of Terms</h2>
             <p style={bodyStyle}>
-              By accessing or using the Healthy Jewelry website ({SITE_DOMAIN}) or placing an order,
-              you agree to be bound by these Terms of Service. If you do not agree, please do not
-              use our site or services.
+              By accessing or using the Healthy Jewelry website ({SITE_DOMAIN}), you agree to be
+              bound by these Terms of Service. If you do not agree, please do not use our site or
+              services.
             </p>
             <p style={bodyStyle}>
               These terms apply to all visitors, customers, and others who access or use our
@@ -101,17 +104,23 @@ export default function TermsPage() {
             </p>
             <p style={bodyStyle}>
               {/*
-                Not a named currency. This paragraph said "US Dollars (USD)" while the
-                store charges VND — the same defect the code carried until
-                `HJProduct.currencyCode` was threaded end to end, surviving in prose
-                because a sentence has no type checker. Naming a currency here means
-                re-editing legal copy whenever Shopify's changes, and forgetting is
-                exactly what happened.
+                This paragraph has been wrong twice, in two different ways, and both are
+                worth remembering because a sentence has no type checker.
+
+                It first said prices were "in US Dollars (USD)" while the store charged
+                VND — the same defect the code carried until `HJProduct.currencyCode` was
+                threaded end to end. That was corrected to "the currency shown at
+                checkout", which was right until there was no checkout.
+
+                Naming a currency in legal copy means re-editing legal copy whenever the
+                store's changes. Naming a *checkout* means re-editing it whenever the
+                selling model does. This names neither, because this site now publishes no
+                price at all — see BROWSE_ONLY_STATEMENT in src/config/site.ts.
               */}
-              Prices are displayed in the currency shown at checkout, which is the currency
-              you will be charged in. We reserve the right to change prices at any time
-              without notice. The price shown at the time of your order confirmation is the
-              price you will pay.
+              This site publishes no prices. What a piece costs, in which currency, and how
+              it is paid for are settled in the conversation with your ambassador before
+              anything is agreed. Nothing on this website constitutes an offer to sell or a
+              quotation.
             </p>
             <p style={bodyStyle}>
               Product imagery is illustrative. Where a piece has not yet been photographed its
@@ -121,38 +130,61 @@ export default function TermsPage() {
             </p>
           </div>
 
-          {/* 3. Order process */}
+          {/* 3. How a piece is arranged */}
           <div>
-            <h2 style={sectionHeadStyle}>Order Process and Confirmation</h2>
+            <h2 style={sectionHeadStyle}>How a Piece Is Arranged</h2>
+            {/*
+              This section described a cart, an order-confirmation email, "pricing errors
+              on the website" and a refund to "your original payment method" — an entire
+              order lifecycle this site cannot begin. It is replaced rather than deleted:
+              a customer arranging a piece still needs to know when the arrangement becomes
+              binding and on what grounds it can be declined.
+            */}
             <p style={bodyStyle}>
-              Placing an item in your cart does not constitute a purchase. Your order is confirmed
-              when you receive an order confirmation email from us. We reserve the right to cancel
-              orders in cases of:
+              Browsing this catalogue creates no obligation on either side. An arrangement
+              exists only once it has been confirmed directly with a Healthy Jewelry
+              ambassador, in writing, including the piece, the size, the price and the
+              delivery address.
             </p>
+            <p style={bodyStyle}>An arrangement may be declined before it is confirmed where:</p>
             <ul style={listStyle}>
-              <li>Stock unavailability after order placement</li>
-              <li>Pricing errors on the website</li>
-              <li>Suspected fraudulent transactions</li>
-              <li>Delivery address issues we cannot resolve</li>
+              <li>the piece is unavailable or is no longer made</li>
+              <li>the delivery address cannot be served</li>
+              <li>the request appears fraudulent</li>
             </ul>
             <p style={bodyStyle}>
-              If we cancel your order, you will receive a full refund to your original payment
-              method within 5–7 business days.
+              If an arrangement is declined after payment has been made, the amount paid is
+              returned in full by the same method within 5–7 business days.
             </p>
           </div>
 
           {/* 4. Payment */}
           <div>
-            <h2 style={sectionHeadStyle}>Payment Methods</h2>
-            <p style={bodyStyle}>We accept the following payment methods:</p>
-            <ul style={listStyle}>
-              <li>Credit and debit cards (Visa, Mastercard)</li>
-              <li>PayPal</li>
-              <li>Bank transfer</li>
-            </ul>
+            <h2 style={sectionHeadStyle}>Payment</h2>
+            {/*
+              This listed Visa, Mastercard, PayPal and bank transfer as accepted methods and
+              said "all transactions are processed securely. We do not store your full card
+              details on our servers." Both sentences were true of a storefront with a
+              hosted checkout and neither is true of this one: nothing on this site takes a
+              payment, so listing methods it accepts is a claim about a capability it does
+              not have.
+            */}
             <p style={bodyStyle}>
-              All transactions are processed securely. We do not store your full card details on our
-              servers.
+              No payment is taken on this website. There is no checkout, no cart, and no
+              payment form; this site holds no card details and never has any to hold.
+            </p>
+            <p style={bodyStyle}>
+              Payment for a piece is arranged directly with your ambassador, who will tell
+              you which methods are available and issue a receipt. Anyone asking you to pay
+              through a form on this domain is not acting for Healthy Jewelry — please
+              report it to{' '}
+              <a
+                href={`mailto:${CONTACT_EMAIL}`}
+                style={{ color: 'var(--ink)', textDecoration: 'underline' }}
+              >
+                {CONTACT_EMAIL}
+              </a>
+              .
             </p>
           </div>
 
@@ -188,7 +220,7 @@ export default function TermsPage() {
               >
                 {CONTACT_EMAIL}
               </a>{' '}
-              with your order number and a description of the issue.
+              with {ORDER_REFERENCE_HINT} and a description of the issue.
             </p>
           </div>
 
