@@ -86,6 +86,42 @@ export const LEGAL_EMAIL = 'legal@healthyjewellery.com'
 /** Resend "from" sender identity only — not a real inbox. */
 export const SENDER_EMAIL = 'contact@healthyjewellery.com'
 
+// ── How this brand sells, stated once ──────────────────────────────────────
+//
+// **Declared here because four pages make the same claim and two of them used to make it
+// differently.** `/terms` said "Placing an item in your cart does not constitute a
+// purchase" and listed Visa, Mastercard, PayPal and bank transfer as accepted payment
+// methods; `/shipping` said "All orders ship free" with a table; `/faq` explained how to
+// start a return "with your order number"; `/checkout` answers 410 saying the opposite of
+// all three. Every one of those was written in good faith about a storefront that took
+// orders, and none of them was updated when it stopped.
+//
+// Legal and support copy is the worst place in a codebase for a fact to be duplicated:
+// nothing renders wrong when it drifts, a reader has no way to tell which page is current,
+// and the wrong one is a claim about a real business. One constant, four consumers.
+
+/**
+ * The single sentence every transactional page opens with.
+ *
+ * Deliberately says what *is* true rather than only what is not: "no online orders" alone
+ * reads as a fault, and a visitor who wants a piece needs the next step in the same breath.
+ */
+export const BROWSE_ONLY_STATEMENT =
+  'This catalogue is for browsing. Healthy Jewelry does not take orders on this site — a ' +
+  'piece is arranged with an ambassador, or through the contact channel below.'
+
+/**
+ * How a customer identifies an existing order when writing in.
+ *
+ * There is no order-confirmation email from this site and therefore no order number from
+ * it, which is what made "email us with your order number" unanswerable. An ambassador's
+ * reference or the email address the arrangement was made under is what a real customer
+ * actually holds.
+ */
+export const ORDER_REFERENCE_HINT =
+  'the reference your ambassador gave you, or the email address the piece was arranged under'
+
+
 // Removed 2026-08-07: three legacy aliases read server-only Shopify secrets
 // (`SHOPIFY_STOREFRONT_URL`, `SHOPIFY_STOREFRONT_ACCESS_TOKEN`,
 // `SHOPIFY_REVALIDATION_SECRET`) from this module — which `ContactForm.tsx`

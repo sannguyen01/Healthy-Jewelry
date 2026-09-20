@@ -1,17 +1,25 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { HJProduct, HJCollectionHandle } from '@/lib/catalog/types'
+import type { CatalogProduct } from '@/lib/catalog'
+import type { CollectionHandle } from '@/lib/catalog/schema'
 import { ProductCard } from '@/components/product/ProductCard'
 
 interface ProductGridProps {
-  products: HJProduct[]
+  products: readonly CatalogProduct[]
   showFilters?: boolean
 }
 
-type SortKey = 'featured' | 'price-asc' | 'price-desc' | 'newest'
+/**
+ * `price-asc` and `price-desc` are gone: there is no price to sort on.
+ *
+ * Removed from the union rather than left unhandled, so a stale `?sort=price-asc` in a
+ * bookmark is a type the component cannot represent instead of a silent no-op that looks
+ * like a broken control.
+ */
+type SortKey = 'featured' | 'newest'
 
-const COLLECTION_FILTERS: { label: string; value: HJCollectionHandle | 'all' }[] = [
+const COLLECTION_FILTERS: { label: string; value: CollectionHandle | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Rings', value: 'rings' },
   { label: 'Necklaces', value: 'necklaces' },
@@ -22,13 +30,11 @@ const COLLECTION_FILTERS: { label: string; value: HJCollectionHandle | 'all' }[]
 
 const SORT_OPTIONS: { label: string; value: SortKey }[] = [
   { label: 'Featured', value: 'featured' },
-  { label: 'Price: Low → High', value: 'price-asc' },
-  { label: 'Price: High → Low', value: 'price-desc' },
   { label: 'Newest', value: 'newest' },
 ]
 
 export function ProductGrid({ products, showFilters = false }: ProductGridProps) {
-  const [activeCollection, setActiveCollection] = useState<HJCollectionHandle | 'all'>('all')
+  const [activeCollection, setActiveCollection] = useState<CollectionHandle | 'all'>('all')
   const [sortBy, setSortBy] = useState<SortKey>('featured')
 
   const filtered = useMemo(() => {
@@ -36,13 +42,9 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
       ? [...products]
       : products.filter((p) => p.collection === activeCollection)
 
-    if (sortBy === 'price-asc') {
-      list = [...list].sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
-    } else if (sortBy === 'price-desc') {
-      list = [...list].sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
-    } else if (sortBy === 'newest') {
-      list = [...list].filter((p) => p.badge === 'New').concat(
-        [...list].filter((p) => p.badge !== 'New')
+    if (sortBy === 'newest') {
+      list = [...list].filter((p) => p.badge === 'new').concat(
+        [...list].filter((p) => p.badge !== 'new')
       )
     }
 
@@ -156,7 +158,7 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
           }}
         >
           {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product.handle} product={product} />
           ))}
         </div>
       )}

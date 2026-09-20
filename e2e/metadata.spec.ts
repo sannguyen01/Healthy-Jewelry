@@ -66,30 +66,38 @@ test.describe('Product metadata', () => {
     await expect(page.getByRole('heading', { level: 1 })).not.toContainText(/titanium/i)
   })
 
-  test('a nonexistent product is noindex, so the junk URL cannot be indexed', async ({
-    page,
-  }) => {
-    // `/products/<unknown>` answers HTTP 200 while rendering not-found.tsx, and no code in
-    // the page can change that: Next returns 200 for streamed responses, and this route
-    // cannot use `dynamicParams = false` without 404ing products newly added in Shopify.
-    // So the harm is addressed instead of the status — noindex removes the URL from the
-    // index, which a robots.txt disallow would not.
-    await page.goto('/products/this-product-does-not-exist')
+  /**
+   * **The `noindex` mitigation is gone, because the thing it mitigated is gone.**
+   *
+   * What stood here asserted that `/products/<unknown>` carried `noindex, nofollow`. The
+   * reasoning was sound at the time and is worth keeping on the record: that URL answered
+   * **HTTP 200** while rendering `not-found.tsx`, and no code in the page could change it —
+   * Next returns 200 for streamed responses, and the route could not use
+   * `dynamicParams = false` without hard-404ing any product newly added in Shopify Admin.
+   * So the *harm* was addressed instead of the status, with `noindex`, which removes a URL
+   * from the index where a `robots.txt` disallow would not.
+   *
+   * After [ADR 034](../docs/adr/034-the-catalogue-is-the-source.md) the handle set is closed
+   * — nobody can add a product anywhere but this repository — so `dynamicParams = false`
+   * makes the status honest and Next's own 404 renders. `generateMetadata` is never reached
+   * for an unknown handle, so there is no `noindex` to assert and asserting one would fail
+   * for correct behaviour.
+   *
+   * `e2e/retired-routes.spec.ts` owns the replacement, and it is a stronger claim: the
+   * status code itself, read with `request.get()`. A 404 needs no meta tag to stay out of an
+   * index.
+   */
+  test('a nonexistent product is a real 404, which needs no noindex', async ({ request }) => {
+    const response = await request.get('/products/this-product-does-not-exist', {
+      maxRedirects: 0,
+    })
 
-    // Reads *every* robots tag, not the first. Next's not-found boundary emits its own
-    // alongside the one from generateMetadata, and a crawler obeys all of them — so
-    // asserting on a single element both breaks on ambiguity and checks less than the
-    // crawler sees.
-    const robots = await page.locator('meta[name="robots"]').evaluateAll((tags) =>
-      tags.map((t) => t.getAttribute('content') ?? ''),
-    )
-
-    expect(robots.length, 'no robots directive at all').toBeGreaterThan(0)
-    expect(robots.some((c) => /noindex/.test(c))).toBe(true)
-    expect(robots.some((c) => /nofollow/.test(c))).toBe(true)
-    // No contradicting directive. Google resolves a conflict to the most restrictive
-    // value, but an `index` here would mean two parts of the app disagree.
-    expect(robots.filter((c) => /\bindex\b/.test(c) && !/noindex/.test(c))).toEqual([])
+    expect(
+      response.status(),
+      'An unknown handle answered 200. That is a soft 404: the page says "not found" while ' +
+        'the status line says the URL is fine, so a crawler indexes it. Check that ' +
+        '`dynamicParams = false` is still exported from products/[handle]/page.tsx.'
+    ).toBe(404)
   })
 
   test('a real product is NOT noindex', async ({ page }) => {

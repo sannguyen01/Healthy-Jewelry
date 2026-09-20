@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { PRODUCTS_TAG, collectionTag, PURGE_NOW } from '@/lib/shopify/cacheTags'
-import { hjCollections } from '@/lib/data/hj-data'
+import { getAllCollections } from '@/lib/catalog'
 import { timingSafeEqual } from 'crypto'
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -30,10 +30,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     revalidatePath('/shop', 'page')
     revalidatePath('/products/[handle]', 'page')
 
-    // Derived, not five hardcoded paths. `hjCollections` is site structure — the same
+    // Derived, not five hardcoded paths. `getAllCollections()` is site structure — the same
     // fixed set `/shop/[collection]` prerenders — so a sixth collection is covered here
     // automatically instead of being silently skipped.
-    for (const collection of hjCollections) {
+    for (const collection of getAllCollections()) {
       revalidatePath(`/shop/${collection.handle}`, 'page')
     }
 
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // two named files), so the bug survived here. `'products'` was a literal too, correct
     // only by coincidence.
     revalidateTag(PRODUCTS_TAG, PURGE_NOW)
-    for (const collection of hjCollections) {
+    for (const collection of getAllCollections()) {
       revalidateTag(collectionTag(collection.handle), PURGE_NOW)
     }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import { HJ_SVG_TYPES } from '@/lib/catalog/types'
+import { HJ_SVG_TYPES } from '@/lib/svg/types'
 import { FALLBACK_VIEWBOX, SVG_VIEWBOX, viewBoxFor } from '@/lib/svg/viewbox'
 
 /**

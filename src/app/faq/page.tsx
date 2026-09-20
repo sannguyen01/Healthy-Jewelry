@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
+import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { SUPPORT_EMAIL } from '@/config/site'
+import { CONTACT_EMAIL, ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'FAQ',
@@ -73,15 +74,30 @@ const sections: Section[] = [
     ],
   },
   {
-    title: 'Orders',
+    /*
+     * Titled "Orders" and opening with shipping times, on a site that cannot take an
+     * order. The first question a visitor now has is the one that was missing: *how do I
+     * get one?* It goes first, and the two that survive keep their answers — a piece
+     * arranged with an ambassador ships and returns on exactly the terms this page
+     * already stated.
+     */
+    title: 'Getting a piece',
     items: [
       {
+        q: 'How do I buy something?',
+        a: `Not on this site — there is no cart and no checkout here. Pieces are arranged directly with a Healthy Jewelry ambassador, who will confirm the size, the price and the delivery address with you in writing before anything is agreed. If you do not already know an ambassador, write to ${CONTACT_EMAIL} and we will put you in touch.`,
+      },
+      {
+        q: 'Why are there no prices on the site?',
+        a: 'Because a number published here would be a figure nobody could act on: this site takes no orders, so there is nothing for it to be the price of. What a piece costs is settled in the conversation with your ambassador, in the currency you will actually pay in.',
+      },
+      {
         q: 'How long does shipping take?',
-        a: 'International orders arrive in 7–14 business days. All orders ship free with no minimum order value.',
+        a: 'A confirmed arrangement is dispatched within 1 business day and arrives in 7–14 business days internationally. Shipping is free on every piece, with no minimum.',
       },
       {
         q: 'Can I return or exchange?',
-        a: `Yes. We accept returns and exchanges within 30 days of delivery. Items must be unworn and in original condition. Email ${SUPPORT_EMAIL} with your order number to initiate a return or exchange. We provide a prepaid return label for all eligible orders.`,
+        a: `Yes, on any piece however it was arranged. Returns and exchanges are accepted within 30 days of delivery; items must be unworn and in original condition. Email ${SUPPORT_EMAIL} with ${ORDER_REFERENCE_HINT} to start one. We provide a prepaid return label.`,
       },
     ],
   },
@@ -103,6 +119,9 @@ export default function FAQPage() {
           }}
         >
           <PageHeader eyebrow="Support" title="Frequently Asked Questions" variant="compact" />
+          <div style={{ marginTop: '40px' }}>
+            <BrowseOnlyNotice />
+          </div>
         </section>
 
         {/* Divider */}

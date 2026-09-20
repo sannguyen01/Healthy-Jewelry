@@ -1,9 +1,9 @@
 'use client'
 
-import type { HJCollectionHandle } from '@/lib/catalog/types'
+import type { CollectionHandle } from '@/lib/catalog/schema'
 
 interface SizePickerProps {
-  collection: HJCollectionHandle
+  collection: CollectionHandle
   onSelect: (size: string) => void
   selected?: string
 }

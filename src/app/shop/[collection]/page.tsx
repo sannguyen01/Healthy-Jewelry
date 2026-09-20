@@ -5,12 +5,11 @@ import { Footer } from '@/components/layout/Footer'
 import { ProductGrid } from '@/components/product/ProductGrid'
 import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
-import { hjCollections } from '@/lib/data/hj-data'
-import { getProductsByCollection } from '@/lib/shopify'
+import { getCollectionByHandle, getProductsByCollection } from '@/lib/catalog'
 import { TrackView } from '@/components/analytics/TrackView'
-import type { HJCollectionHandle } from '@/lib/catalog/types'
+import type { CollectionHandle } from '@/lib/catalog/schema'
 
-const VALID_COLLECTIONS: HJCollectionHandle[] = [
+const VALID_COLLECTIONS: CollectionHandle[] = [
   'rings',
   'necklaces',
   'earrings',
@@ -42,11 +41,18 @@ export function generateStaticParams() {
  * `dynamicParams = false` rejects any param outside `generateStaticParams` **before
  * rendering begins**, so the status is still ours to set.
  *
- * Only safe because this set is closed: five collections, fixed in `hjCollections`. A sixth
- * one must be added there and deployed, or it will 404 — and that failure will look like a
- * routing bug rather than a missing config. Products deliberately do NOT use this: their
- * set is open, and locking it would 404 any product added in Shopify until the next
- * redeploy. They use `robots: noindex` instead. See docs/adr/007.
+ * Only safe because this set is closed: five collections, fixed in `src/content/catalog/
+ * collections/`. A sixth one must be added there, listed in `VALID_COLLECTIONS` below, and
+ * deployed, or it will 404 — and that failure will look like a routing bug rather than a
+ * missing config. `collection-handle-contract.test.ts` compares the two lists in every
+ * direction so that mistake fails the gate instead of a page.
+ *
+ * **Products use this too now.** They did not, and the comment here said why: their set was
+ * open — a merchant could add one in Shopify Admin — so locking it would 404 any product
+ * added since the last deploy, and `robots: noindex` was the mitigation. That premise
+ * expired with ADR 034; nobody can add a product anywhere but this repository, so
+ * `generateStaticParams` is complete by construction on both routes. See
+ * `src/tests/unit/soft-404-premise.test.ts`, which failed the moment the data source moved.
  */
 export const dynamicParams = false
 
@@ -56,7 +62,7 @@ interface CollectionPageProps {
 
 export async function generateMetadata({ params }: CollectionPageProps): Promise<Metadata> {
   const { collection } = await params
-  const col = hjCollections.find((c) => c.handle === collection)
+  const col = getCollectionByHandle(collection)
   if (!col) {
     return { title: 'Collection Not Found' }
   }
@@ -69,13 +75,13 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 export default async function CollectionPage({ params }: CollectionPageProps) {
   const { collection } = await params
 
-  if (!VALID_COLLECTIONS.includes(collection as HJCollectionHandle)) {
+  if (!VALID_COLLECTIONS.includes(collection as CollectionHandle)) {
     notFound()
   }
 
-  const handle = collection as HJCollectionHandle
-  const col = hjCollections.find((c) => c.handle === handle)
-  const products = await getProductsByCollection(handle)
+  const handle = collection as CollectionHandle
+  const col = getCollectionByHandle(handle)
+  const products = getProductsByCollection(handle)
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },

@@ -29,13 +29,24 @@ test.describe('Product detail — ring', () => {
     await expect(h1).toBeVisible()
   })
 
-  test('shows a formatted price in the store currency', async ({ page }) => {
-    // Not `/\$\d+/`. The price is now rendered in whatever currency Shopify
-    // charges, so pinning the dollar sign here would turn red the day a
-    // non-USD store connects — failing for correct behaviour. What matters is
-    // that a formatted amount is shown at all; `currency-consistency.test.tsx`
-    // owns the question of *which* currency.
-    await expect(page.getByText(/[$€£₫]\s?[\d,]+/).first()).toBeVisible()
+  test('shows no price, because nothing on this page can be bought', async ({ page }) => {
+    // The inversion of what stood here. This asserted that *a formatted amount is shown at
+    // all*, currency-agnostically, so it would not turn red the day a non-USD store
+    // connected — a good rule for a storefront and the wrong question for a catalogue.
+    //
+    // PR #75 removed Add to Bag on 2026-09-19 and this test kept passing, which is the
+    // point worth recording: for that window the detail page quoted a number against no way
+    // to pay it, and the suite reported the number's presence as correct.
+    //
+    // Asserted over the whole page rather than one element: a price returning in a tooltip,
+    // a meta line or a badge is the same claim in a different box.
+    await expect(page.getByText(/[$€£¥₫]\s?[\d,]+/)).toHaveCount(0)
+  })
+
+  test('shows no Add to Bag control', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /add to bag|add to cart|buy now/i })).toHaveCount(
+      0
+    )
   })
 
   test('shows product description', async ({ page }) => {

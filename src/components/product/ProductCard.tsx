@@ -1,24 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import type { HJProduct } from '@/lib/catalog/types'
+import type { CatalogProduct } from '@/lib/catalog'
 import { ProductImage } from '@/components/product/ProductImage'
 import { ProductBadge } from '@/components/product/ProductBadge'
-import { formatPrice } from '@/lib/utils/formatPrice'
 
 interface ProductCardProps {
-  product: HJProduct
+  product: CatalogProduct
   className?: string
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
-  // availableForSale comes from Shopify per variant; the static fallback
-  // catalog hardcodes every variant to true, so this only activates once
-  // real inventory data flows through. No variants means no availability
-  // signal at all, not a confirmed sold-out state.
-  const isSoldOut =
-    product.variants.length > 0 && product.variants.every((v) => !v.availableForSale)
-
   return (
     <Link
       href={`/products/${product.handle}`}
@@ -80,21 +72,22 @@ export function ProductCard({ product, className }: ProductCardProps) {
               pointerEvents: 'none',
             }}
           >
-            {product.spec}
+            {product.specification}
           </p>
         </div>
 
-        {/* Badge — absolute top-left. Sold-out status pre-empts promotional badges. */}
-        {isSoldOut ? (
+        {/*
+          Badge — absolute top-left.
+          The Sold Out state is gone with the inventory signal that produced it: it read
+          `every variant unavailable` from Shopify, and there is no inventory system left
+          to read. Claiming a piece is sold out on a catalogue that cannot check would be
+          an invented fact; `availability` carries the honest answer instead, and it is
+          `ask-an-ambassador` for every product today.
+        */}
+        {product.badge !== null && (
           <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
-            <span className="badge">Sold Out</span>
+            <ProductBadge badge={product.badge} />
           </div>
-        ) : (
-          product.badge !== null && (
-            <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
-              <ProductBadge badge={product.badge} />
-            </div>
-          )
         )}
 
         {/* Info bar */}
@@ -114,40 +107,14 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
           <span className="material-tag">{product.material.replace('-', ' ').toUpperCase()}</span>
 
-          {/* Price row */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginTop: '8px',
-            }}
-          >
-            <span
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontWeight: 300,
-                fontSize: 'var(--text-sm)',
-                color: 'var(--ink)',
-              }}
-            >
-              {formatPrice(product.price, product.currencyCode)}
-            </span>
+          {/*
+            The price row was here.
 
-            {product.compareAtPrice !== null && (
-              <span
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  fontWeight: 300,
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--graphite)',
-                  textDecoration: 'line-through',
-                }}
-              >
-                {formatPrice(product.compareAtPrice, product.currencyCode)}
-              </span>
-            )}
-          </div>
+            A browse-only catalogue publishes no prices: there is nothing to pay and
+            nothing to pay it with. `material` above and `specification` on hover are
+            what a card can honestly say about a piece; what it costs is a
+            conversation with an ambassador, which is what `availability` records.
+          */}
         </div>
       </article>
     </Link>

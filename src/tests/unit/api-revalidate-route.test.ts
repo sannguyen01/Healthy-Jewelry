@@ -10,7 +10,7 @@ vi.mock('next/cache', () => ({
 const { POST } = await import('@/app/api/revalidate/route')
 const { revalidatePath, revalidateTag } = await import('next/cache')
 const { PRODUCTS_TAG, collectionTag } = await import('@/lib/shopify/cacheTags')
-const { hjCollections } = await import('@/lib/data/hj-data')
+const { getAllCollections } = await import('@/lib/catalog')
 
 /**
  * The manual counterpart to the Shopify webhook: purge the cache without waiting for a
@@ -119,7 +119,7 @@ describe('POST /api/revalidate', () => {
       // revalidate a bare 'collections' instead, which matched nothing.
       await POST(makeRequest(SECRET))
 
-      for (const collection of hjCollections) {
+      for (const collection of getAllCollections()) {
         expect(revalidateTag).toHaveBeenCalledWith(collectionTag(collection.handle), PURGE_NOW)
       }
     })
@@ -136,7 +136,7 @@ describe('POST /api/revalidate', () => {
       // skipped while everything else picked it up.
       await POST(makeRequest(SECRET))
 
-      for (const collection of hjCollections) {
+      for (const collection of getAllCollections()) {
         expect(revalidatePath).toHaveBeenCalledWith(`/shop/${collection.handle}`, 'page')
       }
       expect(revalidatePath).toHaveBeenCalledWith('/', 'page')

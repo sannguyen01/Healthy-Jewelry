@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 const { assessLiveness, REQUIRED_STEPS, DEFAULT_WINDOW_HOURS, ALARMING_VERDICTS } =
   await import('../../../scripts/probe-smoke-liveness.mjs')
@@ -26,8 +28,34 @@ const { assessLiveness, REQUIRED_STEPS, DEFAULT_WINDOW_HOURS, ALARMING_VERDICTS 
  * credential, correctly, 32 times. Nothing named this.
  */
 
+/**
+ * **The step that looks at production was renamed, and these fixtures are not rewritten.**
+ *
+ * Every array below is verbatim from the Actions API — that is what makes them evidence
+ * rather than a shape somebody imagined. When WS-6 replaced `verify-production.mjs` with
+ * the credential-free browse-only check, the step's *name* changed from
+ * `Live store and storefront` to `Browse-only catalogue`, and `REQUIRED_STEPS` with it.
+ *
+ * Editing the captured arrays to say the new name would falsify the record: run #155 did
+ * not have a step called `Browse-only catalogue`, and the whole point of these fixtures is
+ * that they are what the API actually returned on 2026-09-19. So the rename is applied as
+ * a *transform*, named and explained, and the captured data stays as captured.
+ *
+ * The probe's logic is what is under test, and it keys on `REQUIRED_STEPS`. Running it
+ * against the historical step name would exercise a name the workflow no longer emits —
+ * which would pass, and prove nothing about today.
+ */
+const CAPTURED_LIVE_STEP = 'Live store and storefront'
+
+/** The name the workflow emits now. Read from the probe so the two cannot drift. */
+const LIVE_STEP = REQUIRED_STEPS[0]
+
+/** A captured run, with its live-check step renamed to what the workflow calls it today. */
+const asTodaysWorkflow = (steps: { name: string; conclusion: string }[]) =>
+  steps.map((step) => (step.name === CAPTURED_LIVE_STEP ? { ...step, name: LIVE_STEP } : step))
+
 /** Verbatim from `GET /repos/{owner}/{repo}/actions/runs/33120472571/jobs`. */
-const REAL_STEPS_OF_A_DARK_RUN = [
+const REAL_STEPS_OF_A_DARK_RUN = asTodaysWorkflow([
   { name: 'Set up job', conclusion: 'success' },
   { name: 'Run actions/checkout@v4', conclusion: 'success' },
   { name: 'Set up Node.js', conclusion: 'success' },
@@ -39,12 +67,12 @@ const REAL_STEPS_OF_A_DARK_RUN = [
   { name: 'Report premise drift', conclusion: 'success' },
   { name: 'Close the failure issue on recovery', conclusion: 'skipped' },
   { name: 'Complete job', conclusion: 'success' },
-]
+])
 
 /** What a healthy run looks like: the same job with the checks actually executing. */
 const STEPS_OF_A_LIT_RUN = REAL_STEPS_OF_A_DARK_RUN.map((step) =>
   step.name === 'Preflight — secrets present and environment-scoped' ||
-  step.name === 'Live store and storefront' ||
+  step.name === LIVE_STEP ||
   step.name === 'Webhook signing secret'
     ? { ...step, conclusion: 'success' }
     : step
@@ -115,7 +143,7 @@ describe('a step that ran and found problems is not darkness', () => {
    * insisting otherwise would be a control reporting something other than the truth.
    */
   const RAN_AND_FAILED = REAL_STEPS_OF_A_DARK_RUN.map((step) =>
-    step.name === 'Live store and storefront' ? { ...step, conclusion: 'failure' } : step
+    step.name === LIVE_STEP ? { ...step, conclusion: 'failure' } : step
   )
 
   it('a live step concluding failure counts as lit', () => {
@@ -127,7 +155,7 @@ describe('a step that ran and found problems is not darkness', () => {
     // Pinning the behaviour change itself, so a future edit that reverts to
     // `conclusion === 'success'` fails here rather than silently re-arming a false alarm.
     const executedUnderOldRule = RAN_AND_FAILED.find(
-      (s) => s.name === 'Live store and storefront'
+      (s) => s.name === LIVE_STEP
     )?.conclusion === 'success'
     expect(executedUnderOldRule).toBe(false)
   })
@@ -144,7 +172,7 @@ describe('a step that ran and found problems is not darkness', () => {
   it('a cancelled step is dark, not lit', () => {
     // `cancelled` is neither success nor failure. A run someone stopped looked at nothing.
     const cancelled = REAL_STEPS_OF_A_DARK_RUN.map((step) =>
-      step.name === 'Live store and storefront' ? { ...step, conclusion: 'cancelled' } : step
+      step.name === LIVE_STEP ? { ...step, conclusion: 'cancelled' } : step
     )
     const stepsByRunId = Object.fromEntries(REAL_RUNS.map((r) => [r.id, cancelled]))
     expect(assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW }).verdict).toBe('dark')
@@ -152,7 +180,7 @@ describe('a step that ran and found problems is not darkness', () => {
 
   it('a missing step is dark, not lit', () => {
     const withoutStep = REAL_STEPS_OF_A_DARK_RUN.filter(
-      (s) => s.name !== 'Live store and storefront'
+      (s) => s.name !== LIVE_STEP
     )
     const stepsByRunId = Object.fromEntries(REAL_RUNS.map((r) => [r.id, withoutStep]))
     expect(assessLiveness({ runs: REAL_RUNS, stepsByRunId, now: NOW }).verdict).toBe('dark')
@@ -227,8 +255,34 @@ describe('silence and ignorance are different findings', () => {
 })
 
 describe('the required steps are the ones that look at production', () => {
-  it('requires the storefront step specifically', () => {
-    expect(REQUIRED_STEPS).toContain('Live store and storefront')
+  it('requires exactly one step, and it is the live check', () => {
+    expect(REQUIRED_STEPS).toEqual(['Browse-only catalogue'])
+  })
+
+  it('requires a step that needs no credential to run', () => {
+    // The property that matters, stated separately from the name. `Live store and
+    // storefront` gated on `storefrontReady`, so emptying five secrets on the
+    // `production-readonly` environment silenced it — and a silenced step is
+    // indistinguishable from a passing one from outside, which is how this tier went dark
+    // on 2026-09-19 (ADR 033, issue #81).
+    //
+    // `Browse-only catalogue` has no capability gate in the workflow. Asserted against the
+    // workflow file rather than trusted, because a gate added later would re-arm the exact
+    // failure this probe exists to name, and nothing else would notice.
+    const workflow = readFileSync(
+      join(process.cwd(), '.github/workflows/production-smoke.yml'),
+      'utf8'
+    )
+    const step = workflow.slice(workflow.indexOf(`- name: ${REQUIRED_STEPS[0]}`))
+    const body = step.slice(0, step.indexOf('      - name:', 10))
+
+    expect(body, `the ${REQUIRED_STEPS[0]} step is not in the workflow`).toContain('run:')
+    expect(
+      body.match(/^\s*if:.*$/m)?.[0] ?? '',
+      `the ${REQUIRED_STEPS[0]} step has acquired a condition beyond always(). If it can ` +
+        `skip, this probe's alarm can be silenced by a missing secret — which is what it ` +
+        `exists to catch.`
+    ).toMatch(/if:\s*always\(\)\s*$/)
   })
 
   it('does not accept the job conclusion as a substitute', () => {
@@ -274,7 +328,7 @@ describe('the required steps are the ones that look at production', () => {
  */
 
 /** Verbatim from `GET /actions/runs/105921386282` — run #154, the last one that looked. */
-const STEPS_OF_RUN_154 = [
+const STEPS_OF_RUN_154 = asTodaysWorkflow([
   { name: 'Set up job', conclusion: 'success' },
   { name: 'Run actions/checkout@v4', conclusion: 'success' },
   { name: 'Set up Node.js', conclusion: 'success' },
@@ -288,7 +342,7 @@ const STEPS_OF_RUN_154 = [
   { name: 'Report premise drift', conclusion: 'success' },
   { name: 'Close the failure issue on recovery', conclusion: 'skipped' },
   { name: 'Complete job', conclusion: 'success' },
-]
+])
 
 /**
  * Verbatim from `GET /actions/runs/105960406584` — run #155.
@@ -297,7 +351,7 @@ const STEPS_OF_RUN_154 = [
  * and took the checks down with it. Here everything the reader can see is green and the two
  * steps that touch production did not run.
  */
-const STEPS_OF_RUN_155 = [
+const STEPS_OF_RUN_155 = asTodaysWorkflow([
   { name: 'Set up job', conclusion: 'success' },
   { name: 'Run actions/checkout@v4', conclusion: 'success' },
   { name: 'Set up Node.js', conclusion: 'success' },
@@ -311,7 +365,7 @@ const STEPS_OF_RUN_155 = [
   { name: 'Report premise drift', conclusion: 'success' },
   { name: 'Close the failure issue on recovery', conclusion: 'skipped' },
   { name: 'Complete job', conclusion: 'success' },
-]
+])
 
 const RUN_154 = { id: 35452275777, created_at: '2026-09-19T15:35:16Z', conclusion: 'failure' }
 const RUN_155 = { id: 35466761323, created_at: '2026-09-19T20:14:14Z', conclusion: 'success' }
@@ -363,7 +417,7 @@ describe('a tier that has just stopped is not a tier that is lit', () => {
     // Run #155 concluded `success`. Nothing that reads job conclusions can see this.
     expect(RUN_155.conclusion).toBe('success')
     expect(
-      STEPS_OF_RUN_155.find((s) => s.name === 'Live store and storefront')?.conclusion
+      STEPS_OF_RUN_155.find((s) => s.name === LIVE_STEP)?.conclusion
     ).toBe('skipped')
   })
 

@@ -53,11 +53,11 @@
     {
       "id": "browse-only-smoke",
       "claims": "the deployed site serves every catalogue handle, 404s the ones it does not hold, references no Shopify host, and emits no commerce semantics",
-      "status": "not-configured",
+      "status": "configured",
       "probe": "scripts/verify-browse-only.mjs",
-      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "probeRunsIn": ".github/workflows/production-smoke.yml",
       "selfMonitoring": false,
-      "humanAction": "None yet. This probe is written, tested and deliberately unwired: run against the live site today it reports 52 true findings \u2014 51 commerce semantics that WS-5 removes and one soft 404 that WS-4 removes. Wiring it into the schedule now would create a check that is red for weeks by design, which is the shape people mute (ADR 011). Add the step once WS-4 and WS-5 land and a manual `pnpm verify:browse-only` against production comes back clean.",
+      "humanAction": "None. Wired into production-smoke.yml on 2026-09-20 as the `Browse-only catalogue` step, replacing `verify-production.mjs` — whose seventeen checks all needed a Shopify credential and whose central discriminator had inverted, since a live site serving the bundled catalogue is now correct. This probe needs nothing: PRODUCTION_SITE_URL when set, otherwise the apex read out of src/config/site.ts. It therefore carries no capability gate and cannot be skipped by an empty secret, which is what un-darkens this tier without the console action issue #81 was otherwise waiting on. Measured clean against a local production build before wiring: 24 responses against 17 catalogue handles. The first scheduled run after this branch deploys is the first against production.",
       "knownLimit": "Two. It reads expected handles from the *filenames* in src/content/catalog/products/ rather than from parsed records, because it is dependency-free .mjs and cannot import the TypeScript reader \u2014 that shortcut is licensed only by catalog-content.test.ts asserting every file is named after the handle inside it, and removing that assertion silently points this probe at URLs with no records behind them. And it judges what a response *contains*: a page that omits a price because the data is missing looks identical to one that omits it because the decommission removed the field.",
       "adr": "docs/adr/034-the-catalogue-is-the-source.md",
       "backstop": "human:weekly",
@@ -127,7 +127,7 @@
       "probe": "src/tests/unit/coverage-gate-contract.test.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Scoped to src/lib, src/store and src/config on purpose — the UI layer is covered by E2E, and e2e/COVERAGE.md is the compensating control for it. Within that scope the floor is now per-file with no glob exemptions: the aggregate form of this threshold hid five files below 80% behind a 91% total on 2026-09-15, customer/client.ts at 0% among them, which is what issue 14 of that review recorded and what perFile: true closed on 2026-09-18.",
+      "knownLimit": "Scoped to src/lib and src/config on purpose — src/store was in that list until 2026-09-20 and the directory went with the cart, so the glob matched nothing while still reading as coverage of something that exists (ADR 035). The UI layer is covered by E2E, and e2e/COVERAGE.md is the compensating control for it. Within that scope the floor is now per-file with no glob exemptions: the aggregate form of this threshold hid five files below 80% behind a 91% total on 2026-09-15, customer/client.ts at 0% among them, which is what issue 14 of that review recorded and what perFile: true closed on 2026-09-18.",
       "backstop": "control:merge-gate"
     },
     {
@@ -216,11 +216,11 @@
       "id": "premise-detectors",
       "claims": "every recorded decision that rests on a live premise has a detector that reports when the premise drifts",
       "status": "configured",
-      "probe": "scripts/verify-production.mjs",
+      "probe": "scripts/verify-premises.mjs",
       "probeRunsIn": ".github/workflows/production-smoke.yml",
       "probeLibrary": "scripts/lib/premise-checks.mjs",
       "selfMonitoring": true,
-      "knownLimit": "Runs only inside production-smoke, whose real checks have not executed since 2026-08-15. A detector downstream of a failing preflight is a detector that is not running — which is what the smoke-liveness control exists to say out loud.",
+      "knownLimit": "One premise, down from six, and the narrowing is the limit worth stating. Five took Shopify data as input — shop locales, the collection set, spec metafields, order and payment counts, app-owned webhook subscriptions — and lost their subject when the read path went (WS-6, ADR 035). Only SHOPIFY-API-VERSION survives, because it is pure: a clock against a published retirement date. It still matters while /api/webhooks/shopify and /api/version name that version, which is until WS-7. It used to run downstream of a preflight that had not passed since 2026-08-15, so it was not running at all; its own step now needs no credential and carries no gate, which fixes that and buys nothing about the store, because nothing can currently see the store.",
       "adr": "docs/adr/008-decisions-need-premise-detectors.md",
       "backstop": "control:smoke-liveness"
     },
@@ -355,7 +355,8 @@
     "docs/adr/025-a-number-in-prose-is-a-claim.md": "A rule about how documentation is written. Its reconciler runs in the fast gate and fails by name, so its absence would be visible — a guardrail, not a control.",
     "docs/adr/033-a-premise-that-expired-mid-decommission.md": "A rule about when a monitor must report a transition rather than a level, and about where an expired premise is repaired \u2014 at the evidence, not at the assumption. It refines the smoke-liveness control rather than adding one: the `stopped` verdict lives in that control's existing probe, its claims line now says so, and a second entry naming the same probe would be two answers to one question. Its enforcement is smoke-liveness.test.ts, eight assertions shown to fail against three mutations, which fail by name in the fast gate.",
     "docs/adr/028-a-fixture-is-the-input-you-thought-of.md": "A rule about how verification tools are tested before being relied upon, like ADR 007 is about how guardrails are written and ADR 024 about pointing them at a known answer. It constrains the entries rather than being one, and its enforcement is parser-fuzz.test.ts, which fails by name in the fast gate.",
-    "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
+    "docs/adr/035-a-control-outlives-its-subject.md": "A rule about what to do with a control when the thing it measures is deleted: re-found it, suspend it behind a premise detector that fails when the conditions return, or delete it and record the removal where the claim was \u2014 never narrow it to keep it green. Like ADR 007 (how guardrails are written), ADR 024 (pointing them at a known answer) and ADR 028 (testing them before relying on them), it constrains the entries in this registry rather than being one. Its enforcement is the premise detector the ADR itself installs: cache-tag-contract.test.ts asserts that nothing registers a cache tag and names, by name, the two suspended assertions that must be restored the moment anything does. That runs in the fast gate and fails loudly, which is what makes this a guardrail rather than a control.",
+  "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
   },
   "$backstopComment": [
     "Every control names what catches ITS OWN failure, and following the chain must end at a person.",

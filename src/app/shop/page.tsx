@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ProductGrid } from '@/components/product/ProductGrid'
 import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
-import { getProducts } from '@/lib/shopify'
+import { getAllProducts } from '@/lib/catalog'
 
 const BREADCRUMB_ITEMS = [{ label: 'Home', href: '/' }, { label: 'Shop' }]
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ShopPage() {
-  const products = await getProducts()
+  const products = getAllProducts()
 
   return (
     <>

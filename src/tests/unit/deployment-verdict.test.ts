@@ -5,7 +5,6 @@ const {
   staleBundleVerdict,
   environmentVerdict,
   freshnessVerdict,
-  shopifyConfigVerdict,
   catalogueSourceVerdict,
   summarise,
 } = await import('../../../scripts/lib/deployment-verdict.mjs')
@@ -226,85 +225,69 @@ describe('freshnessVerdict — the dead end that looks alive', () => {
   })
 })
 
-// ── Shopify configuration ───────────────────────────────────────────────────
-
-describe('shopifyConfigVerdict', () => {
-  it('passes when the domain is inlined and the token is present', () => {
-    expect((shopifyConfigVerdict(payload()) as Verdict).level).toBe('ok')
-  })
-
-  it('fails and names the missing token', () => {
-    const v = shopifyConfigVerdict(
-      payload({ shopify: { configured: false, pinnedApiVersion: '2026-07' } })
-    ) as Verdict
-
-    expect(v.level).toBe('fail')
-    expect(v.detail).toContain('SHOPIFY_STOREFRONT_ACCESS_TOKEN')
-  })
-
-  /**
-   * The build-time half fails differently from the runtime half and is fixed in a
-   * different place, so they are reported separately rather than as one boolean.
-   */
-  it('distinguishes a domain missing from the bundle from one missing at runtime', () => {
-    const bundleOnly = shopifyConfigVerdict(
-      payload({ build: { ...payload().build, storeDomainInlined: false } })
-    ) as Verdict
-    expect(bundleOnly.detail).toContain('bundle')
-
-    const runtimeOnly = shopifyConfigVerdict(
-      payload({
-        shopify: { configured: false, pinnedApiVersion: '2026-07' },
-        runtime: { vercelEnv: 'production', configFingerprint: 'deadbeef', storeDomainSet: false },
-      })
-    ) as Verdict
-    expect(runtimeOnly.detail).toContain('runtime')
-  })
-
-  it('explains why the site still renders — the fallback catalogue', () => {
-    const v = shopifyConfigVerdict(
-      payload({ shopify: { configured: false, pinnedApiVersion: '2026-07' } })
-    ) as Verdict
-
-    expect(v.detail).toContain('hj-data.ts')
-  })
-})
+/*
+ * `shopifyConfigVerdict` stood here with four tests, and both it and they are gone.
+ *
+ * It returned **fail** with the title "Shopify is NOT configured on this deployment"
+ * whenever the store domain or the Storefront token was absent, because that state meant
+ * every fetcher fell back to a bundled catalogue whose placeholder variant IDs Shopify
+ * rejected — the site rendered perfectly and checkout could not start. Its build-time and
+ * runtime halves were reported separately because they are fixed in different consoles,
+ * which was a good distinction and is now a distinction about nothing.
+ *
+ * After ADR 034 an unconfigured deployment is the *target* state. A verdict that reports
+ * the intended configuration as a failure is worse than no verdict: it is a red that
+ * teaches its reader to ignore reds (ADR 011). Retired rather than inverted, because
+ * "Shopify is correctly absent" is not a question anybody runs a deployment diagnostic to
+ * ask. See ADR 035.
+ */
 
 // ── What the page is actually serving ───────────────────────────────────────
 
+/**
+ * The surviving half of the pair, with its premise turned over.
+ *
+ * It used to take two hand-maintained handle lists — `FALLBACK_ONLY_HANDLES` and
+ * `SHOPIFY_ONLY_HANDLES` — and fail on finding a bundled-only handle, because that meant
+ * the page was serving products "that have never existed in Shopify, so nothing on this
+ * page can be bought". There is one catalogue now, so the discriminator has nothing to
+ * discriminate: the question becomes whether `/shop` links to products *this build holds*.
+ */
 describe('catalogueSourceVerdict', () => {
-  const handles = {
-    fallbackOnly: ['dome-ring-titanium', 'flat-band-niobium'],
-    shopifyOnly: ['meridian-cuff', 'tectonic-ring'],
-  }
+  const known = ['arc-band-titanium', 'disc-studs-titanium', 'cable-cuff-titanium']
 
-  it('confirms live data from a Shopify-only handle', () => {
-    const v = catalogueSourceVerdict('<a href="/products/meridian-cuff">', handles) as Verdict
+  it("confirms the page is serving this build's catalogue", () => {
+    const v = catalogueSourceVerdict('<a href="/products/arc-band-titanium">', known) as Verdict
     expect(v.level).toBe('ok')
+    expect(v.detail).toContain('1 of 3')
   })
 
-  /** The exact symptom that opened this investigation. */
-  it('fails on a fallback-only handle, and says the product cannot be bought', () => {
-    const v = catalogueSourceVerdict('<a href="/products/dome-ring-titanium">', handles) as Verdict
-    expect(v.level).toBe('fail')
-    expect(v.detail).toContain('dome-ring-titanium')
-    expect(v.detail).toContain('never existed in Shopify')
+  it('counts every known handle it finds, not just the first', () => {
+    const html = '<a href="/products/arc-band-titanium"><a href="/products/cable-cuff-titanium">'
+    expect((catalogueSourceVerdict(html, known) as Verdict).detail).toContain('2 of 3')
   })
 
   /**
-   * Absence of the fallback is not proof of success: an empty catalogue has no
-   * fallback handles either. Positive proof is required, which is the property
-   * `production-smoke-handles` exists to protect.
+   * A shelf with nothing on it. The page rendered, so this is not a deploy failure — and
+   * that distinction is the reason it is reported at all rather than inferred from a 200.
    */
-  it('fails on a page with neither kind of handle rather than passing by default', () => {
-    const v = catalogueSourceVerdict('<html><body>nothing here</body></html>', handles) as Verdict
+  it('fails on a page carrying none of them rather than passing by default', () => {
+    const v = catalogueSourceVerdict('<html><body>nothing here</body></html>', known) as Verdict
     expect(v.level).toBe('fail')
-    expect(v.detail).toContain('not proof')
+    expect(v.detail).toContain('nothing on it')
   })
 
-  it('reports fallback contamination even when Shopify handles are also present', () => {
-    const both = '<a href="/products/meridian-cuff"><a href="/products/dome-ring-titanium">'
-    expect((catalogueSourceVerdict(both, handles) as Verdict).level).toBe('fail')
+  it('matches on the product path, not on the bare handle', () => {
+    // A handle appearing in prose — a description, a heading, an alt attribute — is not a
+    // link to the product. The old version matched `html.includes(handle)` and would have
+    // counted any of those as evidence the page was serving it.
+    const prose = '<p>The arc-band-titanium is our bestseller.</p>'
+    expect((catalogueSourceVerdict(prose, known) as Verdict).level).toBe('fail')
+  })
+
+  it('is not fooled by a handle this build does not hold', () => {
+    const v = catalogueSourceVerdict('<a href="/products/dome-ring-titanium">', known) as Verdict
+    expect(v.level).toBe('fail')
   })
 })
 

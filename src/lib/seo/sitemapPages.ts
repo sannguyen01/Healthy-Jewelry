@@ -1,4 +1,4 @@
-import { hjCollections } from '@/lib/data/hj-data'
+import { getAllCollections } from '@/lib/catalog'
 
 /**
  * Routes that exist and are deliberately **not** in the sitemap, each with the reason.
@@ -40,14 +40,14 @@ export const SITEMAP_EXCLUDED: Record<string, string> = {
  * restating the palette.
  *
  * The five collection paths used to be written out here by hand, one line each,
- * duplicating `hjCollections`. They are derived now: a collection added to the catalogue
+ * duplicating `getAllCollections()`. They are derived now: a collection added to the catalogue
  * appears in the sitemap without anyone remembering this file. Reconciling two lists is
  * the fallback; having one list is the fix.
  */
 export const STATIC_PAGES = [
   { loc: '/', changefreq: 'weekly', priority: '1.0' },
   { loc: '/shop', changefreq: 'daily', priority: '0.9' },
-  ...hjCollections.map((collection) => ({
+  ...getAllCollections().map((collection) => ({
     loc: `/shop/${collection.handle}`,
     changefreq: 'daily',
     priority: '0.8',

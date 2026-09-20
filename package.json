@@ -17,7 +17,6 @@
     "test:coverage": "vitest run --coverage",
     "verify:webhook": "node scripts/verify-webhook-secret.mjs",
     "audit:secrets": "node scripts/audit-workflow-secrets.mjs",
-    "verify:production": "node scripts/verify-production.mjs",
     "verify:browse-only": "node scripts/verify-browse-only.mjs",
     "diagnose:deployment": "node scripts/diagnose-deployment.mjs",
     "e2e": "playwright test",

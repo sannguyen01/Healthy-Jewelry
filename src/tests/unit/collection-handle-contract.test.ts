@@ -1,28 +1,46 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { HJ_COLLECTION_HANDLES } from '@/lib/catalog/types'
-import { parseCollection, isHJCollectionHandle } from '@/lib/shopify/tags'
-import { hjCollections } from '@/lib/data/hj-data'
+import { COLLECTION_HANDLES } from '@/lib/catalog/schema'
+import { getAllCollections, getAllProducts } from '@/lib/catalog'
 import { parseSource, walk } from '@/lib/analysis/tsAstScan'
 import ts from 'typescript'
 
 /**
- * **Every collection a product can be mapped into must be one the router will serve.**
+ * **Every collection a product can belong to must be one the router will serve.**
  *
- * That is the invariant. `parseCollection` is only how it is currently upheld, and
- * testing the parser alone would miss the way this actually breaks: the two sets
- * drifting apart.
+ * That is the invariant, and it has outlived two different mechanisms for upholding it.
  *
+ * ## What it used to be checked against
+ *
+ * `parseCollection` in `src/lib/shopify/tags.ts` mapped a product's Shopify collection
+ * memberships onto one of ours, skipping built-ins like `frontpage`. This file tested that
+ * parser at length — the live `arc-band-titanium → [frontpage, rings]` case, casing,
+ * whitespace, the fallback and its reason — and then held the set the parser could return
+ * against the set the router serves.
+ *
+ * The parser is gone with the fetcher. A product's collection is now a `z.enum` field in a
+ * reviewed JSON record, so "a handle the mapper could invent" is not a thing that can
+ * happen: an unknown value fails validation and stops the build.
+ *
+ * ## Why the file is still here
+ *
+ * Because the *drift* it was really about is still possible, and it is the expensive kind.
  * `/shop/[collection]` sets `dynamicParams = false`, so a handle outside its
- * `VALID_COLLECTIONS` is a **hard 404 before rendering** — and `product.collection`
- * is what the product page's breadcrumb links to, and what `breadcrumbJsonLd`
- * publishes as structured data. A mismatch is a 404 reached from a link the site
- * renders itself, on a page that looks completely healthy.
+ * `VALID_COLLECTIONS` is a **hard 404 before rendering** — and `product.collection` is what
+ * the product page's breadcrumb links to, and what `breadcrumbJsonLd` publishes as
+ * structured data. A mismatch is a 404 reached from a link the site renders itself, on a
+ * page that looks completely healthy.
  *
- * Two sides of a contract with nothing joining them: the `cacheTags.ts` shape, which
- * this repo has already paid for twice. So they are compared here, in both directions,
- * against the router's real source.
+ * There are now four declarations of the same set, in four languages of a sort:
+ *
+ *   1. `COLLECTION_HANDLES` in `src/lib/catalog/schema.ts` — what a record may say;
+ *   2. `VALID_COLLECTIONS` in `src/app/shop/[collection]/page.tsx` — what the router serves;
+ *   3. `src/content/catalog/collections/*.json` — what has a title and a description;
+ *   4. the `collection` field on each of the seventeen products.
+ *
+ * Nothing in the type system joins 1 to 2, or 3 to either. So they are compared here, in
+ * every direction, against real sources rather than against a list written in this file.
  */
 
 const COLLECTION_ROUTE = 'src/app/shop/[collection]/page.tsx'
@@ -51,128 +69,79 @@ function routerCollections(): string[] {
   return found
 }
 
-describe('the collection set is one set, not three', () => {
+describe('the collection set is one set, not four', () => {
   it('finds the router declaration at all', () => {
     // Without this, a rename would make every assertion below vacuously true —
     // the `cache-tag-contract` lesson about a guardrail that reads a file by name.
     expect(routerCollections().length).toBeGreaterThan(0)
   })
 
-  it('every handle the parser can return is served by the router', () => {
-    expect([...HJ_COLLECTION_HANDLES].sort()).toEqual(routerCollections().sort())
+  it('every handle a record may declare is served by the router', () => {
+    expect([...COLLECTION_HANDLES].sort()).toEqual(routerCollections().sort())
   })
 
-  it('every handle the router serves has a collection entry to render', () => {
-    expect(hjCollections.map((c) => c.handle).sort()).toEqual(routerCollections().sort())
+  it('every handle the router serves has a collection record to render', () => {
+    // `/shop/rings` needs a title and a description, not just permission to exist. A
+    // served route with no record renders a heading over nothing.
+    expect(getAllCollections().map((c) => c.handle).sort()).toEqual(routerCollections().sort())
+  })
+
+  it('every product sits in a collection the router serves', () => {
+    // The direction that produces the visible defect: a product whose breadcrumb links
+    // to a 404 the site renders itself.
+    const served = new Set(routerCollections())
+    for (const product of getAllProducts()) {
+      expect(
+        served.has(product.collection),
+        `${product.handle} is in "${product.collection}", which /shop/[collection] does not serve`
+      ).toBe(true)
+    }
   })
 
   /**
-   * The direction that bites. Adding a sixth collection to the type without adding it
+   * The direction that bites. Adding a sixth collection to the schema without adding it
    * to the router gives it a hard 404, and the failure looks like a routing bug rather
    * than a missing config.
    */
-  it('a handle added to the type but not the router is caught', () => {
+  it('a handle added to the schema but not the router is caught', () => {
     const router = new Set(routerCollections())
-    const orphans = [...HJ_COLLECTION_HANDLES, 'pendants'].filter((h) => !router.has(h))
+    const orphans = [...(COLLECTION_HANDLES as readonly string[]), 'pendants'].filter(
+      (h) => !router.has(h)
+    )
     expect(orphans).toEqual(['pendants'])
   })
-})
-
-describe('parseCollection', () => {
-  /**
-   * Captured verbatim from the live store on 2026-08-12, via the Admin API:
-   *
-   *   arc-band-titanium → collections: [frontpage, rings]
-   *
-   * Written in Shopify's order, not a convenient one. *A fixture written in your own
-   * vocabulary asserts only that you agree with yourself* — the lesson from
-   * `material:steel` mismatching `surgical-steel` on all 22 products while every test
-   * stayed green.
-   */
-  it('resolves the live arc-band-titanium case to rings, not frontpage', () => {
-    const result = parseCollection(['frontpage', 'rings'], 'arc-band-titanium')
-    expect(result.collection).toBe('rings')
-    expect(result.matched).toBe(true)
-  })
-
-  it('does not report the built-in frontpage as an unrecognised collection', () => {
-    // Shopify creates it; nobody put the product there. Reporting it as a problem
-    // every run is how a warning becomes wallpaper.
-    expect(parseCollection(['frontpage', 'rings']).ignored).toEqual([])
-  })
-
-  it('takes the first real handle when a product is in several of ours', () => {
-    expect(parseCollection(['bracelets', 'charms']).collection).toBe('bracelets')
-  })
-
-  it('skips past a built-in to find a real handle later in the list', () => {
-    expect(parseCollection(['frontpage', 'charms']).collection).toBe('charms')
-  })
-
-  it('falls back to rings when no handle is one of ours', () => {
-    const result = parseCollection(['seasonal', 'spectrum'], 'nova-pendant')
-    expect(result.collection).toBe('rings')
-    expect(result.matched).toBe(false)
-  })
 
   /**
-   * The fallback and the reason for it are reported separately. "Defaulted to rings"
-   * and "defaulted to rings *because this product is in a collection called spectrum
-   * that has no page*" call for different responses.
+   * And the reverse: a route serving a handle no record backs. This one is quieter — the
+   * page resolves, `getProductsByCollection` returns an empty array, and the visitor gets
+   * a shelf with a heading and nothing on it, which reads as a stock problem rather than
+   * a configuration one.
    */
-  it('names the collections it could not use', () => {
-    expect(parseCollection(['seasonal', 'spectrum']).ignored).toEqual(['seasonal', 'spectrum'])
-  })
-
-  it('falls back on an empty list, as an untagged product produces', () => {
-    const result = parseCollection([])
-    expect(result.collection).toBe('rings')
-    expect(result.matched).toBe(false)
-    expect(result.ignored).toEqual([])
-  })
-
-  it('tolerates the casing and whitespace a hand-edited Shopify handle can carry', () => {
-    expect(parseCollection([' Rings ']).collection).toBe('rings')
-  })
-
-  it('never returns a handle outside the served set, whatever the input', () => {
-    const inputs = [
-      ['frontpage'],
-      ['', '   '],
-      ['RINGS'],
-      ['not-a-collection'],
-      [],
-      ['frontpage', 'seasonal', 'earrings'],
-    ]
-    for (const input of inputs) {
-      expect(isHJCollectionHandle(parseCollection(input).collection)).toBe(true)
-    }
-  })
-})
-
-describe('isHJCollectionHandle', () => {
-  it('accepts every served handle', () => {
-    for (const handle of HJ_COLLECTION_HANDLES) expect(isHJCollectionHandle(handle)).toBe(true)
-  })
-
-  it('rejects the built-in that caused this', () => {
-    expect(isHJCollectionHandle('frontpage')).toBe(false)
-  })
-
-  it('rejects near-misses rather than guessing', () => {
-    for (const value of ['Rings', 'ring', 'rings ', '', 'necklace']) {
-      expect(isHJCollectionHandle(value)).toBe(false)
-    }
+  it('a handle added to the router but not the catalogue is caught', () => {
+    const recorded = new Set<string>(getAllCollections().map((c) => c.handle))
+    const unbacked = [...routerCollections(), 'pendants'].filter((h) => !recorded.has(h))
+    expect(unbacked).toEqual(['pendants'])
   })
 })
 
 /**
- * The premise checker and the parser both decide what a "built-in" collection is, in
- * two languages, in two files. They now have to agree — which is the whole reason the
- * blind spot existed: `premise-checks.mjs` exempted `frontpage` as harmless while the
- * mapper was busy mapping a product into it.
+ * **The Shopify built-in exemption, and the join that keeps it from becoming a blind spot
+ * again.**
+ *
+ * `scripts/lib/premise-checks.mjs` exempts `frontpage` — Shopify creates it, nobody puts a
+ * product there deliberately, and reporting it every run is how a warning becomes
+ * wallpaper. The exemption was originally dangerous because the *mapper* was simultaneously
+ * capable of mapping a product into it, so one file waved through what the other acted on.
+ *
+ * The mapper is gone, and the exemption outlived it. What has to stay true is narrower and
+ * still worth asserting: a handle the premise checker waves through must not be one the
+ * catalogue schema accepts. If `frontpage` ever became a servable collection, the checker
+ * would be silently ignoring the thing it exists to notice.
+ *
+ * This assertion leaves when `premise-checks.mjs` does — see WS-6. It is kept until then
+ * rather than deleted early, because the exemption it guards is still in the file.
  */
-describe('the built-in exemption is the same set on both sides', () => {
+describe('the built-in exemption is not a handle the catalogue serves', () => {
   it('matches scripts/lib/premise-checks.mjs', () => {
     const path = resolve(__dirname, '../../../scripts/lib/premise-checks.mjs')
     const source = readFileSync(path, 'utf8')
@@ -182,11 +151,12 @@ describe('the built-in exemption is the same set on both sides', () => {
     const handles = [...(declared?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1])
     expect(handles).toEqual(['frontpage'])
 
-    // Every handle the premise checker waves through must also be one the parser
-    // refuses to map a product into. Otherwise the exemption is a blind spot again.
     for (const handle of handles) {
-      expect(isHJCollectionHandle(handle)).toBe(false)
-      expect(parseCollection([handle]).matched).toBe(false)
+      expect(
+        (COLLECTION_HANDLES as readonly string[]).includes(handle),
+        `"${handle}" is exempted as a Shopify built-in and is also a collection this site ` +
+          `serves. One of the two is wrong.`
+      ).toBe(false)
     }
   })
 })

@@ -72,11 +72,25 @@ function loadedWeightsByToken(): Map<string, Set<number>> {
   return byToken
 }
 
+/**
+ * `src/tests` is walked past, not scanned.
+ *
+ * This rule is about the app's own typography: which faces the browser will be asked for
+ * and whether `next/font` downloaded them. A spec is not a surface. It declares weights to
+ * *exercise* a component or, in `opengraph-bundled-font.test.tsx`, to prove that both
+ * bundled Noto Sans faces rasterise — a family `layout.tsx` has never heard of, resolved by
+ * Satori against files on disk rather than by a browser against a CSS custom property.
+ *
+ * Scanning it reported `weight 700 on an unresolved font (available: 300, 400, 500)`: a
+ * confident failure about the wrong font, which is the exact outcome the `availableFor`
+ * fallback below is written to avoid. `opengraph-image.tsx` is exempt by name for the same
+ * reason; this is that exemption applied to the directory where it kept recurring.
+ */
 function tsxFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry)
     if (statSync(full).isDirectory()) {
-      if (entry === 'node_modules' || entry === '.next') continue
+      if (entry === 'node_modules' || entry === '.next' || entry === 'tests') continue
       tsxFiles(full, found)
     } else if (entry.endsWith('.tsx') && !EXEMPT.includes(entry)) {
       found.push(full)

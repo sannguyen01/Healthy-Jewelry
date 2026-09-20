@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import type { HJSvgType } from '@/lib/catalog/types'
+import type { HJSvgType } from '@/lib/svg/types'
 
 const COLLECTION_PHOTOS: Partial<Record<string, string>> = {
   charms: '/images/collections/charms.jpg',
@@ -22,7 +22,15 @@ const COLLECTION_PHOTOS: Partial<Record<string, string>> = {
 export interface CollectionTile {
   handle: string
   title: string
-  /** Illustration for collections with no photograph yet. Null renders no mark. */
+  /**
+   * Illustration for collections with no photograph yet. Null renders no mark.
+   *
+   * Typed as `HJSvgType`, and the catalogue's media union stores `svgType` as a plain
+   * `string` — the schema deliberately does not import that union, because it has to
+   * outlive `@/lib/catalog/types` (WS-4b deletes it). `svg-viewbox-contract.test.tsx`
+   * is what reconciles the two: every `svgType` in the content must have a measured
+   * viewBox entry, which is a stronger check than the type would give.
+   */
   svgType: HJSvgType | null
 }
 

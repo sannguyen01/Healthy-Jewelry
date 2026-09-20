@@ -1,22 +1,30 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { ImageResponse } from 'next/og'
-import { getProduct } from '@/lib/shopify'
-import { formatPrice } from '@/lib/utils/formatPrice'
+import { getProductByHandle } from '@/lib/catalog'
 import { productSeo } from '@/lib/seo/productSeo'
 
 // `next/og`'s automatic font loader fetches Google Fonts per glyph range at
-// request time, keyed off a font-name heuristic it does not document. For the
-// ₫ (U+20AB DONG SIGN) in a VND price it returned 400 in production — 23
-// failures across 18 users, logged as "Failed to load dynamic font for ₫" —
-// while every other character on the card rendered fine, so the failure only
-// ever showed up on the one currency this store actually charges in.
+// **request time**, keyed off a font-name heuristic it does not document. That
+// fetch is a dependency on a third-party CDN inside the render path of a route
+// only crawlers hit, and when it fails the card does not degrade — the whole
+// response throws.
 //
-// Bundling the font removes the request-time dependency entirely: Satori gets
-// bytes it already has, for glyphs confirmed present (`fontTools.ttLib`
-// cmap-checked both weights for U+20AB before these files were committed).
-// Noto Sans, not the brand's DM Sans, because pan-Unicode currency coverage is
-// what this card needs and DM Sans's coverage of U+20AB was not verified.
+// It failed here. For the ₫ (U+20AB DONG SIGN) in a VND price it returned 400
+// in production — 23 failures across 18 users, logged as "Failed to load dynamic
+// font for ₫" — while every other character on the card rendered fine.
+//
+// **That glyph is gone and the bundling stays.** The card no longer carries a
+// price, so U+20AB is no longer on it; what has not changed is that a
+// request-time font fetch can fail for any glyph, and this route has no
+// fallback when it does. Bundling removes the dependency rather than the one
+// symptom. `opengraph-bundled-font.test.tsx` exercises the real rasteriser
+// against the characters the card actually renders today.
+//
+// Noto Sans, not the brand's DM Sans, is a leftover of the original fix — it
+// was chosen for pan-Unicode currency coverage. Switching to DM Sans would put
+// the share card in the brand's own typeface and is a deliberate change with
+// its own glyph-coverage question, not a tidy-up to fold into a decommission.
 const FONT_FILES = {
   regular: path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf'),
   bold: path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf'),
@@ -33,28 +41,28 @@ async function loadCardFonts() {
   ]
 }
 
-// Deliberately NOT `runtime = 'edge'`.
+// Still deliberately NOT `runtime = 'edge'`, and the reason has changed.
 //
-// This card used to read the static catalogue, which needed no network and ran
-// happily on the edge. It now reads Shopify through `src/lib/shopify/client.ts`,
-// so it runs on the Node runtime instead. The cost is a slower cold start on a
-// route only crawlers hit; the alternative was a card that renders the wrong
-// product, which is what the edge version was doing.
+// It was the network. This card read the static catalogue and ran happily on
+// the edge; when it moved to Shopify through `src/lib/shopify/client.ts` it had
+// to move to the Node runtime with it, and the accepted cost was a slower cold
+// start on a route only crawlers hit. The alternative was an edge card that
+// rendered the wrong product, which is what it had been doing.
 //
-// **That tradeoff has a budget: 2500ms, enforced against production by
-// `scripts/verify-production.mjs`.**
+// There is no Shopify call any more — `getProductByHandle` reads seventeen
+// records compiled into the bundle — so the *original* argument for Node has
+// expired. What replaces it is `loadCardFonts()`: `node:fs/promises` reading two
+// files out of `public/fonts/`, which the edge runtime has no filesystem for.
+// Bundled fonts and the edge runtime are mutually exclusive, and the bundled
+// fonts are the thing keeping a third-party CDN out of this render path.
 //
-// A tradeoff accepted without a number is a tradeoff nobody can tell has gone
-// bad. Link crawlers give up somewhere around 3-5s, and a timed-out unfurl
-// renders *no* card at all — strictly worse than the wrong card this change
-// fixed. 2500ms sits under the low end with room for a slow Storefront
-// response on top of a cold start.
-//
-// Measured locally at 513ms cold, 54ms warm, 15KB. Treat that as a floor rather
-// than an estimate: locally the Shopify call fails fast against a placeholder
-// domain, so it skips the round-trip production actually makes. The number that
-// matters is the one the smoke run reports, and it is printed on every run —
-// passing or failing — so the trend is visible before it breaches.
+// The 2500ms budget that used to be enforced here by
+// `scripts/verify-production.mjs` went with that script (WS-6). It was a budget
+// on a round trip this route no longer makes. Local measurements on the Shopify
+// version — 513ms cold, 54ms warm, 15KB — are kept only as the record of what
+// the network cost; a card with no fetch in it is bounded by rasterisation, and
+// nothing currently measures that. Say so rather than leave a number that
+// describes a different route.
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const alt = 'Healthy Jewelry product'
@@ -63,21 +71,19 @@ interface Props {
   params: Promise<{ handle: string }>
 }
 
-const MATERIAL_LABELS: Record<string, string> = {
-  titanium: 'GRADE 23 TITANIUM',
-  niobium: 'NIOBIUM',
-  'surgical-steel': '316L SURGICAL STEEL',
-}
-
 export default async function Image({ params }: Props) {
   const { handle } = await params
-  // `getProduct` falls back to the static catalogue on its own when Shopify is
-  // unconfigured or unreachable, so this is strictly better-informed than the
-  // direct `getProductByHandle` it replaces — never worse.
-  const product = await getProduct(handle)
-  // Same derivation as generateMetadata and the JSON-LD.
+  const product = getProductByHandle(handle)
+  // Same derivation as generateMetadata and the JSON-LD, so the tab title, the share
+  // card and the structured data cannot describe the product differently.
   const title = product ? productSeo(product).title : 'Product'
-  const material = MATERIAL_LABELS[product?.material ?? ''] ?? 'TITANIUM'
+  // The published label off the record, upper-cased for the card's own typography — not
+  // a `MATERIAL_LABELS` lookup keyed on `product.material`, which is what this was. Three
+  // rows mapping `titanium` to "GRADE 23 TITANIUM" meant a claim about metallurgy lived
+  // in a constant in a route file, and its unknown-handle default was the string
+  // 'TITANIUM': a card for a product this catalogue does not hold asserted it was
+  // titanium. It says nothing now.
+  const material = product ? product.materialLabel.toUpperCase() : ''
   const fonts = await loadCardFonts()
 
   return new ImageResponse(
@@ -134,30 +140,32 @@ export default async function Image({ params }: Props) {
           {title}
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <div
-            style={{
-              border: '1px solid #D8D3CB',
-              padding: '8px 16px',
-              fontSize: 12,
-              letterSpacing: '0.12em',
-              color: '#6B6762',
-              display: 'flex',
-            }}
-          >
-            {material}
-          </div>
-          {product && (
-            // Formatted inline, not through an intermediate variable rendered
-            // bare — `currency-consistency.test.tsx` treats a standalone
-            // `{price}` expression as an unformatted raw number on sight,
-            // regardless of what produced it, and a bare `{product.price}`
-            // really did render "1450000" beside a store charging
-            // "1.450.000₫" the fourth time this project shipped a price no
-            // formatter had seen.
-            <div style={{ fontSize: 20, color: '#1A1714', fontWeight: 400, display: 'flex' }}>
-              {formatPrice(product.price, product.currencyCode)}
+          {/* An empty bordered box is worse than no box: it reads as a label that failed
+              to load. Rendered only when there is a material to name. */}
+          {material !== '' && (
+            <div
+              style={{
+                border: '1px solid #D8D3CB',
+                padding: '8px 16px',
+                fontSize: 12,
+                letterSpacing: '0.12em',
+                color: '#6B6762',
+                display: 'flex',
+              }}
+            >
+              {material}
             </div>
           )}
+          {/*
+            The price was rendered here, formatted inline so that the currency scan — now
+            `price-absence-contract.test.tsx` — could not mistake it for a raw number:
+            this project shipped an unformatted "1450000" beside a store charging
+            "1.450.000₫" four separate times.
+
+            It is gone with the rest of the prices. An unfurled link is often the first
+            thing someone sees of a product, so a price on it is a claim made before they
+            reach any page that could qualify it. The card keeps the name and the material.
+          */}
         </div>
       </div>
     </div>,

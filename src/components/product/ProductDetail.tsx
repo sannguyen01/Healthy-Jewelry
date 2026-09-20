@@ -2,28 +2,24 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import type { HJProduct } from '@/lib/catalog/types'
+import type { CatalogProduct } from '@/lib/catalog'
 import { ProductImage } from '@/components/product/ProductImage'
 import { ProductBadge } from '@/components/product/ProductBadge'
 import { SizePicker } from '@/components/product/SizePicker'
-import { formatPrice } from '@/lib/utils/formatPrice'
 import { track } from '@/lib/analytics'
 
 interface ProductDetailProps {
-  product: HJProduct
-}
-
-const MATERIAL_FULL_NAMES: Record<string, string> = {
-  titanium: 'Grade 23 Titanium',
-  niobium: 'Niobium',
-  'surgical-steel': '316L Surgical Steel',
+  product: CatalogProduct
 }
 
 const TRUST_SIGNALS = ['·IMPLANT GRADE·', '·HYPOALLERGENIC·', '·MRI SAFE·']
 
 export function ProductDetail({ product }: ProductDetailProps) {
   const [selectedSize, setSelectedSize] = useState<string | undefined>(undefined)
-  const [activeImageIndex, setActiveImageIndex] = useState(0)
+  // `activeImageIndex` was here, driving the thumbnail gallery. The media union holds at
+  // most one photograph, so there was never a second thumbnail to switch to — see the note
+  // where the gallery used to render. State nothing can change is state that misleads a
+  // reader about what the component does.
 
   // One view per mount. The ref guards React's development double-invoke, which
   // would otherwise double every page-view number and teach everyone to halve it.
@@ -36,39 +32,46 @@ export function ProductDetail({ product }: ProductDetailProps) {
       handle: product.handle,
       collection: product.collection,
       material: product.material,
-      value: product.price,
-      currency: product.currencyCode,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.handle])
 
   /**
-   * The image currently shown, or `undefined` when the product has no photography
-   * and the illustration should be drawn instead.
+   * The photograph, when the catalogue record carries one.
    *
-   * Falls back to `featuredImage` when `images` is empty but a featured image
-   * exists — Shopify can return one without the other, and a product whose only
-   * photo lives in `featuredImage` must not silently render as a line drawing.
-   * Indexed defensively so a shrinking gallery cannot strand the index out of
-   * range.
+   * The media union holds **at most one** image per product, which is a deliberate
+   * narrowing: Shopify returned a `featuredImage` and an `images` array that could
+   * disagree, and reconciling them here was how a product whose only photo lived in
+   * `featuredImage` could silently render as a line drawing. One field cannot disagree
+   * with itself. A gallery returns when there is real photography to put in it, and the
+   * schema is where that decision belongs.
    */
-  const activeImage = product.images[activeImageIndex] ?? product.images[0] ?? product.featuredImage
+  const activeImage = product.media.kind === 'photo' ? product.media : null
 
-  // `isSoldOut` is the only variant-derived value left, and it feeds the badge below.
+  // `isSoldOut` was the last variant-derived value here, and it is gone with the inventory
+  // signal that produced it: `every variant unavailable`, read from Shopify per variant.
+  // Nothing can check stock any more, so a Sold Out badge would be an invented fact rather
+  // than a stale one. `availability` on the record carries what the site can honestly say.
   //
   // Everything else that used to live here — `requiresSize`, `selectedVariant`,
-  // `relevantVariant`, `variantSoldOut`, `canAddToBag` — existed solely to decide whether
-  // the Add to Bag button could be pressed and which of its three labels to show. The
-  // button is gone, so resolving a size to a Shopify variant answers no question this page
-  // still asks. Left in place they would be unread state that a reader has to walk before
-  // discovering it goes nowhere.
-  //
-  // The size picker stays and stays interactive: it tells a visitor what sizes exist and
-  // which one they picked. It simply no longer has to map that choice onto a variant id.
-  const isSoldOut =
-    product.variants.length > 0 && product.variants.every((v) => !v.availableForSale)
+  // `relevantVariant`, `variantSoldOut`, `canAddToBag` — went with the Add to Bag button in
+  // PR #75. The size picker stays and stays interactive: it tells a visitor what sizes exist
+  // and which one they picked, without mapping that choice onto anything purchasable.
 
-  const materialName = MATERIAL_FULL_NAMES[product.material] ?? product.material
+  /**
+   * The material as the brand publishes it, read from the record rather than derived.
+   *
+   * This was a `MATERIAL_FULL_NAMES` lookup keyed on `product.material` — three rows
+   * mapping `titanium` to "Grade 23 Titanium" and so on. `schema.ts` argues against
+   * exactly that: the handle is an identifier this repository owns, the label is
+   * published copy making a claim about metallurgy, and deriving the second from the
+   * first put the only statement of that claim in a constant inside a component.
+   *
+   * The catalogue stores `materialLabel` on every record, and the seventeen values agree
+   * with the table this replaced, so nothing on the page changes today. What changes is
+   * where a correction would have to be made: a content file, not a component.
+   */
+  const materialName = product.materialLabel
 
   return (
     <div
@@ -87,8 +90,8 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <div className="card-tile hj-product-tile">
             {activeImage ? (
               <Image
-                src={activeImage.url}
-                alt={activeImage.altText?.trim() || product.title}
+                src={activeImage.src}
+                alt={activeImage.alt}
                 fill
                 sizes="(max-width: 767px) 100vw, (max-width: 1120px) 50vw, 560px"
                 // The largest above-the-fold image on the page it belongs to,
@@ -107,47 +110,14 @@ export function ProductDetail({ product }: ProductDetailProps) {
           </div>
 
           {/*
-            Thumbnails only when there is a choice to make. A single-image gallery
-            is a row of one button that changes nothing — visual noise that reads
-            as broken.
+            The thumbnail gallery was here.
+
+            The media union holds at most one photograph, so there is never a second
+            thumbnail to switch to — a gallery of one is a row of one button that
+            changes nothing, which `e2e/visual-assets.spec.ts` already asserts must not
+            render. It comes back with the schema change that allows more than one image,
+            not before.
           */}
-          {product.images.length > 1 && (
-            <div role="group" aria-label="Product images" style={{ display: 'flex', gap: '8px' }}>
-              {product.images.map((image, index) => {
-                const isActive = index === activeImageIndex
-                return (
-                  <button
-                    key={image.url}
-                    type="button"
-                    onClick={() => setActiveImageIndex(index)}
-                    aria-label={`View image ${index + 1} of ${product.images.length}`}
-                    aria-pressed={isActive}
-                    className="card-tile"
-                    style={{
-                      position: 'relative',
-                      width: '72px',
-                      height: '72px',
-                      flexShrink: 0,
-                      cursor: 'pointer',
-                      padding: 0,
-                      // --titanium, not --titanium-text: this is a border, and
-                      // the contrast rule applies to text (CLAUDE.md).
-                      border: `1px solid ${isActive ? 'var(--titanium)' : 'var(--ash)'}`,
-                      transition: `border-color var(--duration-fast) var(--ease)`,
-                    }}
-                  >
-                    <Image
-                      src={image.url}
-                      alt=""
-                      fill
-                      sizes="72px"
-                      style={{ objectFit: 'contain' }}
-                    />
-                  </button>
-                )
-              })}
-            </div>
-          )}
         </div>
 
         {/* Right — Info panel */}
@@ -159,17 +129,11 @@ export function ProductDetail({ product }: ProductDetailProps) {
             justifyContent: 'center',
           }}
         >
-          {/* Badge — sold-out status pre-empts promotional badges */}
-          {isSoldOut ? (
+          {/* Badge. Sold Out is gone with the inventory signal — see the note above. */}
+          {product.badge !== null && (
             <div>
-              <span className="badge">Sold Out</span>
+              <ProductBadge badge={product.badge} />
             </div>
-          ) : (
-            product.badge !== null && (
-              <div>
-                <ProductBadge badge={product.badge} />
-              </div>
-            )
           )}
 
           {/* Title */}
@@ -194,7 +158,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
               which is optional. An empty one used to render a blank uppercase
               line with its own margins, so the layout showed a gap where a
               measurement should be. */}
-          {product.spec.trim() !== '' && (
+          {product.specification.trim() !== '' && (
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
@@ -204,7 +168,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                 textTransform: 'uppercase',
               }}
             >
-              {product.spec}
+              {product.specification}
             </p>
           )}
 
@@ -232,32 +196,13 @@ export function ProductDetail({ product }: ProductDetailProps) {
             role="separator"
           />
 
-          {/* Price */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-            <span
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'var(--text-xl)',
-                color: 'var(--ink)',
-              }}
-            >
-              {formatPrice(product.price, product.currencyCode)}
-            </span>
+          {/*
+            The price block was here.
 
-            {product.compareAtPrice !== null && (
-              <span
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  fontWeight: 300,
-                  fontSize: 'var(--text-base)',
-                  color: 'var(--graphite)',
-                  textDecoration: 'line-through',
-                }}
-              >
-                {formatPrice(product.compareAtPrice, product.currencyCode)}
-              </span>
-            )}
-          </div>
+            Nothing on this page can be bought, so a number with a currency symbol on it
+            is a claim the site cannot honour. `availability` is the honest field and it
+            reads `ask-an-ambassador` for every piece in the catalogue today.
+          */}
 
           {/* Size picker — only for rings and bracelets */}
           <SizePicker

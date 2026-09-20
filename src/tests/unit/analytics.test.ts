@@ -34,13 +34,19 @@ beforeEach(() => {
   setAnalyticsSink({ send: (event) => void sent.push(event) })
 })
 
+/**
+ * `value` and `currency` are gone from this event, and their absence is the point.
+ *
+ * `product_viewed` used to carry the product's price so an analytics backend could
+ * attribute revenue to a view. There is no price to attribute and no transaction to
+ * attribute it to, so the fields were removed from `AnalyticsEvent` rather than sent as
+ * `'0'` — a zero-value conversion event is a number a dashboard will happily average.
+ */
 const productEvent: AnalyticsEvent = {
   name: 'product_viewed',
   handle: 'arc-band-titanium',
   collection: 'rings',
   material: 'titanium',
-  value: '1450000',
-  currency: 'VND',
 }
 
 describe('consent gate', () => {

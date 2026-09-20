@@ -152,7 +152,7 @@ describe('scripts/verify-webhook-secret.mjs', () => {
       // Revalidating a tag nothing is registered under is a no-op. If this ever
       // became a real handle, running the probe would purge that product's
       // cache in production.
-      const { getAllProducts } = await import('@/lib/data/hj-data')
+      const { getAllProducts } = await import('@/lib/catalog')
       const payload = JSON.parse(buildProbeBody().toString('utf-8')) as { handle: string }
       const realHandles = getAllProducts().map((p) => p.handle)
 

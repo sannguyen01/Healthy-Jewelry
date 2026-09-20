@@ -36,15 +36,16 @@
  */
 
 import { execFileSync } from 'node:child_process'
+import { readdirSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   staleBundleVerdict,
   environmentVerdict,
   freshnessVerdict,
-  shopifyConfigVerdict,
   catalogueSourceVerdict,
   summarise,
 } from './lib/deployment-verdict.mjs'
-import { FALLBACK_ONLY_HANDLES, SHOPIFY_ONLY_HANDLES } from './verify-production.mjs'
 
 const USER_AGENT = 'healthy-jewellery-deployment-diagnostic'
 const TIMEOUT_MS = 20_000
@@ -144,6 +145,36 @@ function print(verdict) {
   console.log('')
 }
 
+/**
+ * Every product handle this build holds, read from the content directory's filenames.
+ *
+ * The filenames rather than the parsed records, for the same reason
+ * `verify-browse-only.mjs` does it: this script is dependency-free `.mjs` and cannot
+ * import the TypeScript reader. That shortcut is licensed by `catalog-content.test.ts`,
+ * which asserts every file is named after the handle inside it — remove that assertion and
+ * this quietly starts checking for URLs with no records behind them.
+ *
+ * Replaces the two hand-maintained lists this used to import from `verify-production.mjs`:
+ * `FALLBACK_ONLY_HANDLES` and `SHOPIFY_ONLY_HANDLES`, whose whole job was telling the
+ * bundled catalogue apart from Shopify's. There is one catalogue now, so the discriminator
+ * has nothing to discriminate.
+ */
+function knownHandles() {
+  const dir = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    'src/content/catalog/products'
+  )
+  try {
+    return readdirSync(dir)
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => name.replace(/\.json$/, ''))
+      .sort()
+  } catch {
+    return []
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2)
   const expectProduction = args.includes('--expect-production')
@@ -176,7 +207,6 @@ async function main() {
     environmentVerdict(payload, { expectProduction }),
     freshnessVerdict(payload, readDefaultBranchTip()),
     staleBundleVerdict(payload),
-    shopifyConfigVerdict(payload),
   ]
 
   // Two page-level probes. Failures here are reported, never fatal to the run:
@@ -184,10 +214,7 @@ async function main() {
   try {
     const shopHtml = await getText(new URL('/shop', baseUrl))
     verdicts.push(
-      catalogueSourceVerdict(shopHtml, {
-        fallbackOnly: FALLBACK_ONLY_HANDLES,
-        shopifyOnly: SHOPIFY_ONLY_HANDLES,
-      })
+      catalogueSourceVerdict(shopHtml, knownHandles())
     )
   } catch (err) {
     verdicts.push({

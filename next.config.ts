@@ -1,15 +1,10 @@
 import type { NextConfig } from 'next'
 // Relative, not the `@/` alias: next.config.ts is loaded by Next's own config
 // loader, which does not apply tsconfig path mappings.
-import { warnIfShopifyUnconfigured } from './src/lib/shopify/env-check'
+//
 // Importing the reader *is* the validation: every catalogue record is parsed through its
 // Zod schema at module load, and a malformed one throws. See the block below.
 import { getAllProducts } from './src/lib/catalog'
-
-// Runs once per build (and once on `next start`), so a deployment that will
-// serve a catalog nobody can buy from says so in the build log rather than
-// looking perfectly healthy until a customer clicks Checkout.
-warnIfShopifyUnconfigured()
 
 /**
  * **Invalid catalogue content stops the build.**
@@ -23,12 +18,16 @@ warnIfShopifyUnconfigured()
  * later "unused import" cleanup deletes, taking the guarantee with it and leaving nothing
  * that fails. Reading the length makes the dependency visible to a human and to eslint.
  *
- * This is deliberately a **throw** and not the `warn` immediately above it. The two guard
- * different things: Shopify being unconfigured degrades to a working site, whereas a
- * malformed product record renders a page with a hole in it — a customer-visible lie that
- * no check downstream of the build would catch. `warnIfShopifyUnconfigured` exists because
- * a hard failure there would break the architecture it protects; nothing here protects
- * anything by continuing.
+ * This is deliberately a **throw**, and the contrast that makes the point used to sit one
+ * line above it. `warnIfShopifyUnconfigured()` ran here every build and *printed*: a
+ * deployment with no Storefront credentials degraded to the static catalogue and served a
+ * working site, so failing the build over it would have broken the architecture the warning
+ * protected.
+ *
+ * There is no such degradation any more. The static catalogue is not a fallback, it is the
+ * source, and a malformed record renders a page with a hole in it — a customer-visible lie
+ * no check downstream of the build would catch. Nothing here is protected by continuing,
+ * so nothing continues.
  *
  * Note the ordering constraint this creates: `manifest.ts` imports its JSON with relative
  * paths, not the `@/` alias, because this file is loaded by Next's own config loader, which
@@ -65,20 +64,21 @@ const buildInfoEnv: Record<string, string> = {
 
 const nextConfig: NextConfig = {
   env: buildInfoEnv,
+  /*
+   * No `remotePatterns`.
+   *
+   * This allowlisted `cdn.shopify.com` and `*.shopify.com`, which is how a product
+   * photograph reached `next/image` from a Shopify CDN URL. The catalogue's `photo` media
+   * arm carries a repository-relative `src` instead, so every image `next/image` is asked
+   * to optimise is one this build ships.
+   *
+   * Removed rather than left harmlessly in place. `remotePatterns` is a statement about
+   * which third parties may put bytes through this deployment's image optimiser, and a
+   * wildcard for a vendor nothing fetches from is a standing permission nobody reviewed.
+   * A photograph arriving from a CDN again is a decision, and it should cost an edit here.
+   */
   images: {
     formats: ['image/webp', 'image/avif'],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'cdn.shopify.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.shopify.com',
-        pathname: '/**',
-      },
-    ],
   },
   async headers() {
     return [

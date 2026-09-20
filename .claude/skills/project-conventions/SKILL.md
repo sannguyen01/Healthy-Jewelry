@@ -41,12 +41,27 @@ flag it if you see:
 
 ## Testing baseline
 
-The suite spans **91 unit spec files** and **15 E2E spec files**.
+The suite spans **87 unit spec files** and **15 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
 spec file disappearing fails the gate instead of quietly lowering the bar. Do not edit
 them by hand to make a check pass — re-measure, and if the number really moved, ask why.
+
+**The unit count fell from 91 to 86 on 2026-09-20, and the reason is on the record rather
+than in a diff.** The Shopify decommission deleted seven specs whose subjects no longer
+exist — `shopify-index`, `shopify-pagination`, `shopify-client`, `shopify-env-check`,
+`shopify-mapping`, `formatPrice` and `seo` (the last covering `src/lib/utils/seo.ts`, which
+had no application caller at all) — and added three: `catalog-fixture-contract`,
+`catalog-search` and `browse-only-copy`. Three more were re-founded in place under new names:
+`currency-consistency` → `price-absence-contract`, `homepage-fetch-budget` →
+`homepage-composition-contract`, `opengraph-vnd-font` → `opengraph-bundled-font`.
+
+A falling spec count is exactly what this check exists to make somebody explain. The
+explanation is that the code under test was deleted, not that coverage was dropped — and
+`catalog-search` is the counter-example that proves the distinction is being applied:
+search *moved* catalogue rather than going away, so it got a spec of its own rather than
+inheriting the deleted one's number.
 
 Test *totals* are a dated observation, not a constant. Nothing here can re-measure them
 without running the suites, so they are recorded rather than reconciled:

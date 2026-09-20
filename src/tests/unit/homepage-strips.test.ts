@@ -1,38 +1,30 @@
 import { describe, it, expect } from 'vitest'
 import { stripByMaterial, duplicateAcrossStrips, dedupeInOrder } from '@/lib/utils/homepageStrips'
-import type { HJMaterialHandle, HJProduct } from '@/lib/catalog/types'
-import { hjProducts } from '@/lib/data/hj-data'
+import type { CatalogProduct, MaterialHandle } from '@/lib/catalog/schema'
+import { getAllProducts, getBestsellers, getNewArrivals } from '@/lib/catalog'
+import { makeProduct } from '@/tests/support/catalogFixtures'
 
 /**
- * Both defects these functions exist to remove were live on the static catalogue, so the
- * regression cases below are the real handles rather than invented ones — a fixture that
+ * Both defects these functions exist to remove were live on the real catalogue, so the
+ * regression cases below use the real handles rather than invented ones — a fixture that
  * cannot reproduce the original bug is not evidence the bug is fixed.
  */
 
 function product(
   handle: string,
-  material: HJMaterialHandle,
-  overrides: Partial<HJProduct> = {}
-): HJProduct {
-  return {
-    id: `gid://shopify/Product/${handle}`,
-    defaultVariantId: `gid://shopify/ProductVariant/${handle}`,
+  material: MaterialHandle,
+  overrides: Partial<CatalogProduct> = {}
+): CatalogProduct {
+  return makeProduct({
     handle,
     title: handle,
     collection: 'necklaces',
     material,
-    tags: [],
-    price: '100.00',
-    compareAtPrice: null,
-    currencyCode: 'USD',
-    badge: null,
-    description: '',
-    spec: '',
-    svgType: 'necklace-pendant',
-    featuredImage: null,
-    images: [],
+    materialLabel: material,
+    sizes: [],
+    media: { kind: 'illustration', svgType: 'necklace-pendant' },
     ...overrides,
-  } as HJProduct
+  })
 }
 
 describe('stripByMaterial', () => {
@@ -69,7 +61,7 @@ describe('stripByMaterial', () => {
   })
 
   it('returns an empty strip rather than throwing when nothing matches', () => {
-    // A material with no stock must render an empty strip, not crash the homepage.
+    // A material with nothing in it must render an empty strip, not crash the homepage.
     expect(stripByMaterial([product('a-nb', 'niobium')], 'titanium', [])).toEqual([])
   })
 
@@ -77,13 +69,14 @@ describe('stripByMaterial', () => {
     // The regression, exactly: the strip was getProductsByCollection('necklaces'), which
     // returned drop-pendant-surgical-steel and link-chain-niobium — each rendering its own
     // material line, "316L Surgical Steel" and "Niobium", directly under the word TITANIUM.
-    const necklaces = hjProducts.filter((p) => p.collection === 'necklaces')
+    const catalogue = getAllProducts()
+    const necklaces = catalogue.filter((p) => p.collection === 'necklaces')
     expect(necklaces.filter((p) => p.material !== 'titanium').map((p) => p.handle)).toEqual([
       'drop-pendant-surgical-steel',
       'link-chain-niobium',
     ])
 
-    const strip = stripByMaterial(hjProducts, 'titanium', [])
+    const strip = stripByMaterial(catalogue, 'titanium', [])
 
     expect(strip.every((p) => p.material === 'titanium')).toBe(true)
     expect(strip.map((p) => p.handle)).not.toContain('drop-pendant-surgical-steel')
@@ -92,11 +85,12 @@ describe('stripByMaterial', () => {
 
   it('fixes the real repetition: nothing the first two strips already showed', () => {
     // 2 of the old strip's 4 cards were repeats — orbit-pendant-titanium carried its
-    // "Bestseller" badge in both places.
-    const bestsellers = hjProducts.filter((p) => p.badge === 'Bestseller')
-    const newArrivals = hjProducts.filter((p) => p.badge === 'New')
+    // "Bestseller" badge in both places. Read through the catalogue accessors the homepage
+    // itself uses, so this asks the question of the same lists the page composes.
+    const bestsellers = getBestsellers()
+    const newArrivals = getNewArrivals()
 
-    const strip = stripByMaterial(hjProducts, 'titanium', [...bestsellers, ...newArrivals])
+    const strip = stripByMaterial(getAllProducts(), 'titanium', [...bestsellers, ...newArrivals])
 
     expect(strip.map((p) => p.handle)).not.toContain('orbit-pendant-titanium')
     expect(
@@ -122,28 +116,39 @@ describe('dedupeInOrder', () => {
     expect(second.map((p) => p.handle)).toEqual(['b'])
   })
 
-  it('reproduces the live-store case the E2E suite structurally cannot', () => {
-    // BESTSELLING and NEW ARRIVALS are two independent Shopify queries, `tag:bestseller`
-    // and `tag:new`. A product carrying both tags is returned by both — and `badge`
-    // collapses to a single value with bestseller winning, so it renders the same
-    // "Bestseller" pill in both strips.
-    //
-    // The static fallback cannot produce this: `badge` is one scalar field, so
-    // `badge === 'Bestseller'` and `badge === 'New'` are disjoint by construction. That is
-    // exactly why this case lives here — e2e/homepage-composition.spec.ts runs against
-    // mock.myshopify.com and could never observe it, however carefully it asks.
-    const doubleTagged = product('meridian-cuff', 'titanium', { badge: 'Bestseller' })
-    const fromBestsellerQuery = [doubleTagged, product('tectonic-ring', 'titanium')]
-    const fromNewQuery = [doubleTagged, product('nova-pendant', 'titanium')]
+  /**
+   * **The case this function was written for, kept as a fixture after the data model
+   * stopped being able to produce it.**
+   *
+   * BESTSELLING and NEW ARRIVALS were two independent Shopify queries, `tag:bestseller`
+   * and `tag:new`. A product carrying both tags came back from both — and `badge`
+   * collapsed to one value with bestseller winning, so it rendered the same "Bestseller"
+   * pill in both strips. E2E could not see it, because the static fallback it ran against
+   * had a scalar `badge` and could not reproduce it.
+   *
+   * The catalogue's `badge` *is* that scalar now, so the collision is impossible between
+   * these two strips and `catalog-content.test.ts` asserts the disjointness directly. This
+   * test therefore no longer describes a reachable production state, and it is kept
+   * deliberately rather than deleted: `dedupeInOrder` is a general guard whose next caller
+   * is a strip nobody has written yet, and this is the only place its cross-strip branch
+   * is exercised with two lists that genuinely overlap.
+   *
+   * Two independent lists that share a member is the *shape*; which upstream produced them
+   * was never part of the function's contract.
+   */
+  it('collapses two overlapping strips, whatever produced them', () => {
+    const doubleListed = product('meridian-cuff', 'titanium', { badge: 'bestseller' })
+    const firstList = [doubleListed, product('tectonic-ring', 'titanium')]
+    const secondList = [doubleListed, product('nova-pendant', 'titanium')]
 
     expect(
       duplicateAcrossStrips([
-        { label: 'BESTSELLING', products: fromBestsellerQuery },
-        { label: 'NEW ARRIVALS', products: fromNewQuery },
+        { label: 'BESTSELLING', products: firstList },
+        { label: 'NEW ARRIVALS', products: secondList },
       ])
     ).toEqual([{ handle: 'meridian-cuff', labels: ['BESTSELLING', 'NEW ARRIVALS'] }])
 
-    const [bestsellers, newArrivals] = dedupeInOrder([fromBestsellerQuery, fromNewQuery])
+    const [bestsellers, newArrivals] = dedupeInOrder([firstList, secondList])
 
     expect(
       duplicateAcrossStrips([
@@ -155,7 +160,7 @@ describe('dedupeInOrder', () => {
   })
 
   it('collapses a product repeated within one strip', () => {
-    // A hand-curated or paginated Shopify collection can return the same product twice.
+    // A strip assembled by concatenating two lists can hold the same product twice.
     const twice = product('a', 'titanium')
 
     expect(dedupeInOrder([[twice, twice]])[0]).toHaveLength(1)

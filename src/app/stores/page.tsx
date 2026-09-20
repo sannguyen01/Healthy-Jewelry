@@ -7,7 +7,7 @@ import { CONTACT_EMAIL, SITE_DOMAIN } from '@/config/site'
 export const metadata: Metadata = {
   title: 'Locations',
   description:
-    'Healthy Jewelry is available exclusively online. Ships worldwide with free delivery on every order.',
+    'Healthy Jewelry is arranged through ambassadors and shipped worldwide with free delivery. Showroom appointments available; flagship store coming 2026.',
 }
 
 export default function StoresPage() {
@@ -37,8 +37,15 @@ export default function StoresPage() {
               margin: 0,
             }}
           >
-            Currently available exclusively online — we ship worldwide with free delivery on every
-            order.
+            {/*
+              This said "available exclusively online", which is now exactly backwards. The
+              site takes no orders; every piece is arranged with a person. A page titled
+              Find Us telling a visitor to look online was the single most misleading
+              sentence left in the catalogue after the decommission, because it is the page
+              somebody reads when they want to know how to actually get one.
+            */}
+            Arranged in person, through a Healthy Jewelry ambassador — then shipped
+            worldwide, free, wherever you are.
           </p>
         </section>
 
@@ -51,7 +58,7 @@ export default function StoresPage() {
           }}
         />
 
-        {/* Online Store */}
+        {/* How a piece is arranged, and the flagship */}
         <section
           style={{
             padding: 'clamp(64px, 8vw, 120px) clamp(24px, 6vw, 120px)',
@@ -72,7 +79,7 @@ export default function StoresPage() {
                 marginBottom: '20px',
               }}
             >
-              Online Store
+              Through an Ambassador
             </p>
             <h2
               style={{
@@ -98,8 +105,9 @@ export default function StoresPage() {
                 margin: '0 0 16px',
               }}
             >
-              Our full collection is available at {SITE_DOMAIN}. Free shipping to every country, no
-              minimum order.
+              The full collection is at {SITE_DOMAIN} to browse. To hold one, talk to an
+              ambassador — they will confirm the piece, the size and the price with you, and
+              it ships free to every country with no minimum.
             </p>
             <p
               style={{
@@ -165,8 +173,9 @@ export default function StoresPage() {
                 margin: 0,
               }}
             >
-              Until then, we offer in-person consultations and showroom appointments by appointment.
-              Email us to arrange a visit.
+              Until then, consultations and showroom appointments are how most people meet a
+              piece before they choose it. Email us to arrange a visit, or to be introduced
+              to an ambassador near you.
             </p>
           </div>
         </section>

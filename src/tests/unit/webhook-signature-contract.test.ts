@@ -5,7 +5,6 @@ import { parseSource, importsFrom } from '@/lib/analysis/tsAstScan'
 
 const shared = await import('../../../scripts/lib/webhook-signature.mjs')
 const webhookCli = await import('../../../scripts/verify-webhook-secret.mjs')
-const productionCli = await import('../../../scripts/verify-production.mjs')
 
 /**
  * `verify-production.mjs` used to import `buildProbeRequest` straight out of
@@ -17,12 +16,25 @@ const productionCli = await import('../../../scripts/verify-production.mjs')
  * silent divergence starts, and a divergence there means every webhook fails
  * authentication with no diagnostic. The logic is shared from a module both CLIs depend on
  * — and this file is the test that was missing.
+ *
+ * ## One CLI now, and the contract is still worth holding
+ *
+ * WS-6 deleted `verify-production.mjs`: its seventeen checks all needed a Shopify
+ * credential and its central discriminator inverted when the bundled catalogue became the
+ * source (ADR 034). So the *pair* this file was written about is a single script, and half
+ * its assertions — "neither CLI imports the other" — have one member.
+ *
+ * Kept rather than deleted, for two reasons. `buildProbeRequest`, `signWebhookBody` and
+ * `resolveStoreDomain` are still the thing that decides whether a real Shopify delivery
+ * authenticates against `/api/webhooks/shopify`, and that route survives until WS-7 removes
+ * the subscriptions. And the boundary rule is the kind that only matters when a second
+ * caller appears: asserting it against one is cheap, and asserting it for the first time
+ * against two is the version nobody writes. See ADR 035.
  */
 
 const ROOT = process.cwd()
 const CLI_PATHS = {
   webhook: 'scripts/verify-webhook-secret.mjs',
-  production: 'scripts/verify-production.mjs',
 }
 
 function importsIn(relPath: string): string[] {
@@ -37,14 +49,13 @@ function importsIn(relPath: string): string[] {
 
 describe('webhook probe contract', () => {
   describe('module boundaries', () => {
-    it('neither CLI imports the other', () => {
-      // The property finding #6 is really about. Both may depend on the shared module;
-      // neither may depend on the other's internals.
+    it('the CLI imports no sibling CLI', () => {
+      // The property finding #6 is really about. A CLI may depend on the shared module;
+      // it may not depend on another CLI's internals.
       expect(importsIn(CLI_PATHS.webhook)).toEqual([])
-      expect(importsIn(CLI_PATHS.production)).toEqual([])
     })
 
-    it('both CLIs depend on the shared module', () => {
+    it('the CLI depends on the shared module', () => {
       // The inverse failure: satisfying the rule above by duplicating the signing.
       for (const relPath of Object.values(CLI_PATHS)) {
         const full = join(ROOT, relPath)
@@ -65,11 +76,12 @@ describe('webhook probe contract', () => {
       }
     })
 
-    it('importing either CLI has no side effects', () => {
-      // Both are guarded against running main() on import. Now that neither imports the
-      // other, that guard is back to guarding only direct execution — but it still has to
-      // hold for these very imports at the top of this file.
-      expect(productionCli).toHaveProperty('SHOPIFY_ONLY_HANDLES')
+    it('importing the CLI has no side effects', () => {
+      // It is guarded against running main() on import, and that guard has to hold for the
+      // very import at the top of this file. `productionCli` was asserted here too, on
+      // `SHOPIFY_ONLY_HANDLES` — a list whose job was telling the bundled catalogue from
+      // Shopify's, and which went with the script.
+      expect(webhookCli).toHaveProperty('buildProbeRequest')
       expect(shared).toHaveProperty('buildProbeRequest')
     })
   })
@@ -106,9 +118,12 @@ describe('webhook probe contract', () => {
       expect(() => shared.resolveStoreDomain({})).toThrow(/NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN/)
     })
 
-    it('neither CLI hard-requires one spelling', () => {
+    it('the CLI does not hard-require one spelling', () => {
       // `required('SHOPIFY_STORE_DOMAIN')` in verify-production.mjs was the actual
-      // divergence. Pinning its absence keeps the two scripts answerable to one contract.
+      // divergence: one CLI accepted either variable and the other demanded one, so the
+      // same probe succeeded from one script and failed from the other. That script is
+      // gone; pinning the absence keeps the surviving one answerable to the contract, and
+      // keeps it that way for whatever calls the shared module next.
       for (const relPath of Object.values(CLI_PATHS)) {
         const src = readFileSync(join(ROOT, relPath), 'utf-8')
         expect(src, `${relPath} should resolve the domain, not require one name`).not.toMatch(

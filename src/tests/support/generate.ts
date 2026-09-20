@@ -2,8 +2,9 @@
  * **Renderings of one input, so a parser can be asked whether it reads the meaning or the
  * formatting.**
  *
- * Hand-rolled, matching the fuzz precedent in `production-smoke-handles.test.ts`: a
- * cross-product of shapes rather than a property-testing library. A new devDependency here
+ * Hand-rolled: a cross-product of shapes rather than a property-testing library. The
+ * precedent cited here was `production-smoke-handles.test.ts`, deleted in WS-6 with the
+ * script it tested; the argument is unchanged and stands on its own. A new devDependency here
  * would need its own dependabot reasoning, its own major-bump policy, and its own place in
  * the lockfile — cost out of proportion to a few hundred generated strings.
  *

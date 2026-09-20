@@ -8,7 +8,7 @@ import { CONTACT_EMAIL } from '@/config/site'
 export const metadata: Metadata = {
   title: 'Contact',
   description:
-    'Get in touch with Healthy Jewelry. Questions about materials, sizing, or orders — we respond within 24 hours.',
+    'Get in touch with Healthy Jewelry. Questions about materials, sizing, or arranging a piece with an ambassador — we respond within 24 hours.',
 }
 
 const INFO_ITEMS = [
@@ -45,7 +45,8 @@ export default function ContactPage() {
               margin: 0,
             }}
           >
-            Material questions, sizing advice, custom orders. Reach us any time.
+            Material questions, sizing advice, or an introduction to an ambassador. Reach us
+            any time.
           </p>
         </section>
 

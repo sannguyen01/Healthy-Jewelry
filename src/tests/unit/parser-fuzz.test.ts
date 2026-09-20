@@ -41,13 +41,21 @@ import { shellRenderings, workflowsWithCondition, treeReader, type Tree } from '
 
 const ROOT = resolve(__dirname, '../../..')
 const SCRIPT = 'scripts/preflight-secrets.mjs'
-const SECRETS = [
-  'PRODUCTION_SITE_URL',
-  'SHOPIFY_STORE_DOMAIN',
-  'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
-  'SHOPIFY_ADMIN_ACCESS_TOKEN',
-  'SHOPIFY_WEBHOOK_SECRET',
-]
+/**
+ * The argument list the real workflow passes, restated rather than derived.
+ *
+ * Written out on purpose: a constant computed from the same parser it is checking compares
+ * a value to itself and passes forever. This is the shape `doc-numeric-claims` uses for the
+ * same reason, and it fails in both directions — the workflow changes and this is stale, or
+ * this changes and the workflow did not.
+ *
+ * Down from five on 2026-09-20. `SHOPIFY_STOREFRONT_ACCESS_TOKEN` and
+ * `SHOPIFY_ADMIN_ACCESS_TOKEN` were only ever read by `verify-production.mjs`, which WS-6
+ * replaced with a check that needs no credential at all. Fewer names here is the direction
+ * WS-7 wants: every credential a workflow can still reference is one a revocation has to
+ * account for.
+ */
+const SECRETS = ['PRODUCTION_SITE_URL', 'SHOPIFY_STORE_DOMAIN', 'SHOPIFY_WEBHOOK_SECRET']
 
 /** Wraps a `run:` body into a workflow the parser can be pointed at. */
 function workflowWithRun(run: string): string {

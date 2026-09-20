@@ -122,19 +122,85 @@ test.describe('Retired commerce routes', () => {
   })
 })
 
-/*
- * 'Unknown product handles' — a true 404 for a handle the catalogue does not hold — is
- * acceptance criterion 4 and is **not** asserted here yet.
+/**
+ * **Acceptance criterion 4: a handle the catalogue does not hold is a real 404.**
  *
- * It cannot be, honestly. `dynamicParams = false` is what makes that 404 real, and while
- * `products/[handle]/page.tsx` still reads from `@/lib/shopify` the soft 404 is the correct
- * behaviour: `generateStaticParams` enumerates what Shopify held at build time, so a hard
- * 404 would break any product added since the last deploy. That trade-off is documented in
- * the page itself and mitigated with `robots: noindex`.
+ * These assertions were deferred, and the comment that stood here said exactly why: while
+ * `products/[handle]/page.tsx` read `@/lib/shopify`, the *soft* 404 was the correct
+ * behaviour. `generateStaticParams` enumerated what Shopify held at build time, so
+ * `dynamicParams = false` would have hard-404'd any product a merchant added since the last
+ * deploy. The trade-off was documented in the page and mitigated with `robots: noindex`.
  *
- * The premise expires when the data source moves to `@/lib/catalog`, and
- * `src/tests/unit/soft-404-premise.test.ts` fails the moment it does without
- * `dynamicParams = false` beside it. These assertions arrive in the same change, not before
- * — a test written against behaviour the code is deliberately not exhibiting yet is a
- * failing test with a good excuse, which is how a suite learns to be ignored.
+ * That premise expired when the data source moved to `@/lib/catalog`: nobody can add a
+ * product anywhere but this repository, so the generated list is complete by construction.
+ * `src/tests/unit/soft-404-premise.test.ts` failed the moment the imports changed and named
+ * the fix in its message; `dynamicParams = false` went in with it, and these assertions
+ * arrive in the same change rather than before it.
+ *
+ * ## Why a status code and not a rendered page
+ *
+ * A soft 404 is HTTP 200 with `not-found.tsx` inside it. It renders the words "not found",
+ * so `getByText(/not found/i)` passes on both the broken and the fixed behaviour — and a
+ * crawler indexes the 200. This is the same measurement failure as everything else in this
+ * file: `request.get()` and `.status()` are the only things that can tell them apart.
  */
+test.describe('Unknown product handles', () => {
+  const UNKNOWN = [
+    {
+      path: '/products/does-not-exist',
+      why: 'a handle nobody has ever published',
+    },
+    {
+      path: '/products/sapphire-halo-ring',
+      why: 'a plausible jewellery handle for a piece this brand does not make — and one whose name breaks the no-stones rule, so it could never be added',
+    },
+    {
+      path: '/products/arc-band-titanium-x',
+      why: 'a real handle with a character appended, which is what a truncated or mangled inbound link looks like',
+    },
+  ] as const
+
+  for (const route of UNKNOWN) {
+    test(`${route.path} answers 404`, async ({ request }) => {
+      const response = await request.get(route.path, { maxRedirects: 0 })
+      expect(
+        response.status(),
+        `${route.path} answered ${response.status()}, expected 404.\n\n` +
+          `${route.why}.\n\n` +
+          `HTTP 200 here is a soft 404: the page renders "not found" while the status line ` +
+          `says the URL is fine, so a crawler indexes it. dynamicParams = false on ` +
+          `products/[handle]/page.tsx is what makes this real — check it is still there.`
+      ).toBe(404)
+    })
+  }
+
+  test('an unknown collection is a 404 too', async ({ request }) => {
+    // `/shop/[collection]` has had `dynamicParams = false` all along, because its handle set
+    // was always closed. Asserted beside the product case so the two cannot drift: they are
+    // now the same mechanism for the same reason.
+    const response = await request.get('/shop/pendants', { maxRedirects: 0 })
+    expect(response.status()).toBe(404)
+  })
+
+  test('every handle the catalogue does hold still serves', async ({ request }) => {
+    // The other half, and the reason this is not just a 404 test. `dynamicParams = false`
+    // makes the generated list authoritative: a product missing from it is a 404 on a page
+    // the site links to from its own collection grid. A spec that only checked the
+    // negative direction would pass on an empty catalogue.
+    for (const handle of ['arc-band-titanium', 'disc-studs-titanium', 'cable-cuff-titanium']) {
+      const response = await request.get(`/products/${handle}`, { maxRedirects: 0 })
+      expect(response.status(), `/products/${handle} should serve`).toBe(200)
+    }
+  })
+
+  test("the 404 is the site's own page, not a framework error", async ({ request }) => {
+    // A correct status with a stack trace under it is still a bad outcome for the person
+    // who followed a stale link from an ambassador's message. `not-found.tsx` is what
+    // renders here, and this asserts the visitor lands somewhere with a way back in.
+    const response = await request.get('/products/does-not-exist', { maxRedirects: 0 })
+    const body = await response.text()
+
+    expect(body).toMatch(/doesn&#x27;t exist|doesn't exist/i)
+    expect(body).toMatch(/href="\/"/)
+  })
+})

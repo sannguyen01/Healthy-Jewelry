@@ -1,7 +1,62 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-09-18
+Last refreshed by hand: 2026-09-20
+
+## Session note — 2026-09-20
+
+**The storefront is browse-only, and the catalogue is now this repository's.**
+
+Four pull requests across one session, each merged before the next began. #79 recorded the
+plan (`docs/browse-only-masterplan.md`) and the premise that expired mid-decommission
+(ADR 033). #80 built the content layer. #82 removed the commerce UI and retired its URLs.
+The fourth — this branch — moves every product surface onto `@/lib/catalog` and deletes the
+Shopify read path.
+
+What a visitor gets now: seventeen products, five collections, three materials, all served
+from validated JSON in `src/content/catalog/**`. No cart, no checkout, no account, no
+price. `/cart` → 308 `/shop`, `/account` → 308 `/contact`, `/checkout` → 410, and an
+unknown product handle is a **real 404** rather than HTTP 200 with "not found" rendered
+inside it.
+
+### Three findings worth carrying forward
+
+**One — structured data was advertising a shop that had closed.** `productJsonLd` emitted
+an `Offer` with a price, a currency, a purchase URL and `availability: InStock`. PR #75
+removed Add to Bag on 2026-09-19, so from that day the site had been telling search engines
+a transaction existed that did not. Nothing failed: the E2E spec asserted a formatted
+amount *was* shown, so it went green on the defect. Removing the block took
+`pnpm verify:browse-only` from 52 findings to 1, and closing the soft 404 took it to **0**.
+
+**Two — `production-smoke` went green while checking nothing.** Run #155 on 2026-09-19
+reported `success` with both real check steps `skipped`; run #154, four hours earlier, had
+executed them. The five secrets in the `production-readonly` environment were emptied
+between the two, and `preflight-secrets.mjs` reads all-absent as `not-configured` — exits
+0, files nothing. The premise ("nobody has set this up yet") expired the moment a
+decommission started removing credentials. ADR 033 and the `stopped` verdict are the fix;
+issue #81 is that verdict firing, as predicted, at 04:59:46Z.
+
+**Three — a control outlives its subject.** Eleven registries refused the read-path
+deletion. The instructive failure is `cache-tag-contract`: nothing registers a cache tag
+any more, so its orphan check would have reported every surviving `revalidateTag` and its
+widow check would have passed vacuously — one false alarm and one false assurance from the
+same missing producer. ADR 035 is the rule that came out of working all eleven.
+
+### Still blocked, and on what
+
+- **WS-2 (catalogue export)** — the Shopify connector reads `needs_reconnect`, so the
+  22-product export cannot be performed or verified. The catalogue holds 17;
+  `catalog-content.test.ts` asserts `17 + 5 = 22` so the delta stays counted rather than
+  forgotten.
+- **WS-7 (webhooks, then the route)** — `/api/webhooks/shopify`, `/api/revalidate` and
+  `/api/version` are held back deliberately. The subscriptions must be deleted in Shopify
+  Admin *before* the endpoint goes. Same blocker.
+- **`verify-production.mjs`** is registered, scheduled, and its premise is now false: it
+  treats a live site serving the bundled catalogue as a defect, which is what the site is
+  supposed to do. `verify-browse-only.mjs` is its successor and pointing the workflow at it
+  is WS-6's change. Recorded in ADR 035 so the gap is a decision rather than an oversight.
+- **Human console actions** unchanged: branch protection on `main`, the `www` → apex 308 at
+  Vercel (issue #78), and reconnecting Shopify.
 
 ## Session note — 2026-09-18
 

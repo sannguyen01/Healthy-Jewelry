@@ -78,29 +78,46 @@ export default function PrivacyPage() {
           {/* 1. What data we collect */}
           <div>
             <h2 style={sectionHeadStyle}>What Data We Collect</h2>
+            {/*
+              Split into two lists on 2026-09-20, and the split is the correction.
+
+              This section claimed the site collects "your name as provided during
+              checkout" and an "Order data" category covering items purchased, order
+              amounts, delivery addresses and payment method type. There is no checkout on
+              this site and never a payment; it takes a contact form, an analytics beacon
+              and an IP address for rate limiting, and that is the whole of it.
+
+              Over-claiming in a privacy policy is the legally safer direction and it is
+              still wrong: the point of the document is that a visitor can find out what
+              actually happens to their data, and a list padded with categories the site
+              does not hold makes the ones it does hold harder to see. What was true of the
+              old list is true of the brand rather than the website, so it is stated as
+              that instead of being deleted.
+            */}
             <p style={bodyStyle}>
-              When you interact with Healthy Jewelry, we may collect the following information:
+              <strong>This website</strong> collects only the following:
             </p>
             <ul style={listStyle}>
               <li>
-                <strong>Identity data:</strong> your name as provided during checkout or contact.
+                <strong>Contact data:</strong> the name, email address and message you send
+                through the contact form. Nothing else on this site asks for a name.
               </li>
               <li>
-                <strong>Contact data:</strong> email address, phone number (if provided).
-              </li>
-              <li>
-                <strong>Order data:</strong> items purchased, order amounts, delivery address,
-                payment method type (we do not store full card numbers).
-              </li>
-              <li>
-                <strong>Technical data:</strong> IP address, browser type, pages visited, referring
-                URL, time on site.
-              </li>
-              <li>
-                <strong>Communication data:</strong> messages you send us via the contact form or
-                email.
+                <strong>Technical data:</strong> IP address, browser type, pages visited,
+                referring URL, time on site. Your IP address is also used, hashed and
+                short-lived, to rate-limit the contact form and site search against abuse.
               </li>
             </ul>
+            <p style={bodyStyle}>
+              There is no cart, no checkout and no account on this site, so it holds no order
+              history, no delivery address and no payment details of any kind.
+            </p>
+            <p style={bodyStyle}>
+              <strong>Separately, when you arrange a piece with an ambassador</strong>,
+              Healthy Jewelry holds what that arrangement requires: your name, the piece, the
+              amount agreed, a delivery address, and the method of payment — never full card
+              numbers, which are handled by the payment provider and never reach us.
+            </p>
             <p style={bodyStyle}>
               We do not collect sensitive personal data such as national ID numbers, health records,
               or biometric data.
@@ -113,12 +130,12 @@ export default function PrivacyPage() {
             <p style={bodyStyle}>We use your data for the following purposes:</p>
             <ul style={listStyle}>
               <li>
-                <strong>Order fulfillment:</strong> to process, pack, and ship your order and send
-                order confirmation emails.
+                <strong>Fulfilment:</strong> to pack, ship and confirm a piece you have
+                arranged with an ambassador. Nothing on this website initiates this.
               </li>
               <li>
-                <strong>Customer service:</strong> to respond to your inquiries and resolve any
-                issues with your order.
+                <strong>Customer service:</strong> to respond to your enquiries and resolve
+                any issues with a piece you hold.
               </li>
               <li>
                 <strong>Marketing communications:</strong> to send you updates about new products,
@@ -134,24 +151,36 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p style={bodyStyle}>
-              We do not sell your personal data to third parties. We may share data with trusted
-              service providers (shipping carriers, payment processors, email platforms) solely to
-              operate our business. These providers are contractually bound to protect your data.
+              We do not sell your personal data to third parties. We may share data with
+              trusted service providers — shipping carriers and payment processors for a
+              piece you have arranged, and an email platform for the contact form — solely to
+              operate our business. These providers are contractually bound to protect your
+              data.
             </p>
           </div>
 
           {/* 3. Cookies */}
           <div>
             <h2 style={sectionHeadStyle}>Cookies</h2>
+            {/*
+              The session-cookie example was "maintaining your shopping cart". There is no
+              cart: `src/store/` and the persisted bag went with the commerce UI in PR #82,
+              and `/cart` answers 308. Naming a cookie's purpose that does not exist makes
+              the whole list unverifiable — a reader has no way to tell which of the two
+              entries is current.
+            */}
             <p style={bodyStyle}>We use two types of cookies:</p>
             <ul style={listStyle}>
               <li>
-                <strong>Session cookies:</strong> essential for site functionality such as
-                maintaining your shopping cart. These expire when you close your browser.
+                <strong>Session cookies:</strong> essential for site functionality, such as
+                remembering whether you have answered the analytics consent prompt. These
+                expire when you close your browser. Nothing on this site keeps a basket, a
+                saved list or a signed-in session, because none of those exist here.
               </li>
               <li>
-                <strong>Analytics cookies:</strong> used to understand aggregate traffic patterns.
-                These do not identify you personally. You may opt out via your browser settings or a
+                <strong>Analytics cookies:</strong> used to understand aggregate traffic
+                patterns. These do not identify you personally, and nothing is sent until you
+                have opted in. You may opt out at any time via your browser settings or the
                 cookie preference tool.
               </li>
             </ul>

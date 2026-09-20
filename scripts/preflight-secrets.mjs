@@ -49,11 +49,24 @@ import fs from 'node:fs'
  * the state this script exists to make impossible for *missing* secrets and could not
  * see about itself.
  */
+/*
+ * `SHOPIFY_STOREFRONT_ACCESS_TOKEN` and `SHOPIFY_ADMIN_ACCESS_TOKEN` were here until
+ * 2026-09-20, and both are gone because nothing in this workflow reads them any more.
+ *
+ * They fed `verify-production.mjs`'s seventeen live checks, which WS-6 replaced with
+ * `verify-browse-only.mjs` — a check that needs no credential at all. The Admin token had
+ * the widest blast radius of the two and was the one that caused the fourteen-day
+ * regression ADR 026 records: it held the wrong kind of token, the preflight failed, and
+ * twelve checks that never read it were skipped.
+ *
+ * Removing a name from this list narrows what CI asks for, which is the direction WS-7
+ * wants: every credential a workflow can still name is one a revocation has to account
+ * for. `preflight-enumeration.test.ts` reconciles this map against the workflow's argument
+ * list in both directions, so a name left here with no caller fails the gate.
+ */
 export const WHERE = {
   PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
   SHOPIFY_STORE_DOMAIN: 'y0k9ve-q1.myshopify.com',
-  SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'copy the value already working in Vercel',
-  SHOPIFY_ADMIN_ACCESS_TOKEN: 'Shopify Admin → Apps → your custom app (read scopes only)',
   SHOPIFY_WEBHOOK_SECRET: 'Shopify Admin → Settings → Notifications (see ADR 001)',
 }
 
@@ -79,21 +92,22 @@ export const EXPECTED_MARKER = 'environment'
  * @type {Record<string, { wrong: (v: string) => boolean, explain: string }>}
  */
 export const SHAPE_RULES = {
-  SHOPIFY_STOREFRONT_ACCESS_TOKEN: {
-    wrong: (v) => v.startsWith('shpat_'),
-    explain:
-      'starts with "shpat_", which is Shopify\'s ADMIN API token format. A Storefront\n' +
-      '    token is 32 hex characters (headless channel / Online Store) or starts with\n' +
-      '    "shpca_" (a custom app\'s private delegate token). The Storefront API rejects an\n' +
-      '    Admin token with an empty-message UNAUTHORIZED, which reads as an outage.\n' +
-      '    Get the right one: Admin → Sales channels → Headless → Storefront API access token.',
-  },
-  SHOPIFY_ADMIN_ACCESS_TOKEN: {
-    wrong: (v) => !v.startsWith('shpat_'),
-    explain:
-      'does not start with "shpat_". Admin API tokens always do. This is the same swap as\n' +
-      '    above in the other direction — likely a Storefront token in the Admin slot.',
-  },
+  /*
+   * The two token rules stood here — `SHOPIFY_STOREFRONT_ACCESS_TOKEN` rejecting a value
+   * starting `shpat_`, and `SHOPIFY_ADMIN_ACCESS_TOKEN` rejecting one that does not. They
+   * were the sharpest rules in the file and they described the defect that motivated it:
+   * Shopify issues two tokens from the same admin area with similar names, the Storefront
+   * slot held the Admin one, and the Storefront API answered with an empty-message
+   * UNAUTHORIZED that read as an outage.
+   *
+   * Both are gone with the credentials. `preflight-enumeration.test.ts` enforces that a
+   * shape rule can only exist for a secret the preflight is actually given — a rule for a
+   * name nobody passes is a message that can never print, which is indistinguishable from
+   * a rule that was silently dropped.
+   *
+   * If either credential returns, its rule returns with it. The reasoning is preserved in
+   * ADR 026 and in git history rather than as an unreachable branch here.
+   */
   SHOPIFY_STORE_DOMAIN: {
     wrong: (v) => v.includes('/') || v.includes(':') || !v.endsWith('.myshopify.com'),
     explain:
@@ -152,9 +166,22 @@ export function malformedSecrets(required, env) {
  *
  * @type {Record<string, string[]>}
  */
+/**
+ * One capability, and that is the whole point.
+ *
+ * `storefront` was the other — `verify-production.mjs`'s checks, needing
+ * `SHOPIFY_STOREFRONT_ACCESS_TOKEN`. Its replacement, `verify-browse-only.mjs`, needs
+ * nothing: `PRODUCTION_SITE_URL` when set, otherwise the apex read out of
+ * `src/config/site.ts`. A check with no credential has no capability to gate on, so its
+ * step carries no `if:` beyond `always()` and **cannot be silenced by an empty secret**.
+ *
+ * That is not a detail. Emptying the five secrets on `production-readonly` on 2026-09-19
+ * took `storefrontReady` to false, skipped the step, and made run #155 report `success`
+ * while checking nothing (ADR 033, issue #81). The tier had no way back that did not go
+ * through a console. Now the only step that can skip is the webhook probe, which survives
+ * exactly as long as the Shopify webhook subscriptions do — WS-7 removes both together.
+ */
 export const CAPABILITIES = {
-  /** `verify-production.mjs` — the storefront, cart, metadata, SEO and rate-limit checks. */
-  storefront: ['PRODUCTION_SITE_URL', 'SHOPIFY_STORE_DOMAIN', 'SHOPIFY_STOREFRONT_ACCESS_TOKEN'],
   /** `verify-webhook-secret.mjs` — signs a probe and lets the deployed route judge it. */
   webhook: ['PRODUCTION_SITE_URL', 'SHOPIFY_STORE_DOMAIN', 'SHOPIFY_WEBHOOK_SECRET'],
 }

@@ -226,17 +226,11 @@ describe('writeStepOutputs', () => {
  * wrong. Rejecting an unfamiliar-but-working credential would be the worse failure.
  */
 describe('malformed secrets', () => {
-  const SHAPED = [
-    'PRODUCTION_SITE_URL',
-    'SHOPIFY_STORE_DOMAIN',
-    'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
-    'SHOPIFY_ADMIN_ACCESS_TOKEN',
-  ]
+  const SHAPED = ['PRODUCTION_SITE_URL', 'SHOPIFY_STORE_DOMAIN']
   const goodShapes = {
     PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
     SHOPIFY_STORE_DOMAIN: 'y0k9ve-q1.myshopify.com',
-    SHOPIFY_STOREFRONT_ACCESS_TOKEN: '0123456789abcdef0123456789abcdef',
-    SHOPIFY_ADMIN_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+    SHOPIFY_WEBHOOK_SECRET: 'a-webhook-secret',
     [SOURCE_MARKER]: EXPECTED_MARKER,
   }
 
@@ -246,26 +240,22 @@ describe('malformed secrets', () => {
     expect(ok).toBe(true)
   })
 
-  it('catches an Admin token in the storefront slot — the actual outage', () => {
-    const { ok, state, malformed, lines } = preflight(SHAPED, {
-      ...goodShapes,
-      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
-    })
-
-    expect(malformed).toEqual(['SHOPIFY_STOREFRONT_ACCESS_TOKEN'])
-    expect(state).toBe('misconfigured')
-    expect(ok).toBe(false)
-    // The message has to name the fix, not just the fault.
-    expect(lines.join('\n')).toContain('Headless')
-  })
-
-  it('catches the same swap in the other direction', () => {
-    const { malformed } = preflight(SHAPED, {
-      ...goodShapes,
-      SHOPIFY_ADMIN_ACCESS_TOKEN: '0123456789abcdef0123456789abcdef',
-    })
-    expect(malformed).toEqual(['SHOPIFY_ADMIN_ACCESS_TOKEN'])
-  })
+  /*
+   * `catches an Admin token in the storefront slot — the actual outage` and its mirror
+   * stood here, and they were the two sharpest tests in this file: they pinned the exact
+   * swap that made every fetcher fall back silently while the live site served a static
+   * catalogue whose placeholder variant IDs made checkout refuse.
+   *
+   * Both went with their subject. WS-6 removed `verify-production.mjs`, the only consumer
+   * of either token, so neither is passed to the preflight any more and
+   * `preflight-enumeration.test.ts` requires a shape rule to name a secret the preflight is
+   * actually given. A rule for a name nobody passes is a message that can never print.
+   *
+   * The two rules that remain below cover the two credentials that survive, and they are
+   * the same kind of inverse test: they fire only on a value that is definitely wrong.
+   * ADR 026 keeps the reasoning; ADR 035 is why this is a removal with a note rather than a
+   * quietly shorter file.
+   */
 
   it('rejects a store domain carrying a scheme, which builds an unresolvable URL', () => {
     const { malformed } = preflight(SHAPED, {
@@ -286,16 +276,16 @@ describe('malformed secrets', () => {
   it('stays quiet about shape when the variable is absent — that is the missing case', () => {
     const { missing, malformed } = preflight(SHAPED, {
       ...goodShapes,
-      SHOPIFY_STOREFRONT_ACCESS_TOKEN: undefined,
+      SHOPIFY_STORE_DOMAIN: undefined,
     })
-    expect(missing).toEqual(['SHOPIFY_STOREFRONT_ACCESS_TOKEN'])
+    expect(missing).toEqual(['SHOPIFY_STORE_DOMAIN'])
     expect(malformed).toEqual([])
   })
 
   it('still reports isolation alongside a malformed value, rather than one at a time', () => {
     const { lines } = preflight(SHAPED, {
       ...goodShapes,
-      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_EXAMPLE-NOT-A-REAL-TOKEN',
+      SHOPIFY_STORE_DOMAIN: 'https://y0k9ve-q1.myshopify.com',
       [SOURCE_MARKER]: undefined,
     })
     const text = lines.join('\n')
@@ -323,20 +313,22 @@ describe('malformed secrets', () => {
  * [ADR 026](../../../docs/adr/026-a-capability-is-not-a-verdict.md).
  */
 describe('capabilities are computed per check, not per setup', () => {
-  /** The five secrets, in the exact state issue #24 reports: one Admin token of the wrong kind. */
+  /**
+   * The environment in the exact state issue #24 reports — an Admin token of the wrong
+   * kind — carried forward deliberately even though that token is no longer passed to the
+   * preflight.
+   *
+   * It is the fixture that proves the rule *generalises*: a stray credential in the
+   * environment must not disable a capability that does not name it. Deleting it when the
+   * token left would have taken the evidence with the credential and left the principle
+   * asserted by nothing.
+   */
   const PRODUCTION_TODAY = {
     PRODUCTION_SITE_URL: 'https://healthyjewellery.com',
     SHOPIFY_STORE_DOMAIN: 'y0k9ve-q1.myshopify.com',
-    SHOPIFY_STOREFRONT_ACCESS_TOKEN: '0123456789abcdef0123456789abcdef',
     SHOPIFY_ADMIN_ACCESS_TOKEN: 'shpca_not_an_admin_token',
     SHOPIFY_WEBHOOK_SECRET: 'a-webhook-secret',
   }
-
-  it('the wrong Admin token does not disable the storefront checks', () => {
-    // The finding, as a test. Twelve checks were skipped for fourteen days by a credential
-    // none of them reads.
-    expect(capabilities('misconfigured', PRODUCTION_TODAY).storefront).toBe(true)
-  })
 
   it('the wrong Admin token does not disable the webhook probe either', () => {
     // It signs a payload with SHOPIFY_WEBHOOK_SECRET and lets the deployed route judge it.
@@ -353,12 +345,13 @@ describe('capabilities are computed per check, not per setup', () => {
     }
   })
 
-  it('a malformed Storefront token does disable the storefront checks', () => {
-    // The half that must not weaken. A Storefront slot holding an Admin token is the exact
-    // swap that made every fetcher fall back silently, and it must still stop the run.
-    const swapped = { ...PRODUCTION_TODAY, SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'shpat_admin_token' }
-    expect(capabilities('misconfigured', swapped).storefront).toBe(false)
-    expect(capabilities('misconfigured', swapped).webhook).toBe(true)
+  it('a malformed credential the capability names does disable it', () => {
+    // The half that must not weaken. This used to be the Storefront slot holding an Admin
+    // token — the exact swap that made every fetcher fall back silently. The store domain
+    // is what remains: it is interpolated straight into a URL, so a scheme in it produces
+    // a request that fails to resolve rather than a readable configuration error.
+    const swapped = { ...PRODUCTION_TODAY, SHOPIFY_STORE_DOMAIN: 'https://y0k9ve-q1.myshopify.com' }
+    expect(capabilities('misconfigured', swapped).webhook).toBe(false)
   })
 
   it('a missing credential disables only the capabilities that need it', () => {
@@ -366,7 +359,6 @@ describe('capabilities are computed per check, not per setup', () => {
     delete (withoutWebhookSecret as Partial<typeof PRODUCTION_TODAY>).SHOPIFY_WEBHOOK_SECRET
     const ready = capabilities('misconfigured', withoutWebhookSecret)
     expect(ready.webhook).toBe(false)
-    expect(ready.storefront).toBe(true)
   })
 
   it('nothing is capable when nothing is configured', () => {
@@ -377,8 +369,7 @@ describe('capabilities are computed per check, not per setup', () => {
   })
 
   it('a fully valid setup is capable of everything', () => {
-    const good = { ...PRODUCTION_TODAY, SHOPIFY_ADMIN_ACCESS_TOKEN: 'shpat_a_real_admin_token' }
-    const ready = capabilities('ready', good)
+    const ready = capabilities('ready', PRODUCTION_TODAY)
     expect(Object.values(ready).every((v) => v === true)).toBe(true)
   })
 
@@ -388,6 +379,6 @@ describe('capabilities are computed per check, not per setup', () => {
     // fails the preflight, so nothing about it goes quiet; it just no longer vetoes checks.
     const ready = capabilities('misconfigured', PRODUCTION_TODAY)
     expect(PRODUCTION_TODAY).not.toHaveProperty(SOURCE_MARKER)
-    expect(ready.storefront).toBe(true)
+    expect(ready.webhook).toBe(true)
   })
 })

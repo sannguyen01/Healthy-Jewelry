@@ -1,107 +1,48 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductDetail } from '@/components/product/ProductDetail'
-import type { HJProduct } from '@/lib/catalog/types'
+import { makeProduct } from '@/tests/support/catalogFixtures'
 
-const money = (amount: string) => ({ amount, currencyCode: 'USD' })
+const ringProduct = makeProduct({ badge: 'bestseller' })
 
-const ringProduct: HJProduct = {
-  id: 'hj-001',
-  defaultVariantId: 'gid://shopify/ProductVariant/hj-001-size-5',
-  handle: 'arc-band-titanium',
-  title: 'Arc Band',
-  collection: 'rings',
-  material: 'titanium',
-  tags: ['rings', 'titanium', 'bestseller'],
-  price: '89.00',
-  compareAtPrice: null,
-  currencyCode: 'USD',
-  badge: 'Bestseller',
-  description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
-  spec: '2 mm · 1.8 g',
-  svgType: 'ring-arc',
-  featuredImage: null,
-  images: [],
-  variants: ['5', '6', '7', '8', '9', '10', '11', '12'].map((size) => ({
-    id: `gid://shopify/ProductVariant/hj-001-size-${size}`,
-    title: size,
-    price: money('89.00'),
-    compareAtPrice: null,
-    currencyCode: 'USD',
-    availableForSale: true,
-    selectedOptions: [{ name: 'Size', value: size }],
-  })),
-}
-
-const earringProduct: HJProduct = {
-  id: 'hj-009',
-  defaultVariantId: 'gid://shopify/ProductVariant/hj-009-default',
+const earringProduct = makeProduct({
   handle: 'disc-studs-titanium',
   title: 'Disc Studs',
   collection: 'earrings',
-  material: 'titanium',
-  tags: ['earrings', 'titanium'],
-  price: '68.00',
-  compareAtPrice: null,
-  currencyCode: 'USD',
-  badge: null,
   description: 'Flat disc studs on implant-grade titanium posts.',
-  spec: 'Disc 8 mm · post 6 mm',
-  svgType: 'earring-stud',
-  featuredImage: null,
-  images: [],
-  variants: [
-    {
-      id: 'gid://shopify/ProductVariant/hj-009-default',
-      title: 'Default',
-      price: money('68.00'),
-      compareAtPrice: null,
-      availableForSale: true,
-      selectedOptions: [],
-    },
-  ],
-}
+  specification: 'Disc 8 mm · post 6 mm',
+  sizes: [],
+  media: { kind: 'illustration', svgType: 'earring-stud' },
+})
 
-const braceletProduct: HJProduct = {
-  id: 'hj-013',
-  defaultVariantId: 'gid://shopify/ProductVariant/hj-013-size-XS',
+const braceletProduct = makeProduct({
   handle: 'cable-cuff-titanium',
   title: 'Cable Cuff',
   collection: 'bracelets',
-  material: 'titanium',
-  tags: ['bracelets'],
-  price: '168.00',
-  compareAtPrice: null,
-  currencyCode: 'USD',
-  badge: null,
   description: 'Twisted titanium cable cuff.',
-  spec: '2.5 mm cable · 160 mm',
-  svgType: 'bracelet-cuff',
-  featuredImage: null,
-  images: [],
-  variants: ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)'].map((size) => ({
-    id: `gid://shopify/ProductVariant/hj-013-size-${size.slice(0, size.indexOf(' '))}`,
-    title: size,
-    price: money('168.00'),
-    compareAtPrice: null,
-    currencyCode: 'USD',
-    availableForSale: true,
-    selectedOptions: [{ name: 'Size', value: size }],
-  })),
-}
+  specification: '2.5 mm cable · 160 mm',
+  sizes: ['XS (155mm)', 'S (165mm)', 'M (175mm)', 'L (185mm)', 'XL (195mm)'],
+  media: { kind: 'illustration', svgType: 'bracelet-cuff' },
+})
 
 /**
- * No cart-store reset here any more.
+ * No cart-store reset here any more, and no product literals either.
  *
  * This file used to reset `useCartStore` before every test because a third of them
  * clicked Add to Bag and asserted on what landed in the bag. That control has been
  * removed, so none of them do — and a `beforeEach` maintaining state nothing reads is
  * how a fixture outlives the thing it was for.
  *
- * What survives is what the page still shows: title, price, description, spec, material
- * name, badge, compare-at price, the size picker, the Sold Out badge and the trust
- * signals. The sold-out *button* assertions went with the button; the sold-out *badge*
- * assertion stayed, because the badge is still rendered.
+ * The three products were then twenty-line `HJProduct` literals carrying `price`,
+ * `compareAtPrice`, `currencyCode`, `defaultVariantId` and a `variants` array with
+ * `availableForSale` on each entry — five commerce fields feeding assertions about a
+ * page that sells nothing. They are now three overrides on the shared catalogue fixture,
+ * so what each test varies is the line it varies.
+ *
+ * What survives is what the page still shows: title, description, spec, material label,
+ * badge, the size picker and the trust signals. The price block and the Sold Out badge
+ * went with the data that produced them, and their absence is asserted below rather than
+ * left implicit.
  */
 
 describe('ProductDetail', () => {
@@ -110,11 +51,6 @@ describe('ProductDetail', () => {
       render(<ProductDetail product={ringProduct} />)
       const h1 = screen.getByRole('heading', { level: 1 })
       expect(h1.textContent).toBe('Arc Band')
-    })
-
-    it('renders formatted price', () => {
-      render(<ProductDetail product={ringProduct} />)
-      expect(screen.getByText('$89.00')).toBeTruthy()
     })
 
     it('renders product description', () => {
@@ -127,18 +63,36 @@ describe('ProductDetail', () => {
       expect(screen.getByText('2 mm · 1.8 g')).toBeTruthy()
     })
 
-    it('renders full material name for titanium', () => {
+    /**
+     * The material line reads `materialLabel` off the record now, not a lookup table
+     * keyed on `material`. These three cases used to prove the table had three rows;
+     * they now prove the published label reaches the page unaltered, which is the claim
+     * that actually matters — `schema.ts` keeps handle and label as separate fields
+     * precisely so a metallurgy claim lives in content rather than in a component.
+     */
+    it('renders the published material label for titanium', () => {
       render(<ProductDetail product={ringProduct} />)
       expect(screen.getByText('Grade 23 Titanium')).toBeTruthy()
     })
 
-    it('renders full material name for niobium', () => {
-      render(<ProductDetail product={{ ...ringProduct, material: 'niobium' }} />)
+    it('renders the published material label for niobium', () => {
+      render(
+        <ProductDetail
+          product={makeProduct({ material: 'niobium', materialLabel: 'Niobium' })}
+        />
+      )
       expect(screen.getByText('Niobium')).toBeTruthy()
     })
 
-    it('renders full material name for surgical-steel', () => {
-      render(<ProductDetail product={{ ...ringProduct, material: 'surgical-steel' }} />)
+    it('renders the published material label for surgical steel', () => {
+      render(
+        <ProductDetail
+          product={makeProduct({
+            material: 'surgical-steel',
+            materialLabel: '316L Surgical Steel',
+          })}
+        />
+      )
       expect(screen.getByText('316L Surgical Steel')).toBeTruthy()
     })
 
@@ -160,19 +114,39 @@ describe('ProductDetail', () => {
     })
   })
 
-  describe('compare at price', () => {
-    it('renders compareAtPrice when present', () => {
-      render(
-        <ProductDetail product={{ ...ringProduct, compareAtPrice: '130.00', badge: 'Sale' }} />
-      )
-      expect(screen.getByText('$130.00')).toBeTruthy()
+  /**
+   * **What a page that sells nothing must not say.**
+   *
+   * These replace `renders formatted price`, `renders compareAtPrice when present` and
+   * `does not render compareAtPrice when null`. All three described a page with an Add
+   * to Bag button; PR #75 removed the button and left the number, so for a window the
+   * detail page quoted a price against no way to pay it.
+   *
+   * Asserted as an absence over the whole rendered subtree, because a price that comes
+   * back somewhere new — a tooltip, a meta line, a badge — is the same defect in a
+   * different element, and an assertion naming one element would miss it.
+   */
+  describe('no price and nothing purchasable', () => {
+    it('renders no currency symbol anywhere', () => {
+      const { container } = render(<ProductDetail product={ringProduct} />)
+      expect(container.textContent ?? '').not.toMatch(/[$€£¥₫]/)
     })
 
-    it('does not render compareAtPrice when null', () => {
+    it('renders no Add to Bag control', () => {
       render(<ProductDetail product={ringProduct} />)
-      const prices = screen.getAllByText(/\$89\.00/)
-      expect(prices.length).toBeGreaterThanOrEqual(1)
-      expect(screen.queryByText('$130.00')).toBeNull()
+      expect(screen.queryByRole('button', { name: /add to bag|add to cart|buy/i })).toBeNull()
+    })
+
+    it('renders no Sold Out claim, because nothing can check stock', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.queryByText('Sold Out')).toBeNull()
+    })
+
+    it('does not surface the availability state as customer-facing copy', () => {
+      // `availability` is the honest field and it is not rendered here yet. When it is,
+      // this assertion is the one to change — deliberately, in the same diff.
+      render(<ProductDetail product={makeProduct({ availability: 'discontinued' })} />)
+      expect(screen.queryByText(/discontinued|ask-an-ambassador|made-to-order/i)).toBeNull()
     })
   })
 
@@ -194,21 +168,23 @@ describe('ProductDetail', () => {
     })
 
     it('does not show size picker for necklaces', () => {
-      const necklaceProduct = { ...earringProduct, collection: 'necklaces' as const }
-      render(<ProductDetail product={necklaceProduct} />)
+      render(<ProductDetail product={makeProduct({ collection: 'necklaces', sizes: [] })} />)
       expect(screen.queryByText('US Ring Size')).toBeNull()
     })
   })
 
-  describe('sold out', () => {
-    it('shows the Sold Out badge instead of the promotional badge when every variant is unavailable', () => {
-      const soldOutRing = {
-        ...ringProduct,
-        variants: ringProduct.variants.map((v) => ({ ...v, availableForSale: false })),
-      }
-      render(<ProductDetail product={soldOutRing} />)
-      expect(screen.getByText('Sold Out')).toBeTruthy()
-      expect(screen.queryByText('Bestseller')).toBeNull()
+  /**
+   * An empty `specification` used to render a blank uppercase line with its own margins,
+   * so the layout showed a gap where a measurement should be. The catalogue schema
+   * declares `.min(1)`, so an empty spec cannot be stored — but the guard stays in the
+   * component and so does this test, because the two protect against different things:
+   * the schema stops the empty string being authored, and the guard stops whitespace
+   * that passes `.min(1)` from rendering a gap.
+   */
+  describe('specification guard', () => {
+    it('renders nothing for a whitespace-only specification', () => {
+      render(<ProductDetail product={makeProduct({ specification: '   ' })} />)
+      expect(screen.queryByText('2 mm · 1.8 g')).toBeNull()
     })
   })
 
