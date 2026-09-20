@@ -162,9 +162,21 @@ describe('the workflow consumes the capabilities the preflight emits', () => {
   }
   const steps = Object.values(workflow.jobs ?? {}).flatMap((job) => job.steps ?? [])
 
-  /** The steps that reach production, keyed by the capability each one needs. */
+  /**
+   * The steps that reach production **and need a credential to do it**, keyed by the
+   * capability each one needs.
+   *
+   * `storefront: 'storefrontReady'` was the first entry and is gone with the step. Its
+   * replacement, `Browse-only catalogue`, reaches production too — and needs nothing, so it
+   * has no capability, no gate, and nothing for these assertions to check. That absence is
+   * asserted where it belongs, in `smoke-liveness.test.ts`, which requires that step's `if:`
+   * to stay exactly `always()`: a gate added there would re-arm the failure ADR 033 records.
+   *
+   * One entry left, and it leaves with the webhook subscriptions in WS-7. When it does,
+   * this whole describe block goes with it rather than being emptied — an enumeration with
+   * no members is not a check.
+   */
   const LIVE_STEPS: Record<string, string> = {
-    storefront: 'storefrontReady',
     webhook: 'webhookReady',
   }
 

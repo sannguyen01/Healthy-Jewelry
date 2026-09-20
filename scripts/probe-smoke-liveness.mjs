@@ -65,7 +65,26 @@ const WORKFLOW = 'production-smoke.yml'
  *
  * See docs/adr/026-a-capability-is-not-a-verdict.md.
  */
-export const REQUIRED_STEPS = ['Live store and storefront']
+/**
+ * **`Browse-only catalogue`, not `Live store and storefront`.**
+ *
+ * The step this keys on was renamed and re-founded in WS-6. The old one ran
+ * `verify-production.mjs`, whose seventeen checks all needed a Shopify credential — which
+ * is precisely how this tier went dark: the five secrets on `production-readonly` were
+ * emptied between run #154 and run #155 on 2026-09-19, `storefrontReady` went false, and
+ * the step reported `skipped` thereafter. From outside, a skipped step is indistinguishable
+ * from a passing one, which is what the `stopped` verdict below exists to say (ADR 033).
+ *
+ * Its replacement needs **no credential at all** — `PRODUCTION_SITE_URL` when set,
+ * otherwise the apex read out of `src/config/site.ts` — so it has no capability gate and
+ * cannot skip. That is not a smaller check, it is a check that cannot be silenced by a
+ * console action nobody in CI can perform.
+ *
+ * Keying on it rather than on the webhook step is deliberate for the same reason the old
+ * value was a single name: the webhook step still gates on `webhookReady`, so requiring it
+ * would reintroduce exactly the credential dependency this rename removes.
+ */
+export const REQUIRED_STEPS = ['Browse-only catalogue']
 
 /**
  * Re-exported so this probe's public surface is unchanged by the extraction. The reasoning

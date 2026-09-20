@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { resolve, join } from 'node:path'
 import { shopifyPublicConfig } from '@/config/shopify-public'
 import {
   reportApiVersionDrift,
@@ -95,24 +95,62 @@ describe('Shopify API version contract', () => {
 
   /**
    * The failure that started this: a literal spelled out in a second file, drifting
-   * unnoticed. `verify-production.mjs` must *import* the version, never re-declare
-   * it — so the source is scanned, not just compared.
+   * unnoticed. A script must *import* the version, never re-declare it — so the sources
+   * are scanned, not just compared.
+   *
+   * **Every script, not one named file.** This read `scripts/verify-production.mjs` alone,
+   * because that is where the drifted copy was. WS-6 deleted that script, which would have
+   * turned this into an ENOENT — and the obvious repair, pointing it at whichever file
+   * inherited the check, would have rebuilt the same narrow rule one file over. That is the
+   * second time a guardrail here was scoped to its discoverer rather than to its invariant
+   * (`cache-tag-contract` was the first), which is why the rule is now "scan everything and
+   * exempt explicitly" (ADR 007, ADR 035).
    *
    * Comments are stripped first. `audit-workflow-secrets.mjs` learned this the
    * expensive way: its first grep-based pass reported a secret name that came from a
    * comment documenting an anti-pattern, and **a tool that reports phantoms teaches
    * its reader to skim.** The history of this very bug is written in the comments of
-   * the file under test, so scanning them would fail permanently for the wrong reason.
+   * the files under test, so scanning them would fail permanently for the wrong reason.
    *
    * Stripping cannot be allowed to blind the scan, which is what `stripComments`'s own
    * tests below are for.
    */
+  const SCRIPTS_DIR = resolve(__dirname, '../../../scripts')
+
+  /** The one file allowed to spell the version out: the declaration itself. */
+  const DECLARATION = 'lib/api-version.mjs'
+
+  function scriptFiles(dir: string, prefix = ''): string[] {
+    const out: string[] = []
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry)
+      const rel = prefix ? `${prefix}/${entry}` : entry
+      if (statSync(full).isDirectory()) out.push(...scriptFiles(full, rel))
+      else if (entry.endsWith('.mjs')) out.push(rel)
+    }
+    return out
+  }
+
+  it('finds scripts to scan', () => {
+    // An empty walk would make the assertion below vacuously green — the failure this
+    // repository keeps shipping, and the reason every sweep here asserts non-emptiness.
+    expect(scriptFiles(SCRIPTS_DIR).length).toBeGreaterThan(5)
+  })
+
   it('no script hardcodes a version literal instead of importing it', () => {
-    const source = readFileSync(
-      resolve(__dirname, '../../../scripts/verify-production.mjs'),
-      'utf8',
-    )
-    expect(findVersionLiterals(stripComments(source))).toEqual([])
+    const offenders: string[] = []
+    for (const rel of scriptFiles(SCRIPTS_DIR)) {
+      if (rel === DECLARATION) continue
+      const found = findVersionLiterals(stripComments(readFileSync(join(SCRIPTS_DIR, rel), 'utf8')))
+      if (found.length > 0) offenders.push(`scripts/${rel}: ${found.join(', ')}`)
+    }
+    expect(
+      offenders,
+      `A script spells a Shopify API version out instead of importing SHOPIFY_API_VERSION ` +
+        `from scripts/lib/api-version.mjs. A second copy of a version literal is exactly ` +
+        `what kept this project pinned to a retired API for seven months (ADR 009):\n  ` +
+        offenders.join('\n  ')
+    ).toEqual([])
   })
 
   it('the retirement date is a parseable instant in the future of the pinned release', () => {

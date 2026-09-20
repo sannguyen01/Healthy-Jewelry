@@ -236,87 +236,55 @@ export function freshnessVerdict(payload, local) {
 }
 
 /**
- * Whether this deployment can talk to Shopify at all.
+ * The deployment is serving the repository's own catalogue, and nothing else.
  *
- * The direct answer to "why is the page showing Dome Ring". Both halves are
- * reported separately because they fail for different reasons and are fixed in
- * different places: the public domain is inlined at build time, while the token
- * is read at runtime.
+ * ## What this replaced, and why both of them inverted
  *
- * @param {VersionPayload} payload
+ * Two verdicts stood here. `shopifyConfigVerdict` returned **fail** with the title
+ * *"Shopify is NOT configured on this deployment"* whenever the store domain or the
+ * Storefront token was missing, because that state meant "every fetcher falls back to the
+ * static catalogue, whose variant IDs are placeholders Shopify rejects — so the site
+ * renders perfectly and checkout cannot start."
+ *
+ * `catalogueSourceVerdict` fetched `/shop` and looked for handles that exist only in the
+ * bundled catalogue. Finding one was **fail**: *"These products have never existed in
+ * Shopify, so nothing on this page can be bought."*
+ *
+ * Both sentences are now descriptions of the intended state.
+ * [ADR 034](../../docs/adr/034-the-catalogue-is-the-source.md) makes
+ * `src/content/catalog/**` the source; there is no fetcher to fall back and no second
+ * catalogue to leak from. A diagnostic that reports the correct configuration as a
+ * failure is worse than no diagnostic — it is a red that teaches its reader to ignore
+ * reds ([ADR 011](../../docs/adr/011-repeated-identical-failures-must-escalate.md)).
+ *
+ * ## What is worth asking instead
+ *
+ * The question the two of them were really asking is *"which catalogue is this deployment
+ * serving?"*, and it survives with the answer inverted: the deployment must serve handles
+ * this repository holds. Checking that needs no handle-list discriminator — the catalogue
+ * is the repository, so `/shop` linking to a product this build knows about is the whole
+ * of it.
+ *
+ * Deliberately *not* re-implemented here as a full sweep: `scripts/verify-browse-only.mjs`
+ * already asks every catalogue handle of the live site, and duplicating it would put two
+ * answers to one question in two files. This is the cheap single-page version a human runs
+ * against an arbitrary URL, which is what `diagnose-deployment.mjs` is for.
+ *
+ * @param {string} html The rendered `/shop` page.
+ * @param {string[]} knownHandles Every handle this build holds.
  * @returns {Verdict}
  */
-export function shopifyConfigVerdict(payload) {
-  if (payload.shopify.configured && payload.build.storeDomainInlined) {
-    return {
-      id: 'shopify-config',
-      level: 'ok',
-      title: 'Shopify is configured on this deployment',
-      detail:
-        `Store domain inlined into the bundle, Storefront token present at runtime, ` +
-        `API version ${payload.shopify.pinnedApiVersion}.`,
-    }
-  }
-
-  const missing = []
-  if (!payload.build.storeDomainInlined) missing.push('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN (bundle)')
-  if (!payload.runtime.storeDomainSet) missing.push('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN (runtime)')
-  if (!payload.shopify.configured) missing.push('SHOPIFY_STOREFRONT_ACCESS_TOKEN')
-
-  return {
-    id: 'shopify-config',
-    level: 'fail',
-    title: 'Shopify is NOT configured on this deployment',
-    detail:
-      `Missing: ${[...new Set(missing)].join(', ')}. Every fetcher falls back to the static ` +
-      'catalogue in src/lib/data/hj-data.ts, whose variant IDs are placeholders Shopify ' +
-      'rejects — so the site renders perfectly and checkout cannot start.',
-    action:
-      'Set the missing variables in Vercel for THIS environment, then redeploy with the ' +
-      'build cache disabled (NEXT_PUBLIC_* is inlined at build time).',
-  }
-}
-
-/**
- * Is the served page reading Shopify, or the bundled fallback catalogue?
- *
- * The one check here that looks at what a customer actually receives. Uses the
- * same discriminator as `verify-production.mjs`: the two catalogues are nearly
- * disjoint, so a handle from one is proof of the other's absence.
- *
- * Absence of a fallback handle is deliberately not treated as success on its own
- * — an empty page has no fallback handles either. Positive proof is required.
- *
- * @param {string} html
- * @param {{ fallbackOnly: readonly string[], shopifyOnly: readonly string[] }} handles
- * @returns {Verdict}
- */
-export function catalogueSourceVerdict(html, handles) {
-  const leaked = handles.fallbackOnly.filter((h) => html.includes(h))
-  const found = handles.shopifyOnly.filter((h) => html.includes(h))
-
-  if (leaked.length > 0) {
-    return {
-      id: 'catalogue-source',
-      level: 'fail',
-      title: 'The page is serving the static fallback catalogue',
-      detail:
-        `Found handles that exist only in src/lib/data/hj-data.ts: ${leaked.join(', ')}. ` +
-        'These products have never existed in Shopify, so nothing on this page can be bought.',
-      action:
-        'Check the Shopify verdict above. If configuration is fine, confirm every product ' +
-        'is published to the headless publication (`pnpm verify:production`).',
-    }
-  }
+export function catalogueSourceVerdict(html, knownHandles) {
+  const found = knownHandles.filter((handle) => html.includes(`/products/${handle}`))
 
   if (found.length === 0) {
     return {
       id: 'catalogue-source',
       level: 'fail',
-      title: 'No Shopify products found on the page',
+      title: 'No catalogue products found on the page',
       detail:
-        'Neither fallback-only nor Shopify-only handles appeared. The absence of fallback ' +
-        'handles is not proof of a successful fetch — an empty catalogue looks identical.',
+        `/shop links to none of this build's ${knownHandles.length} product handles. The ` +
+        'page rendered, so this is not a deploy failure — it is a shelf with nothing on it.',
       action: 'Load /shop by hand and see what it is actually rendering.',
     }
   }
@@ -324,8 +292,8 @@ export function catalogueSourceVerdict(html, handles) {
   return {
     id: 'catalogue-source',
     level: 'ok',
-    title: 'The page is serving live Shopify data',
-    detail: `Found ${found.length} Shopify-only handle(s): ${found.join(', ')}.`,
+    title: "The page is serving this build's catalogue",
+    detail: `/shop links to ${found.length} of ${knownHandles.length} known product handle(s).`,
   }
 }
 

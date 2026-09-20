@@ -116,48 +116,65 @@ jobs:
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
           SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
-          SHOPIFY_STOREFRONT_ACCESS_TOKEN: ${{ secrets.SHOPIFY_STOREFRONT_ACCESS_TOKEN }}
-          SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
           SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
           SMOKE_SECRETS_SOURCE: ${{ vars.SMOKE_SECRETS_SOURCE }}
         run: |
           node scripts/preflight-secrets.mjs \
             PRODUCTION_SITE_URL \
             SHOPIFY_STORE_DOMAIN \
-            SHOPIFY_STOREFRONT_ACCESS_TOKEN \
-            SHOPIFY_ADMIN_ACCESS_TOKEN \
             SHOPIFY_WEBHOOK_SECRET \
             2>&1 | tee preflight.log
 
-      # Catalogue, publishing scope, the real cart → checkoutUrl path, metadata,
-      # search, rate-limit durability, and cache revalidation.
-      # Runs every check even when one fails, so a run reports the whole picture.
-      # `always()` is load-bearing, and its absence cost fourteen days of verification.
+      # ─────────────────────────────────────────────────────────────────────────
+      # THE CHECK THAT NEEDS NO CREDENTIAL, AND WHY THAT IS THE POINT.
       #
-      # An `if:` that names no status function has `success()` implicitly ANDed onto it by
-      # GitHub. So while this read `if: steps.preflight.outputs.configured == 'true'`, a
-      # *failed preflight* skipped it — even though `configured` was 'true' the whole time.
+      # This step replaced `node scripts/verify-production.mjs`, which asked seventeen
+      # questions about a headless Shopify storefront: is the live catalogue Shopify's or
+      # the bundled fallback, does the cart reach a checkoutUrl, is the Storefront token
+      # valid, is the pinned API version still served. Every one of those needed a
+      # credential, and its premise inverted on 2026-09-20: a live site serving the bundled
+      # catalogue is now what the site is *supposed* to do (ADR 034), so its central
+      # discriminator would have reported the correct state as a defect.
       #
-      # The preflight failed because SHOPIFY_ADMIN_ACCESS_TOKEN held the wrong kind of token.
-      # This step needs PRODUCTION_SITE_URL, SHOPIFY_STORE_DOMAIN and the *Storefront* token;
-      # it never reads the Admin one. Twelve of its seventeen checks — including "Live site
-      # serves Shopify data, not the static fallback", the only thing between customers and a
-      # catalogue whose variant IDs Shopify rejects at checkout — were skipped for a
-      # credential they do not use.
+      # It was also, by then, dark. The five secrets on `production-readonly` were emptied
+      # between run #154 and run #155 on 2026-09-19, which took `storefrontReady` to false
+      # and skipped this step — and a skipped step is indistinguishable from a passing one
+      # from outside (ADR 033, issue #81). The tier had no way back without a console
+      # action nobody in CI can perform.
       #
-      # `storefrontReady` says whether *this step's own* credentials are present and
-      # well-formed. The preflight's verdict is unchanged and still fails the run.
-      # See docs/adr/026-a-capability-is-not-a-verdict.md.
-      - name: Live store and storefront
-        id: storefront
-        if: always() && steps.preflight.outputs.storefrontReady == 'true'
+      # `verify-browse-only.mjs` asks the same *shape* of question about the site this
+      # project now serves — every catalogue handle resolves, unknown handles 404, no
+      # Shopify host is referenced, no commerce semantics survive in any page — and it
+      # needs **nothing**. `PRODUCTION_SITE_URL` when set, otherwise the apex read out of
+      # `src/config/site.ts`, which is the same source `probe-canonical-domain.mjs` reads
+      # so that a probe cannot carry its own stale copy of the hostname (ADR 032).
+      #
+      # So it has no `if:` gate at all beyond `always()`. There is no capability for it to
+      # be missing. That is what un-darkens this tier without waiting on anybody.
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Browse-only catalogue
+        id: browseOnly
+        if: always()
         env:
           PRODUCTION_SITE_URL: ${{ secrets.PRODUCTION_SITE_URL }}
-          SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
-          SHOPIFY_STOREFRONT_ACCESS_TOKEN: ${{ secrets.SHOPIFY_STOREFRONT_ACCESS_TOKEN }}
-          SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
-          SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
-        run: node scripts/verify-production.mjs | tee storefront.log
+        run: node scripts/verify-browse-only.mjs | tee browseOnly.log
+
+      # Premises, evaluated where they can still be evaluated.
+      #
+      # This used to happen inside `verify-production.mjs`, at the bottom, after the live
+      # checks. Five of its six premises took Shopify data as input and lost their subject
+      # with the read path; the sixth — the pinned API version's published expiry — is pure
+      # and still matters, because `/api/webhooks/shopify` and `/api/version` both name that
+      # version and survive until WS-7.
+      #
+      # Split into its own step rather than folded into the browse-only check, because they
+      # answer different questions and a reader needs to see which one spoke. A premise is
+      # never a failure: this always exits 0 and always writes `premise-drift.json`, and the
+      # reporting step below decides what reaches a person. See ADR 008 and ADR 035.
+      - name: Premise detectors
+        id: premises
+        if: always()
+        run: node scripts/verify-premises.mjs | tee premises.log
 
       # Separate step, and `if: always()`, because the webhook secret is an
       # independent question. A catalogue problem should not hide a secret
@@ -204,12 +221,13 @@ jobs:
             "completedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "checks": {
               "preflight": "${{ steps.preflight.outcome }}",
-              "storefront": "${{ steps.storefront.outcome }}",
+              "browseOnly": "${{ steps.browseOnly.outcome }}",
+              "premises": "${{ steps.premises.outcome }}",
               "webhook": "${{ steps.webhook.outcome }}"
             },
             "configured": "${{ steps.preflight.outputs.configured }}",
             "capabilities": {
-              "storefront": "${{ steps.preflight.outputs.storefrontReady }}",
+              "browseOnly": "always",
               "webhook": "${{ steps.preflight.outputs.webhookReady }}"
             }
           }
@@ -232,9 +250,10 @@ jobs:
             echo "## Production smoke"
             echo ""
             if [ "${{ steps.preflight.outputs.configured }}" != "true" ]; then
-              echo "**Not configured for live verification.** No secrets are set on the"
-              echo "\`production-readonly\` environment, so this run had nothing to check."
-              echo "It is not a failure and no issue was filed."
+              echo "**No secrets are set on the \`production-readonly\` environment.**"
+              echo "That no longer means this run checked nothing: \`Browse-only catalogue\`"
+              echo "needs no credential and ran anyway. What did not run is the webhook probe,"
+              echo "which signs a payload with \`SHOPIFY_WEBHOOK_SECRET\`."
               echo ""
             fi
 
@@ -245,27 +264,28 @@ jobs:
             # sees three rows; a reader shown "2 of 3 checks did not execute" sees the
             # finding. Same data, and only one of them is read.
             did_not_run=0
-            for outcome in "${{ steps.storefront.outcome }}" "${{ steps.webhook.outcome }}"; do
+            for outcome in "${{ steps.browseOnly.outcome }}" "${{ steps.webhook.outcome }}"; do
               case "$outcome" in success|failure) ;; *) did_not_run=$((did_not_run + 1)) ;; esac
             done
-            if [ "$did_not_run" -gt 0 ] && [ "${{ steps.preflight.outputs.configured }}" = "true" ]; then
+            if [ "$did_not_run" -gt 0 ]; then
               echo "> ⚠ **$did_not_run of 2 live checks did not execute.** A check is skipped"
               echo "> only when its own credentials are missing or malformed — not because"
-              echo "> some other secret is wrong. Storefront ready:"
-              echo "> \`${{ steps.preflight.outputs.storefrontReady }}\`, webhook ready:"
-              echo "> \`${{ steps.preflight.outputs.webhookReady }}\`. See the preflight below."
+              echo "> some other secret is wrong. Browse-only needs none and should never"
+              echo "> skip; webhook ready: \`${{ steps.preflight.outputs.webhookReady }}\`."
+              echo "> See the preflight below."
               echo ""
             fi
 
             echo "| Check | Result |"
             echo "|---|---|"
             echo "| Secrets preflight | ${{ steps.preflight.outcome }} (${{ steps.preflight.outputs.state }}) |"
-            echo "| Live store and storefront | ${{ steps.storefront.outcome }} |"
+            echo "| Browse-only catalogue | ${{ steps.browseOnly.outcome }} |"
+            echo "| Premise detectors | ${{ steps.premises.outcome }} |"
             echo "| Webhook signing secret | ${{ steps.webhook.outcome }} |"
             echo ""
-            # Every log, not just the storefront's. The run that prompted this had
+            # Every log, not just the live check's. The run that prompted this had
             # its whole answer in the preflight output and published none of it.
-            for log in preflight storefront webhook; do
+            for log in preflight browseOnly premises webhook; do
               if [ -s "$log.log" ]; then
                 echo "<details><summary>$log</summary>"
                 echo ""
@@ -287,10 +307,23 @@ jobs:
       # `continue-on-error` because a notification problem must never mask a
       # smoke result or manufacture one.
       #
-      # Gated on `configured` so a store nobody has set up yet cannot generate a
-      # six-hourly "Still failing" comment about a fact its owner already knows.
-      # Partial configuration is still a failure and still files — that is the
-      # state most easily mistaken for a working one.
+      # **No longer gated on `configured`, and that is the correction.**
+      #
+      # It read `failure() && steps.preflight.outputs.configured == 'true'`, so that a store
+      # nobody had set up could not generate a six-hourly "Still failing" comment about a
+      # fact its owner already knows. Sound while every check needed a credential: with none
+      # set, nothing ran, and a run that checked nothing has nothing to report.
+      #
+      # That stopped being true when `Browse-only catalogue` arrived. It needs no credential,
+      # so it runs on a not-configured tier — and under the old gate its failure would have
+      # filed nothing. The five secrets on `production-readonly` were emptied on 2026-09-19,
+      # which is exactly the state in which this would have been silent about a real finding
+      # on the live site. A gate written about *whether anything could run* had become a gate
+      # on *whether a finding reaches anyone*.
+      #
+      # `failure()` alone is the honest condition now. A not-configured preflight exits 0 and
+      # does not fail the run, so nothing here fires on absence; the run goes red only when a
+      # step that actually executed found something.
       #
       # Dedup + escalate, not just comment (ADR 011).
       #
@@ -341,7 +374,7 @@ jobs:
       # See docs/adr/030-an-equivalence-relation-is-the-control.md.
       # ──────────────────────────────────────────────────────────────────────
       - name: Report failure as an issue
-        if: failure() && steps.preflight.outputs.configured == 'true'
+        if: failure()
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -360,7 +393,7 @@ jobs:
             const read = (name) => {
               try { return { name, text: fs.readFileSync(`${name}.log`, 'utf-8') } } catch { return null }
             }
-            const logs = ['preflight', 'storefront', 'webhook'].map(read).filter(Boolean)
+            const logs = ['preflight', 'browseOnly', 'webhook'].map(read).filter(Boolean)
 
             const { data: open } = await github.rest.issues.listForRepo({ ...repo, state: 'open', labels: SMOKE_LABEL })
             const issue = open[0] ?? null
@@ -477,13 +510,25 @@ jobs:
       # Closing on recovery is what keeps the issue meaningful. An alert that
       # only ever opens becomes a list nobody reads.
       #
-      # `configured` is not optional here. A not-configured run *succeeds* — it has
-      # nothing to check — so without this gate it would close an open failure
-      # issue and comment "recovered" having verified precisely nothing. Combined
-      # with the pipefail bug (ADR 010) that is how a broken store would have
-      # retracted its own alarm.
+      # **The gate that survives, and the one that does not.**
+      #
+      # This read `success() && steps.preflight.outputs.configured == 'true'`, because a
+      # not-configured run *succeeded* — it had nothing to check — so without the gate it
+      # would close an open failure issue and comment "recovered" having verified precisely
+      # nothing. Combined with the pipefail bug (ADR 010) that is how a broken store would
+      # have retracted its own alarm.
+      #
+      # The danger is unchanged and the condition that answers it is not. `configured` asks
+      # about credentials; what actually licenses a "recovered" claim is that **the live
+      # check ran and passed**. Those coincided while every check needed a secret. They no
+      # longer do: `Browse-only catalogue` runs on a not-configured tier, and gating on
+      # `configured` would now refuse to close an issue that a green run genuinely resolved.
+      #
+      # So it gates on the step's own outcome. Same protection, asked of the thing that
+      # provides it — which is ADR 026's rule applied to the reporting tier rather than to
+      # the checking one.
       - name: Close the failure issue on recovery
-        if: success() && steps.preflight.outputs.configured == 'true'
+        if: success() && steps.browseOnly.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
