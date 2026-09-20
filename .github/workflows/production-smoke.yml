@@ -97,9 +97,14 @@ jobs:
       # dependency change the merge gate has not seen yet.
 
       # One message naming everything that is missing, before any request goes
-      # out. Without this, `required()` inside verify-production.mjs throws on
-      # the first absent variable, so configuring from scratch costs five
-      # sequential red runs to learn five facts knowable up front.
+      # out. The original reason was `required()` inside verify-production.mjs, which threw
+      # on the first absent variable — so configuring from scratch cost five sequential red
+      # runs to learn five facts knowable up front. That script is gone and the reasoning
+      # survives it: `verify-webhook-secret.mjs` resolves its own inputs and would fail one
+      # at a time in the same way.
+      #
+      # Three variables now, not five. Only the webhook probe needs a credential; the
+      # browse-only check above needs none, which is why it is not represented here at all.
       #
       # It also asserts SMOKE_SECRETS_SOURCE, which is set only on the
       # environment — the marker that distinguishes "isolated" from "green but

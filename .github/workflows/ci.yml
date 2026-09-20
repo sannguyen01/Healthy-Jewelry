@@ -35,10 +35,19 @@ env:
   SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: mock.myshopify.com
   SHOPIFY_WEBHOOK_SECRET: mock_webhook_secret
-  # Set so the build's own configuration warning (src/lib/shopify/env-check.ts)
-  # stays silent here. A CI log that always prints "Shopify is not fully
-  # configured" trains everyone to ignore the one place that would catch a
-  # genuinely unconfigured deploy.
+  # Set for /api/revalidate, which reads it to authenticate a manual purge.
+  #
+  # The reason used to be different and is worth correcting rather than leaving: it was set
+  # so `src/lib/shopify/env-check.ts`'s build-time warning stayed silent, because a CI log
+  # that always prints "Shopify is not fully configured" trains everyone to ignore the one
+  # place that would catch a genuinely unconfigured deploy. That file is gone — the static
+  # catalogue is the source now, so there is no degraded mode to warn about, and
+  # `next.config.ts` throws on a malformed record instead of warning about a missing one.
+  #
+  # All five values above are still read by code that survives: /api/version, /api/revalidate
+  # and /api/webhooks/shopify, which stay until WS-7 deletes the Shopify webhook
+  # subscriptions from Admin. They are mocks. A credential that works has no business being
+  # reachable from a merge gate.
   SHOPIFY_REVALIDATION_SECRET: mock_revalidation_secret
 
 jobs:
