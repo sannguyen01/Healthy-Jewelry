@@ -155,7 +155,9 @@ async function main() {
     )
     return 1
   }
-  console.log(`Checking ${baseUrl}`)
+  // stderr, not stdout: `--json` must emit parseable JSON and nothing else, or every
+  // caller has to strip a preamble. The URL still reaches a human reading the log.
+  console.error(`Checking ${baseUrl}`)
 
   const expectedHandles = handlesIn(PRODUCT_DIR)
   const collections = handlesIn(COLLECTION_DIR)

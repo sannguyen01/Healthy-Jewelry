@@ -507,14 +507,18 @@ commerce semantics, and does the sitemap agree with the repository.
 
 **Pointed at the running application, it returns 52 findings and every one is true:**
 
-| finding | count | whose work |
-|---|---|---|
-| `commerce-offer-jsonld` | 17 | WS-5 |
-| `commerce-price-jsonld` | 17 | WS-5 |
-| `commerce-availability-jsonld` | 17 | WS-5 |
-| `unknown-not-404` | 1 | WS-4 |
+| finding | count at first run | now | whose work |
+|---|---|---|---|
+| `commerce-offer-jsonld` | 17 | **0** | WS-5a — done |
+| `commerce-price-jsonld` | 17 | **0** | WS-5a — done |
+| `commerce-availability-jsonld` | 17 | **0** | WS-5a — done |
+| `unknown-not-404` | 1 | 1 | WS-4 |
 
-That last one is the interesting one, and it is **documented and deliberate today**.
+**52 findings down to 1**, measured against a real production server before and after.
+WS-5a removed the `offers` block from the product JSON-LD; the remaining finding is
+WS-4's.
+
+That last one is **documented and deliberate today**.
 `/products/<unknown>` answers HTTP 200 with `not-found.tsx` rendered and
 `robots: noindex`, because — in the page's own words — "this route cannot use
 `dynamicParams = false` without 404ing products newly added in Shopify". Acceptance
