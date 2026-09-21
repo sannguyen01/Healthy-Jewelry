@@ -98,6 +98,92 @@ export const COMMERCE_MARKERS = [
 ]
 
 /**
+ * The registrable domain, as the last two labels.
+ *
+ * Deliberately not a public-suffix lookup. This repository owns exactly one name and the
+ * only comparison it ever makes is apex-versus-`www` of that name; a PSL would be a
+ * dependency and a data file to keep current in a dependency-free `.mjs`, bought to answer
+ * a question that cannot arise here. The cost of being wrong is bounded and stated: on a
+ * multi-label suffix like `co.uk` this returns `co.uk` and would call two unrelated sites
+ * the same site. Nothing here ever sees one, and if that changes this is the function to
+ * replace rather than the call sites.
+ *
+ * @param {string} host
+ * @returns {string}
+ */
+export function registrableDomain(host) {
+  const labels = String(host).toLowerCase().split('.').filter(Boolean)
+  return labels.slice(-2).join('.')
+}
+
+/**
+ * Do two hostnames belong to the same site?
+ *
+ * @param {string} a
+ * @param {string} b
+ */
+export function sameSite(a, b) {
+  const left = registrableDomain(a)
+  return left !== '' && left === registrableDomain(b)
+}
+
+/**
+ * Is *everything* a redirect to one place?
+ *
+ * **This function exists because the probe it belongs to reported twenty-five findings
+ * about a healthy site.** On 2026-09-20 the apex began answering 307 for every path, and
+ * the sweep dutifully filed `product-not-served` seventeen times, `collection-not-served`
+ * six times, `unknown-not-404` once and `sitemap-unreadable` once — twenty-five rows with
+ * one cause between them, none of which named the destination, because {@link observe}
+ * did not capture `location` and there was nothing to name it with.
+ *
+ * Two failures in one, and the second is the worse:
+ *
+ *   · **Volume.** A reader given twenty-five findings looks for twenty-five problems. The
+ *     same reader given one finding reading "the host hands every path to www" goes to the
+ *     Vercel domain settings, which is where the fix is. Same data; only one of them is
+ *     acted on, which is the argument `production-smoke.yml` already makes about printing
+ *     a sentence before a table.
+ *   · **Direction.** Every one of those rows asserted something false. The products *were*
+ *     served — by `www.healthyjewellery.com`, on the right commit, the whole time. A
+ *     monitor that reports a correct deployment as a broken catalogue is the ADR 011
+ *     failure with the sign flipped: not a control that cannot fail, but one whose failures
+ *     cannot be believed, which gets muted just as fast.
+ *
+ * Uniformity is the test, not a threshold. A *single* product redirecting is a finding
+ * about that product and must keep its own row; every attributable response redirecting to
+ * one host is a fact about the host. There is no middle case worth guessing at — a partial
+ * redirect keeps its per-path rows and the `location` now printed beside each.
+ *
+ * @param {Array<object>} observations
+ * @returns {{ to: string, status: number, count: number } | null}
+ */
+export function uniformRedirect(observations) {
+  const attributable = observations.filter(isAttributable)
+  if (attributable.length === 0) return null
+
+  /** @type {Set<string>} */
+  const targets = new Set()
+  let status = 0
+
+  for (const o of attributable) {
+    if (!(o.status >= 300 && o.status < 400)) return null
+    if (!o.location) return null
+    let target
+    try {
+      target = new URL(o.location, `https://${o.host ?? 'invalid.invalid'}${o.path ?? '/'}`)
+    } catch {
+      return null
+    }
+    targets.add(target.hostname)
+    status = o.status
+  }
+
+  if (targets.size !== 1) return null
+  return { to: [...targets][0], status, count: attributable.length }
+}
+
+/**
  * Turn observations into a verdict.
  *
  * @param {object} input
@@ -105,8 +191,13 @@ export const COMMERCE_MARKERS = [
  * @param {Array<object>} input.observations One per fetched URL.
  * @param {string[] | null} input.sitemapHandles Handles the live sitemap lists, or null when
  *   the sitemap could not be read — which is a finding about the sitemap, not about them.
+ * @param {{ from: string, to: string, status: number, followed: boolean } | null}
+ *   [input.redirect] What the anchor probe found at the base URL, when it found a redirect.
+ *   `followed` says whether the sweep below was re-pointed at `to` — see
+ *   `verify-browse-only.mjs`, which will only ever follow one hop and only within the same
+ *   registrable domain.
  */
-export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles }) {
+export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles, redirect = null }) {
   const findings = []
 
   // Nothing to compare against is a broken probe, not a healthy site. A sweep whose input
@@ -138,6 +229,75 @@ export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles
     }
   }
 
+  // ── The base URL handed its traffic somewhere else ──────────────────────────────────
+  //
+  // Reported before anything else and, when the sweep could not be re-pointed, *instead*
+  // of everything else. See `uniformRedirect` for why: twenty-five rows asserting that a
+  // correctly-served catalogue was missing, none of them naming the destination.
+  if (redirect) {
+    findings.push(
+      sameSite(redirect.from, redirect.to)
+        ? {
+            code: 'canonical-host-redirects',
+            detail:
+              `${redirect.from} answers ${redirect.status} and hands every path to ` +
+              `${redirect.to}. The catalogue may be served perfectly there and this is ` +
+              `still wrong: src/config/site.ts names ${redirect.from} as the canonical ` +
+              `origin, so every absolute URL this application emits — JSON-LD, the OG ` +
+              `card, the sitemap, the canonical link — points at a host that serves ` +
+              `nothing but a redirect. Vercel -> Project -> Settings -> Domains: the ` +
+              `redirect belongs on ${redirect.to}, pointing at ${redirect.from}, and it ` +
+              `should be permanent (308) rather than ${redirect.status}.` +
+              (redirect.followed
+                ? ` The findings below were measured against ${redirect.to}, one hop on, ` +
+                  `and describe that origin rather than ${redirect.from}.`
+                : ''),
+          }
+        : {
+            code: 'canonical-host-redirects-off-site',
+            detail:
+              `${redirect.from} answers ${redirect.status} and hands every path to ` +
+              `${redirect.to}, which is a different site. Not followed, deliberately: a ` +
+              `probe that chases a redirect off the brand's own domain reports some other ` +
+              `origin's health as ours. Nothing below was measured.`,
+          }
+    )
+  }
+
+  // The same shape arriving through the sweep rather than the anchor — a base URL supplied
+  // by `PRODUCTION_SITE_URL` that redirects, or a redirect that appeared mid-sweep. One
+  // cause, one row, and the per-path rows suppressed rather than printed twenty-five times.
+  const swept = uniformRedirect(observations)
+  if (swept) {
+    if (!redirect) {
+      findings.push({
+        code: 'canonical-host-redirects',
+        detail:
+          `Every one of the ${swept.count} attributable responses was a ${swept.status} to ` +
+          `${swept.to}. That is one fact about the host, not ${swept.count} facts about ` +
+          `the catalogue — the pages may be served correctly at ${swept.to}.`,
+      })
+    }
+    return {
+      verdict: 'findings',
+      findings,
+      checked: attributable.length,
+      expectedHandles: expectedHandles.length,
+      summary:
+        `${findings.length} finding(s). Every response redirected, so nothing about the ` +
+        `catalogue was measured at this origin.`,
+    }
+  }
+
+  /**
+   * Where a redirect went, for a finding that would otherwise only say a number.
+   *
+   * A 3xx's whole diagnostic content is its `Location`: the body is empty and the status
+   * says only "elsewhere". Printing `returned 307` and stopping is what left a run's worth
+   * of findings unattributable to any cause.
+   */
+  const destination = (o) => (o.location ? ` -> ${o.location}` : '')
+
   for (const observation of observations) {
     if (!isAttributable(observation)) continue
 
@@ -145,16 +305,16 @@ export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles
       findings.push({
         code: 'product-not-served',
         detail:
-          `${observation.path} returned ${observation.status}. The repository holds a ` +
-          `record for this handle, so a customer following a link, a search result or a ` +
-          `sitemap entry lands on nothing.`,
+          `${observation.path} returned ${observation.status}${destination(observation)}. ` +
+          `The repository holds a record for this handle, so a customer following a link, ` +
+          `a search result or a sitemap entry lands on nothing.`,
       })
     }
 
     if (observation.kind === 'collection' && observation.status !== 200) {
       findings.push({
         code: 'collection-not-served',
-        detail: `${observation.path} returned ${observation.status}.`,
+        detail: `${observation.path} returned ${observation.status}${destination(observation)}.`,
       })
     }
 
@@ -164,9 +324,9 @@ export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles
       findings.push({
         code: 'unknown-not-404',
         detail:
-          `${observation.path} returned ${observation.status} rather than 404. A handle ` +
-          `the catalogue does not contain must not resolve: a soft 200 is an indexable ` +
-          `page for a product that does not exist.`,
+          `${observation.path} returned ${observation.status}${destination(observation)} ` +
+          `rather than 404. A handle the catalogue does not contain must not resolve: a ` +
+          `soft 200 is an indexable page for a product that does not exist.`,
       })
     }
 
