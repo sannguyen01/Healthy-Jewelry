@@ -36,6 +36,7 @@ interface Observation {
   body: string
   location?: string
   host?: string
+  url?: string
   detail?: string
 }
 
@@ -312,6 +313,7 @@ const moved = (
   server: 'Vercel',
   location: `${to}${path}`,
   host: 'healthyjewellery.com',
+  url: `https://healthyjewellery.com${path}`,
   body: '',
 })
 
@@ -362,6 +364,7 @@ describe('one cause is one finding', () => {
   it('detects that every attributable response went to one place', () => {
     expect(uniformRedirect(productionShape())).toEqual({
       to: 'www.healthyjewellery.com',
+      toOrigin: 'https://www.healthyjewellery.com',
       status: 307,
       count: 5,
     })
@@ -450,6 +453,8 @@ describe('the canonical host handing over its traffic', () => {
   const redirect = {
     from: 'healthyjewellery.com',
     to: 'www.healthyjewellery.com',
+    fromOrigin: 'https://healthyjewellery.com',
+    toOrigin: 'https://www.healthyjewellery.com',
     status: 307,
     followed: true,
   }
@@ -490,6 +495,10 @@ describe('the canonical host handing over its traffic', () => {
 
     expect(detail).toContain('Settings -> Domains')
     expect(detail).toContain('308')
+    // The order, and why. Adding the www redirect while the apex still redirects to www
+    // is a loop, and an instruction that omits that is an instruction that breaks a site.
+    expect(detail).toContain('clear the redirect on https://healthyjewellery.com first')
+    expect(detail).toContain('makes a loop')
   })
 
   it('refuses to follow off the brand domain, and says nothing was measured', () => {
@@ -497,7 +506,14 @@ describe('the canonical host handing over its traffic', () => {
       expectedHandles: HANDLES,
       observations: cleanRun(),
       sitemapHandles: HANDLES,
-      redirect: { from: 'healthyjewellery.com', to: 'parking.example', status: 302, followed: false },
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'parking.example',
+        fromOrigin: 'https://healthyjewellery.com',
+        toOrigin: 'https://parking.example',
+        status: 302,
+        followed: false,
+      },
     })
 
     expect(result.findings[0].code).toBe('canonical-host-redirects-off-site')
@@ -533,6 +549,8 @@ describe('resolveRedirect follows one hop, and only within the site', () => {
     expect(resolveRedirect(anchor, BASE)).toEqual({
       from: 'healthyjewellery.com',
       to: 'www.healthyjewellery.com',
+      fromOrigin: 'https://healthyjewellery.com',
+      toOrigin: 'https://www.healthyjewellery.com',
       status: 307,
       followed: true,
       baseUrl: 'https://www.healthyjewellery.com',
@@ -580,5 +598,75 @@ describe('resolveRedirect follows one hop, and only within the site', () => {
   it('returns null for a Location that is not a URL', () => {
     // A broken redirect is a finding about that path, not a destination to re-anchor on.
     expect(resolveRedirect({ ...moved('/', 'anchor'), location: 'http://' }, BASE)).toBeNull()
+  })
+})
+
+describe('a redirect that changes only the port still reads as two ends', () => {
+  /**
+   * Found by running the probe against a local redirector rather than by reading it
+   * (ADR 024). `localhost:3001` 307ing to `localhost:3000` produced the sentence
+   * *"localhost answers 307 and hands every path to localhost"* — true, useless, and the
+   * same shape a scheme-only redirect would take.
+   *
+   * `sameSite` still compares hostnames, because "is this one site" is a question about
+   * labels. Only the prose changed.
+   */
+  it('names origins rather than hostnames', () => {
+    const { detail } = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'localhost',
+        to: 'localhost',
+        fromOrigin: 'http://localhost:3001',
+        toOrigin: 'http://localhost:3000',
+        status: 307,
+        followed: true,
+      },
+    }).findings[0]
+
+    expect(detail).toContain('http://localhost:3001 answers 307')
+    expect(detail).toContain('hands every path to http://localhost:3000')
+  })
+
+  it('resolves the two origins off the real request URL', () => {
+    const anchor = {
+      path: '/',
+      kind: 'anchor',
+      transport: 'ok',
+      status: 307,
+      server: 'Vercel',
+      location: 'http://localhost:3000/',
+      host: 'localhost',
+      url: 'http://localhost:3001/',
+      body: '',
+    }
+
+    expect(resolveRedirect(anchor, 'http://localhost:3001')).toMatchObject({
+      fromOrigin: 'http://localhost:3001',
+      toOrigin: 'http://localhost:3000',
+      followed: true,
+      baseUrl: 'http://localhost:3000',
+    })
+  })
+
+  it('falls back to hostnames when no origin was supplied', () => {
+    // The pure function must not require a field its caller might not have. A verdict
+    // that renders `undefined` into an issue body is worse than a coarse one.
+    const { detail } = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'www.healthyjewellery.com',
+        status: 307,
+        followed: true,
+      },
+    }).findings[0]
+
+    expect(detail).toContain('healthyjewellery.com answers 307')
+    expect(detail).not.toContain('undefined')
   })
 })

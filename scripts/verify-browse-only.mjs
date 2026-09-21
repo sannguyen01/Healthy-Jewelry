@@ -110,6 +110,7 @@ export async function observe(baseUrl, pathname, kind) {
       // `uniformRedirect` in `./lib/browse-only.mjs`.
       location: response.headers.get('location') ?? '',
       host: url.hostname,
+      url: url.toString(),
       body,
     }
   } catch (error) {
@@ -121,6 +122,7 @@ export async function observe(baseUrl, pathname, kind) {
       server: '',
       location: '',
       host: url.hostname,
+      url: url.toString(),
       body: '',
       detail: error.message,
     }
@@ -156,7 +158,8 @@ export async function observe(baseUrl, pathname, kind) {
  *
  * @param {object | null} anchor an observation of `/` at the base URL, or null when none was made
  * @param {string} baseUrl
- * @returns {{ from: string, to: string, status: number, followed: boolean, baseUrl: string } | null}
+ * @returns {{ from: string, to: string, fromOrigin: string, toOrigin: string,
+ *             status: number, followed: boolean, baseUrl: string } | null}
  */
 export function resolveRedirect(anchor, baseUrl) {
   if (!anchor || anchor.transport !== 'ok') return null
@@ -171,11 +174,15 @@ export function resolveRedirect(anchor, baseUrl) {
     return null
   }
 
-  const from = new URL(baseUrl).hostname
-  const followed = sameSite(from, target.hostname)
+  const base = new URL(baseUrl)
+  const followed = sameSite(base.hostname, target.hostname)
   return {
-    from,
+    from: base.hostname,
     to: target.hostname,
+    // Origins as well as hostnames: the comparison is about labels, the sentence a person
+    // reads is about ends, and a same-host redirect names one hostname twice.
+    fromOrigin: base.origin,
+    toOrigin: target.origin,
     status: anchor.status,
     followed,
     baseUrl: followed ? target.origin : baseUrl,
@@ -235,12 +242,14 @@ async function main() {
   // Twenty-four of them were spent discovering the same redirect twenty-four times.
   const redirect = resolveRedirect(await observe(baseUrl, '/', 'anchor'), baseUrl)
   if (redirect) {
+    // Origins, not hostnames: apex-to-www differs by label, but a port- or scheme-only
+    // redirect does not, and this line is the first thing a reader of the log sees.
     console.error(
       redirect.followed
-        ? `${redirect.from} redirects (${redirect.status}) to ${redirect.to}; sweeping ` +
-          `${redirect.baseUrl} and reporting the redirect as a finding.`
-        : `${redirect.from} redirects (${redirect.status}) to ${redirect.to}, off this ` +
-          `site. Not following.`
+        ? `${redirect.fromOrigin} redirects (${redirect.status}) to ${redirect.toOrigin}; ` +
+          `sweeping ${redirect.baseUrl} and reporting the redirect as a finding.`
+        : `${redirect.fromOrigin} redirects (${redirect.status}) to ${redirect.toOrigin}, ` +
+          `off this site. Not following.`
     )
     baseUrl = redirect.baseUrl
   }

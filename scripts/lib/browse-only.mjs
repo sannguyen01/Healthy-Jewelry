@@ -156,7 +156,7 @@ export function sameSite(a, b) {
  * redirect keeps its per-path rows and the `location` now printed beside each.
  *
  * @param {Array<object>} observations
- * @returns {{ to: string, status: number, count: number } | null}
+ * @returns {{ to: string, toOrigin: string, status: number, count: number } | null}
  */
 export function uniformRedirect(observations) {
   const attributable = observations.filter(isAttributable)
@@ -164,6 +164,7 @@ export function uniformRedirect(observations) {
 
   /** @type {Set<string>} */
   const targets = new Set()
+  let toOrigin = ''
   let status = 0
 
   for (const o of attributable) {
@@ -171,16 +172,20 @@ export function uniformRedirect(observations) {
     if (!o.location) return null
     let target
     try {
-      target = new URL(o.location, `https://${o.host ?? 'invalid.invalid'}${o.path ?? '/'}`)
+      // `o.url` is the full request URL when `observe` recorded one. The fallback covers a
+      // caller that supplied only a host and a path, which is enough to resolve a relative
+      // `Location` and is how the fixtures in the unit tests are written.
+      target = new URL(o.location, o.url ?? `https://${o.host ?? 'invalid.invalid'}${o.path ?? '/'}`)
     } catch {
       return null
     }
     targets.add(target.hostname)
+    toOrigin = target.origin
     status = o.status
   }
 
   if (targets.size !== 1) return null
-  return { to: [...targets][0], status, count: attributable.length }
+  return { to: [...targets][0], toOrigin, status, count: attributable.length }
 }
 
 /**
@@ -191,11 +196,14 @@ export function uniformRedirect(observations) {
  * @param {Array<object>} input.observations One per fetched URL.
  * @param {string[] | null} input.sitemapHandles Handles the live sitemap lists, or null when
  *   the sitemap could not be read — which is a finding about the sitemap, not about them.
- * @param {{ from: string, to: string, status: number, followed: boolean } | null}
+ * @param {{ from: string, to: string, fromOrigin?: string, toOrigin?: string,
+ *            status: number, followed: boolean } | null}
  *   [input.redirect] What the anchor probe found at the base URL, when it found a redirect.
- *   `followed` says whether the sweep below was re-pointed at `to` — see
- *   `verify-browse-only.mjs`, which will only ever follow one hop and only within the same
- *   registrable domain.
+ *   `from` and `to` are hostnames, because `sameSite` asks a question about labels. The
+ *   optional origins are what the prose prints, since a port- or scheme-only redirect has
+ *   one hostname at both ends. `followed` says whether the sweep below was re-pointed at
+ *   `to` — see `verify-browse-only.mjs`, which will only ever follow one hop and only
+ *   within the same registrable domain.
  */
 export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles, redirect = null }) {
   const findings = []
@@ -235,31 +243,40 @@ export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles
   // of everything else. See `uniformRedirect` for why: twenty-five rows asserting that a
   // correctly-served catalogue was missing, none of them naming the destination.
   if (redirect) {
+    // **Origins in the prose, hostnames in the comparison.** `sameSite` asks whether two
+    // names belong to one site, which is a question about labels. The sentence a person
+    // reads has to distinguish the two ends, and hostnames alone cannot: a redirect from
+    // `localhost:3001` to `localhost:3000` renders as "localhost hands every path to
+    // localhost", which is how this read the first time it was run against a real HTTP
+    // redirect. Same for a scheme-only redirect.
+    const from = redirect.fromOrigin ?? redirect.from
+    const to = redirect.toOrigin ?? redirect.to
+
     findings.push(
       sameSite(redirect.from, redirect.to)
         ? {
             code: 'canonical-host-redirects',
             detail:
-              `${redirect.from} answers ${redirect.status} and hands every path to ` +
-              `${redirect.to}. The catalogue may be served perfectly there and this is ` +
-              `still wrong: src/config/site.ts names ${redirect.from} as the canonical ` +
-              `origin, so every absolute URL this application emits — JSON-LD, the OG ` +
-              `card, the sitemap, the canonical link — points at a host that serves ` +
-              `nothing but a redirect. Vercel -> Project -> Settings -> Domains: the ` +
-              `redirect belongs on ${redirect.to}, pointing at ${redirect.from}, and it ` +
-              `should be permanent (308) rather than ${redirect.status}.` +
+              `${from} answers ${redirect.status} and hands every path to ${to}. The ` +
+              `catalogue may be served perfectly there and this is still wrong: ` +
+              `src/config/site.ts names ${from} as the canonical origin, so every ` +
+              `absolute URL this application emits — JSON-LD, the OG card, the sitemap, ` +
+              `the canonical link — points at a host that serves nothing but a redirect. ` +
+              `Vercel -> Project -> Settings -> Domains: clear the redirect on ${from} ` +
+              `first, then put one on ${to} pointing back at it, permanent (308) rather ` +
+              `than ${redirect.status}. Doing only the second half makes a loop.` +
               (redirect.followed
-                ? ` The findings below were measured against ${redirect.to}, one hop on, ` +
-                  `and describe that origin rather than ${redirect.from}.`
+                ? ` The findings below were measured against ${to}, one hop on, and ` +
+                  `describe that origin rather than ${from}.`
                 : ''),
           }
         : {
             code: 'canonical-host-redirects-off-site',
             detail:
-              `${redirect.from} answers ${redirect.status} and hands every path to ` +
-              `${redirect.to}, which is a different site. Not followed, deliberately: a ` +
-              `probe that chases a redirect off the brand's own domain reports some other ` +
-              `origin's health as ours. Nothing below was measured.`,
+              `${from} answers ${redirect.status} and hands every path to ${to}, which is ` +
+              `a different site. Not followed, deliberately: a probe that chases a ` +
+              `redirect off the brand's own domain reports some other origin's health as ` +
+              `ours. Nothing below was measured.`,
           }
     )
   }
@@ -270,12 +287,13 @@ export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles
   const swept = uniformRedirect(observations)
   if (swept) {
     if (!redirect) {
+      const to = swept.toOrigin || swept.to
       findings.push({
         code: 'canonical-host-redirects',
         detail:
           `Every one of the ${swept.count} attributable responses was a ${swept.status} to ` +
-          `${swept.to}. That is one fact about the host, not ${swept.count} facts about ` +
-          `the catalogue — the pages may be served correctly at ${swept.to}.`,
+          `${to}. That is one fact about the host, not ${swept.count} facts about the ` +
+          `catalogue — the pages may be served correctly at ${to}.`,
       })
     }
     return {

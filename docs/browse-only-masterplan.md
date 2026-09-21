@@ -287,6 +287,23 @@ This is the only workstream that must complete before the others start.
 The done-condition is the probe closing its own issue, not a person saying it looks right.
 That is the whole point of having built the probe.
 
+**Amended 2026-09-21, twice, and both amendments are findings rather than edits.**
+
+*On step 1.* The apex is attached and assigned to Production, and it does **not** serve:
+it answers 307 and hands every path to `www.healthyjewellery.com`, which serves the right
+commit. The redirect this workstream asks for is installed, on the wrong hostname, in the
+wrong direction, and as a temporary status. So the order in the list above is load-bearing
+in a way it did not say: **clear the redirect on the apex before adding one on www**, or
+the two settings form a loop. `docs/dns-domain-setup.md` carries the measured state and the
+two-step fix.
+
+*On the done-condition.* Issue #78 auto-closed on 2026-09-20 when PR #83 merged, because
+GitHub linked the two — not because a control-audit run found the domain bound. The probe
+re-opened the same finding 35 minutes later as #84. A done-condition phrased as *"an issue
+closes"* is satisfiable by anything that can close an issue, which is a wider set than the
+one thing it meant. Read as *"a control-audit run reports `bound`"*; the issue closing is
+how you notice, not what it means.
+
 ### WS-2 — Catalogue export · **blocked**
 
 | | |
