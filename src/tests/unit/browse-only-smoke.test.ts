@@ -10,6 +10,7 @@ const {
   registrableDomain,
   sameSite,
   uniformRedirect,
+  BROWSE_ONLY_FINDINGS,
   COMMERCE_MARKERS,
   FORBIDDEN_HOST_PATTERN,
 } = await import('../../../scripts/lib/browse-only.mjs')
@@ -668,5 +669,103 @@ describe('a redirect that changes only the port still reads as two ends', () => 
 
     expect(detail).toContain('healthyjewellery.com answers 307')
     expect(detail).not.toContain('undefined')
+  })
+})
+
+describe('the enumeration and the decision agree', () => {
+  /**
+   * The same reconciliation `canonical-domain-decision.test.ts` gained on the same day,
+   * and for the same reason: `CANONICAL_FINDINGS` was exported, documented as ADR 019's
+   * list, and referenced by nothing at all. An enumeration nobody compares to anything is
+   * a comment with a type annotation.
+   *
+   * Both directions. A code the function emits but the list does not name is an unnamed
+   * failure mode; a code named but unproducible is one that was removed and left in the
+   * documentation.
+   */
+  const emitted = new Set<string>()
+  const record = (r: { findings: { code: string }[] }) => {
+    for (const f of r.findings) emitted.add(f.code)
+    return r
+  }
+
+  const shopifyBody = '<!doctype html><html><img src="https://cdn.shopify.com/x.jpg"></html>'
+  const commerceBody =
+    '<!doctype html><html>' +
+    '<script>{"@type":"Offer","price":"1","priceCurrency":"GBP"}</script>' +
+    '<link href="https://schema.org/InStock">' +
+    '<button data-testid="add-to-bag"></button>' +
+    '<button data-testid="checkout-button"></button>' +
+    '</html>'
+
+  // One scenario per code, driven through the real function.
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: [
+        { ...ok('/products/arc-band-titanium', 'product'), status: 404 },
+        { ...ok('/shop', 'collection'), status: 500 },
+        { ...ok('/products/nope', 'unknown-product'), status: 200 },
+        ok('/products/dome-ring-titanium', 'product', shopifyBody),
+      ],
+      sitemapHandles: ['arc-band-titanium', 'a-handle-we-do-not-hold'],
+    }),
+  )
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: [ok('/products/arc-band-titanium', 'product', commerceBody)],
+      sitemapHandles: null,
+    }),
+  )
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'www.healthyjewellery.com',
+        status: 307,
+        followed: true,
+      },
+    }),
+  )
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'parking.example',
+        status: 302,
+        followed: false,
+      },
+    }),
+  )
+
+  it('emits enough to make the comparison non-trivial', () => {
+    expect(emitted.size).toBeGreaterThan(8)
+  })
+
+  it('names every code it can emit', () => {
+    for (const code of emitted) {
+      expect(BROWSE_ONLY_FINDINGS, `${code} is emitted but not enumerated`).toContain(code)
+    }
+  })
+
+  it('can emit every code it names', () => {
+    for (const code of BROWSE_ONLY_FINDINGS) {
+      expect(emitted, `${code} is enumerated but no scenario produces it`).toContain(code)
+    }
+  })
+
+  it('derives the commerce codes from the markers rather than copying them', () => {
+    // A hand-copy would be a second list to keep in step, which is the shape this whole
+    // describe block exists to refuse.
+    for (const marker of COMMERCE_MARKERS) {
+      expect(BROWSE_ONLY_FINDINGS).toContain(`commerce-${marker.id}`)
+    }
   })
 })

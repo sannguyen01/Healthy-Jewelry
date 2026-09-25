@@ -98,6 +98,39 @@ export const COMMERCE_MARKERS = [
 ]
 
 /**
+ * Every finding code this module can emit.
+ *
+ * Composed rather than hand-listed for the commerce half, because those are derived from
+ * {@link COMMERCE_MARKERS} and a hand-copy would be a second list to keep in step.
+ *
+ * ADR 019, and the precedent next door: `CANONICAL_FINDINGS` in `canonical-domain.mjs` was
+ * exported, documented as the list ADR 019 reconciles against prose, and referenced by
+ * **nothing** — not by the function that emits the codes, not by a test, not by
+ * `docs/failure-modes.md`. An enumeration nobody compares to anything is a comment with a
+ * type annotation. `browse-only-smoke.test.ts` reconciles this one in both directions: a
+ * code the function emits but this does not name is an unnamed failure mode, and a code
+ * named here that nothing can emit is a failure mode that was removed and left in the
+ * documentation.
+ *
+ * Deliberately findings only. `assessBrowseOnly` also returns a `reason` on an
+ * `unevaluable` verdict (`no-expected-handles`, `no-attributable-responses`); those answer
+ * "why could nothing be measured", which is a different question from "what is wrong with
+ * the site", and collapsing them is the distinction ADR 010 exists to keep.
+ */
+export const BROWSE_ONLY_FINDINGS = /** @type {const} */ ([
+  'canonical-host-redirects',
+  'canonical-host-redirects-off-site',
+  'product-not-served',
+  'collection-not-served',
+  'unknown-not-404',
+  'shopify-host-referenced',
+  'sitemap-unreadable',
+  'sitemap-omits-product',
+  'sitemap-lists-unknown-product',
+  ...COMMERCE_MARKERS.map((m) => `commerce-${m.id}`),
+])
+
+/**
  * The registrable domain, as the last two labels.
  *
  * Deliberately not a public-suffix lookup. This repository owns exactly one name and the
