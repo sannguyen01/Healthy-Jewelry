@@ -122,7 +122,11 @@ jobs:
       # duplication: this step keeps working if the unit runner itself breaks, and that is
       # precisely the state in which somebody is most tempted to merge anyway.
       - name: Commerce elimination contract
-        run: pnpm verify:commerce-contract
+        # Invoked by path rather than through the pnpm alias on purpose: the control
+        # registry proves a probe is wired in by looking for its path in the workflow that
+        # claims to run it, and `ci.yml` has already carried a `fetch-depth: 0` justified by
+        # a comment for a script nothing invoked.
+        run: node scripts/verify-commerce-contract.mjs
 
       # The tool this job's `fetch-depth: 0` exists for.
       #

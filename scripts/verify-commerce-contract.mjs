@@ -52,7 +52,7 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8')
  * globs. A file that is unreadable as UTF-8 is not a file this scanner has an opinion
  * about, and the `excluded` globs still have to justify themselves independently.
  */
-function trackedFiles() {
+export function trackedFiles() {
   const out = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
   const names = out.toString('utf8').split('\0').filter(Boolean)
   const files = []
@@ -69,7 +69,7 @@ function trackedFiles() {
   return files
 }
 
-function main() {
+export function main({ log = console.log } = {}) {
   const contract = parseContract(read(CONTRACT))
   const register = parseRegister(read(REGISTER))
   const files = trackedFiles()
@@ -121,27 +121,27 @@ function main() {
       if (f.id) byPath.get(f.path).add(f.id)
     }
     for (const [p, ids] of [...byPath].sort()) {
-      console.log(
+      log(
         `| \`${p}\` | ${[...ids].sort().join(' ')} | TODO | TODO | TODO | TODO | TODO | TODO |`
       )
     }
     return 0
   }
 
-  console.log(`Commerce Elimination Contract — ${scannedCount} tracked text files scanned`)
-  console.log(
+  log(`Commerce Elimination Contract — ${scannedCount} tracked text files scanned`)
+  log(
     `  classes: ` +
       Object.entries(classCounts)
         .filter(([, n]) => n > 0)
         .map(([k, n]) => `${k} ${n}`)
         .join(' · ')
   )
-  console.log(`  register rows: ${register.length}`)
-  console.log(`  identifiers: ${contract.identifiers.length} · package rules: ${contract.packages.length}`)
-  console.log('')
+  log(`  register rows: ${register.length}`)
+  log(`  identifiers: ${contract.identifiers.length} · package rules: ${contract.packages.length}`)
+  log('')
 
   if (blocking.length === 0) {
-    console.log('No blocking findings. The boundary holds.')
+    log('No blocking findings. The boundary holds.')
     return 0
   }
 
@@ -151,17 +151,29 @@ function main() {
     byCode.get(f.code).push(f)
   }
 
-  console.log(`${blocking.length} blocking finding(s):\n`)
+  log(`${blocking.length} blocking finding(s):\n`)
   for (const [code, group] of [...byCode].sort((a, b) => b[1].length - a[1].length)) {
-    console.log(`── ${code} (${group.length})`)
+    log(`── ${code} (${group.length})`)
     for (const f of group.slice(0, 40)) {
-      console.log(`   ${f.path}${f.line ? `:${f.line}` : ''}${f.id ? `  [${f.id}]` : ''}`)
-      console.log(`     ${f.detail}`)
+      log(`   ${f.path}${f.line ? `:${f.line}` : ''}${f.id ? `  [${f.id}]` : ''}`)
+      log(`     ${f.detail}`)
     }
-    if (group.length > 40) console.log(`   … and ${group.length - 40} more`)
-    console.log('')
+    if (group.length > 40) log(`   … and ${group.length - 40} more`)
+    log('')
   }
   return 1
 }
 
-process.exit(main())
+/*
+ * Only when run as a command.
+ *
+ * Without the guard, importing this module to point it at a known answer would scan the
+ * tree, print a report and call `process.exit` inside the test runner — which is why
+ * `probe-canonical-domain.mjs` and `verify-browse-only.mjs` both carry the same line. The
+ * registry rule behind it is ADR 024: a verification tool that cannot be driven against a
+ * fixture has never been driven against one, and every probe defect this repository has
+ * found was found exactly there.
+ */
+if (import.meta.url === `file://${process.argv[1]}`) {
+  process.exit(main())
+}

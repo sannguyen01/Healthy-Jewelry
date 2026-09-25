@@ -24,6 +24,8 @@ const {
   tableRows,
 } = await import('../../../scripts/lib/commerce-contract.mjs')
 
+const driver = await import('../../../scripts/verify-commerce-contract.mjs')
+
 /**
  * **The Commerce Elimination Contract, held against the repository and against itself.**
  *
@@ -576,6 +578,67 @@ describe('the boundary holds, here, now', () => {
     expect(registered.size).toBe(register.length)
     for (const row of register) {
       expect(files.some((f) => f.path === row.path), `${row.path} is not tracked`).toBe(true)
+    }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('the driver, pointed at the answer it is meant to give', () => {
+  /*
+   * `scripts/verify-commerce-contract.mjs` is what CI runs, and until this existed it was
+   * the one piece of the control nothing had ever executed under test. That is the exact
+   * gap [ADR 024](../../../docs/adr/024-a-tool-never-pointed-at-a-known-answer.md) names:
+   * of the three probes written in one week, the two with fixture tests shipped correct and
+   * the one without produced two defects — a sentinel naming a spec that protected nothing,
+   * and a missing browser binary read as proof that a mutation had been caught.
+   *
+   * The driver exits the process when run as a command, so it carries the same
+   * `import.meta.url` guard as `verify-browse-only.mjs` and `probe-canonical-domain.mjs`.
+   * Importing it here would otherwise scan the tree, print a report and kill the runner.
+   */
+
+  it('reads the real tree rather than an empty one', () => {
+    const tracked = driver.trackedFiles()
+    expect(tracked.length, 'git ls-files returned nothing').toBeGreaterThan(200)
+    expect(tracked.every((f: { source: string }) => typeof f.source === 'string')).toBe(true)
+    // Binary files are dropped by a NUL test, not an extension list. If that ever inverted,
+    // the scanner would be handed image bytes and report `unknown-language` noise.
+    expect(tracked.some((f: { path: string }) => f.path.endsWith('.png'))).toBe(false)
+  })
+
+  it('exits 0 and says so, on a tree that passes', () => {
+    const lines: string[] = []
+    const code = driver.main({ log: (line: string) => lines.push(line) })
+    const report = lines.join('\n')
+
+    expect(code, `the driver exited non-zero:\n${report}`).toBe(0)
+    expect(report).toContain('No blocking findings. The boundary holds.')
+    // The counts are in the report because a checker that prints only a verdict gives a
+    // reader no way to notice it has stopped looking at anything.
+    expect(report).toMatch(/\d+ tracked text files scanned/)
+    expect(report).toMatch(/register rows: \d+/)
+  })
+
+  it('draft mode is idempotent — it answers what a complete register holds', () => {
+    /*
+     * The bug this pins shipped once and was invisible: `--draft` originally evaluated
+     * against the *current* register, so once the register was populated it printed almost
+     * nothing, and regenerating the document produced two rows instead of fifty-eight. A
+     * drafting tool has to give the same answer every time it is asked.
+     */
+    const argv = process.argv
+    process.argv = [...argv, '--draft']
+    try {
+      const lines: string[] = []
+      const code = driver.main({ log: (line: string) => lines.push(line) })
+      const rows = lines.filter((l) => l.startsWith('|'))
+      expect(code).toBe(0)
+      expect(rows.length, 'draft printed no rows — the scanner has stopped seeing anything').toBe(
+        register.length
+      )
+      for (const row of rows) expect(row).toMatch(/\| TODO \|/)
+    } finally {
+      process.argv = argv
     }
   })
 })
