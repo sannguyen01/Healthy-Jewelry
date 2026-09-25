@@ -162,6 +162,7 @@ Guidance a person or an agent acts on, which is why an obsolete one is not harml
 | `docs/safety.md` | shopify-name | Loop policy, prose mirror | Unattended loop runs | none | rewrite together with `gate.yaml`, which it mirrors | `src/tests/unit/gate-denylist-contract.test.ts` | WS-I |
 | `docs/testing-strategy.md` | cart-mutation checkout-handoff inventory-check shopify-env shopify-host shopify-name | Test documentation | Every contributor and agent | none | rewrite — the cart, checkout and inventory tiers it documents are gone | `src/tests/unit/doc-numeric-claims.test.ts` | WS-I |
 | `e2e/COVERAGE.md` | shopify-name | E2E coverage map | Spec review | none | rewrite — the commerce journeys it maps no longer have specs | `src/tests/unit/spec-anchor-contract.test.ts` | WS-I |
+| `docs/commerce-elimination-masterplan.md` | shopify-env shopify-host shopify-name | Plan of record | Read before any workstream starts | none | delete when the last register row closes — a plan for work that is finished is a plan somebody will start | `src/tests/unit/commerce-contract.test.ts` | WS-I |
 | `loop-constraints.md` | shopify-env shopify-name | Loop policy | Unattended loop runs | credential names | rewrite — the credential rules stay; the Shopify examples change subject | `src/tests/unit/agent-doc-claims.test.ts` | WS-I |
 
 <!-- /contract:register -->
