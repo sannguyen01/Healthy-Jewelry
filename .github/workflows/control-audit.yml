@@ -799,7 +799,7 @@ jobs:
             echo "| Control | Result |"
             echo "|---|---|"
             echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
-            echo "| Assertion liveness (11 vitest sentinels) | ${{ steps.liveness.outcome }} |"
+            echo "| Assertion liveness (12 vitest sentinels) | ${{ steps.liveness.outcome }} |"
             echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
             echo "| Merge gate liveness (is CI evaluating?) | ${{ steps.ci-liveness.outcome }} |"
             echo "| Canonical domain bound to production | ${{ steps.canonical-domain.outcome }} |"

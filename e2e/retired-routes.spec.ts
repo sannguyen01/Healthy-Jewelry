@@ -22,6 +22,23 @@ import { test, expect } from '@playwright/test'
  * them of every build, before deploy.
  */
 
+/**
+ * **Handlers exercised here by status code rather than by navigation.**
+ *
+ * Named explicitly because `e2e/COVERAGE.md` cites this file as the coverage for each of
+ * them, and `coverage-manifest-truthfulness.test.ts` reads that citation literally: a
+ * reason naming a file that never mentions the route is a justification nobody checked.
+ *
+ * - `/checkout`
+ * - `/checkouts/[[...path]]`
+ * - `/orders/[[...path]]`
+ * - `/discount/[[...path]]`
+ *
+ * All four answer 410 and none of them can be meaningfully `goto`-ed: Playwright follows a
+ * 410 and renders its body, so a navigation test passes identically whether the route
+ * answers 410 or 200. The status read below is the only assertion that distinguishes them.
+ */
+
 /** What each retired URL must answer, and why that status rather than another. */
 const RETIRED = [
   {
@@ -37,10 +54,88 @@ const RETIRED = [
     why: 'a login becomes the person who replaces it',
   },
   {
+    path: '/cart/add',
+    status: 308,
+    location: '/shop',
+    why: "Shopify's cart endpoint, reachable from any cached page or restored tab",
+  },
+  {
+    path: '/account/orders',
+    status: 308,
+    location: '/contact',
+    why: 'order history, for accounts that were built and never switched on',
+  },
+  {
+    path: '/collections',
+    status: 308,
+    location: '/shop',
+    why: "Shopify's collection index — the shelf still exists, it moved",
+  },
+  {
+    path: '/collections/rings',
+    status: 308,
+    location: '/shop',
+    why: 'an indexed collection URL; one always-correct destination beats five that drift',
+  },
+  {
+    path: '/policies/privacy-policy',
+    status: 308,
+    location: '/legal',
+    why: "the four policy URLs Shopify's hosted checkout linked from its footer",
+  },
+  {
     path: '/checkout',
     status: 410,
     location: null,
     why: 'a withdrawn capability has no successor — 410 is final where 404 invites re-crawling',
+  },
+  {
+    path: '/checkouts/c/abc123',
+    status: 410,
+    location: null,
+    why: "Shopify's own hosted-checkout URL space, carried in abandoned-cart emails",
+  },
+  {
+    path: '/orders',
+    status: 410,
+    location: null,
+    why: 'this site holds no orders and must never imply it can look one up',
+  },
+  {
+    path: '/orders/1234567890',
+    status: 410,
+    location: null,
+    why: 'an order-status token from a confirmation email',
+  },
+  {
+    path: '/discount/SUMMER25',
+    status: 410,
+    location: null,
+    why: 'a discount is a price claim, and this site publishes no prices',
+  },
+  {
+    path: '/stones',
+    status: 308,
+    location: '/',
+    why: 'a pre-repositioning category URL — this is a titanium brand',
+  },
+  {
+    path: '/crystals',
+    status: 308,
+    location: '/',
+    why: 'healing-crystal inventory the brand no longer sells and whose copy is prohibited',
+  },
+  {
+    path: '/stones/amethyst-ring',
+    status: 308,
+    location: '/',
+    why: 'an indexed product URL beneath the retired category; no titanium successor exists',
+  },
+  {
+    path: '/crystals/quartz-pendant',
+    status: 308,
+    location: '/',
+    why: 'as /stones/:path* — a per-item map would imply a successor piece, and there is none',
   },
   {
     path: '/api/shopify',
@@ -88,28 +183,54 @@ test.describe('Retired commerce routes', () => {
     })
   }
 
-  test('the checkout 410 explains itself to a human', async ({ request }) => {
-    // A bare 410 is correct for a crawler and useless to the customer who followed an old
-    // link from an email. The body is the difference between "this is broken" and "this
-    // brand stopped selling online, here is what to do instead".
-    const response = await request.get('/checkout', { maxRedirects: 0 })
+  /** Every path in the table above that answers 410, checked as a page rather than a status. */
+  const GONE = RETIRED.filter((r) => r.status === 410).map((r) => r.path)
+
+  for (const path of GONE) {
+    test(`the ${path} 410 explains itself to a human`, async ({ request }) => {
+      // A bare 410 is correct for a crawler and useless to the customer who followed an old
+      // link from an email. The body is the difference between "this is broken" and "this
+      // brand stopped selling online, here is what to do instead".
+      const response = await request.get(path, { maxRedirects: 0 })
+      const body = await response.text()
+
+      expect(body, `${path} names no next step`).toMatch(/ambassador/i)
+      expect(body, `${path} offers no way to reach a person`).toContain('/contact')
+      // The page must render without the app shell, which is the reason it is hand-written
+      // HTML. A stylesheet or script tag is a dependency on the pipeline that may be the
+      // thing that is gone.
+      expect(body).not.toMatch(/<script\b/i)
+    })
+
+    test(`the ${path} 410 is not indexable`, async ({ request }) => {
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.headers()['x-robots-tag']).toMatch(/noindex/i)
+    })
+
+    test(`a stale POST to ${path} is also gone, not 405`, async ({ request }) => {
+      // An old form re-submitted from a restored tab must get the same answer. 405 Method
+      // Not Allowed would suggest the resource exists and the verb is wrong.
+      const response = await request.post(path, { maxRedirects: 0 })
+      expect(response.status()).toBe(410)
+    })
+  }
+
+  test('the 410 family is not empty', () => {
+    // Guard on the guard: if the filter above ever matched nothing — a status typo, a table
+    // rewritten — the three generated tests would simply not exist, and their absence looks
+    // exactly like them passing.
+    expect(GONE.length).toBeGreaterThanOrEqual(4)
+  })
+
+  test('a discount code cannot be smuggled through a query string', async ({ request }) => {
+    // Shopify accepts `?discount=CODE` on any storefront URL as well as at `/discount/CODE`.
+    // The path is retired above; this asserts the query form reaches an ordinary page with
+    // no special behaviour, rather than being honoured by something left over.
+    const response = await request.get('/shop?discount=SUMMER25', { maxRedirects: 0 })
+    expect(response.status()).toBe(200)
     const body = await response.text()
-
-    expect(body).toMatch(/no longer accepts online orders/i)
-    expect(body).toMatch(/ambassador/i)
-    expect(body).toContain('/contact')
-  })
-
-  test('the checkout 410 is not indexable', async ({ request }) => {
-    const response = await request.get('/checkout', { maxRedirects: 0 })
-    expect(response.headers()['x-robots-tag']).toMatch(/noindex/i)
-  })
-
-  test('a stale POST to checkout is also gone, not 405', async ({ request }) => {
-    // An old form re-submitted from a restored tab must get the same answer. 405 Method
-    // Not Allowed would suggest the resource exists and the verb is wrong.
-    const response = await request.post('/checkout', { maxRedirects: 0 })
-    expect(response.status()).toBe(410)
+    expect(body).not.toMatch(/SUMMER25/)
+    expect(body).not.toMatch(/discount applied/i)
   })
 
   test('the routes that stay, stay', async ({ request }) => {

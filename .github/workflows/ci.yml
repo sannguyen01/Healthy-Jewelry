@@ -111,6 +111,23 @@ jobs:
       - name: Type-check
         run: pnpm type-check
 
+      # The Commerce Elimination Contract, enforced against the tree rather than read.
+      #
+      # Before Unit tests on purpose: it is the cheapest check that can fail here (one pass
+      # over `git ls-files`, no transform, no jsdom), and its failure message names a file
+      # and a line. A contributor who has re-added a cart mutation should learn that in
+      # seconds, not after a two-minute suite.
+      #
+      # `commerce-contract.test.ts` asserts the same thing inside vitest, which is not
+      # duplication: this step keeps working if the unit runner itself breaks, and that is
+      # precisely the state in which somebody is most tempted to merge anyway.
+      - name: Commerce elimination contract
+        # Invoked by path rather than through the pnpm alias on purpose: the control
+        # registry proves a probe is wired in by looking for its path in the workflow that
+        # claims to run it, and `ci.yml` has already carried a `fetch-depth: 0` justified by
+        # a comment for a script nothing invoked.
+        run: node scripts/verify-commerce-contract.mjs
+
       # The tool this job's `fetch-depth: 0` exists for.
       #
       # It was never invoked. Every CI run has been paying for a full-history clone —

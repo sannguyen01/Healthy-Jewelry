@@ -4,6 +4,53 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-09-25 — PR #88: The commerce boundary becomes something the build checks
+
+`docs/browse-only-masterplan.md` was a careful plan that nothing enforced. Nothing in
+this repository mechanically prevented commerce from returning, and a decommission's
+output is an **absence** — the one thing nobody notices coming back.
+
+- **`COMMERCE-ELIMINATION-CONTRACT.md` is parsed, not read.** Seven machine-read
+  sections: forbidden identifiers, position classes, prohibited packages, the approved
+  and forbidden route inventories, forbidden content fields, and one named owner per
+  deletion domain. A missing section throws rather than parsing to an empty list, because
+  a rule enforced against nothing passes and checks nothing.
+- **A finding is a function of the identifier *and its position*.** A flat "fail on
+  `shopify`" scan calls `browse-only-copy.test.tsx` a defect — and that file is the check
+  that forbids the word. Three scopes (`value`, `absolute`, `staged`), two positions
+  (`code`, `prose` — a comment inside a code file is free), and six classes with
+  `executable` as the default, so a new file is a defect until somebody classifies it.
+  Each non-default class has an earning condition that is itself checked.
+- **`docs/commerce-dependency-register.md` reconciles in both directions.** 58 rows at
+  the start of the day, each with path · identifiers · owning system · trigger · data
+  class · action · proving check · workstream. A file with no row fails; **a row whose
+  file no longer matches fails too**, which is the direction most registers omit and the
+  one that keeps the document worth reading. A row is finished by deleting it.
+- **Shopify's own URL space is retired, not just this application's.** `/cart/*`,
+  `/account/*`, `/collections*` and `/policies/*` answer 308 where a successor exists;
+  `/checkout`, `/checkouts/*`, `/orders/*` and `/discount/*` answer **410 Gone** from one
+  shared builder in `src/lib/http/goneResponse.ts`. Four hand-rolled `Response` objects
+  would be four places for `X-Robots-Tag` to go missing from one — a failure that renders
+  correctly, breaks nothing, and leaves a withdrawn capability indexable.
+- **Ten documents stopped describing a system being deleted.** The worst was
+  `.claude/skills/project-conventions/SKILL.md`, loaded at the start of every agent
+  session, whose "outstanding work" section told the reader to add five commerce
+  credentials and register a webhook. `README.md` called the project an "E-Commerce
+  Storefront" on "Next.js 14 · Shopify Storefront API" — three wrong facts in one line.
+- **The gate has been observed failing.** Three mutations, three correct and specific
+  failures; the `commerce-boundary` sentinel is registered and
+  `probe-assertion-liveness.mjs` reports it alive. The scanner also failed its own
+  author's work twice — a credential-shaped literal in the test proving the credential
+  rule fires, and a sentinel whose scar text named payment brands in a string literal.
+  Both fixed by changing the text, because `value` and `absolute` admit no exemption.
+- **`docs/commerce-elimination-masterplan.md`** replaces the browse-only plan: nine
+  workstreams cut by deletion domain rather than by phase, so they own disjoint file sets
+  and can run in parallel. Measuring the catalogue for it turned up that **8 of 17
+  product titles carry a form from the geometric vocabulary and 9 do not**, and that
+  **Halo and Facet have no product at all**.
+
+See [ADR 036](docs/adr/036-a-prohibition-in-prose-is-not-a-boundary.md).
+
 ## 2026-08-13 — PR #20: The verifier that could not fail
 
 Investigating why production smoke was failing (#18) found something larger than

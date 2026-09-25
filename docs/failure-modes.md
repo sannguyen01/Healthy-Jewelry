@@ -90,7 +90,7 @@ thrown by the request path.
 
 | mode | meaning | effect | covered by |
 |---|---|---|---|
-| `allow` | posture for `/api/shopify`, `/api/analytics`, `/api/health` | an unreachable limiter lets traffic through; losing the ceiling costs quota, refusing would cost checkout | `rateLimit.test.ts` |
+| `allow` | posture for `/api/analytics`, `/api/health` | an unreachable limiter lets traffic through; losing the ceiling costs quota, refusing would blind the only telemetry this site has and break its own health probe. (`/api/shopify` was the third holder of this posture and answers 404 since PR #82.) | `rateLimit.test.ts` |
 | `deny` | posture for `/api/contact` | an unreachable limiter refuses; an unmetered form spends money on a paid email API | `rateLimit.test.ts` |
 | `ok` | Upstash answered a diagnostic round-trip | `/api/health` reports healthy | `rateLimit.test.ts`, `api-health-route.test.ts` |
 | `unreachable` | Upstash is configured and did not answer | `/api/health` 503 with a hint naming each route's posture | `rateLimit.test.ts`, `api-health-route.test.ts` |

@@ -65,7 +65,7 @@ describe('the escalation list was found', () => {
   })
 
   it('carries the four names the rule has always named', () => {
-    expect(majors).toEqual(['next', 'react', 'react-dom', '@shopify/*'])
+    expect(majors).toEqual(['next', 'react', 'react-dom'])
   })
 
   it('the prose above the fence still describes what the fence does', () => {
@@ -84,7 +84,10 @@ describe('a scope pattern matches what it says it matches', () => {
   })
 
   it('matches a whole scope through the trailing star', () => {
-    expect(isEscalated('@shopify/hydrogen-react', majors)).toBe(true)
+    // Was `@shopify/hydrogen-react`, which the escalation list used to carry. It is now
+    // forbidden outright by COMMERCE-ELIMINATION-CONTRACT.md §5 rather than escalated on a
+    // major bump, so the wildcard case needs a package that could legitimately arrive.
+    expect(isEscalated('react-dom', majors)).toBe(true)
   })
 
   it('does not match an unlisted package', () => {

@@ -21,12 +21,12 @@
 ## Credential check failures
 - Never set, read, propose, or guess a credential value — not even a plausible-looking
   correction. `scripts/preflight-secrets.mjs` (`SHAPE_RULES`) already tells you exactly
-  which secret is wrong and why (missing vs. present-but-wrong-shape, e.g. a Storefront
-  token in the `SHOPIFY_ADMIN_ACCESS_TOKEN` slot, which must start with `shpat_`).
+  which secret is wrong and why — missing, versus present but the wrong shape, which is
+  usually one credential pasted into another's slot.
 - If a preflight/smoke check fails on a credential: name the secret, quote the tool's own
   diagnosis, state which console it's fixed in (GitHub → Settings → Environments →
-  `production-readonly`, or the relevant Shopify/Vercel page), and stop. This is a human
-  console action, never a code change. See ADR 011 and `docs/go-live-runbook.md`.
+  `production-readonly`, or the relevant Vercel page), and stop. This is a human console
+  action, never a code change. See ADR 011.
 - If `production-smoke` has been failing with the *same* diagnosis for 3+ runs, don't add
   another "still failing" comment — the workflow's own escalation step (ADR 011) already
   did that once. Check whether it's escalated (`human-required` label) before commenting.
@@ -70,7 +70,8 @@
   .vercel/**
   **/migrations/**
   .github/workflows/**
-  src/lib/shopify/**
+  COMMERCE-ELIMINATION-CONTRACT.md
+  docs/commerce-dependency-register.md
   next.config.ts
   vercel.json
   ```
@@ -88,8 +89,14 @@
   next
   react
   react-dom
-  @shopify/*
   ```
+
+  `@shopify/*` was the fourth entry and has been removed rather than kept as a
+  belt-and-braces. It is now a *prohibited* package under
+  `COMMERCE-ELIMINATION-CONTRACT.md` §5, checked against the manifest and the lockfile
+  including transitives — so it can never be installed, and a rule about raising its
+  major can never fire. A dead rule in a list read as data is worse than no rule: it
+  reads as coverage.
 
   That block is read as data by `scripts/audit-dependency-scope.mjs`, which runs on every
   pull request and fails one that raises a listed package's major without a written

@@ -183,3 +183,67 @@ export function pageRoutes(readDir: ReadDir, dir = '', prefix = ''): string[] {
 
   return routes
 }
+
+/**
+ * Every URL path the App Router serves a **route handler** for.
+ *
+ * `pageRoutes` deliberately skips `api/` and looks only for `page.tsx`, because its consumer
+ * is the sitemap and an API endpoint is not a page. This is the other half, and the
+ * decommission is what made it necessary: `/checkout`, `/orders`, `/checkouts` and
+ * `/discount` answer **410 Gone** from `route.ts` files, and a `page.tsx` could not do that
+ * — a page renders and Next answers 200, which is the soft-404 shape this repository has
+ * already shipped once.
+ *
+ * So the retired-route contract lives in files `pageRoutes` cannot see, and a reconciliation
+ * built on it would have been blind to exactly the routes it exists to check.
+ *
+ * Returns Next's own path syntax, dynamic segments included — `/api/analytics`,
+ * `/orders/[[...path]]` — because normalising here would bake one consumer's idea of a
+ * canonical form into a parser that has several. The caller canonicalises.
+ */
+export function routeHandlerPaths(readDir: ReadDir, dir = '', prefix = ''): string[] {
+  const routes: string[] = []
+
+  for (const entry of readDir(dir)) {
+    if (entry.isDirectory) {
+      // Private folders serve nothing. `@slot` directories are parallel-route slots, which
+      // cannot hold a route handler at all. `api/` is **not** skipped here — unlike in
+      // `pageRoutes`, it is most of the point.
+      if (entry.name.startsWith('_') || entry.name.startsWith('@')) continue
+
+      const isGroup = entry.name.startsWith('(') && entry.name.endsWith(')')
+      const nextPrefix = isGroup ? prefix : `${prefix}/${entry.name}`
+      routes.push(
+        ...routeHandlerPaths(readDir, dir === '' ? entry.name : `${dir}/${entry.name}`, nextPrefix)
+      )
+    } else if (entry.name === 'route.ts' || entry.name === 'route.tsx') {
+      routes.push(prefix === '' ? '/' : prefix)
+    }
+  }
+
+  return routes
+}
+
+/**
+ * One spelling for a route, whatever syntax it arrived in.
+ *
+ * Four sources describe the same routes in three notations: the App Router's file
+ * conventions (`[handle]`, `[...path]`, `[[...path]]`), `next.config.ts` redirect sources
+ * (`:path*`), and the contract, which uses whichever reads better in a table. Comparing them
+ * requires one form, and picking it deliberately is cheaper than discovering later that two
+ * reconciliations disagreed about whether `/orders/[[...path]]` and `/orders/:path*` are the
+ * same route.
+ *
+ * Wildcards of every spelling collapse to `*`; a single dynamic segment becomes `:name`. The
+ * name is kept for single segments because `/shop/[collection]` and `/products/[handle]` are
+ * genuinely different routes and erasing the name would make them compare equal.
+ */
+export function canonicalRoute(path: string): string {
+  return path
+    .replace(/\[\[\.\.\.[^\]]*\]\]/g, '*')
+    .replace(/\[\.\.\.[^\]]*\]/g, '*')
+    .replace(/:[A-Za-z_][A-Za-z0-9_]*\*/g, '*')
+    .replace(/\[([^\]]+)\]/g, ':$1')
+    .replace(/\/+$/, '')
+    .replace(/^$/, '/')
+}

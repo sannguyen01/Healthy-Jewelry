@@ -124,9 +124,74 @@ const nextConfig: NextConfig = {
         destination: '/shop',
         permanent: true,
       },
+      /*
+       * `/cart/add`, `/cart/change`, `/cart/update`, `/cart/clear` — Shopify's cart
+       * endpoints, and the reason this needs a wildcard rather than the bare path above.
+       * They are reachable from any cached page, any restored tab and any theme snippet
+       * that outlived the theme, and several of them are `POST`. A redirect answers a POST
+       * too, which is what makes this the right mechanism here: the visitor lands on the
+       * shelf rather than on a 405.
+       */
+      {
+        source: '/cart/:path*',
+        destination: '/shop',
+        permanent: true,
+      },
       {
         source: '/account',
         destination: '/contact',
+        permanent: true,
+      },
+      /*
+       * `/account/login`, `/account/register`, `/account/orders`, `/account/addresses`.
+       *
+       * Customer accounts were built and never switched on, so no visitor has credentials
+       * to use here. The destination is the same as the bare path's for the same reason: a
+       * login becomes the person who replaces it.
+       */
+      {
+        source: '/account/:path*',
+        destination: '/contact',
+        permanent: true,
+      },
+      /*
+       * Shopify's collection URL space.
+       *
+       * `/collections/<handle>` and `/collections/all` are what a storefront publishes and
+       * what search engines indexed. They redirect rather than 410 because — unlike a
+       * checkout — a successor genuinely exists: the shelf is still there, it is just at
+       * `/shop` now.
+       *
+       * Deliberately **not** mapped handle-by-handle onto `/shop/<handle>`. Shopify's
+       * handle set was never identical to this catalogue's five, it included the built-in
+       * `frontpage` (ADR 008's exemption, and the source of a real hard-404 on the site's
+       * only bestseller), and a per-handle map would be a second collection inventory to
+       * keep in step with `COLLECTION_HANDLES`. One destination that is always correct
+       * beats five that are correct until somebody renames a collection.
+       */
+      {
+        source: '/collections',
+        destination: '/shop',
+        permanent: true,
+      },
+      {
+        source: '/collections/:path*',
+        destination: '/shop',
+        permanent: true,
+      },
+      /*
+       * `/policies/privacy-policy`, `/policies/terms-of-service`, `/policies/refund-policy`,
+       * `/policies/shipping-policy` — the four URLs Shopify's hosted checkout linked from
+       * its footer.
+       *
+       * They go to `/legal`, which is this site's index of the same documents, rather than
+       * being mapped individually. A visitor following a policy link wants *the policies*,
+       * and the site's own four pages do not correspond one-to-one with Shopify's — there
+       * is no refund policy here, because there is nothing to refund.
+       */
+      {
+        source: '/policies/:path*',
+        destination: '/legal',
         permanent: true,
       },
       {

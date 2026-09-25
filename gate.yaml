@@ -17,7 +17,12 @@ denylist:
   - ".vercel/**"
   - "**/migrations/**"
   - ".github/workflows/**"
-  - "src/lib/shopify/**"
+  # Was `src/lib/shopify/**`, until WS-A deletes it. Denying a loop from editing a
+  # directory that is scheduled to disappear protects nothing; what needs protecting is
+  # the boundary that replaced it. A weakening edit here is invisible in review — it looks
+  # like tidying — which is why it is a human action rather than an autonomous one.
+  - "COMMERCE-ELIMINATION-CONTRACT.md"
+  - "docs/commerce-dependency-register.md"
   - "next.config.ts"
   # Holds `buildCommand`, and is where any future deploy gate (an `ignoreCommand`)
   # would live. `.vercel/**` above covers only the gitignored local link directory,

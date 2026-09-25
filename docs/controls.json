@@ -65,6 +65,17 @@
       "acceptedWhy": "**The 2026-09-20 acceptance expired on its own terms and is not renewed for the same reason.** It read, in full: accepted on the day it was written, for one scheduled-run cycle rather than indefinitely. The probe is complete and its decision is covered by 32 fixture-driven assertions; what is missing is a site for it to pass against. Run against the current deployment it returns `findings` with 52 entries, every one of them true: 17 products x 3 surviving commerce markers (Offer JSON-LD, a price field, a schema.org availability claim), plus /products/<unknown> answering 200 rather than 404. Those are WS-5's and WS-4's work respectively. Scheduling a check that cannot pass until two other workstreams land trains the reader to ignore it, which is precisely what ADR 011 records costing this repository a month of unread escalations. The acceptance expires when WS-4 and WS-5 merge; probe-accepted-gap.mjs will say so if they have not. Both merged in PR #83 on 2026-09-20, and the 52 findings that acceptance described are gone \u2014 the commerce markers with WS-5, the soft 404 with WS-4's `dynamicParams = false`. What replaces it is narrower and is about a hostname rather than about this repository: the probe reports one true finding, `canonical-host-redirects`, and will keep reporting it until someone clears the redirect on the apex in Vercel. That is a console action nobody in CI can perform, it is tracked as the `domain-unbound` issue the canonical-domain probe opens, and the check goes green the moment it is done. Nothing in this repository can close it, which is what distinguishes it from the gap it replaces."
     },
     {
+      "id": "commerce-elimination-boundary",
+      "claims": "no commerce identifier, package, route or document can enter this repository without being classified in COMMERCE-ELIMINATION-CONTRACT.md or owned by a row in docs/commerce-dependency-register.md",
+      "status": "configured",
+      "probe": "scripts/verify-commerce-contract.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Three limits, each measured rather than assumed. (1) The position split is a lexer, not a parser: a `//` inside a string literal ends the code half early, which moves a token from `code` to `prose` and so weakens a finding rather than inventing one \u2014 asserted as a known limit in commerce-contract.test.ts rather than left to be discovered. (2) It reads tracked text files, so it cannot see a commerce dependency reached at runtime through a generated path, an env var assembled from fragments, or anything untracked \u2014 the bundle-level question belongs to a build-output scan, which does not exist yet. (3) `negative-control` and `specification` are whole-file exemptions: a file classified either way may carry any identifier anywhere in it, so a genuine regression inside one of those files would not be seen. Each class has an earning condition that is itself checked, which bounds the blast radius without removing it.",
+      "adr": "docs/adr/036-a-prohibition-in-prose-is-not-a-boundary.md",
+      "backstop": "control:merge-gate"
+    },
+    {
       "id": "canonical-domain-binding",
       "claims": "something asks, every six hours, whether healthyjewellery.com and its www host both reach this project's production deployment on the same commit — and reports the answer whatever it is",
       "status": "configured",
@@ -226,7 +237,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 13 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 14 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",

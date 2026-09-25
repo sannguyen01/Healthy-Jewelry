@@ -41,7 +41,7 @@ flag it if you see:
 
 ## Testing baseline
 
-The suite spans **89 unit spec files** and **15 E2E spec files**.
+The suite spans **92 unit spec files** and **15 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
@@ -113,15 +113,27 @@ E2E tests (Playwright)
 
 ## Outstanding known work (carry-forward — see STATE.md for current status)
 
-Manual Vercel dashboard steps not yet done (human action — never propose
-running these yourself):
-- Env vars: `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`,
-  `NEXT_PUBLIC_SITE_URL`, `SHOPIFY_WEBHOOK_SECRET`, `SHOPIFY_REVALIDATION_SECRET`,
-  `RESEND_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
-- Shopify webhook registration: Admin -> Settings -> Notifications -> Webhooks
-  -> point to `/api/webhooks/shopify`.
-- Visual QA against the live Vercel deploy URL and the checkout redirect to a
-  real Shopify URL. Note that axe a11y and visual-asset rendering are now
-  covered automatically (`e2e/a11y.spec.ts`, `e2e/visual-assets.spec.ts`,
-  `e2e/hero-legibility.spec.ts`); what still needs a human is the live
-  deployment itself, which sandboxed sessions cannot reach.
+**This section told you to set up a commerce platform until 2026-09-25**, listing five
+credentials to add and a webhook to register. It was written when that was the work. An
+obsolete runbook that reads as current is worse than no runbook — it is the one failure
+`COMMERCE-ELIMINATION-CONTRACT.md` §4 exists to catch, and it caught this file.
+
+The work is now the reverse. `docs/commerce-elimination-masterplan.md` is the plan of
+record; `docs/commerce-dependency-register.md` is the burn-down list, and its row count
+only moves one way.
+
+Manual console steps (human action — never propose running these yourself):
+- **Vercel env vars to remove**, from Production, Preview *and* Development. Inventory with
+  `vercel env ls` first rather than trusting a list. Keep `RESEND_API_KEY`,
+  `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`: `/api/contact` still consumes a
+  paid service and still needs distributed abuse protection.
+- **Delete the commerce webhook subscriptions before the endpoint that serves them.**
+  Reversing that order leaves the platform retrying a failing route for its full backoff
+  schedule. This is the masterplan's WS-F and it is not negotiable.
+- **Branch protection on `main`** — still unset, so a merge is a deploy with nothing in
+  between. Required contexts are the three strings in the fence above; never type `verify`
+  or `e2e`, which are job IDs.
+- **Visual QA against the live deployment.** axe a11y and visual-asset rendering are covered
+  automatically (`e2e/a11y.spec.ts`, `e2e/visual-assets.spec.ts`,
+  `e2e/hero-legibility.spec.ts`); what still needs a human is the live deployment itself,
+  which sandboxed sessions cannot reach.

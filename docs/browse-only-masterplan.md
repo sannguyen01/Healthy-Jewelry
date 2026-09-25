@@ -1,5 +1,23 @@
 # Browse-only masterplan — the coordinated decommission of Shopify
 
+> **Superseded, 2026-09-25 by [`docs/commerce-elimination-masterplan.md`](commerce-elimination-masterplan.md).**
+>
+> Not edited to match it. This is the plan as it stood on 2026-09-20, and its WS numbering
+> (WS-0 … WS-8, ordered by phase) is *not* the successor's (WS-A … WS-I, ordered by deletion
+> domain). Anyone reading a WS reference in a commit message before 2026-09-25 wants this
+> file; anyone doing the work wants the other one.
+>
+> What the successor changes, in one line each: the boundary is now a parsed contract and a
+> reconciled register rather than a plan ([ADR 036](adr/036-a-prohibition-in-prose-is-not-a-boundary.md));
+> the workstreams are cut by deletion domain so they can run in parallel with disjoint file
+> ownership; and the north star is stated as five responsibilities the site is measured
+> against rather than as an end state.
+>
+> Kept rather than deleted because §2's findings are evidence — the production verification
+> tier going dark and reporting success, the `www` redirect defect, the domain model moving
+> house without changing shape — and each is dated, sourced and still true of the day it
+> records.
+
 The execution runbook for turning Healthy Jewellery from a headless Shopify storefront into a
 browse-only catalogue hosted entirely on Vercel, with the Shopify tenancy left dormant.
 

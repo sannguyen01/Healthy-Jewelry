@@ -25,6 +25,7 @@
 > | `opengraph-vnd-font.test.tsx` — the ₫ glyph rasterises | `opengraph-bundled-font.test.tsx` — every character the card can carry |
 > | coverage scoped to `src/lib`, `src/store`, `src/config` | `src/store` is gone with the cart; `src/lib` and `src/config` |
 > | six premise detectors, five of them reading Shopify | one, `SHOPIFY-API-VERSION`, and it is pure |
+> | the prohibition lived in prose, in this file and four others | `COMMERCE-ELIMINATION-CONTRACT.md`, **parsed** on every pull request, with a 53-row register reconciled in both directions ([ADR 036](adr/036-a-prohibition-in-prose-is-not-a-boundary.md)) |
 >
 > [ADR 035](adr/035-a-control-outlives-its-subject.md) is the rule that governed every one of those
 > transitions: a control whose subject is deleted is re-founded, suspended behind a premise
@@ -632,6 +633,30 @@ Two things that took a debugging round each, and are commented in the spec so th
   a clip taken from a still-moving element lands where the element *was*. Waiting for opacity is not
   enough either — the effect applies its starting values after mount, so a naive check reports
   "settled" before the animation has begun.
+
+---
+
+> ## ⚠ Everything from here to the end of this file is history
+>
+> The opening banner says so, and a reader who arrives from a search result or a deep link
+> never met it. So it is repeated at the boundary, once, where the historical block actually
+> begins.
+>
+> **The four sections below — checkout and currency, the headless storefront, the store's
+> vocabulary, and the purchase journey's ending — describe a system that no longer exists.**
+> There is no cart, no checkout, no account and no price; `/checkout`, `/checkouts/*`,
+> `/orders/*` and `/discount/*` answer **410 Gone**, and
+> [`COMMERCE-ELIMINATION-CONTRACT.md`](../COMMERCE-ELIMINATION-CONTRACT.md) fails the build
+> on any attempt to bring one back
+> ([ADR 036](adr/036-a-prohibition-in-prose-is-not-a-boundary.md)).
+>
+> They are kept because the lessons are about **how verification fails**, not about a vendor:
+> a suite green on an assertion whose definition of success contained the dead end; a
+> discriminator that stopped discriminating; a price nothing guaranteed; two secrets that are
+> not interchangeable and fail silently when swapped. Every one of those recurs in systems
+> with no commerce in them at all.
+>
+> Nothing below is an instruction. Do not act on it.
 
 ---
 
