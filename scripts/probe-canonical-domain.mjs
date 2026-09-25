@@ -74,6 +74,21 @@ export const MAX_REDIRECTS = 3
 export async function observe(host) {
   const chain = [host]
   let url = `https://${host}/api/version`
+  /**
+   * The status of the FIRST hop that redirected, kept separately from `status`.
+   *
+   * **A finding in issue #84 read "healthyjewellery.com answers 200 and redirects to
+   * www.healthyjewellery.com", which is not a thing that can happen.** A 200 does not
+   * redirect. The loop below walks the chain and returns the status of whatever finally
+   * answered — 200, from `www` — so the `apex-redirected` detail, which interpolated
+   * `o.status`, described the end of the chain while claiming to describe its start.
+   *
+   * The two halves of the sentence came from different hops, and the reader is given no
+   * way to tell. `verify-browse-only.mjs` got this right by accident of design: it never
+   * follows a redirect, so the only status it has is the immediate one. This probe follows
+   * by design, and therefore has to carry both.
+   */
+  let redirectStatus = null
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     let response
@@ -98,11 +113,15 @@ export async function observe(host) {
           host,
           transport: 'ok',
           status: response.status,
+          redirectStatus,
           chain,
           server: response.headers.get('server'),
           version: null,
         }
       }
+      // First hop only. A chain of 307 → 308 is one policy to a reader, and the status
+      // that matters is the one the canonical host itself answers with.
+      if (redirectStatus === null) redirectStatus = response.status
       // Record the hostname only when it actually changes: a scheme or path redirect
       // within one host is not a binding fact and would make the chain unreadable.
       if (next.hostname !== chain[chain.length - 1]) chain.push(next.hostname)
@@ -142,6 +161,7 @@ export async function observe(host) {
       host,
       transport: 'ok',
       status: response.status,
+      redirectStatus,
       chain,
       server,
       version: body,
@@ -152,6 +172,7 @@ export async function observe(host) {
     host,
     transport: 'ok',
     status: 310,
+    redirectStatus,
     chain,
     server: null,
     version: null,
