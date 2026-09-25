@@ -46,6 +46,36 @@ records, because Vercel's edge network accepts traffic on a range of its own
 anycast IPs — this is not something to "clean up" by guessing at a single
 correct IP by hand.
 
+### The redirect is on the wrong hostname (measured 2026-09-20)
+
+The table above is about DNS and is still accurate. What changed is a **Vercel
+domain setting**, which DNS cannot show you:
+
+| Hostname | What it does now | What it should do |
+|---|---|---|
+| `healthyjewellery.com` | Answers **307** and redirects every path to `www.healthyjewellery.com` | Serve the Production deployment directly |
+| `www.healthyjewellery.com` | Serves the Production deployment | Redirect **permanently (308)** to the apex |
+
+Measured twice, 24 minutes apart, from two different workflows — `probe-canonical-domain.mjs`
+walked the chain `healthyjewellery.com → www.healthyjewellery.com` and found the right
+commit in production at the end of it, and `verify-browse-only.mjs` got a 307 on every path
+it asked the apex for.
+
+**Nothing is broken for a visitor**, which is why this needs writing down. Both hostnames
+resolve, both serve the same production deployment, and a browser following the redirect
+renders the site. What is wrong is that `src/config/site.ts` names the apex as `SITE_URL`,
+so every absolute URL the application emits — canonical links, JSON-LD, the OG card, the
+sitemap — points at a host that serves nothing but a hand-off, and a `307` tells a crawler
+the move is temporary and the old URL should keep being re-checked.
+
+**Fix in Vercel → Project → Settings → Domains, in this order.** Clearing the apex first
+matters: adding the www redirect while the apex still redirects to www produces a loop.
+
+1. On `healthyjewellery.com`, remove the redirect so it serves the Production deployment.
+2. On `www.healthyjewellery.com`, set a redirect to `healthyjewellery.com`, **permanent**.
+
+Do **not** touch DNS for either of these. This is a project setting, not a record.
+
 ## Decision already made: Vercel stays the root, Shopify stays headless
 
 This project keeps its bespoke Next.js frontend at the root domain. Shopify
