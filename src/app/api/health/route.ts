@@ -11,8 +11,10 @@ import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
  * `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` are absent. On Vercel
  * that map lives per Lambda instance, so the effective limit is
  * `limit × concurrent instances` rather than `limit` — the same single-instance
- * weakness a security audit already corrected once for `/api/contact`, quietly
- * reintroduced for `/api/shopify`, which is unauthenticated and creates carts.
+ * weakness a security audit already corrected once for `/api/contact`, and then
+ * quietly reintroduced for the unauthenticated cart proxy that used to sit at
+ * `/api/shopify`. That route now answers 404 and the limiter went with it; the
+ * shape of the mistake is what is worth keeping here.
  *
  * `/api/contact` has the same shape of gap: PR #32 made a missing
  * `RESEND_API_KEY` fail honestly at request time (503, no more silent
@@ -195,7 +197,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         ? undefined
         : probe.distributed
           ? 'Upstash is configured but did not answer. Each limiter falls back to its ' +
-            'declared onError posture: /api/shopify and /api/analytics allow, ' +
+            'declared onError posture: /api/analytics allows, ' +
             '/api/contact refuses. Until 2026-09-15 this line read "rate limits are ' +
             'failing open" while all three actually threw, returning 500 at the till.'
           : 'UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are unset in this ' +

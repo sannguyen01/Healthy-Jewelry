@@ -56,7 +56,6 @@ Routes, components, API handlers, configuration and the client bundle.
 
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
-| `src/app/api/health/route.ts` | shopify-name | Application | HTTP GET, uncached | none | rewrite one sentence — it names `/api/shopify`, a route that answers 404 | `src/tests/unit/api-health-route.test.ts` | WS-A |
 | `src/app/api/revalidate/route.ts` | shopify-env shopify-name | Application | HTTP POST with a shared secret | credential names | delete — a static catalogue is revalidated by deploying, not by purging | `src/tests/unit/api-revalidate-route.test.ts` | WS-A |
 | `src/app/api/version/route.ts` | shopify-name | Application | HTTP GET, uncached | public config | rewrite — the stale-build fingerprint stays, its Shopify fields go | `src/tests/unit/api-version-route.test.ts` | WS-A |
 | `src/config/build-info.ts` | shopify-name | Application | Build time, inlined into the client bundle | public config | rewrite — drop the store domain from the fingerprinted key set | `src/tests/unit/api-version-route.test.ts` | WS-A |
@@ -88,7 +87,6 @@ Workflows, probes, gates, fixtures and the machinery that watches them.
 | `.github/workflows/diagnose-deployment.yml` | shopify-env shopify-host shopify-name | GitHub Actions | workflow_dispatch | credential names | delete with its script — it diagnoses a headless storefront | `src/tests/unit/workflow-validity.test.ts` | WS-C |
 | `.github/workflows/production-smoke.yml` | shopify-env shopify-name | GitHub Actions | Six-hourly cron | credential names | rewrite — retire the Shopify tier once the browse-only smoke files issues | `src/tests/unit/smoke-liveness.test.ts` | WS-C |
 | `docs/controls.json` | shopify-env shopify-name | Control registry | Six-hourly control audit | credential names | rewrite — retire the controls whose subject the decommission deletes (ADR 035) | `src/tests/unit/control-registry.test.ts` | WS-C |
-| `gate.yaml` | shopify-name | Loop denylist | Unattended loop runs | none | rewrite — `src/lib/shopify/**` is denied to a loop and is being deleted outright | `src/tests/unit/gate-denylist-contract.test.ts` | WS-C |
 | `playwright.config.ts` | shopify-env shopify-host shopify-name | Playwright | Every E2E run | public config | delete the mock storefront env injected into the web server | `e2e/retired-routes.spec.ts` | WS-C |
 | `scripts/diagnose-deployment.mjs` | shopify-env shopify-host shopify-name | Deployment diagnosis | workflow_dispatch | credential names | delete — every question it asks is about a headless storefront | `src/tests/unit/deployment-verdict.test.ts` | WS-C |
 | `scripts/lib/api-version.mjs` | shopify-env shopify-name | API version pin | Premise checks, six-hourly | none | delete — a pinned vendor API version with no vendor | `src/tests/unit/api-version-contract.test.ts` | WS-C |
@@ -153,17 +151,13 @@ Guidance a person or an agent acts on, which is why an obsolete one is not harml
 
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
-| `.claude/skills/project-conventions/SKILL.md` | shopify-env shopify-name | Agent guidance | Loaded at the start of every agent session | none | rewrite — the verify commands and brand prohibitions stay; the Shopify env preamble goes | `src/tests/unit/agent-doc-claims.test.ts` | WS-I |
-| `.github/PULL_REQUEST_TEMPLATE.md` | shopify-name | GitHub | Every pull request | none | rewrite — the Shopify checklist item has no subject | this contract scan | WS-I |
-| `CLAUDE.md` | shopify-name | Agent guidance | Loaded at the start of every agent session | none | rewrite — the Shopify paragraph becomes a pointer to this contract | `src/tests/unit/agent-doc-claims.test.ts` | WS-I |
-| `CONTRIBUTING.md` | shopify-env shopify-name | Contributor guidance | Onboarding | credential names | rewrite — the local setup section names variables that will not exist | this contract scan | WS-I |
-| `README.md` | shopify-name | Repository front page | First read | none | rewrite — the stack description still leads with a headless storefront | this contract scan | WS-I |
-| `docs/failure-modes.md` | shopify-name | Failure registry | Design review | none | rewrite — Shopify-sourced degradation modes have no source left | `src/tests/unit/failure-mode-registry.test.ts` | WS-I |
-| `docs/safety.md` | shopify-name | Loop policy, prose mirror | Unattended loop runs | none | rewrite together with `gate.yaml`, which it mirrors | `src/tests/unit/gate-denylist-contract.test.ts` | WS-I |
-| `docs/testing-strategy.md` | cart-mutation checkout-handoff inventory-check shopify-env shopify-host shopify-name | Test documentation | Every contributor and agent | none | rewrite — the cart, checkout and inventory tiers it documents are gone | `src/tests/unit/doc-numeric-claims.test.ts` | WS-I |
-| `e2e/COVERAGE.md` | shopify-name | E2E coverage map | Spec review | none | rewrite — the commerce journeys it maps no longer have specs | `src/tests/unit/spec-anchor-contract.test.ts` | WS-I |
+| `.claude/skills/project-conventions/SKILL.md` | shopify-env shopify-name | Agent guidance | Loaded at the start of every agent session | none | rewrite — **done**; the section that told an agent to register webhooks and add five credentials now describes the removal. What remains is the dated account of the spec-count change | `src/tests/unit/agent-doc-claims.test.ts` | WS-I |
+| `CLAUDE.md` | shopify-name | Agent guidance | Loaded at the start of every agent session | none | rewrite — **done 2026-09-25**; what remains is the account of the three routes deliberately still standing, which closes with them (WS-F) | `src/tests/unit/agent-doc-claims.test.ts` | WS-I |
+| `docs/failure-modes.md` | shopify-name | Failure registry | Design review | none | rewrite — **done**; the dead `/api/shopify` posture row is corrected, and what remains is a dated account of six failure modes deleted with the read path, named rather than silently dropped | `src/tests/unit/failure-mode-registry.test.ts` | WS-I |
+| `docs/testing-strategy.md` | cart-mutation checkout-handoff inventory-check shopify-env shopify-host shopify-name | Test documentation | Every contributor and agent | none | rewrite — **done**; the commerce sections carry a dated banner at the top of the file and at the boundary of the historical block, and are kept because the lessons are about how verification fails rather than about a vendor | `src/tests/unit/doc-numeric-claims.test.ts` | WS-I |
+| `e2e/COVERAGE.md` | shopify-name | E2E coverage map | Spec review | none | no rewrite needed — its references are a live coverage exception for `/api/webhooks/shopify` and a dated record of two wrong citations. Closes when WS-F deletes that route | `src/tests/unit/spec-anchor-contract.test.ts` | WS-I |
 | `docs/commerce-elimination-masterplan.md` | shopify-env shopify-host shopify-name | Plan of record | Read before any workstream starts | none | delete when the last register row closes — a plan for work that is finished is a plan somebody will start | `src/tests/unit/commerce-contract.test.ts` | WS-I |
-| `loop-constraints.md` | shopify-env shopify-name | Loop policy | Unattended loop runs | credential names | rewrite — the credential rules stay; the Shopify examples change subject | `src/tests/unit/agent-doc-claims.test.ts` | WS-I |
+| `loop-constraints.md` | shopify-env shopify-name | Loop policy | Unattended loop runs | credential names | rewrite — **done**; the credential guidance no longer names a closing console and `@shopify/*` is gone from the escalation list. One dated sentence remains explaining why | `src/tests/unit/agent-doc-claims.test.ts` | WS-I |
 
 <!-- /contract:register -->
 

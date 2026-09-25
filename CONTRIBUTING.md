@@ -84,6 +84,11 @@ have drifted before and caused real confusion:
   listing
 - `STATE.md` — anything that moves an item from pending to resolved, or
   surfaces a new gotcha
-- `SHOPIFY_SETUP.md` / `docs/webhooks.md` / `docs/catalog-conventions.md` — any
-  change to Shopify integration behavior
+- `COMMERCE-ELIMINATION-CONTRACT.md` — any new route, any new position class, any
+  change to what this site is allowed to be. Weakening it is not an ordinary
+  edit: say in the PR body which capability it re-permits and who approved that
+- `docs/commerce-dependency-register.md` — a row is finished by **deleting** it.
+  Leaving a spent row behind fails the build, which is the point
+- `docs/catalog-conventions.md`'s successor — any change to how a catalogue
+  record is authored or validated
 - `CHANGELOG.md` — append an entry; don't rewrite history

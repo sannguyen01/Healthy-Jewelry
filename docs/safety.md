@@ -17,7 +17,8 @@ autonomous run escalates instead of editing them on its own.
 .vercel/**
 **/migrations/**
 .github/workflows/**
-src/lib/shopify/**   (Storefront API client — version-pinned in production)
+COMMERCE-ELIMINATION-CONTRACT.md      (the commerce boundary, parsed on every PR)
+docs/commerce-dependency-register.md  (its inventory — a row is closed by deleting it)
 next.config.ts
 ```
 
@@ -47,8 +48,8 @@ contexts are in `docs/testing-strategy.md`.
 
 - Any push to `main` — auto-deploys to Vercel production
   (`prj_yXFNldDpw3O3r3BWnM0g5ExpfVmN`).
-- Dependency major-version bumps (`next`, `react`, `react-dom`, `@shopify/*`)
-  and high-severity CVE fixes.
+- Dependency major-version bumps (`next`, `react`, `react-dom`) and
+  high-severity CVE fixes.
 - Changes touching more than 10 files.
 - Third attempt failed on the same item.
 - Any content change touching stones/gems/crystals/chakras/healing language —
@@ -60,8 +61,9 @@ No MCP connectors configured for this repo's loops currently.
 
 ## Secrets in prompts and logs
 
-- Never paste Shopify tokens, Upstash/Resend keys, or webhook secrets into
-  scheduler prompts.
+- Never paste a credential of any kind — Upstash, Resend, a webhook signing
+  secret, or any surviving platform token — into a scheduler prompt. The rule is
+  about the act, not about which vendor issued the value.
 - `STATE.md` is committed — no credentials in it, ever.
 
 ## Incident response

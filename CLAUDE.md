@@ -184,12 +184,20 @@ ways, clipping, spread across ratios, buy-control position) and
 - `src/lib/data/hj-data.ts` — **materials copy only** (three metals). Not a catalogue: a
   metal has no handle, URL, sizes or photograph. `hj-data.test.ts` asserts its export
   surface is exactly `hjMaterials`.
-- **Shopify**: the read path is gone. What survives is `src/lib/shopify/cacheTags.ts` and
-  `api-version.ts`, kept only because `/api/webhooks/shopify`, `/api/revalidate` and
-  `/api/version` still import them — and those three routes are held back on purpose. The
-  webhook subscriptions must be deleted in Shopify Admin *before* the endpoint is removed,
-  or Shopify retries against a failing route for its full backoff schedule. That is the
-  masterplan's WS-7 ordering and the connector is currently `needs_reconnect`.
+- **Commerce**: nothing here can be bought, and that is a **contract** rather than a
+  description. `COMMERCE-ELIMINATION-CONTRACT.md` is parsed on every pull request; a
+  commerce identifier, package, route or document that is neither classified there nor owned
+  by a row in `docs/commerce-dependency-register.md` fails the build. See
+  [ADR 036](docs/adr/036-a-prohibition-in-prose-is-not-a-boundary.md), and
+  `docs/commerce-elimination-masterplan.md` for the nine workstreams that burn the register
+  down. A new file carrying a commerce identifier is a defect until somebody classifies it —
+  `executable` is the default class.
+- **What is deliberately still standing**: `src/lib/shopify/cacheTags.ts` and
+  `api-version.ts`, because `/api/webhooks/shopify`, `/api/revalidate` and `/api/version`
+  still import them. The webhook subscriptions must be deleted in the platform console
+  *before* the endpoint is removed, or it retries against a failing route for its full
+  backoff schedule. That is the masterplan's **WS-F** ordering (the browse-only plan called
+  it WS-7), and the connector is currently `needs_reconnect`.
 - Hooks: `src/lib/hooks/useReveal.ts` — IntersectionObserver scroll-reveal hook, returns `[ref, visible]` tuple, triggers once then disconnects
 
 ### No prices, anywhere
