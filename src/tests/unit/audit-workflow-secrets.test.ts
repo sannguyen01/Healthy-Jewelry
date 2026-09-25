@@ -137,19 +137,52 @@ describe('auditSecrets against this repository', () => {
     expect(byName.has('X')).toBe(false)
   })
 
-  itFull('classifies the smoke-test secrets as pending, not orphaned', () => {
-    // They are referenced by a workflow that exists but has not reached the default
-    // branch, so they are needed — they just cannot do anything yet.
-    for (const name of [
-      'PRODUCTION_SITE_URL',
-      'SHOPIFY_STORE_DOMAIN',
-      'SHOPIFY_STOREFRONT_ACCESS_TOKEN',
-      'SHOPIFY_ADMIN_ACCESS_TOKEN',
-      'SHOPIFY_WEBHOOK_SECRET',
-    ]) {
+  itFull('classifies the smoke-test secrets the workflow still consumes as not orphaned', () => {
+    // `production-smoke.yml` references each of these, so they are needed. It has since
+    // reached the default branch, which moves them from `pending` to `live` — either is a
+    // correct answer to the question this asserts, which is only ever *not an orphan*.
+    for (const name of ['PRODUCTION_SITE_URL', 'SHOPIFY_STORE_DOMAIN', 'SHOPIFY_WEBHOOK_SECRET']) {
       const entry = byName.get(name)
       expect(entry, `${name} should be in the audit`).toBeDefined()
       expect(entry?.status, `${name} should not be an orphan`).not.toBe('orphan')
+    }
+  })
+
+  itFull('classifies the two decommissioned Shopify read tokens as orphans', () => {
+    // **This assertion was inverted on 2026-09-21, and the inversion is the finding.**
+    //
+    // Both names sat in the list above until WS-6 removed the last thing that consumed
+    // them: the Storefront and Admin tokens were arguments to `preflight-secrets.mjs` and
+    // entries in its `WHERE` map, for live checks that read a store this brand no longer
+    // has. `production-smoke.yml` stopped passing them, so no existing workflow references
+    // either — which is precisely the definition of `orphan`.
+    //
+    // The auditor said so on the first run after the merge and this test called it a
+    // regression. It was not: the tool was right and the expectation was stale. Two
+    // credentials that can read a Shopify store are still configured in repository
+    // settings with nothing left to use them, which is the exact condition
+    // `scripts/audit-workflow-secrets.mjs` exists to surface.
+    //
+    // Asserted positively rather than deleted, per
+    // [ADR 035](../../../docs/adr/035-a-control-outlives-its-subject.md): dropping the two
+    // names would have made the suite green and left the finding unwatched. Written this
+    // way it bites in both directions — it fails if a workflow starts referencing them
+    // again (a decommissioned credential coming back is a decision, not a diff), and it
+    // fails if the audit stops classifying them, which is the shape of a broken auditor.
+    //
+    // It is expected to fail once more, deliberately: when the tokens are deleted from
+    // Settings → Secrets and variables → Actions **and** revoked in Shopify Admin, the
+    // last historical reference is still in git history, so they stay orphans here. The
+    // row to remove then is in `docs/credential-inventory.md`, which records the console
+    // half this script cannot see.
+    for (const name of ['SHOPIFY_STOREFRONT_ACCESS_TOKEN', 'SHOPIFY_ADMIN_ACCESS_TOKEN']) {
+      const entry = byName.get(name)
+      expect(entry, `${name} should be in the audit`).toBeDefined()
+      expect(entry?.status, `${name} should be an orphan after WS-6`).toBe('orphan')
+      expect(
+        entry?.workflows,
+        `${name} should name the workflow that last used it`,
+      ).toContain('.github/workflows/production-smoke.yml')
     }
   })
 

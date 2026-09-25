@@ -34,6 +34,7 @@ const {
   classifyResponseOrigin,
   classifyTransportFailure,
   decideCanonicalDomain,
+  CANONICAL_FINDINGS,
 } = await import('../../../scripts/lib/canonical-domain.mjs')
 
 // The probe itself, imported for its transport half. Safe because the script guards its
@@ -191,6 +192,68 @@ describe('decideCanonicalDomain', () => {
       apexHost: APEX,
     })
     expect(codes(verdict)).toContain('www-not-redirected')
+  })
+
+  it('notices the apex handing its traffic to www', () => {
+    // **The state of the live domain on 2026-09-20, and the one this probe could not
+    // describe.** Both hostnames served the right commit in production; the apex answered
+    // 307 and pointed at www. The only finding the probe could produce was about www.
+    const verdict = decideCanonicalDomain({
+      observations: [ok(APEX, { status: 307, chain: [APEX, WWW] }), ok(WWW)],
+      apexHost: APEX,
+      expectedCommit: COMMIT,
+    })
+
+    expect(codes(verdict)).toContain('apex-redirected')
+    expect(verdict.state).toBe('drifted')
+  })
+
+  it('does not also blame www when the apex is the one redirecting', () => {
+    // The two cannot both be acted on: www cannot redirect to a host that redirects to
+    // www. Reporting both gives a reader two instructions that contradict each other.
+    const verdict = decideCanonicalDomain({
+      observations: [ok(APEX, { status: 307, chain: [APEX, WWW] }), ok(WWW)],
+      apexHost: APEX,
+      expectedCommit: COMMIT,
+    })
+
+    expect(codes(verdict)).not.toContain('www-not-redirected')
+  })
+
+  it('tells a reader which hostname to change, and in which direction', () => {
+    // The generic action line said "www redirecting permanently to the apex", which reads
+    // as a description of the setting that is already wrong in the other direction.
+    const { action } = decideCanonicalDomain({
+      observations: [ok(APEX, { status: 307, chain: [APEX, WWW] }), ok(WWW)],
+      apexHost: APEX,
+      expectedCommit: COMMIT,
+    })
+
+    expect(action).toContain(`Clear the redirect on ${APEX}`)
+    expect(action).toContain('308')
+  })
+
+  it('still blames www when the apex serves its own content', () => {
+    // The suppression above must be conditional on the apex redirecting, not general.
+    const verdict = decideCanonicalDomain({
+      observations: [ok(APEX), ok(WWW)],
+      apexHost: APEX,
+    })
+
+    expect(codes(verdict)).toContain('www-not-redirected')
+    expect(codes(verdict)).not.toContain('apex-redirected')
+  })
+
+  it('prefers off-domain-redirect when the apex leaves the brand', () => {
+    // An apex pointing at a host that is not under test is a different and worse fact
+    // than an apex pointing at www, and the two must not be confused.
+    const verdict = decideCanonicalDomain({
+      observations: [ok(APEX, { status: 307, chain: [APEX, 'shops.myshopify.com'] }), ok(WWW)],
+      apexHost: APEX,
+    })
+
+    expect(codes(verdict)).toContain('off-domain-redirect')
+    expect(codes(verdict)).not.toContain('apex-redirected')
   })
 
   it('notices a redirect leaving the brand entirely', () => {
@@ -477,5 +540,77 @@ describe('the audit workflow reaches the decision it claims to', () => {
     expect(
       existsSync(path.resolve(import.meta.dirname, '../../../scripts/lib/canonical-domain.mjs'))
     ).toBe(true)
+  })
+})
+
+describe('the enumeration and the decision agree', () => {
+  /**
+   * `CANONICAL_FINDINGS` was exported, documented as the list ADR 019 reconciles against
+   * prose, and referenced by **nothing** — not by the decision function that emits the
+   * codes, not by a test, not by `docs/failure-modes.md`. An enumeration nobody compares
+   * to anything is a comment with a type annotation.
+   *
+   * Both directions, this repository's usual rule: a code the function can emit but the
+   * list does not name is an unnamed failure mode; a code the list names but nothing can
+   * emit is a failure mode that was removed and left in the documentation.
+   */
+  const emitted = new Set<string>()
+  const record = (v: { findings: { code: string }[] }) => {
+    for (const f of v.findings) emitted.add(f.code)
+    return v
+  }
+
+  // One scenario per code, so the reconciliation below is driven by the real function.
+  record(decideCanonicalDomain({ observations: [], apexHost: APEX }))
+  record(decideCanonicalDomain({ observations: [ok(WWW)], apexHost: APEX }))
+  record(
+    decideCanonicalDomain({
+      observations: [{ host: APEX, transport: 'not-resolved', detail: 'ENOTFOUND' }],
+      apexHost: APEX,
+    }),
+  )
+  record(
+    decideCanonicalDomain({
+      observations: [ok(APEX), { host: WWW, transport: 'unreachable', detail: 'ETIMEDOUT' }],
+      apexHost: APEX,
+    }),
+  )
+  record(decideCanonicalDomain({ observations: [ok(APEX, { status: 500 })], apexHost: APEX }))
+  record(decideCanonicalDomain({ observations: [ok(APEX, { server: 'cloudflare' })], apexHost: APEX }))
+  record(decideCanonicalDomain({ observations: [ok(APEX, { version: null })], apexHost: APEX }))
+  record(
+    decideCanonicalDomain({
+      observations: [
+        ok(APEX, {
+          version: { build: { commit: COMMIT, vercelEnv: 'preview' }, runtime: { vercelEnv: 'preview' } },
+        }),
+      ],
+      apexHost: APEX,
+    }),
+  )
+  record(
+    decideCanonicalDomain({
+      observations: [ok(APEX), ok(WWW, { version: { build: { commit: 'b'.repeat(40), vercelEnv: 'production' }, runtime: { vercelEnv: 'production' } } })],
+      apexHost: APEX,
+    }),
+  )
+  record(decideCanonicalDomain({ observations: [ok(APEX)], apexHost: APEX, expectedCommit: 'c'.repeat(40) }))
+  record(decideCanonicalDomain({ observations: [ok(APEX, { chain: [APEX, WWW] }), ok(WWW)], apexHost: APEX }))
+  record(decideCanonicalDomain({ observations: [ok(APEX, { chain: [APEX, 'elsewhere.example'] })], apexHost: APEX }))
+
+  it('emits something, so the comparison is not trivially satisfied', () => {
+    expect(emitted.size).toBeGreaterThan(5)
+  })
+
+  it('names every code it can emit', () => {
+    for (const code of emitted) {
+      expect(CANONICAL_FINDINGS, `${code} is emitted but not enumerated`).toContain(code)
+    }
+  })
+
+  it('can emit every code it names', () => {
+    for (const code of CANONICAL_FINDINGS) {
+      expect(emitted, `${code} is enumerated but no scenario produces it`).toContain(code)
+    }
   })
 })

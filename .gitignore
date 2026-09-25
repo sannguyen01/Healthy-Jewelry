@@ -53,3 +53,21 @@ next-env.d.ts
 # Written by scripts/probe-canonical-domain.mjs on every run, same contract as the two
 # above: control-audit reads the verdict as data instead of parsing the probe's output.
 /canonical-domain.json
+
+# Probe output, written into the workspace root by control-audit.yml and
+# production-smoke.yml. Every probe there is piped through `tee <name>.log`, and the
+# reporting steps read the file back.
+#
+# Untracked and uncommittable, which ought to have been obvious and was not: these logs
+# made `git status --porcelain` non-empty, and `probe-assertion-liveness.mjs` reads that to
+# decide whether it is safe to mutate tracked source. It refused to start on every
+# scheduled run. That probe now filters untracked entries out of the status it judges —
+# this entry is the second layer, not the fix.
+/*.log
+
+# Written by scripts/verify-premises.mjs and consumed by control-audit's premise-drift
+# reporter, same data-not-prose contract as the verdict files above.
+/premise-drift.json
+
+# The production-smoke receipt, uploaded as an artifact and read by probe-smoke-liveness.
+/smoke-receipt.json
