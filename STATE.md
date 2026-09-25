@@ -1,7 +1,73 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-09-21
+Last refreshed by hand: 2026-09-25
+
+## Session note — 2026-09-25
+
+**Every prohibition this repository wrote as prose has been violated at least once, and
+nothing went red.** `/terms` listed three card-and-wallet brands as accepted payment methods
+for eleven days after Add to Bag was deleted. `docs/controls.json` claimed a merge gate
+GitHub had never been told about. A pinned vendor API version was believed for seven months
+past its retirement. Prose has no type checker, and every reconciliation this repository owns
+checks something else — numbers in documents, claims about controls, rendered geometry. A
+sentence describing a capability is none of those.
+
+The decommission makes it worse in a specific way: **its output is an absence**, and an
+absence is the one thing nobody notices returning. A cart component re-added next quarter
+looks like a feature. A commerce SDK arriving as a transitive of an image plugin looks like
+lockfile churn. A runbook telling somebody to reconnect the storefront looks like
+documentation — and one was, in the file every agent session loads first.
+
+`COMMERCE-ELIMINATION-CONTRACT.md` is now parsed on every merge, with a register reconciled
+in both directions. See [ADR 036](docs/adr/036-a-prohibition-in-prose-is-not-a-boundary.md).
+
+**The design decision worth carrying forward.** The obvious control — fail on any tracked
+file containing the vendor name — is unusable, and the reason decides everything. It calls
+`browse-only-copy.test.tsx` a defect, and that file is the check that *forbids* the word. It
+calls seventeen ADRs defects for recording decisions correctly. A guardrail that fails on its
+own guardrails collects exemptions until it is quiet, which is ADR 011's muting pattern
+pointed at a linter. So a finding is a function of the identifier **and the position it
+occupies**, and `executable` is the default class: a new file is a defect until somebody
+classifies it, and each non-default class has an earning condition that is itself checked.
+
+**Three things the session found by running the tool rather than reading it.**
+
+- **The scanner failed its own author's work twice.** A credential-shaped literal in the very
+  test that proves the credential rule fires; then a sentinel whose scar text named payment
+  brands in a `.mjs` string literal. Both fixed by rewording, because `value` and `absolute`
+  admit no exemption of any kind. That is the intended cost and the clearest evidence the
+  scopes are real.
+- **`--draft` was not idempotent, and it had already shipped that way.** It evaluated against
+  the *current* register, so once the register was populated it printed almost nothing —
+  regenerating the document produced two rows instead of fifty-eight. A drafting tool has to
+  answer the same question every time it is asked. Now pinned by a test.
+- **The lockfile parser could not see scoped packages.** `'@upstash/redis@1.38.4':` is quoted
+  in pnpm's format and `next@16.3.4:` is not. The first draft matched only the bare form,
+  which would have silently dropped every `@shopify/*` from the prohibited-package scan — the
+  exact class it exists to catch, invisible, reporting a clean lockfile. Caught because the
+  test asserts the parser can see packages this project is *known* to depend on, rather than
+  only asserting the absence of ones it must not have.
+
+**Two pre-existing gaps the route reconciliation surfaced.** Four `/stones` and `/crystals`
+redirects that no E2E test had ever requested — live routing rules nothing observed — and two
+contract rows whose stated reason was "As above."
+
+**ADR 035's tax, paid three times and then a fourth.** The spec-anchor coverage map, the
+numeric-claims registry and the sentinel list each refused the change until updated with it.
+Then `main` merged in carrying PR #87, and git produced a **clean merge that was wrong twice**:
+`SKILL.md` ended up with both sides' sentence one line apart (90 and 89 specs; the real figure
+is 92), and `doc-numeric-claims.test.ts` ended up with two `context`/`claimed` pairs in one
+object literal — the second silently wins, so a live check was pinning a string that appeared
+nowhere. ADR 031 with a fresh example. The newly-merged `sentinel-inventory.test.ts` caught
+the other two counts in the same run that broke them.
+
+**Still open, and owned.** 53 register rows. The runtime deletions are WS-A and deliberately
+out of this change: the brief's own ordering puts negative controls before removal.
+`/api/webhooks/shopify` is WS-F and gated on deleting the Shopify subscriptions first —
+reversing that leaves Shopify retrying a failing route for its full backoff schedule. Branch
+protection on `main` is still unset, which means a merge is a deploy with nothing in between,
+and that is the single most important governance fact for a fan-out of agents.
 
 ## Session note — 2026-09-21
 
