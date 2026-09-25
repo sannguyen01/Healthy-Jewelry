@@ -210,6 +210,17 @@ export const SENTINELS = [
     invariant: 'a budget named in bytes is measured in bytes, and counted while the body is still arriving',
     scar: "Two routes declared MAX_BODY_BYTES and compared it against String.prototype.length — UTF-16 code units — so the effective budget was up to 3x its stated value on the multi-byte input a VND storefront receives as a matter of course. And the check ran after `await request.text()` had already materialised the whole body.",
   },
+  {
+    id: 'commerce-boundary',
+    runner: 'vitest',
+    file: 'COMMERCE-ELIMINATION-CONTRACT.md',
+    find: '| `src/tests/unit/browse-only-copy.test.tsx` | negative-control |',
+    replace: '| `src/tests/unit/browse-only-copy.test.tsx` | superseded |',
+    specs: ['src/tests/unit/commerce-contract.test.ts'],
+    invariant:
+      'a commerce identifier in running code is a build failure unless the contract classifies the file or the register owns it',
+    scar: "The decommission's output is an *absence*, and an absence is the one thing nobody notices returning. /terms listed three card-and-wallet brands as accepted methods for eleven days after Add to Bag was deleted, and nothing went red: prose has no type checker. This mutation downgrades the one class allowed to name those brands — the check that forbids them — so the contract stops covering the file that was the original defect. (Written without naming them, because the contract's `payment-provider` rule is absolute in code position and this registry is code: the scanner failed this very entry on its first run, which is the shortest possible demonstration that the scope has no escape hatch.)",
+  },
 
   // ── Playwright: need a production build, so opt-in via --with-e2e ──
   {

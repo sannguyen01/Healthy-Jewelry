@@ -26,6 +26,9 @@ check too: a stale exception is an assertion nobody re-examined.
 /api/webhooks/shopify — Verified by src/tests/unit/api-webhooks-shopify-route.test.ts and webhook-signature-contract.test.ts. Driving it from a browser would mean forging a signature in the spec, duplicating the script that already does it.
 /api/analytics — e2e/analytics.spec.ts asserts the beacons this route receives, from the page side. The route itself is a sink; asserting it twice adds nothing.
 /checkout — Verified by e2e/retired-routes.spec.ts, which reads the status code rather than navigating. `page.goto('/checkout')` would assert the wrong thing: Playwright follows a 410 and renders its body, so a navigation test passes identically whether the route answers 410 or 200. The spec asserts 410 on GET and on a stale POST, the noindex header, and that the body tells a human what to do instead.
+/checkouts/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code. Shopify's hosted-checkout URL space, retired as 410; `page.goto` cannot tell a 410 from a 200 because Playwright follows both and renders the body. The spec asserts the status on GET and on a stale POST, the noindex header, and that the body hands the visitor to an ambassador.
+/orders/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code. This site holds no orders and must not imply it can find one; the same 410-vs-200 argument as /checkout applies, so navigation would assert nothing.
+/discount/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code, plus a query-string case asserting `?discount=CODE` is not honoured on a live page. A discount is a price claim, and this site publishes no prices.
 /api/contact — e2e/contact.spec.ts intercepts it to drive the form's success, failure and 503 states, and src/tests/unit/api-contact-route.test.ts exercises the handler. Between them both sides of the contract are covered.
 ```
 

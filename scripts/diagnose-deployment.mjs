@@ -251,8 +251,8 @@ async function main() {
         detail:
           `Searched ${bundle.scripts} chunk(s) and found no occurrence of the store domain. ` +
           'NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN was absent when this bundle was built, so the ' +
-          'cart cannot sync and Checkout can never produce a checkoutUrl — regardless of ' +
-          'what the variable is set to now.',
+          'cart cannot sync and the hand-off to the hosted checkout can never complete — ' +
+          'regardless of what the variable is set to now.',
         action:
           'Set it in Vercel for this environment and redeploy with the build cache ' +
           'DISABLED. A plain redeploy will reuse this same bundle.',

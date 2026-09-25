@@ -1,3 +1,5 @@
+import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/goneResponse'
+
 /**
  * `/checkout` — **410 Gone**, deliberately, and not a redirect.
  *
@@ -8,9 +10,10 @@
  * it is the one a crawler treats as final — a 404 invites re-crawling for months, a 410 does
  * not.
  *
- * `/cart` and `/account` **do** redirect (308, in `next.config.ts`), because for those a
- * destination exists that answers the visitor's actual question: a bag becomes the shelf it
- * was filled from, and a login becomes the person who replaces it. A checkout has no such
+ * `/cart`, `/account`, `/collections/*` and `/policies/*` **do** redirect (308, in
+ * `next.config.ts`), because for those a destination exists that answers the visitor's actual
+ * question: a bag becomes the shelf it was filled from, a login becomes the person who
+ * replaces it, a Shopify collection URL becomes the shelf it named. A checkout has no such
  * successor. Sending someone to `/shop` after they clicked Checkout tells them nothing about
  * why they cannot buy.
  *
@@ -24,67 +27,18 @@
  * So this is a `route.ts`. A route handler and a page cannot coexist on one path, which is
  * why `checkout/page.tsx` is deleted rather than kept alongside.
  *
- * The body is served for the human who followed an old link. It is deliberately plain HTML
- * with inline styles: a 410 must not depend on the app shell, its fonts or its CSS pipeline,
- * any of which may be the thing that is gone.
- */
-
-const GONE_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>Checkout is closed — Healthy Jewellery</title>
-<style>
-  :root { color-scheme: light dark; }
-  body {
-    margin: 0; min-height: 100vh; display: grid; place-items: center;
-    background: #F7F5F1; color: #1A1714;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    line-height: 1.6; padding: 24px;
-  }
-  main { max-width: 34rem; }
-  h1 { font-size: 1.5rem; font-weight: 500; margin: 0 0 1rem; letter-spacing: 0.01em; }
-  p { margin: 0 0 1rem; color: #6B6762; }
-  a { color: #59636B; }
-</style>
-</head>
-<body>
-<main>
-  <h1>This catalogue no longer accepts online orders.</h1>
-  <p>
-    Please meet a Healthy Jewellery ambassador, or
-    <a href="/contact">use the official contact channel</a>.
-  </p>
-  <p><a href="/shop">Browse the catalogue</a></p>
-</main>
-</body>
-</html>`
-
-export function GET(): Response {
-  return new Response(GONE_HTML, {
-    status: 410,
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      // A withdrawn capability is not a page worth indexing, and the header carries the
-      // instruction even where the meta tag is not parsed.
-      'X-Robots-Tag': 'noindex, nofollow',
-      // Gone is a durable answer, but not a permanent one: it must be re-askable cheaply if
-      // this ever changes.
-      'Cache-Control': 'public, max-age=3600',
-    },
-  })
-}
-
-/**
- * Every other method gets the same answer.
+ * ## Why the body now comes from `@/lib/http/goneResponse`
  *
- * A `POST /checkout` from a stale form must not fall through to Next's 405: the resource is
- * gone regardless of what the caller wanted to do with it.
+ * This file used to hold its own copy of the markup, the headers and the verb aliases. It
+ * was the only 410 on the site, so that was fine. Contract §7 retires four more families,
+ * and four hand-rolled copies is four places for the `X-Robots-Tag` to go missing from one —
+ * a failure that breaks nothing, renders correctly, and leaves one withdrawn capability
+ * indexable. The reasoning above is the part worth keeping in this file; the bytes are not.
  */
-export const POST = GET
-export const PUT = GET
-export const PATCH = GET
-export const DELETE = GET
-export const HEAD = GET
+const COPY = {
+  title: 'Checkout is closed — Healthy Jewellery',
+  heading: 'This catalogue no longer accepts online orders.',
+  paragraphs: [AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP],
+} as const
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = goneRoute(COPY)

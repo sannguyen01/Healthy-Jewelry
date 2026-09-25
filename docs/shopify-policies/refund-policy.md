@@ -1,5 +1,17 @@
 # Refund policy
 
+> **Superseded, 2026-09-21 — kept as the record of a system being dismantled.**
+>
+> These are drafts to be pasted into **Shopify Admin → Settings → Policies**, for a hosted
+> checkout that is being decommissioned. Nothing here should be acted on. The live policies
+> are the pages this site serves — `/privacy`, `/terms`, `/shipping`, `/legal` — and they are
+> written for a website that takes no orders.
+>
+> Kept rather than deleted because the drafting notes record *why* each clause says what it
+> says, and `/privacy` and `/terms` still have to be reconciled against them before the
+> Shopify tenancy closes. See `COMMERCE-ELIMINATION-CONTRACT.md` and
+> `docs/commerce-elimination-masterplan.md`.
+
 *Reconciled from `/shipping` on healthyjewellery.com. Review before pasting.*
 
 ---
