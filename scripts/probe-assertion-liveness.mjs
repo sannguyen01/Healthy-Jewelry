@@ -46,7 +46,28 @@ const withE2E = argv.includes('--with-e2e')
 const asJson = argv.includes('--json')
 const only = argv.find((a) => a.startsWith('--only='))?.slice('--only='.length).split(',')
 
-/** Refuses to run on a dirty tree. See the safety note above. */
+/**
+ * Refuses to run on a dirty tree. See the safety note above.
+ *
+ * **Tracked files only, and the distinction cost this control a run every six hours.**
+ *
+ * `git status --porcelain` lists untracked files too, as `?? path`. The steps above this
+ * one in `control-audit.yml` each pipe their probe through `tee <name>.log`, and those logs
+ * are written into the workspace root. So by the time this probe started, `merge-gate.log`
+ * and `accepted-gap.log` existed, porcelain was non-empty, and it threw before mutating
+ * anything — every scheduled run, reported as one `failure` cell in a job summary nobody
+ * reads, while `continue-on-error: true` kept the job green.
+ *
+ * The irony is exact: `main()` below carries a guard against "measured nothing, reported
+ * all was well", written after this probe spent PR #44 to 2026-09-18 in precisely that
+ * state. The guard was correct and never ran, because the refusal happens first.
+ *
+ * Narrowing this to tracked changes is not a narrowing of the control. The safety argument
+ * in the module docstring is specifically about tracked files: this probe edits them and
+ * restores them, and a crash leaves a state `git checkout -- .` recovers. An untracked file
+ * is never touched, never restored, and cannot be destroyed by anything here — refusing on
+ * one protects nothing and disables everything.
+ */
 function assertCleanTree() {
   let status
   try {
@@ -54,6 +75,10 @@ function assertCleanTree() {
   } catch {
     throw new Error('Not a git repository, or git is unavailable. This probe edits tracked files and will not run without a way to recover them.')
   }
+  status = status
+    .split('\n')
+    .filter((line) => line.trim() !== '' && !line.startsWith('??'))
+    .join('\n')
   if (status.trim() !== '') {
     throw new Error(
       'The working tree has uncommitted changes.\n\n' +

@@ -377,6 +377,68 @@ jobs:
           pnpm install --frozen-lockfile
           node scripts/probe-assertion-liveness.mjs 2>&1 | tee liveness.log
 
+      # Its own label, its own issue — and until 2026-09-21 it had neither.
+      #
+      # This step is `continue-on-error: true`, and its only trace was one `failure` cell
+      # in the job summary at the bottom. So when the probe began refusing to start — the
+      # steps above write `merge-gate.log` and `accepted-gap.log` into the workspace, and
+      # `git status --porcelain` counts an untracked file as a dirty tree — it failed on
+      # every scheduled run and told nobody. The control that exists to find tests which
+      # cannot fail was itself a check that could not report.
+      #
+      # `continue-on-error` on the reporter too: a notification problem must never mask or
+      # manufacture a result. Same trade as the two reporters below it.
+      - name: Report dead or unrunnable assertions
+        # `always() &&` is load-bearing. An `if:` naming no status function has `success()`
+        # ANDed onto it by GitHub, which would make this ask "did every earlier step pass,
+        # AND did liveness fail?" — a question about execution wearing the clothes of a
+        # question about configuration. See ADR 027.
+        #
+        # Both this and the recovery step below run on `always()` and hand the outcome to
+        # the decision, rather than each carrying half of it in their own `if:`. The
+        # decision is in scripts/lib/liveness-report.mjs; this block is transport.
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const lib = `file://${process.env.GITHUB_WORKSPACE}/scripts/lib/liveness-report.mjs`
+            const { livenessIssuePlan, LIVENESS_ISSUE_LABEL, LIVENESS_ISSUE_TITLE } =
+              await import(lib)
+
+            const repo = { owner: context.repo.owner, repo: context.repo.repo }
+            const runUrl = `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`
+
+            let log = null
+            try { log = fs.readFileSync('liveness.log', 'utf-8') } catch { /* absence is not a finding */ }
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              ...repo, state: 'open', labels: LIVENESS_ISSUE_LABEL,
+            })
+            const comments = openIssues.length
+              ? await github.paginate(github.rest.issues.listComments, {
+                  ...repo, issue_number: openIssues[0].number, per_page: 100,
+                })
+              : []
+
+            const plan = livenessIssuePlan({
+              outcome: '${{ steps.liveness.outcome }}', log, openIssues, comments, runUrl,
+            })
+
+            for (const issue_number of plan.close) {
+              await github.rest.issues.createComment({ ...repo, issue_number, body: plan.closeComment })
+              await github.rest.issues.update({ ...repo, issue_number, state: 'closed', state_reason: 'completed' })
+            }
+            if (plan.create) {
+              await github.rest.issues.create({
+                ...repo, title: LIVENESS_ISSUE_TITLE, body: plan.body, labels: [LIVENESS_ISSUE_LABEL],
+              })
+            }
+            if (plan.comment !== null) {
+              await github.rest.issues.createComment({ ...repo, issue_number: plan.comment, body: plan.body })
+            }
+
       # Is anything still looking at production?
       #
       # Separate from production-smoke's own failure channel on purpose. That one says
@@ -737,7 +799,7 @@ jobs:
             echo "| Control | Result |"
             echo "|---|---|"
             echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
-            echo "| Assertion liveness (12 sentinels) | ${{ steps.liveness.outcome }} |"
+            echo "| Assertion liveness (11 vitest sentinels) | ${{ steps.liveness.outcome }} |"
             echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
             echo "| Merge gate liveness (is CI evaluating?) | ${{ steps.ci-liveness.outcome }} |"
             echo "| Canonical domain bound to production | ${{ steps.canonical-domain.outcome }} |"

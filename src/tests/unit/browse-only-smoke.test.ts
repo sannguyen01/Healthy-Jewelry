@@ -4,9 +4,17 @@ import { join, resolve } from 'node:path'
 
 const ROOT = resolve(__dirname, '../../..')
 
-const { assessBrowseOnly, isAttributable, COMMERCE_MARKERS, FORBIDDEN_HOST_PATTERN } =
-  await import('../../../scripts/lib/browse-only.mjs')
-const { sitemapPathFromRobots, handlesFromSitemap } = await import(
+const {
+  assessBrowseOnly,
+  isAttributable,
+  registrableDomain,
+  sameSite,
+  uniformRedirect,
+  BROWSE_ONLY_FINDINGS,
+  COMMERCE_MARKERS,
+  FORBIDDEN_HOST_PATTERN,
+} = await import('../../../scripts/lib/browse-only.mjs')
+const { sitemapPathFromRobots, handlesFromSitemap, resolveRedirect } = await import(
   '../../../scripts/verify-browse-only.mjs'
 )
 
@@ -27,6 +35,9 @@ interface Observation {
   status: number
   server: string
   body: string
+  location?: string
+  host?: string
+  url?: string
   detail?: string
 }
 
@@ -279,6 +290,482 @@ describe('the markers are the ones the decommission removes', () => {
   it('carries a human-readable explanation for each', () => {
     for (const marker of COMMERCE_MARKERS) {
       expect(marker.what.length).toBeGreaterThan(5)
+    }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────────────
+// The redirect the probe could not see
+// ─────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A 3xx from the site, carrying the one header that makes it diagnosable.
+ */
+const moved = (
+  path: string,
+  kind: string,
+  to = 'https://www.healthyjewellery.com',
+  status = 307,
+): Observation => ({
+  path,
+  kind,
+  transport: 'ok',
+  status,
+  server: 'Vercel',
+  location: `${to}${path}`,
+  host: 'healthyjewellery.com',
+  url: `https://healthyjewellery.com${path}`,
+  body: '',
+})
+
+describe('same-site comparison', () => {
+  it('reads the registrable domain off a hostname', () => {
+    expect(registrableDomain('www.healthyjewellery.com')).toBe('healthyjewellery.com')
+    expect(registrableDomain('healthyjewellery.com')).toBe('healthyjewellery.com')
+    expect(registrableDomain('HEALTHYJEWELLERY.COM')).toBe('healthyjewellery.com')
+    expect(registrableDomain('a.b.c.example.org')).toBe('example.org')
+  })
+
+  it('calls apex and www one site, and anything else another', () => {
+    expect(sameSite('healthyjewellery.com', 'www.healthyjewellery.com')).toBe(true)
+    expect(sameSite('www.healthyjewellery.com', 'healthyjewellery.com')).toBe(true)
+    // A different TLD is a different site, however similar the label reads. (The
+    // single-L typo domain would be the sharper example and is deliberately not written
+    // here: `domain-consistency.test.ts` forbids that string anywhere under `src/`, and
+    // it caught this line on its first run.)
+    expect(sameSite('healthyjewellery.com', 'healthyjewellery.net')).toBe(false)
+    expect(sameSite('healthyjewellery.com', 'evil.example')).toBe(false)
+  })
+
+  it('never calls two empty names the same site', () => {
+    // A guard against the shape where a missing hostname makes everything same-site and
+    // the probe follows a redirect it should have refused.
+    expect(sameSite('', '')).toBe(false)
+    expect(sameSite('', 'healthyjewellery.com')).toBe(false)
+  })
+})
+
+describe('one cause is one finding', () => {
+  /**
+   * **The production run this was written from.**
+   *
+   * 2026-09-20T20:30 and again at 20:54, from two different workflows: seventeen products,
+   * six collections, `/shop`, the unknown-handle probe and the sitemap, every one of them
+   * 307. The catalogue was being served correctly the whole time — by
+   * `www.healthyjewellery.com`, on the same commit — and the probe filed twenty-five
+   * findings saying it was not.
+   */
+  const productionShape = (): Observation[] => [
+    ...HANDLES.map((h) => moved(`/products/${h}`, 'product')),
+    moved('/shop/rings', 'collection'),
+    moved('/shop', 'collection'),
+    moved('/products/nope', 'unknown-product'),
+  ]
+
+  it('detects that every attributable response went to one place', () => {
+    expect(uniformRedirect(productionShape())).toEqual({
+      to: 'www.healthyjewellery.com',
+      toOrigin: 'https://www.healthyjewellery.com',
+      status: 307,
+      count: 5,
+    })
+  })
+
+  it('collapses a whole-host redirect into a single finding', () => {
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: productionShape(),
+      sitemapHandles: null,
+    })
+
+    expect(result.verdict).toBe('findings')
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].code).toBe('canonical-host-redirects')
+    // It must name the destination. The rows this replaces said "returned 307" and left
+    // the reader with no way to reach the cause.
+    expect(result.findings[0].detail).toContain('www.healthyjewellery.com')
+  })
+
+  it('does not report a missing sitemap on top of it', () => {
+    // `sitemapHandles: null` above. A sitemap that redirects is the same one fact, and
+    // `sitemap-unreadable` beside it would be the twenty-sixth row.
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: productionShape(),
+      sitemapHandles: null,
+    })
+    expect(result.findings.map((f) => f.code)).not.toContain('sitemap-unreadable')
+  })
+
+  it('keeps a single redirecting product as its own finding', () => {
+    // Uniformity is the test, not a threshold. One product redirecting is a fact about
+    // that product and must not be laundered into a claim about the host.
+    const observations = [
+      ...cleanRun(),
+      moved('/products/dome-ring-titanium', 'product', 'https://healthyjewellery.com', 301),
+    ]
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations,
+      sitemapHandles: HANDLES,
+    })
+
+    expect(uniformRedirect(observations)).toBeNull()
+    expect(result.findings.map((f) => f.code)).toEqual(['product-not-served'])
+  })
+
+  it('prints where a single redirect went', () => {
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: [
+        ...cleanRun(),
+        moved('/products/dome-ring-titanium', 'product', 'https://elsewhere.example', 302),
+      ],
+      sitemapHandles: HANDLES,
+    })
+    expect(result.findings[0].detail).toContain('https://elsewhere.example')
+  })
+
+  it('is not fooled by two different destinations', () => {
+    // Two targets is not one cause, so the per-path rows stand.
+    const observations = [
+      moved('/products/arc-band-titanium', 'product', 'https://a.example'),
+      moved('/products/dome-ring-titanium', 'product', 'https://b.example'),
+    ]
+    expect(uniformRedirect(observations)).toBeNull()
+  })
+
+  it('ignores a redirect with no Location header', () => {
+    // A 3xx without a destination cannot be collapsed into a claim about a host, because
+    // there is no host to name.
+    const observations = [
+      { ...moved('/products/arc-band-titanium', 'product'), location: '' },
+      { ...moved('/products/dome-ring-titanium', 'product'), location: '' },
+    ]
+    expect(uniformRedirect(observations)).toBeNull()
+  })
+
+  it('reports nothing about an empty sweep', () => {
+    expect(uniformRedirect([])).toBeNull()
+  })
+})
+
+describe('the canonical host handing over its traffic', () => {
+  const redirect = {
+    from: 'healthyjewellery.com',
+    to: 'www.healthyjewellery.com',
+    fromOrigin: 'https://healthyjewellery.com',
+    toOrigin: 'https://www.healthyjewellery.com',
+    status: 307,
+    followed: true,
+  }
+
+  it('is a finding even when everything at the destination is correct', () => {
+    // The state on 2026-09-20: `www` served the right commit, so nothing was broken for a
+    // visitor. It is still wrong — every absolute URL the application emits names the
+    // apex, which serves nothing but a redirect.
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect,
+    })
+
+    expect(result.verdict).toBe('findings')
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].code).toBe('canonical-host-redirects')
+  })
+
+  it('says which origin the rest of the findings describe', () => {
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect,
+    })
+    expect(result.findings[0].detail).toContain('one hop on')
+  })
+
+  it('names the console and the permanent status a reader should set', () => {
+    const { detail } = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect,
+    }).findings[0]
+
+    expect(detail).toContain('Settings -> Domains')
+    expect(detail).toContain('308')
+    // The order, and why. Adding the www redirect while the apex still redirects to www
+    // is a loop, and an instruction that omits that is an instruction that breaks a site.
+    expect(detail).toContain('clear the redirect on https://healthyjewellery.com first')
+    expect(detail).toContain('makes a loop')
+  })
+
+  it('refuses to follow off the brand domain, and says nothing was measured', () => {
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'parking.example',
+        fromOrigin: 'https://healthyjewellery.com',
+        toOrigin: 'https://parking.example',
+        status: 302,
+        followed: false,
+      },
+    })
+
+    expect(result.findings[0].code).toBe('canonical-host-redirects-off-site')
+    expect(result.findings[0].detail).toContain('Nothing below was measured')
+  })
+
+  it('still reports the catalogue findings measured at the destination', () => {
+    // Re-anchoring must not suppress anything. The redirect is one finding; a genuinely
+    // missing product at the destination is another.
+    const result = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: [
+        ok('/products/arc-band-titanium', 'product'),
+        { ...ok('/products/dome-ring-titanium', 'product'), status: 404 },
+        ok('/products/nope', 'unknown-product'),
+      ],
+      sitemapHandles: HANDLES,
+      redirect,
+    })
+
+    expect(result.findings.map((f) => f.code)).toEqual([
+      'canonical-host-redirects',
+      'product-not-served',
+    ])
+  })
+})
+
+describe('resolveRedirect follows one hop, and only within the site', () => {
+  const BASE = 'https://healthyjewellery.com'
+
+  it('follows apex to www and reports it', () => {
+    const anchor = moved('/', 'anchor')
+    expect(resolveRedirect(anchor, BASE)).toEqual({
+      from: 'healthyjewellery.com',
+      to: 'www.healthyjewellery.com',
+      fromOrigin: 'https://healthyjewellery.com',
+      toOrigin: 'https://www.healthyjewellery.com',
+      status: 307,
+      followed: true,
+      baseUrl: 'https://www.healthyjewellery.com',
+    })
+  })
+
+  it('refuses to follow a redirect off the brand domain', () => {
+    const anchor = moved('/', 'anchor', 'https://parking.example')
+    const resolved = resolveRedirect(anchor, BASE)
+
+    expect(resolved?.followed).toBe(false)
+    // The sweep stays where it was: a probe that chases a redirect off the domain reports
+    // some other origin's health as ours.
+    expect(resolved?.baseUrl).toBe(BASE)
+  })
+
+  it('resolves a relative Location against the base URL', () => {
+    const anchor = { ...moved('/', 'anchor'), location: '/en' }
+    expect(resolveRedirect(anchor, BASE)).toMatchObject({
+      to: 'healthyjewellery.com',
+      followed: true,
+      baseUrl: 'https://healthyjewellery.com',
+    })
+  })
+
+  it('returns null for a healthy origin', () => {
+    expect(resolveRedirect(ok('/', 'anchor'), BASE)).toBeNull()
+  })
+
+  it('returns null for a 3xx with no Location', () => {
+    expect(resolveRedirect({ ...moved('/', 'anchor'), location: '' }, BASE)).toBeNull()
+  })
+
+  it('returns null when the anchor never reached anything', () => {
+    // A runner with no egress must not produce a redirect verdict — ADR 010.
+    expect(
+      resolveRedirect(
+        { path: '/', kind: 'anchor', transport: 'failed', status: 0, server: '', body: '' },
+        BASE,
+      ),
+    ).toBeNull()
+    expect(resolveRedirect(null, BASE)).toBeNull()
+  })
+
+  it('returns null for a Location that is not a URL', () => {
+    // A broken redirect is a finding about that path, not a destination to re-anchor on.
+    expect(resolveRedirect({ ...moved('/', 'anchor'), location: 'http://' }, BASE)).toBeNull()
+  })
+})
+
+describe('a redirect that changes only the port still reads as two ends', () => {
+  /**
+   * Found by running the probe against a local redirector rather than by reading it
+   * (ADR 024). `localhost:3001` 307ing to `localhost:3000` produced the sentence
+   * *"localhost answers 307 and hands every path to localhost"* — true, useless, and the
+   * same shape a scheme-only redirect would take.
+   *
+   * `sameSite` still compares hostnames, because "is this one site" is a question about
+   * labels. Only the prose changed.
+   */
+  it('names origins rather than hostnames', () => {
+    const { detail } = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'localhost',
+        to: 'localhost',
+        fromOrigin: 'http://localhost:3001',
+        toOrigin: 'http://localhost:3000',
+        status: 307,
+        followed: true,
+      },
+    }).findings[0]
+
+    expect(detail).toContain('http://localhost:3001 answers 307')
+    expect(detail).toContain('hands every path to http://localhost:3000')
+  })
+
+  it('resolves the two origins off the real request URL', () => {
+    const anchor = {
+      path: '/',
+      kind: 'anchor',
+      transport: 'ok',
+      status: 307,
+      server: 'Vercel',
+      location: 'http://localhost:3000/',
+      host: 'localhost',
+      url: 'http://localhost:3001/',
+      body: '',
+    }
+
+    expect(resolveRedirect(anchor, 'http://localhost:3001')).toMatchObject({
+      fromOrigin: 'http://localhost:3001',
+      toOrigin: 'http://localhost:3000',
+      followed: true,
+      baseUrl: 'http://localhost:3000',
+    })
+  })
+
+  it('falls back to hostnames when no origin was supplied', () => {
+    // The pure function must not require a field its caller might not have. A verdict
+    // that renders `undefined` into an issue body is worse than a coarse one.
+    const { detail } = assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'www.healthyjewellery.com',
+        status: 307,
+        followed: true,
+      },
+    }).findings[0]
+
+    expect(detail).toContain('healthyjewellery.com answers 307')
+    expect(detail).not.toContain('undefined')
+  })
+})
+
+describe('the enumeration and the decision agree', () => {
+  /**
+   * The same reconciliation `canonical-domain-decision.test.ts` gained on the same day,
+   * and for the same reason: `CANONICAL_FINDINGS` was exported, documented as ADR 019's
+   * list, and referenced by nothing at all. An enumeration nobody compares to anything is
+   * a comment with a type annotation.
+   *
+   * Both directions. A code the function emits but the list does not name is an unnamed
+   * failure mode; a code named but unproducible is one that was removed and left in the
+   * documentation.
+   */
+  const emitted = new Set<string>()
+  const record = (r: { findings: { code: string }[] }) => {
+    for (const f of r.findings) emitted.add(f.code)
+    return r
+  }
+
+  const shopifyBody = '<!doctype html><html><img src="https://cdn.shopify.com/x.jpg"></html>'
+  const commerceBody =
+    '<!doctype html><html>' +
+    '<script>{"@type":"Offer","price":"1","priceCurrency":"GBP"}</script>' +
+    '<link href="https://schema.org/InStock">' +
+    '<button data-testid="add-to-bag"></button>' +
+    '<button data-testid="checkout-button"></button>' +
+    '</html>'
+
+  // One scenario per code, driven through the real function.
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: [
+        { ...ok('/products/arc-band-titanium', 'product'), status: 404 },
+        { ...ok('/shop', 'collection'), status: 500 },
+        { ...ok('/products/nope', 'unknown-product'), status: 200 },
+        ok('/products/dome-ring-titanium', 'product', shopifyBody),
+      ],
+      sitemapHandles: ['arc-band-titanium', 'a-handle-we-do-not-hold'],
+    }),
+  )
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: [ok('/products/arc-band-titanium', 'product', commerceBody)],
+      sitemapHandles: null,
+    }),
+  )
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'www.healthyjewellery.com',
+        status: 307,
+        followed: true,
+      },
+    }),
+  )
+  record(
+    assessBrowseOnly({
+      expectedHandles: HANDLES,
+      observations: cleanRun(),
+      sitemapHandles: HANDLES,
+      redirect: {
+        from: 'healthyjewellery.com',
+        to: 'parking.example',
+        status: 302,
+        followed: false,
+      },
+    }),
+  )
+
+  it('emits enough to make the comparison non-trivial', () => {
+    expect(emitted.size).toBeGreaterThan(8)
+  })
+
+  it('names every code it can emit', () => {
+    for (const code of emitted) {
+      expect(BROWSE_ONLY_FINDINGS, `${code} is emitted but not enumerated`).toContain(code)
+    }
+  })
+
+  it('can emit every code it names', () => {
+    for (const code of BROWSE_ONLY_FINDINGS) {
+      expect(emitted, `${code} is enumerated but no scenario produces it`).toContain(code)
+    }
+  })
+
+  it('derives the commerce codes from the markers rather than copying them', () => {
+    // A hand-copy would be a second list to keep in step, which is the shape this whole
+    // describe block exists to refuse.
+    for (const marker of COMMERCE_MARKERS) {
+      expect(BROWSE_ONLY_FINDINGS).toContain(`commerce-${marker.id}`)
     }
   })
 })

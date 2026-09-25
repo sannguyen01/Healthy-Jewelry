@@ -18,7 +18,7 @@ That reads **git history**, so it reports what workflows still reference — not
 still configured. The two halves have to be compared by a human against
 **Settings → Secrets and variables → Actions**. That is the whole point of the exercise.
 
-Last reconciled by hand: **2026-08-10**.
+Last reconciled by hand: **2026-09-21**.
 
 **The git-history half is no longer hand-run.** `scripts/audit-workflow-secrets.mjs` runs on
 every `verify` job as *Audit workflow credentials*, and its findings go to the run's job
@@ -82,31 +82,63 @@ Same workflow, same fate. **Not credentials** — they are identifiers, and they
 public: hardcoded in that workflow's git history and printed in every Vercel bot comment on
 every PR. Delete them for tidiness, not for safety.
 
+### `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_ADMIN_ACCESS_TOKEN` — orphaned by WS-6
+
+**These became orphans by design on 2026-09-20, and that is not the same as being handled.**
+
+Both were arguments to `scripts/preflight-secrets.mjs` and entries in its `WHERE` map, read
+by `production-smoke.yml` for live checks against a Shopify store this brand no longer runs.
+WS-6 removed the last consumer of each — `verify-browse-only.mjs` replaced those checks and
+needs no credential at all — so no workflow that exists anywhere references either name. The
+auditor classified both as `orphan` on its first run after the merge, and
+`src/tests/unit/audit-workflow-secrets.test.ts` now asserts that classification positively
+rather than dropping the names, per [ADR 035](adr/035-a-control-outlives-its-subject.md).
+
+| Secret | Reaches | Revocation is two-sided |
+|---|---|---|
+| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Published catalogue, cart creation on the Storefront API | Delete the GitHub secret **and** the Vercel environment variable. The token itself dies with the custom app |
+| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Admin API at its granted scopes — the sensitive one | Same, **plus** revoke in Shopify Admin → Settings → Apps and sales channels → Develop apps. Deleting the GitHub secret does not invalidate the token |
+
+**Deleting the repository secret is the smaller half.** A GitHub secret is a copy; the
+credential lives in Shopify and keeps working for anyone holding another copy. The Admin
+token is the one that matters — it reads the store's own data rather than the published
+catalogue, and it is the credential a `VERCEL_TOKEN` holder would reach through
+`vercel pull` (see the top of this file).
+
+**Order matters, and it is not this section's to choose.** WS-7 deletes
+`/api/webhooks/shopify`, `/api/revalidate` and `/api/version`, and the webhook subscriptions
+must be removed in Shopify Admin *before* the endpoint goes, or Shopify retries against a
+failing route for its full backoff schedule. Revoking the Admin token early does not break
+that ordering — nothing in the surviving three routes reads it — but revoking
+`SHOPIFY_WEBHOOK_SECRET` would, which is why it is not in this section.
+
 ---
 
-## Pending — needed, but inert until PR #17 merges
+## Live in GitHub — consumed by `production-smoke.yml`
 
-Referenced by `.github/workflows/production-smoke.yml`, which is not yet on the default
-branch. **Scheduled and `workflow_dispatch` triggers only fire from the default branch**, so
-this workflow cannot run at all until then — not on a schedule, and not manually.
+Referenced by `.github/workflows/production-smoke.yml`, which has been on the default branch
+since PR #17. The auditor reports these as `live`.
 
 | Secret | Reaches | Notes |
 |---|---|---|
-| `PRODUCTION_SITE_URL` | Nothing | Not secret; a secret only so it lives with the rest |
-| `SHOPIFY_STORE_DOMAIN` | Nothing | Public — it appears in the client bundle |
-| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Published catalogue, cart creation | **Public-safe by construction** — the same class already shipped to browsers |
-| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Admin API at its granted scopes | The only sensitive one. Used for a single publication-count query — grant read scopes only |
-| `SHOPIFY_WEBHOOK_SECRET` | Nothing directly | Lets a holder forge webhook deliveries, i.e. trigger cache revalidation |
+| `PRODUCTION_SITE_URL` | Nothing | Not secret; a secret only so it lives with the rest. **Currently empty**, so `verify-browse-only.mjs` falls back to the apex in `src/config/site.ts` |
+| `SHOPIFY_STORE_DOMAIN` | Nothing | Public — it appears in the client bundle. Retained for the preflight's environment-scope marker, not for a read |
+| `SHOPIFY_WEBHOOK_SECRET` | Nothing directly | Lets a holder forge webhook deliveries, i.e. trigger cache revalidation. Survives until WS-7 removes `/api/webhooks/shopify` |
 
 Put these on the **`production-readonly` environment**, not at repository scope. See the
 caveat below — it is not the safeguard it looks like.
+
+**All five were emptied on 2026-09-19** and have not been restored. The preflight reports
+`not-configured` and exits 0, and since WS-6 that no longer means the run checked nothing:
+`Browse-only catalogue` needs no credential and runs anyway. What does not run is the
+webhook probe.
 
 ### The environment is not a control until you configure it
 
 A job naming an environment that does not exist does **not** fail. GitHub creates the
 environment automatically, **with no protection rules and no secrets**.
 
-And a job with an `environment:` key still receives **repository** secrets. So if these five
+And a job with an `environment:` key still receives **repository** secrets. So if these
 are set at repo scope, the workflow goes green with no isolation whatsoever, and nothing
 anywhere reports it.
 
@@ -124,10 +156,10 @@ this file is the one place an orphan is visible.
 
 | Credential | Where | Reaches | Status |
 |---|---|---|---|
-| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Vercel env | Catalogue + cart | In use |
-| `SHOPIFY_REVALIDATION_SECRET` | Vercel env | On-demand revalidation endpoint | In use |
-| `SHOPIFY_WEBHOOK_SECRET` | Vercel env | Webhook signature verification | See `SHOPIFY-WEBHOOK-SECRET` in `STATE.md` |
-| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Shopify custom app | Admin API | Optional; unset in normal operation |
+| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Vercel env | Catalogue + cart | **No longer read.** WS-4b deleted `src/lib/shopify/client.ts`; `shopifyConfig.storefrontAccessToken` survives with no caller. Delete with the GitHub secret |
+| `SHOPIFY_REVALIDATION_SECRET` | Vercel env | On-demand revalidation endpoint | In use by `/api/revalidate`, which WS-7 removes |
+| `SHOPIFY_WEBHOOK_SECRET` | Vercel env | Webhook signature verification | In use by `/api/webhooks/shopify`. **Revoke last** — see `SHOPIFY-WEBHOOK-SECRET` in `STATE.md` and the WS-7 ordering above |
+| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Shopify custom app | Admin API | **Orphaned.** Unset in normal operation, and nothing reads it since WS-6. Revoke the app, not just the copies |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Vercel env | Rate-limit store | **Unset** — `/api/health` reports 503 while so |
 | `RESEND_API_KEY` | Vercel env | Contact-form email | **Unset** |
 | `SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID` | Vercel env | Customer Account OAuth client identity | Not secret; inert while the other two are unset |

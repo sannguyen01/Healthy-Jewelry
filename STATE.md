@@ -1,7 +1,58 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-09-20
+Last refreshed by hand: 2026-09-21
+
+## Session note — 2026-09-21
+
+**Three probes reported the wrong thing about a site that was working.** The decommission
+merged as PR #83 on 2026-09-20; the first scheduled runs afterwards produced three red
+signals, and all three were defects in the controls rather than in the deployment.
+
+**One — 25 findings about a healthy catalogue.** `healthyjewellery.com` answers **307** and
+hands every path to `www.healthyjewellery.com`. Both serve the production deployment, on the
+same commit. `verify-browse-only.mjs` sweeps with `redirect: 'manual'`, so it recorded the
+redirect 25 times and the catalogue zero times — and `observe()` never captured `location`,
+so not one finding named where the traffic went. Now: `location` captured and printed, a
+uniform whole-host redirect collapsed into one `canonical-host-redirects` row, and the
+sweep re-anchored **one hop, same registrable domain only, always reported**. Refusing to
+follow would leave the only automated check on "does the deployed site serve the catalogue"
+blind for as long as a domain setting is wrong.
+
+**Two — the canonical probe could only see the symptom.** `decideCanonicalDomain`'s redirect
+branch read `o.host !== apexHost && landed !== apexHost` — a condition about `www` that
+excludes the apex from its own check. So it walked apex → www, found production at the end,
+and reported that *www* was not redirecting to the apex. True, and backwards: it sends a
+reader to change the hostname that is behaving as configured. New `apex-redirected` finding,
+`www-not-redirected` suppressed while it holds, and the action line now names which hostname
+to clear first (the apex — doing only the other half makes a loop). `CANONICAL_FINDINGS` was
+exported, documented as ADR 019's reconciliation list, and referenced by nothing; now
+asserted in both directions.
+
+**Three — the assertion-liveness control has been dark since it was wired.** Steps above it
+in `control-audit.yml` write untracked `.log` files, `git status --porcelain` counts those as
+a dirty tree, and `probe-assertion-liveness.mjs` refuses to start on one. It threw before
+mutating anything, every scheduled run, behind `continue-on-error: true`, with its only trace
+a cell in a job summary. The probe's own "measured nothing, reported all was well" guard is
+correct and never ran, because the refusal happens first. Fixed by judging tracked changes
+only, and given the reporting channel every other control here already had
+(`assertions-dead`, decided in `scripts/lib/liveness-report.mjs`).
+
+Also: the two Shopify read tokens became genuine orphans when WS-6 removed their last
+consumer, and `audit-workflow-secrets.test.ts` called the auditor a liar for saying so. The
+assertion is inverted rather than narrowed (ADR 035), and `docs/credential-inventory.md`
+carries the console half — revocation is two-sided, and deleting a GitHub secret does not
+invalidate a Shopify token.
+
+### The one thing a person still has to do about the domain
+
+Vercel → Project → Settings → Domains, **in this order**:
+
+1. Clear the redirect on `healthyjewellery.com` so it serves the Production deployment.
+2. Set `www.healthyjewellery.com` to redirect to `healthyjewellery.com`, **permanent (308)**.
+
+Reversing the order produces a loop. Issue #84 carries this; issue #78 was auto-closed by
+PR #83's merge without the underlying setting having changed.
 
 ## Session note — 2026-09-20
 
@@ -56,7 +107,9 @@ same missing producer. ADR 035 is the rule that came out of working all eleven.
   supposed to do. `verify-browse-only.mjs` is its successor and pointing the workflow at it
   is WS-6's change. Recorded in ADR 035 so the gap is a decision rather than an oversight.
 - **Human console actions** unchanged: branch protection on `main`, the `www` → apex 308 at
-  Vercel (issue #78), and reconnecting Shopify.
+  Vercel (issue #78, superseded by #84 — and see the 2026-09-21 note: the redirect turned out
+  to be installed on the apex in the wrong direction, which is a different instruction), and
+  reconnecting Shopify.
 
 ## Session note — 2026-09-18
 

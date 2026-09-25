@@ -113,6 +113,7 @@ export const CANONICAL_FINDINGS = /** @type {const} */ ([
   'commit-mismatch',
   'commit-behind-main',
   'www-not-redirected',
+  'apex-redirected',
   'off-domain-redirect',
   'config-host-mismatch',
 ])
@@ -226,6 +227,36 @@ export function decideCanonicalDomain({ observations, apexHost, expectedCommit =
   // ── Each host that answered ──────────────────────────────────────────────────────────
   const hostSet = new Set(observations.map((o) => o.host))
 
+  /**
+   * Does the apex hand its traffic to the other hostname under test?
+   *
+   * **This question was not asked until 2026-09-21, and its absence is the finding.**
+   *
+   * The loop below walks each host's redirect chain, and the branch that judges a chain
+   * ending somewhere else was written `o.host !== apexHost && landed !== apexHost` — a
+   * condition about `www` that excludes the apex from its own check. So on 2026-09-20,
+   * when `healthyjewellery.com` began answering 307 and handing every path to
+   * `www.healthyjewellery.com`, this probe walked the chain, landed on a host it knew
+   * about, found a healthy production deployment there, and reported exactly one problem:
+   * that **www** was not redirecting to the apex.
+   *
+   * That is the symptom read backwards. It is true — www does serve its own response —
+   * but it is true *because* the redirect is installed on the apex, in the wrong
+   * direction. A person sent to Vercel by that issue is told to fix the hostname that is
+   * behaving as configured, and is not told that the canonical origin, the one every
+   * absolute URL in this application names, serves nothing but a hand-off.
+   *
+   * The cost was not only a confusing issue. `verify-browse-only.mjs` anchors on the same
+   * apex and reported twenty-five findings about a catalogue that was being served
+   * correctly, because nothing in either probe could say the words "the apex redirects".
+   *
+   * Suppressing `www-not-redirected` when this fires, because the two cannot both be
+   * actionable: www cannot redirect to a host that redirects to www.
+   */
+  const apexChain = apex.chain ?? [apex.host]
+  const apexLanded = apexChain[apexChain.length - 1]
+  const apexHandsOver = apex.transport === 'ok' && apexLanded !== apexHost && hostSet.has(apexLanded)
+
   for (const o of answered) {
     if (o.status !== 200) {
       add('not-ok', `${o.host} answered ${o.status} rather than 200.`)
@@ -244,10 +275,25 @@ export function decideCanonicalDomain({ observations, apexHost, expectedCommit =
         'off-domain-redirect',
         `${o.host} redirects to ${landed}, which is neither of the hostnames under test.`
       )
-    } else if (o.host !== apexHost && landed !== apexHost) {
+    } else if (o.host === apexHost && landed !== apexHost) {
+      // The redirect is installed on the canonical origin, pointing away from it. Every
+      // absolute URL this application emits — JSON-LD, the OG card, the sitemap, the
+      // canonical link, every `SITE_URL` interpolation — names a host that serves nothing
+      // but a hand-off, and a crawler following a 307 is told the move is temporary.
+      add(
+        'apex-redirected',
+        `${apexHost} answers ${o.status} and redirects to ${landed}, so the canonical ` +
+          `origin serves no content of its own. The redirect belongs on ${landed}, ` +
+          `pointing at ${apexHost}, and it should be permanent (308).`
+      )
+    } else if (o.host !== apexHost && landed !== apexHost && !apexHandsOver) {
       // `www` is expected to hand over to the apex. Serving its own copy is not an outage,
       // but it is two canonical origins for one site, which is the duplicate-content
       // problem `SITE_URL` exists to prevent.
+      //
+      // Silent while the apex is the one redirecting: www cannot redirect to a host that
+      // redirects to www, so reporting both would give a reader two instructions that
+      // contradict each other.
       add(
         'www-not-redirected',
         `${o.host} serves its own response instead of redirecting to ${apexHost}.`
@@ -309,10 +355,15 @@ export function decideCanonicalDomain({ observations, apexHost, expectedCommit =
     state: 'drifted',
     findings,
     summary: `${apexHost}: ${substantive.length} problem${substantive.length === 1 ? '' : 's'} with the production domain binding.`,
-    action:
-      'Vercel → Project → Settings → Domains. Both hostnames must be attached to this ' +
-      'project and assigned to Production, with www redirecting permanently to the apex. ' +
-      'Do not change DNS at Shopify — see docs/dns-domain-setup.md.',
+    action: apexHandsOver
+      ? `Vercel → Project → Settings → Domains. The redirect is on the wrong hostname: ` +
+        `${apexHost} is set to redirect to ${apexLanded}, and it must be the other way ` +
+        `round. Clear the redirect on ${apexHost} so it serves the Production deployment ` +
+        `directly, then set ${apexLanded} to redirect to ${apexHost} permanently (308). ` +
+        `Do not change DNS at Shopify — see docs/dns-domain-setup.md.`
+      : 'Vercel → Project → Settings → Domains. Both hostnames must be attached to this ' +
+        'project and assigned to Production, with www redirecting permanently to the apex. ' +
+        'Do not change DNS at Shopify — see docs/dns-domain-setup.md.',
   }
 }
 

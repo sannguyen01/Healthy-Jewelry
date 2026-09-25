@@ -133,6 +133,8 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     doc: CONVENTIONS,
     context: '**90 unit spec files**',
     claimed: '90',
+    context: '**89 unit spec files**',
+    claimed: '89',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
