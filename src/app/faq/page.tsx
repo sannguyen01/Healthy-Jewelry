@@ -4,6 +4,19 @@ import { Footer } from '@/components/layout/Footer'
 import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { CONTACT_EMAIL, ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
+import { claimText } from '@/lib/catalog'
+
+/**
+ * Answers whose whole content was a claim come from the claims registry and render their
+ * neutral fallback until a named reviewer approves the original wording against a document.
+ * No question was dropped; one was rewritten because the question itself asserted the claim
+ * ("Is it MRI-safe?"). Answers that restate shipping, returns or exchange terms are left
+ * as they were — they are commercial terms for WS-H's legal review, held by count in
+ * `legal-review-inventory.test.ts`, and are not this rewrite's to change.
+ */
+// An answer about one metal resolves against that metal; one about all three against the
+// whole range, which only evidence spanning every material covers.
+const SITE = { kind: 'site' } as const
 
 export const metadata: Metadata = {
   title: 'FAQ',
@@ -27,19 +40,19 @@ const sections: Section[] = [
     items: [
       {
         q: 'Is Grade 23 Titanium really safe?',
-        a: 'Yes. Grade 23 Titanium (Ti-6Al-4V ELI — Extra Low Interstitial) is the same alloy used in hip replacements, bone screws, dental implants, and spinal surgery hardware. It is the gold standard for implantable medical devices because the human body simply does not react to it. No corrosion, no leaching, no sensitization.',
+        a: claimText('faq-titanium-safety', { kind: 'material', material: 'titanium' }),
       },
       {
         q: 'What is niobium?',
-        a: 'Niobium is a soft, lustrous transition metal that is completely biocompatible and nickel-free. It is naturally hypoallergenic and is one of the safest metals for people with metal sensitivities. Anodizing it in an oxygen-free environment grows a thin oxide layer, and that layer is what gives the metal its color — no dyes, no coatings, nothing applied on top. The color is the surface of the metal, which is why it cannot chip, fade, or wash off.',
+        a: claimText('faq-niobium', { kind: 'material', material: 'niobium' }),
       },
       {
         q: 'Can I wear it in water?',
-        a: 'Yes. All three of our materials — Grade 23 Titanium, Niobium, and 316L Surgical Steel — are fully waterproof. You can shower, swim, and exercise without removing your jewelry. Salt water and chlorine will not affect implant-grade metals under normal exposure conditions.',
+        a: claimText('faq-water', SITE),
       },
       {
-        q: 'Is it MRI-safe?',
-        a: 'Titanium and niobium are non-ferromagnetic, meaning they are not attracted to MRI magnetic fields and will not cause interference or artifact in most MRI scans. 316L surgical steel is also considered MRI-conditional. However, always inform your radiologist or medical team about any jewelry or metal you are wearing before an MRI procedure. Removal is always the safest option when possible.',
+        q: 'What about MRI scans?',
+        a: claimText('faq-mri', SITE),
       },
     ],
   },
@@ -48,15 +61,17 @@ const sections: Section[] = [
     items: [
       {
         q: 'How do I clean my jewelry?',
-        a: 'Rinse with warm water and mild soap, then pat dry with a soft cloth. For deeper cleaning, you can soak titanium and surgical steel pieces in warm soapy water for a few minutes. Avoid harsh chemicals, bleach, and abrasive cleaners. Niobium can be cleaned the same way — the anodized color is durable and will not wash off.',
+        // Care instructions stay; the closing "the anodized color is durable and will not
+        // wash off" was a durability claim and is pending as `anodized-permanence`.
+        a: 'Rinse with warm water and mild soap, then pat dry with a soft cloth. For deeper cleaning, you can soak titanium and surgical steel pieces in warm soapy water for a few minutes. Avoid harsh chemicals, bleach, and abrasive cleaners. Niobium can be cleaned the same way.',
       },
       {
         q: 'Will it scratch or tarnish?',
-        a: 'Titanium is highly scratch-resistant due to its hardness (Mohs ~6). Niobium is softer and may show fine surface scratches over time, but it will not tarnish or corrode. 316L surgical steel is also corrosion-resistant and maintains its finish well. None of our materials will tarnish, rust, or discolor under normal wear conditions.',
+        a: claimText('faq-scratch-tarnish', SITE),
       },
       {
         q: 'Can I wear it 24/7?',
-        a: 'Yes. All of our jewelry is designed for continuous wear. Implant-grade materials are used precisely because they withstand prolonged contact with the body. There is no need to remove your Healthy Jewelry for sleep, exercise, or bathing.',
+        a: claimText('faq-continuous-wear', SITE),
       },
     ],
   },

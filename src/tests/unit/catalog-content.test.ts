@@ -10,9 +10,12 @@ import {
   getBestsellers,
   getNewArrivals,
   totalPendingFields,
+  unassignedFormCount,
 } from '@/lib/catalog'
-import { COLLECTION_HANDLES } from '@/lib/catalog/schema'
-import { rawProducts, rawCollections } from '@/lib/catalog/manifest'
+import { COLLECTION_HANDLES, collectionSchema, productSchema } from '@/lib/catalog/schema'
+import { rawProducts, rawCollections, rawClaims } from '@/lib/catalog/manifest'
+
+const { parseContract } = await import('../../../scripts/lib/commerce-contract.mjs')
 
 /**
  * **The content, the manifest that lists it, and the reader that serves it.**
@@ -54,6 +57,17 @@ const EXPECTED_COLLECTIONS = 5
  * its neighbours, which is exactly the drift `undefined` would have hidden.
  */
 const EXPECTED_PENDING_FIELDS = 51
+
+/**
+ * Products with no form assigned, today: all of them.
+ *
+ * The nine forms are a design taxonomy the owner adopted on 2026-09-26, and assigning one is
+ * a design decision rather than a data migration — so the field arrived `unassigned` on
+ * every record and this number is where the assignment is burnt down. Equality, not a
+ * ceiling (ADR 021): assigning a form moves it down in a reviewed diff, and a new record
+ * arriving unassigned moves it up in one.
+ */
+const EXPECTED_UNASSIGNED_FORMS = 17
 
 describe('the manifest lists every file, and every file exists', () => {
   it('finds catalogue files to check', () => {
@@ -194,11 +208,62 @@ describe('badges', () => {
 })
 
 describe('no commerce semantics survive in the content', () => {
-  it('no record carries a price, a currency or a variant id', () => {
-    const forbidden = /"(price|compareAtPrice|currencyCode|availableForSale|variants|defaultVariantId|checkoutUrl)"/
-    for (const file of productFiles) {
-      const source = readFileSync(join(PRODUCT_DIR, file), 'utf-8')
-      expect(forbidden.test(source), `${file} carries a commerce field`).toBe(false)
+  /**
+   * **The forbidden-field list is the contract's, not this file's.**
+   *
+   * `COMMERCE-ELIMINATION-CONTRACT.md` §8 declares the fields a catalogue nobody can buy
+   * from must not carry, and it was parsed on every run — into `contentForbidden`, which
+   * nothing read. This file meanwhile kept its own regex of seven names. Two lists of one
+   * rule is how they disagree: §8 names twelve, and `sellingPlan`, `taxCode`,
+   * `shippingClass`, `discountEligibility` and `inventoryQuantity` were forbidden by the
+   * contract and checked by nobody. Reading §8 here makes the contract the one list.
+   */
+  const contract = parseContract(readFileSync(join(ROOT, 'COMMERCE-ELIMINATION-CONTRACT.md'), 'utf-8'))
+  const FORBIDDEN: string[] = contract.contentForbidden
+
+  /** Every key at every depth — a price nested under `media` is still a price. */
+  function keysOf(value: unknown, found: Set<string> = new Set()): Set<string> {
+    if (Array.isArray(value)) value.forEach((v) => keysOf(v, found))
+    else if (value !== null && typeof value === 'object') {
+      for (const [key, v] of Object.entries(value)) {
+        found.add(key)
+        keysOf(v, found)
+      }
+    }
+    return found
+  }
+
+  it('reads a non-empty list from contract §8', () => {
+    // An empty list forbids nothing and passes everything — ADR 020's test that cannot fail.
+    // `price` is the anchor: if §8 parses to a list without it, the parse is wrong.
+    expect(FORBIDDEN.length).toBeGreaterThan(0)
+    expect(FORBIDDEN).toContain('price')
+  })
+
+  it('no product, collection or claims record carries a forbidden field, at any depth', () => {
+    const records: Array<[string, unknown]> = [
+      ...rawProducts.map((r, i) => [`product[${i}]`, r] as [string, unknown]),
+      ...rawCollections.map((r, i) => [`collection[${i}]`, r] as [string, unknown]),
+      ['claims', rawClaims],
+    ]
+    for (const [where, record] of records) {
+      const offending = [...keysOf(record)].filter((key) => FORBIDDEN.includes(key))
+      expect(offending, `${where} carries a field contract §8 forbids`).toEqual([])
+    }
+  })
+
+  it('neither schema declares a forbidden field, so none can be stored', () => {
+    // The record check proves today's content; this proves tomorrow's cannot validate.
+    const declared = [...Object.keys(productSchema.shape), ...Object.keys(collectionSchema.shape)]
+    expect(declared.filter((key) => FORBIDDEN.includes(key))).toEqual([])
+  })
+
+  it('the check can fail: a record carrying a §8 field is caught', () => {
+    // Pointed at a known answer (ADR 024), built from the contract's own list so it moves
+    // with it: every forbidden name, planted one level down.
+    for (const field of FORBIDDEN) {
+      const planted = { ...(rawProducts[0] as object), media: { [field]: 1 } }
+      expect([...keysOf(planted)].filter((k) => FORBIDDEN.includes(k)), field).toEqual([field])
     }
   })
 
@@ -296,6 +361,44 @@ describe('content debt is counted, and the count is a ratchet', () => {
   })
 })
 
+describe('form assignment is counted, and the count is a ratchet', () => {
+  it('is exactly what the catalogue carries today', () => {
+    expect(
+      unassignedFormCount(),
+      `Unassigned forms moved from ${EXPECTED_UNASSIGNED_FORMS} to ${unassignedFormCount()}. ` +
+        `Assigning a form is a design decision: update this constant in the diff that makes it.`
+    ).toBe(EXPECTED_UNASSIGNED_FORMS)
+  })
+
+  it('is every product, because no form has been assigned yet', () => {
+    expect(EXPECTED_UNASSIGNED_FORMS).toBe(EXPECTED_PRODUCTS)
+  })
+
+  it('no record was renamed to fit the taxonomy', () => {
+    // The owner's decision: a design taxonomy, not a naming rule. These titles are the
+    // ones the catalogue shipped with; a form that required renaming one would show here.
+    expect(getAllProducts().map((p) => p.title).sort()).toEqual([
+      'Arc Band',
+      'Arc Hoops',
+      'Cable Cuff',
+      'Classic Charm',
+      'Cone Studs',
+      'Disc Charm',
+      'Disc Studs',
+      'Dome Ring',
+      'Fine Link Chain',
+      'Flat Band',
+      'Flat Bangle',
+      'Linear Bar',
+      'Link Bracelet',
+      'Orbit Pendant',
+      'Split Ring',
+      'Teardrop Pendant',
+      'Tube Drops',
+    ])
+  })
+})
+
 describe('the build is what enforces the schema, and the wiring is one import', () => {
   // `docs/adr/018-a-claim-about-a-control-is-not-a-control.md`: the schema only runs when
   // something loads the reader. Before next.config.ts imported it, a malformed record
@@ -325,5 +428,14 @@ describe('the build is what enforces the schema, and the wiring is one import', 
     const manifest = readFileSync(join(ROOT, 'src/lib/catalog/manifest.ts'), 'utf-8')
     expect(manifest).not.toMatch(/from '@\/content\//)
     expect(manifest).toMatch(/from '\.\.\/\.\.\/content\/catalog\//)
+    // The claims registry rides the same import graph, so the same rule applies to it.
+    expect(manifest).toMatch(/from '\.\.\/\.\.\/content\/claims\/claims\.json'/)
+  })
+
+  it('the reader validates the claims registry, so the build does too', () => {
+    // A claim validated in a module nothing in the build imports is a claim validated in
+    // tests only. `index.ts` is the module next.config.ts loads.
+    const reader = readFileSync(join(ROOT, 'src/lib/catalog/index.ts'), 'utf-8')
+    expect(reader).toMatch(/loadClaimsRegistry\(rawClaims,/)
   })
 })

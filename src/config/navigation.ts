@@ -75,25 +75,25 @@ export const collectionsNav: CollectionNav[] = [
   {
     handle: 'necklaces',
     title: 'Necklaces',
-    description: 'Pendants and chains in pure titanium',
+    description: 'Pendants and chains in titanium, niobium and steel',
     href: '/shop/necklaces',
   },
   {
     handle: 'earrings',
     title: 'Earrings',
-    description: 'Studs, hoops and drops — nickel-free',
+    description: 'Studs, hoops and drops',
     href: '/shop/earrings',
   },
   {
     handle: 'bracelets',
     title: 'Bracelets',
-    description: 'Cuffs and bangles. No tarnish. Ever.',
+    description: 'Cuffs, bangles and links.',
     href: '/shop/bracelets',
   },
   {
     handle: 'charms',
     title: 'Charms',
-    description: 'Stackable titanium charms — build your own piece',
+    description: 'Charms in titanium and steel — build your own piece',
     href: '/shop/charms',
   },
 ]

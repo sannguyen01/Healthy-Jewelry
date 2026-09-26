@@ -18,6 +18,9 @@
   ],
   "availability": "ask-an-ambassador",
   "badge": "new",
+  "form": {
+    "state": "unassigned"
+  },
   "media": {
     "kind": "illustration",
     "svgType": "ring-dome"

@@ -38,6 +38,15 @@ import { parseSource, moduleSpecifiers } from '@/lib/analysis/tsAstScan'
 const ROOT = resolve(__dirname, '../../..')
 const READER_DIR = 'src/lib/catalog'
 const CONTENT_DIR = 'src/content/catalog'
+/**
+ * The boundary is drawn around all of `src/content`, not only the catalogue.
+ *
+ * `src/content/claims/` joined it on 2026-09-26 and carries the same risk in a sharper
+ * form: a component importing `claims.json` directly would render a claim's proposed
+ * wording without going through the resolver that decides whether it may — an unreviewed
+ * health claim on the brand's own authority, which is exactly what the registry ended.
+ */
+const CONTENT_ROOT = 'src/content'
 
 /** Every TypeScript source file in the repository, excluding build output and deps. */
 function sourceFiles(dir: string, found: string[] = []): string[] {
@@ -57,12 +66,12 @@ const ALL_SOURCES = [...sourceFiles('src'), ...sourceFiles('e2e')].sort()
 
 /** Does this specifier reach into the content directory, however it is spelled? */
 function reachesContent(specifier: string, fromFile: string): boolean {
-  if (specifier.startsWith('@/content/catalog')) return true
+  if (specifier.startsWith('@/content/')) return true
   if (!specifier.startsWith('.')) return false
   // A relative specifier has to be resolved against its own file before it means anything:
   // `../../content/catalog/x.json` and `@/content/catalog/x.json` are the same edge.
   const resolved = relative(ROOT, resolve(ROOT, fromFile, '..', specifier))
-  return resolved.startsWith(CONTENT_DIR)
+  return resolved.startsWith(`${CONTENT_ROOT}/`)
 }
 
 function contentImportsIn(file: string): string[] {
@@ -103,7 +112,7 @@ describe('only the reader may import catalogue content', () => {
       violations,
       `${file} imports catalogue content directly:\n\n` +
         `${violations.map((v) => `  ${v}`).join('\n')}\n\n` +
-        `Only ${READER_DIR}/** may read ${CONTENT_DIR}/**. Import the accessor you need ` +
+        `Only ${READER_DIR}/** may read ${CONTENT_ROOT}/**. Import the accessor you need ` +
         `from '@/lib/catalog' instead — getAllProducts, getProductByHandle, ` +
         `getProductsByCollection, getBestsellers, getNewArrivals, getAllCollections.\n\n` +
         `Reading a raw record skips Zod validation, so a malformed product renders a page ` +
@@ -140,6 +149,17 @@ describe('the boundary detects the forms a grep would miss', () => {
     // The refactor that looks like lazy-loading and is actually a breach.
     expect(
       detect(`export async function f() { return (await import('@/content/catalog/products/a.json')).default }`)
+    ).toHaveLength(1)
+  })
+
+  it('catches a direct import of the claims registry', () => {
+    // The claims file carries unreviewed wording by design; only the resolver may read it.
+    expect(detect(`import claims from '@/content/claims/claims.json'`)).toHaveLength(1)
+    const relativeSource = `import claims from '../../content/claims/claims.json'`
+    expect(
+      moduleSpecifiers(parseSource('src/components/layout/Footer.tsx', relativeSource)).filter((s) =>
+        reachesContent(s, 'src/components/layout/Footer.tsx')
+      )
     ).toHaveLength(1)
   })
 

@@ -64,10 +64,19 @@ test.describe('Product detail — ring', () => {
     await expect(page.locator('.material-tag')).toHaveText(/grade 23 titanium/i)
   })
 
-  test('shows trust signals', async ({ page }) => {
-    await expect(page.getByText(/IMPLANT GRADE/)).toBeVisible()
-    await expect(page.getByText(/HYPOALLERGENIC/)).toBeVisible()
-    await expect(page.getByText(/MRI SAFE/)).toBeVisible()
+  /**
+   * This was "shows trust signals": ·IMPLANT GRADE· ·HYPOALLERGENIC· ·MRI SAFE·, rendered
+   * on all seventeen pages with no evidence behind any of them, until 2026-09-26. The row
+   * is now the piece's material notes, and the one note that needs no document is the
+   * exact designation — a specification, so it is asserted here. The claims the row may
+   * also carry resolve through the registry, and whether one renders is the registry's
+   * decision, pinned by the ProductDetail unit test and policed by claim-lexicon.test.tsx;
+   * asserting their absence here would turn an approval into an E2E failure.
+   */
+  test('shows the material designation in the notes row', async ({ page }) => {
+    const notes = page.getByTestId('material-notes')
+    await expect(notes).toBeVisible()
+    await expect(notes.getByRole('listitem').first()).toHaveText('Ti-6Al-4V ELI (Grade 23)')
   })
 
   test('shows US ring size picker for rings', async ({ page }) => {

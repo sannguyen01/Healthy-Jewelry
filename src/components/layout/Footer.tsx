@@ -1,5 +1,16 @@
 import Link from 'next/link'
 import { legalLinks } from '@/config/navigation'
+import { claimText } from '@/lib/catalog'
+
+/**
+ * The positioning line, twice below. "Metal that works with your body" is a
+ * biocompatibility claim pending in the registry, so both places render its brand-voice
+ * fallback until it is approved. Resolved once per render; a server component, so the
+ * registry never reaches the browser.
+ */
+function tagline(): string {
+  return claimText('brand-positioning', { kind: 'site' })
+}
 
 const shopLinks = [
   { label: 'Rings', href: '/shop/rings' },
@@ -90,7 +101,7 @@ export function Footer() {
                 lineHeight: 1.7,
               }}
             >
-              Metal that works with your body. Implant-grade titanium, niobium, and surgical steel.
+              {tagline()} Grade 23 titanium, niobium and 316L surgical steel.
             </p>
           </div>
 
@@ -157,7 +168,7 @@ export function Footer() {
               fontStyle: 'italic',
             }}
           >
-            Metal that works with your body.
+            {tagline()}
           </span>
         </div>
       </div>

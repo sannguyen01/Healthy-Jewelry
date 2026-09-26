@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { makeProduct } from '@/tests/support/catalogFixtures'
+import { productMaterialNotes } from '@/lib/catalog'
 
 const ringProduct = makeProduct({ badge: 'bestseller' })
 
@@ -9,7 +10,7 @@ const earringProduct = makeProduct({
   handle: 'disc-studs-titanium',
   title: 'Disc Studs',
   collection: 'earrings',
-  description: 'Flat disc studs on implant-grade titanium posts.',
+  description: 'Flat disc studs on Grade 23 titanium posts.',
   specification: 'Disc 8 mm · post 6 mm',
   sizes: [],
   media: { kind: 'illustration', svgType: 'earring-stud' },
@@ -40,7 +41,7 @@ const braceletProduct = makeProduct({
  * so what each test varies is the line it varies.
  *
  * What survives is what the page still shows: title, description, spec, material label,
- * badge, the size picker and the trust signals. The price block and the Sold Out badge
+ * badge, the size picker and the material notes. The price block and the Sold Out badge
  * went with the data that produced them, and their absence is asserted below rather than
  * left implicit.
  */
@@ -188,20 +189,59 @@ describe('ProductDetail', () => {
     })
   })
 
-  describe('trust signals', () => {
-    it('shows IMPLANT GRADE trust signal', () => {
+  /**
+   * **The row that was `TRUST_SIGNALS`.**
+   *
+   * It rendered ·IMPLANT GRADE·, ·HYPOALLERGENIC· and ·MRI SAFE· on all seventeen product
+   * pages, niobium and 316L included, with no evidence behind any of them; these three tests
+   * asserted that they did. The owner's decision is *enforce now*: all three are pending in
+   * the claims registry, so the row renders the piece's exact designation and nothing it
+   * cannot document. The claim side is asserted against the registry's own resolution, so
+   * approving a claim changes what this row shows without anyone editing this file.
+   */
+  describe('material notes', () => {
+    it('shows the exact designation of a titanium piece', () => {
       render(<ProductDetail product={ringProduct} />)
-      expect(screen.getByText('·IMPLANT GRADE·')).toBeTruthy()
+      expect(screen.getByTestId('material-notes').textContent).toContain('Ti-6Al-4V ELI (Grade 23)')
     })
 
-    it('shows HYPOALLERGENIC trust signal', () => {
-      render(<ProductDetail product={ringProduct} />)
-      expect(screen.getByText('·HYPOALLERGENIC·')).toBeTruthy()
+    it('shows the designation of the piece’s own metal, not titanium’s', () => {
+      render(
+        <ProductDetail
+          product={makeProduct({
+            handle: 'flat-band-niobium',
+            material: 'niobium',
+            materialLabel: 'Niobium',
+          })}
+        />
+      )
+      const notes = screen.getByTestId('material-notes').textContent ?? ''
+      expect(notes).toContain('Niobium (anodized)')
+      expect(notes).not.toContain('Ti-6Al-4V')
     })
 
-    it('shows MRI SAFE trust signal', () => {
+    it('renders none of the three unevidenced claims it used to', () => {
       render(<ProductDetail product={ringProduct} />)
-      expect(screen.getByText('·MRI SAFE·')).toBeTruthy()
+      const notes = screen.getByTestId('material-notes').textContent ?? ''
+      expect(notes).not.toMatch(/implant.grade|hypoallergenic|mri.safe/i)
+    })
+
+    it('renders exactly what the registry resolves for this piece', () => {
+      render(<ProductDetail product={ringProduct} />)
+      const items = [...screen.getByTestId('material-notes').querySelectorAll('li')].map(
+        (li) => li.textContent
+      )
+      const expected = productMaterialNotes(ringProduct)
+      expect(items).toEqual([
+        expected.designation,
+        ...(expected.standard ? [expected.standard] : []),
+        ...expected.claims.map((c) => `·${c}·`),
+      ])
+    })
+
+    it('names no standard, because no provenance is documented', () => {
+      render(<ProductDetail product={ringProduct} />)
+      expect(screen.getByTestId('material-notes').textContent).not.toMatch(/ASTM/)
     })
   })
 })

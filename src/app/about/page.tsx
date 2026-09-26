@@ -8,9 +8,19 @@ import { PageHeader } from '@/components/ui/PageHeader'
 export const metadata: Metadata = {
   title: 'Our Story',
   description:
-    'The science behind Healthy Jewelry. Grade 23 titanium, niobium, and 316L surgical steel — the same alloys used in surgical implants, now in jewelry.',
+    'Why Healthy Jewelry works in three metals — Grade 23 titanium, niobium and 316L surgical steel — and names each by its exact specification.',
 }
 
+/*
+ * The story, told in specifications. Until 2026-09-26 this page made nine health and
+ * regulatory claims in prose — "validated in … the human body", "the body simply does not
+ * react to it", "trusted inside the body", "Biocompatibility First", "does not corrode,
+ * leach, or sensitize", "It will not [corrode]", "accepts them without reaction", "the same
+ * standard used in medical devices" — none with evidence. The claims themselves are pending
+ * in the registry (src/content/claims/claims.json) in their canonical forms; this page now
+ * says what the brand can say without a document. The warranty card's promise stays: it is
+ * a commercial term for WS-H's legal review, held by count in legal-review-inventory.test.ts.
+ */
 export default function AboutPage() {
   return (
     <>
@@ -39,8 +49,8 @@ export default function AboutPage() {
               fontWeight: 300,
             }}
           >
-            Most jewelry is made for display cases. Ours is made for skin. Every alloy we use has
-            been validated in the most demanding environment possible — the human body.
+            Most jewelry is made for display cases. Ours is made to be worn. Every piece is one of
+            three metals, and we name each by its exact specification.
           </p>
         </section>
 
@@ -72,7 +82,7 @@ export default function AboutPage() {
                 margin: '0 0 24px',
               }}
             >
-              Implant-grade,
+              Specified,
               <br />
               by design.
             </h2>
@@ -87,9 +97,9 @@ export default function AboutPage() {
                 margin: '0 0 20px',
               }}
             >
-              Titanium has been used in surgical implants for over 60 years — hip replacements, bone
-              screws, spinal rods. The Grade 23 alloy (Ti-6Al-4V ELI) is chosen because the body
-              simply does not react to it.
+              The Grade 23 alloy is Ti-6Al-4V ELI: titanium alloyed with aluminum and vanadium, in
+              its Extra Low Interstitial form. It is the titanium we work in, and we say so by
+              name.
             </p>
 
             <p
@@ -101,9 +111,9 @@ export default function AboutPage() {
                 fontWeight: 300,
               }}
             >
-              We asked one question: if this metal is trusted inside the body, why are so few
-              jewelers using it? Healthy Jewelry is our answer. Every piece uses the same material
-              specifications that surgeons rely on.
+              We asked one question: what would jewelry look like if every piece were named by its
+              exact alloy? Healthy Jewelry is our answer — each piece described by its material
+              specification, and nothing said about it that we cannot document.
             </p>
           </div>
 
@@ -149,17 +159,17 @@ export default function AboutPage() {
                 {
                   num: '01',
                   title: 'Material Integrity',
-                  body: 'Only implant-grade metals. No plating. No filler alloys. No compromise. What you see is what touches your skin.',
+                  body: 'Three metals, named by their exact specification. No plating. No filler alloys. No compromise. What you see is what you wear.',
                 },
                 {
                   num: '02',
-                  title: 'Biocompatibility First',
-                  body: 'Grade 23 titanium is the same alloy used in hip replacements and bone anchors. It does not corrode, leach, or sensitize.',
+                  title: 'Specification First',
+                  body: 'Grade 23 titanium is Ti-6Al-4V ELI — an alloy named by its composition, not described by adjectives. What we publish about a metal starts from that name.',
                 },
                 {
                   num: '03',
                   title: 'Lifetime Warranty',
-                  body: 'If it corrodes, we replace it. It will not — but the warranty exists because we are certain of the material.',
+                  body: 'If it corrodes, we replace it. The warranty terms are set out in our Terms of Service.',
                 },
               ] as const
             ).map((card) => (
@@ -253,8 +263,8 @@ export default function AboutPage() {
               margin: 0,
             }}
           >
-            Three metals. Each chosen for one reason: the body accepts them without reaction. Read
-            the full material science breakdown.
+            Three metals, each named by its exact specification. Read the full material
+            breakdown.
           </p>
 
           <Link href="/materials" className="btn-ghost" style={{ marginTop: '8px' }}>
@@ -284,7 +294,7 @@ export default function AboutPage() {
               margin: 0,
             }}
           >
-            Built for your body.
+            Built to be worn.
           </h2>
 
           <p
@@ -298,8 +308,8 @@ export default function AboutPage() {
               margin: 0,
             }}
           >
-            Every piece in the collection uses implant-grade metals — the same standard used in
-            medical devices.
+            Every piece in the collection is Grade 23 titanium, anodized niobium or 316L surgical
+            steel.
           </p>
 
           <Link href="/shop" className="btn-ghost-dark">
