@@ -1,0 +1,264 @@
+{
+  "materialSpecs": [
+    {
+      "material": "titanium",
+      "designation": "Ti-6Al-4V ELI (Grade 23)",
+      "appliesTo": { "kind": "material", "materials": ["titanium"] },
+      "standard": { "state": "named", "value": "ASTM F136" },
+      "provenance": { "state": "pending" },
+      "reviewNotes": [
+        "ASTM F136 is carried over from the retired /materials answer to “What does implant-grade mean?”. It renders only once provenance documents the stock a piece is made from."
+      ]
+    },
+    {
+      "material": "niobium",
+      "designation": "Niobium (anodized)",
+      "appliesTo": { "kind": "material", "materials": ["niobium"] },
+      "standard": { "state": "named", "value": "ASTM F2814" },
+      "provenance": { "state": "pending" },
+      "reviewNotes": [
+        "ASTM F2814 is carried over from the retired /materials answer. Nothing in this repository establishes that this standard number is a niobium specification; confirm its scope against the standard itself before any document is recorded against it."
+      ]
+    },
+    {
+      "material": "surgical-steel",
+      "designation": "316L stainless steel",
+      "appliesTo": { "kind": "material", "materials": ["surgical-steel"] },
+      "standard": { "state": "named", "value": "ASTM F138" },
+      "provenance": { "state": "pending" },
+      "reviewNotes": [
+        "ASTM F138 is carried over from the retired /materials answer. It is an implant-quality specification with composition limits tighter than generic 316L, so generic 316L stock does not meet it by default; a mill certificate for the actual stock is what would.",
+        "316L is a nickel-bearing stainless steel by specification. The retired copy called a 316L disc charm nickel-free and the whole earrings collection nickel-free; neither may return without a composition document."
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "brand-positioning",
+      "category": "biocompatibility",
+      "wording": "Metal that\nworks with\nyour body.",
+      "fallback": "Metal,\nnamed\nexactly.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Flagged by the owner's brief: the positioning line is itself a biocompatibility implication, so it is routed here rather than treated as brand copy. Rendered as the homepage h1, twice in the footer, on the default share card and in the homepage share description.",
+        "/legal's trademark notice still names the line as a mark. That notice is a legal instrument and is WS-H's to revise, not this registry's."
+      ]
+    },
+    {
+      "id": "campaign-band",
+      "category": "biocompatibility",
+      "wording": "Every piece engineered for biocompatibility. Grade 23 titanium passes through the body without reaction. That’s not a feature — it’s the foundation.",
+      "fallback": "Every piece begins as a specification: Grade 23 titanium, anodized niobium or 316L surgical steel, each named exactly. That’s not a feature — it’s the foundation.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "States a physiological outcome (“without reaction”) as a property of the alloy."
+      ]
+    },
+    {
+      "id": "materials-intro",
+      "category": "biocompatibility",
+      "wording": "Biocompatibility is not a marketing claim — it is a material property. We use only metals that have been validated for long-term contact with human tissue.",
+      "fallback": "A metal is a specification before it is a story. We name each one by its exact designation, and we publish what it does against skin, in water or in medical imaging only once a named reviewer has approved the statement against a document.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "“Validated for long-term contact with human tissue” names a validation; the reviewer needs the validation."
+      ]
+    },
+    {
+      "id": "implant-grade",
+      "category": "regulatory",
+      "wording": "Implant grade",
+      "fallback": "The standard this metal is certified to is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Rendered on every product page as ·IMPLANT GRADE· until 2026-09-26, niobium and 316L pieces included, and as the titanium subtitle on /materials and the homepage. The standard behind it is modelled separately, in materialSpecs."
+      ]
+    },
+    {
+      "id": "hypoallergenic",
+      "category": "allergen",
+      "wording": "Hypoallergenic",
+      "fallback": "Documentation on skin contact is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Rendered on every product page as ·HYPOALLERGENIC· until 2026-09-26, as a titanium property chip, and in the arc-band-titanium description."
+      ]
+    },
+    {
+      "id": "saltwater-resistant",
+      "category": "corrosion",
+      "wording": "Saltwater-resistant",
+      "fallback": "Documentation on salt-water exposure is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "The retired titanium body copy went further: “corrosion-proof in saltwater”."
+      ]
+    },
+    {
+      "id": "colour-stability",
+      "category": "durability",
+      "wording": "Lifetime color stability",
+      "fallback": "Documentation on how the color holds over time is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "“Lifetime” is a duration claim with no test period behind it."
+      ]
+    },
+    {
+      "id": "mri-safe",
+      "category": "medical-imaging",
+      "wording": "MRI-safe",
+      "fallback": "Documentation on medical imaging is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Rendered on every product page as ·MRI SAFE· until 2026-09-26 — on 316L pieces too, which the retired /faq answer itself called only “MRI-conditional”."
+      ]
+    },
+    {
+      "id": "nickel-free",
+      "category": "allergen",
+      "wording": "Zero nickel",
+      "fallback": "Composition documentation is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Proposed for niobium only. 316L is nickel-bearing by specification; see the surgical-steel materialSpec."
+      ]
+    },
+    {
+      "id": "biocompatible",
+      "category": "biocompatibility",
+      "wording": "Biocompatible",
+      "fallback": "Documentation on long-term skin contact is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": []
+    },
+    {
+      "id": "anodized-permanence",
+      "category": "durability",
+      "wording": "Anodized permanently",
+      "fallback": "Documentation on how the anodized color holds over time is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "The same durability claim appeared in two niobium catalogue descriptions (“Permanent color finish”, “Color-stable”), which now state the process instead."
+      ]
+    },
+    {
+      "id": "corrosion-resistance",
+      "category": "corrosion",
+      "wording": "High corrosion resistance",
+      "fallback": "Corrosion documentation is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": []
+    },
+    {
+      "id": "fda-recognised",
+      "category": "regulatory",
+      "wording": "FDA-recognized",
+      "fallback": "Regulatory documentation is being reviewed.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Names a regulator. The reviewer should establish what, specifically, is recognized, by which listing, and whether it applies to the stock these pieces are made from."
+      ]
+    },
+    {
+      "id": "faq-titanium-safety",
+      "category": "biocompatibility",
+      "wording": "Yes. Grade 23 Titanium (Ti-6Al-4V ELI — Extra Low Interstitial) is the same alloy used in hip replacements, bone screws, dental implants, and spinal surgery hardware. It is the gold standard for implantable medical devices because the human body simply does not react to it. No corrosion, no leaching, no sensitization.",
+      "fallback": "Grade 23 is the designation for Ti-6Al-4V ELI: titanium alloyed with aluminum and vanadium, in its Extra Low Interstitial form. That is a specification, and we state it plainly. What the alloy does in contact with skin is a claim, and we will publish it here once a named reviewer has approved it against documentation for the pieces we make. Until then, if you have a question about wearing a particular metal, ask an ambassador or contact us.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Names four implant applications; each is an industry-use statement a reviewer would want sourced.",
+        "“No corrosion, no leaching, no sensitization” is three claims in six words."
+      ]
+    },
+    {
+      "id": "faq-niobium",
+      "category": "allergen",
+      "wording": "Niobium is a soft, lustrous transition metal that is completely biocompatible and nickel-free. It is naturally hypoallergenic and is one of the safest metals for people with metal sensitivities. Anodizing it in an oxygen-free environment grows a thin oxide layer, and that layer is what gives the metal its color — no dyes, no coatings, nothing applied on top. The color is the surface of the metal, which is why it cannot chip, fade, or wash off.",
+      "fallback": "Niobium is a soft, lustrous transition metal. Anodizing grows a thin oxide layer on its surface, and that layer is what gives the metal its color — no dyes, no coatings, nothing applied on top. How niobium behaves against skin is a claim we will publish once a named reviewer has approved it against documentation; until then, ask an ambassador or contact us about a particular piece.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "“Anodizing it in an oxygen-free environment grows a thin oxide layer” is internally inconsistent — an oxide layer needs oxygen — and is not carried into the fallback.",
+        "“Cannot chip, fade, or wash off” is a durability claim bundled into an allergen answer."
+      ]
+    },
+    {
+      "id": "faq-water",
+      "category": "corrosion",
+      "wording": "Yes. All three of our materials — Grade 23 Titanium, Niobium, and 316L Surgical Steel — are fully waterproof. You can shower, swim, and exercise without removing your jewelry. Salt water and chlorine will not affect implant-grade metals under normal exposure conditions.",
+      "fallback": "Documentation on how each metal behaves in water, salt water and chlorine is being reviewed, and this answer will be published once a named reviewer has approved it. Until then, ask an ambassador or contact us about a particular piece.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": []
+    },
+    {
+      "id": "faq-mri",
+      "category": "medical-imaging",
+      "wording": "Titanium and niobium are non-ferromagnetic, meaning they are not attracted to MRI magnetic fields and will not cause interference or artifact in most MRI scans. 316L surgical steel is also considered MRI-conditional. However, always inform your radiologist or medical team about any jewelry or metal you are wearing before an MRI procedure. Removal is always the safest option when possible.",
+      "fallback": "We do not make statements about medical imaging until a named reviewer has approved them against documentation. Always tell your radiologist or medical team about any jewelry or metal you are wearing before an MRI procedure, and follow their advice. Removal is always the safest option when possible.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Calls 316L “MRI-conditional”, which contradicts materials-faq-mri and the mri-safe chip; the three cannot all be approved as written."
+      ]
+    },
+    {
+      "id": "faq-scratch-tarnish",
+      "category": "durability",
+      "wording": "Titanium is highly scratch-resistant due to its hardness (Mohs ~6). Niobium is softer and may show fine surface scratches over time, but it will not tarnish or corrode. 316L surgical steel is also corrosion-resistant and maintains its finish well. None of our materials will tarnish, rust, or discolor under normal wear conditions.",
+      "fallback": "Documentation on how each metal holds up to scratching and tarnish is being reviewed, and this answer will be published once a named reviewer has approved it. Until then, an ambassador can tell you about a particular piece.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Carries a number (Mohs ~6) with no source."
+      ]
+    },
+    {
+      "id": "faq-continuous-wear",
+      "category": "skin-contact",
+      "wording": "Yes. All of our jewelry is designed for continuous wear. Implant-grade materials are used precisely because they withstand prolonged contact with the body. There is no need to remove your Healthy Jewelry for sleep, exercise, or bathing.",
+      "fallback": "Documentation on continuous wear is being reviewed, and this answer will be published once a named reviewer has approved it. Until then, ask an ambassador or contact us about a particular piece.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": []
+    },
+    {
+      "id": "materials-faq-skin",
+      "category": "skin-contact",
+      "wording": "All three metals — Grade 23 titanium, niobium, and 316L surgical steel — are used in medical implants and body-contact devices. They have negligible nickel content and do not leach ions that trigger contact dermatitis.",
+      "fallback": "We are not answering this yet, deliberately. Statements about how these metals behave against skin are being reviewed against documentation for the pieces we make, and each will be published here once a named reviewer has approved it. If you have a concern about wearing a particular metal, ask an ambassador or contact us before choosing a piece.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Adapted from the retired answer by removing its opening “Yes.”, so that it answers the rewritten question. Everything it asserts is the original's.",
+        "Asserts negligible nickel content for all three metals; 316L is nickel-bearing by specification."
+      ]
+    },
+    {
+      "id": "materials-faq-mri",
+      "category": "medical-imaging",
+      "wording": "Grade 23 titanium and niobium are non-ferromagnetic and MRI-safe. 316L surgical steel has very low magnetic susceptibility and is generally considered safe, but consult your radiologist for specific procedures.",
+      "fallback": "We do not make statements about medical imaging until a named reviewer has approved them against documentation. Tell your radiologist or medical team about any jewelry or metal you are wearing before a scan, and follow their advice.",
+      "evidence": [],
+      "decision": { "state": "pending" },
+      "reviewNotes": [
+        "Calls 316L “generally considered safe”, which the retired /faq answer contradicted (“MRI-conditional”)."
+      ]
+    }
+  ]
+}

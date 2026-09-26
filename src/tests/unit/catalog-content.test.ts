@@ -325,5 +325,14 @@ describe('the build is what enforces the schema, and the wiring is one import', 
     const manifest = readFileSync(join(ROOT, 'src/lib/catalog/manifest.ts'), 'utf-8')
     expect(manifest).not.toMatch(/from '@\/content\//)
     expect(manifest).toMatch(/from '\.\.\/\.\.\/content\/catalog\//)
+    // The claims registry rides the same import graph, so the same rule applies to it.
+    expect(manifest).toMatch(/from '\.\.\/\.\.\/content\/claims\/claims\.json'/)
+  })
+
+  it('the reader validates the claims registry, so the build does too', () => {
+    // A claim validated in a module nothing in the build imports is a claim validated in
+    // tests only. `index.ts` is the module next.config.ts loads.
+    const reader = readFileSync(join(ROOT, 'src/lib/catalog/index.ts'), 'utf-8')
+    expect(reader).toMatch(/loadClaimsRegistry\(rawClaims,/)
   })
 })
