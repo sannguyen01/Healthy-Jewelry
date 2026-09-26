@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './support/test'
 
 /**
  * **The retired-route contract, asserted by status code.**

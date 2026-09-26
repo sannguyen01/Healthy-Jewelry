@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './support/test'
 
 /**
  * The product page read Shopify in its body and the static catalogue in its

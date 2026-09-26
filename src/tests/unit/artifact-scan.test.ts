@@ -488,7 +488,7 @@ describe('the CLI, against a build tree on disk', () => {
 
   const run = (root: string, argv: string[] = []) => {
     const lines: string[] = []
-    const code = main({ argv, env: {}, log: (l: string) => lines.push(l), root })
+    const code = main({ argv, env: {} as NodeJS.ProcessEnv, log: (l: string) => lines.push(l), root })
     return { code, out: lines.join('\n') }
   }
 

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './support/test'
 import { intersection, settle, OVERHANG_TOLERANCE_PX } from './support/viewportFit'
 
 /**
