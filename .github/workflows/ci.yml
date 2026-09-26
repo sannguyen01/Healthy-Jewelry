@@ -186,7 +186,18 @@ jobs:
       # changing a byte of what E2E tests. The key falls back to any cache built
       # from the same lockfile, so a source-only change still gets a warm start
       # rather than a cold rebuild.
+      #
+      # **Pull requests only.** The build that becomes `main` — and so becomes what
+      # Vercel deploys — starts cold. `.next/cache` is written by whatever built last
+      # under a matching key, including a pull request's own earlier push, and the
+      # artifact scan below judges what `next build` emits: a warm cache is an input
+      # to that output which nothing reviewed. A minute of build time on `main` is
+      # the price of the scan reading a build made only from the merged tree.
+      #
+      # Configuration, not execution (ADR 027): this reads the event, not another
+      # step's result, so the implicit `success()` GitHub adds is not load-bearing.
       - name: Cache Next.js build cache
+        if: github.event_name == 'pull_request'
         uses: actions/cache@v4
         with:
           path: .next/cache
@@ -205,6 +216,23 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+      # The Commerce Elimination Contract, enforced against what the build emitted.
+      #
+      # The contract step above reads tracked files, and a bundle is not one: a
+      # NEXT_PUBLIC_ value inlined at build time, a transitive package compiled into a
+      # chunk, and whatever the tree-shaker kept are invisible to it. This reads
+      # `.next/` and `public/` — client chunks and prerendered pages with zero
+      # tolerance, server output with the staged allowance a WS-F register row earns —
+      # and never prints what it matched.
+      #
+      # A step inside this job rather than a job of its own, on purpose: a new check
+      # name blocks nothing until somebody registers it in branch protection (ADR 015),
+      # while this job's context is already the one that is required. Before the
+      # upload, so a build that fails the scan is never handed to E2E as approved.
+      # Invoked by path for the reason the contract step is.
+      - name: Build artifact scan
+        run: node scripts/scan-build-artifacts.mjs
 
       # Handed to the E2E job so it exercises the exact artifact this gate
       # approved, and so the build is paid for once rather than twice.
