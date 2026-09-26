@@ -57,7 +57,6 @@ Routes, components, API handlers, configuration and the client bundle.
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
 | `src/tests/unit/cache-tag-contract.test.ts` | shopify-name | Vitest | Merge gate | none | delete with `cacheTags.ts` and the two routes that register tags | the subject is gone | WS-A |
-| `src/tests/unit/rateLimit.test.ts` | shopify-name | Vitest | Merge gate | none | rewrite one fixture — the limiter keeps its job, its prefix changes subject | the limiter keeps running | WS-A |
 
 ### WS-B — Content
 

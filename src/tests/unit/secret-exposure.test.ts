@@ -169,6 +169,29 @@ describe('server-only secrets never reach a client module', () => {
     expect(new RegExp(SECRET_ENV.source).test('process.env.SHOPIFY_WEBHOOK_SECRET')).toBe(true)
   })
 
+  /**
+   * **The rate-limit key is a secret, and its only reader is server-side.**
+   *
+   * Asserted by name rather than left to the graph walk, for the same reason as the
+   * customer-account block below: the walk protects only what `SECRET_ENV` recognises, and
+   * a secret added after the pattern was written is protected by coincidence or not at all.
+   * Both halves are pinned — the pattern recognises it, and the module that reads it is
+   * outside the client graph — so the test cannot pass by pointing at nothing.
+   */
+  it('RATE_LIMIT_KEY_SECRET is inside the pattern, and its reader is not client-reachable', () => {
+    expect(new RegExp(SECRET_ENV.source).test('process.env.RATE_LIMIT_KEY_SECRET')).toBe(true)
+
+    const reader = path.join(SRC, 'lib/utils/rateLimit.ts')
+    expect(
+      [...readFileSync(reader, 'utf8').matchAll(SECRET_ENV)].map((m) => m[1]),
+      'rateLimit.ts no longer reads the key, so this test is pointed at nothing'
+    ).toContain('RATE_LIMIT_KEY_SECRET')
+    expect(
+      [...reachable].map((f) => path.relative(SRC, f)),
+      'rateLimit.ts is reachable from a client module, so its HMAC key could be inlined into a bundle'
+    ).not.toContain('lib/utils/rateLimit.ts')
+  })
+
 
   /*
    * 'the client store does not import the server config module' was here.

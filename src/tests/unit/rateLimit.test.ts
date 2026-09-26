@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
+import ts from 'typescript'
+import { parseSource, importsFrom } from '@/lib/analysis/tsAstScan'
 
 /**
  * Upstash mocked at the module boundary, matching `api-health-route.test.ts`.
@@ -57,7 +61,7 @@ vi.mock('@upstash/redis', () => ({
  * not the same as endorsing it, and the comments below say which is which.
  */
 
-const ENV_KEYS = ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'] as const
+const ENV_KEYS = ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'RATE_LIMIT_KEY_SECRET'] as const
 const saved: Record<string, string | undefined> = {}
 
 beforeEach(() => {
@@ -134,13 +138,15 @@ describe('the request path never throws — it honours the declared posture', ()
     // On an `allow` posture there is no 429 to notice and no failed request to
     // trace, so this log line is the ONLY signal that the ceiling is absent.
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const limiter = await withUpstash({ prefix: 'hj:shopify', onError: 'allow' })
+    // The prefix was `hj:shopify`, the cart proxy's bucket, until that route went. Any
+    // `allow`-posture prefix exercises the same line; this one still exists.
+    const limiter = await withUpstash({ prefix: 'hj:analytics', onError: 'allow' })
     upstashLimit.mockRejectedValue(new Error('ECONNREFUSED'))
 
     await limiter.isLimited('1.2.3.4')
 
     expect(spy).toHaveBeenCalledOnce()
-    expect(String(spy.mock.calls[0][0])).toContain('hj:shopify')
+    expect(String(spy.mock.calls[0][0])).toContain('hj:analytics')
     expect(String(spy.mock.calls[0][0])).toContain('allow')
     spy.mockRestore()
   })
@@ -365,5 +371,213 @@ describe('clientIp — pinning current behaviour, including the unverified part'
     // is a sentinel rather than something derived.
     const fn = await clientIp()
     expect(fn(new Headers())).toBe('unknown')
+  })
+})
+
+/**
+ * **The privacy page said the IP was "hashed and short-lived". It was neither.**
+ *
+ * Until 2026-09-25 both implementations keyed buckets on the raw address: `upstash.limit(ip)`
+ * wrote it into a Redis key, and the in-memory map held it for the life of the Lambda. The
+ * claim was written in good faith and checked by nothing, which is the whole of
+ * [ADR 018](../../../docs/adr/018-a-claim-about-a-control-is-not-a-control.md) in one
+ * sentence of a privacy policy.
+ *
+ * ## Known answers from outside Node
+ *
+ * The two digests below were computed with coreutils and OpenSSL, not with `node:crypto`:
+ *
+ * ```
+ * printf '%s\0%s' 'hj-rate-limit-key/v1' '203.0.113.7' | sha256sum
+ * printf '%s' '203.0.113.7' | openssl dgst -sha256 -hmac 'test-only-key-0123456789abcdef-0123456789'
+ * ```
+ *
+ * Asserting the derivation against `createHash(...)` in the test would only prove the code
+ * agrees with a copy of itself ([ADR 024](../../../docs/adr/024-a-tool-never-pointed-at-a-known-answer.md)).
+ * An independent tool also pins what matters operationally: the key is a function of the
+ * IP alone, so every instance and every deploy computes the same one, and a distributed
+ * limiter stays distributed. The first draft of the `sha256sum` line lost its NUL
+ * separator to `printf` reading `\0203` as one octal escape — the kind of disagreement a
+ * known answer exists to surface, found here before it could be mistaken for the code's.
+ */
+describe('bucket keys are pseudonymised, never the raw IP', () => {
+  const IP = '203.0.113.7'
+  const UNKEYED_DIGEST = '0d5fc9837e131db040ac1fa9bfdf0d5cb95ee635d8cb47b0a6b644f65ffbdb31'
+  // Test-only, and deliberately shaped like nothing a scanner would call a credential.
+  const TEST_KEY = 'test-only-key-0123456789abcdef-0123456789'
+  const KEYED_DIGEST = '1d7c34931acfbf3759ab9fa4246553222d874622e15fed8f9eb44c4f3c4fd0c7'
+
+  async function derivation() {
+    vi.resetModules()
+    return (await import('@/lib/utils/rateLimit')).ipKeyDerivation
+  }
+
+  it('unkeyed: SHA-256 of the versioned prefix, a NUL and the IP', async () => {
+    const derive = await derivation()
+    expect(derive(undefined).mode).toBe('unkeyed')
+    expect(derive(undefined).key(IP)).toBe(UNKEYED_DIGEST)
+  })
+
+  it('keyed: HMAC-SHA256 of the IP under RATE_LIMIT_KEY_SECRET', async () => {
+    const derive = await derivation()
+    expect(derive(TEST_KEY).mode).toBe('keyed')
+    expect(derive(TEST_KEY).key(IP)).toBe(KEYED_DIGEST)
+  })
+
+  it('a different key gives a different bucket, and neither contains the address', async () => {
+    const derive = await derivation()
+    const other = derive(`${TEST_KEY}-rotated`).key(IP)
+    expect(other).not.toBe(KEYED_DIGEST)
+    for (const key of [other, KEYED_DIGEST, UNKEYED_DIGEST]) {
+      expect(key).toMatch(/^[0-9a-f]{64}$/)
+      expect(key).not.toContain(IP)
+    }
+  })
+
+  it.each([
+    ['unset', undefined],
+    ['blank', ''],
+    ['one short of the floor', 'x'.repeat(31)],
+  ])('a secret that is %s is not a key — the mode says unkeyed rather than vouching for it', async (_label, secret) => {
+    const derive = await derivation()
+    expect(derive(secret).mode).toBe('unkeyed')
+    expect(derive(secret).key(IP)).toBe(UNKEYED_DIGEST)
+  })
+
+  it('Upstash is handed the derived key, never the address', async () => {
+    // This identifier becomes part of a Redis key. It is the line the privacy claim rests on.
+    delete process.env.RATE_LIMIT_KEY_SECRET
+    const limiter = await withUpstash()
+    upstashLimit.mockResolvedValue({ success: true })
+
+    await limiter.isLimited(IP)
+
+    expect(limiter.keying).toBe('unkeyed')
+    expect(upstashLimit).toHaveBeenCalledWith(UNKEYED_DIGEST)
+    expect(upstashLimit.mock.calls.flat().join(' ')).not.toContain(IP)
+  })
+
+  it('uses the HMAC when the secret is set, and reports that it does', async () => {
+    process.env.RATE_LIMIT_KEY_SECRET = TEST_KEY
+    const limiter = await withUpstash()
+    upstashLimit.mockResolvedValue({ success: true })
+
+    await limiter.isLimited(IP)
+
+    expect(limiter.keying).toBe('keyed')
+    expect(upstashLimit).toHaveBeenCalledWith(KEYED_DIGEST)
+  })
+
+  it('two independently built limiters agree on the key — distributed limiting still works', async () => {
+    // A per-instance salt would give every Lambda its own key space: each would count only
+    // its own share of a caller's requests, which is `limit x instances` again, the defect
+    // `distributed` exists to report — and invisible, because `distributed` would still
+    // read true.
+    process.env.RATE_LIMIT_KEY_SECRET = TEST_KEY
+    upstashLimit.mockResolvedValue({ success: true })
+
+    await (await withUpstash()).isLimited(IP)
+    await (await withUpstash()).isLimited(IP)
+
+    expect(upstashLimit.mock.calls.map((c) => c[0])).toEqual([KEYED_DIGEST, KEYED_DIGEST])
+  })
+
+  it('the in-memory fallback reports its keying too, and still counts per caller', async () => {
+    process.env.RATE_LIMIT_KEY_SECRET = TEST_KEY
+    const limiter = await withoutUpstash({ limit: 1 })
+    expect(limiter.keying).toBe('keyed')
+    expect(await limiter.isLimited('198.51.100.1')).toBe(false)
+    expect(await limiter.isLimited('198.51.100.2')).toBe(false)
+    expect(await limiter.isLimited('198.51.100.1')).toBe(true)
+  })
+
+  it('says once, by length and never by value, that a short secret was ignored', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const shortKey = 'too-short-to-count'
+    process.env.RATE_LIMIT_KEY_SECRET = shortKey
+
+    vi.resetModules()
+    const { createRateLimiter } = await import('@/lib/utils/rateLimit')
+    const policy = { limit: 1, window: '1 m', prefix: 'hj:test', onError: 'allow' } as const
+    const first = createRateLimiter(policy)
+    createRateLimiter({ ...policy, prefix: 'hj:test-2' })
+
+    expect(first.keying).toBe('unkeyed')
+    expect(spy).toHaveBeenCalledOnce()
+    expect(String(spy.mock.calls[0][0])).toContain('RATE_LIMIT_KEY_SECRET')
+    expect(spy.mock.calls.flat().join(' ')).not.toContain(shortKey)
+    spy.mockRestore()
+  })
+})
+
+/**
+ * **`node:crypto` is only safe while every caller runs on Node.**
+ *
+ * The Edge runtime has no `node:crypto`. Nothing here uses Edge today — checked, not
+ * assumed: every module that imports the limiter is walked and none may export
+ * `runtime = 'edge'`. The day one does, this fails with the choice to make (Web Crypto,
+ * async, in `ipKeyDerivation`) rather than the build failing on a module-resolution error
+ * that names neither.
+ */
+describe('every caller of the limiter runs on the Node runtime', () => {
+  const SRC = resolve(__dirname, '../..')
+
+  function sourceFiles(dir: string, out: string[] = []): string[] {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry)
+      if (statSync(full).isDirectory()) {
+        if (entry === 'tests' || entry === 'node_modules') continue
+        sourceFiles(full, out)
+      } else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) {
+        out.push(full)
+      }
+    }
+    return out
+  }
+
+  /** `export const runtime = 'edge'`, read from the AST so a comment saying it does not count. */
+  function declaresEdge(sf: ts.SourceFile): boolean {
+    return sf.statements.some(
+      (st) =>
+        ts.isVariableStatement(st) &&
+        st.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true &&
+        st.declarationList.declarations.some(
+          (d) =>
+            ts.isIdentifier(d.name) &&
+            d.name.text === 'runtime' &&
+            d.initializer !== undefined &&
+            ts.isStringLiteralLike(d.initializer) &&
+            d.initializer.text === 'edge'
+        )
+    )
+  }
+
+  const importers = sourceFiles(SRC)
+    .map((file) => ({ file, sf: parseSource(file, readFileSync(file, 'utf8')) }))
+    .filter(({ sf }) => importsFrom(sf, '@/lib/utils/rateLimit').length > 0)
+
+  it('finds the callers it is meant to be checking', () => {
+    // Four today. A scan that found none would pass the assertion below vacuously.
+    expect(importers.map(({ file }) => relative(SRC, file)).sort()).toEqual([
+      'app/api/analytics/route.ts',
+      'app/api/contact/route.ts',
+      'app/api/health/route.ts',
+      'app/search/page.tsx',
+    ])
+  })
+
+  it('none of them declares the Edge runtime', () => {
+    const edge = importers.filter(({ sf }) => declaresEdge(sf)).map(({ file }) => relative(SRC, file))
+    expect(
+      edge,
+      'These import the rate limiter and run on Edge, where node:crypto does not exist. ' +
+        'Move ipKeyDerivation to Web Crypto (crypto.subtle, async) or keep the caller on Node.'
+    ).toEqual([])
+  })
+
+  it('the detector recognises the declaration it is looking for', () => {
+    expect(declaresEdge(parseSource('x.ts', "export const runtime = 'edge'"))).toBe(true)
+    expect(declaresEdge(parseSource('x.ts', "// export const runtime = 'edge'"))).toBe(false)
+    expect(declaresEdge(parseSource('x.ts', "export const runtime = 'nodejs'"))).toBe(false)
   })
 })

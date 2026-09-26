@@ -53,6 +53,7 @@ interface HealthBody {
   rateLimitDistributed: boolean
   redis: 'ok' | 'unreachable' | 'not-configured'
   resend: 'ok' | 'unreachable' | 'not-configured'
+  ipKeying: 'keyed' | 'unkeyed'
   healthy: boolean
   hint?: string
 }
@@ -266,6 +267,62 @@ describe('GET /api/health', () => {
     const GET = await loadRoute()
 
     expect((await GET(healthRequest())).headers.get('Cache-Control')).toContain('no-store')
+  })
+
+  /**
+   * **`ipKeying` says which of the privacy page's two descriptions is currently true.**
+   *
+   * Whether client IPs are HMAC'd under a secret or only hashed under a published prefix
+   * is a per-environment Vercel setting that nothing outside the deployment can see. The
+   * three cases pin the mapping, including the one a naive `!!process.env.X` would get
+   * wrong: a secret that is set but too short is *not* a key, and reporting `keyed` for it
+   * would be this endpoint vouching for a protection that is not there.
+   */
+  describe('ipKeying', () => {
+    const KEY = 'health-test-key-0123456789abcdef-0123456789'
+
+    it("is 'unkeyed' when RATE_LIMIT_KEY_SECRET is unset", async () => {
+      stubUpstash(true)
+      upstashLimit.mockResolvedValue({ success: true })
+      vi.stubEnv('RATE_LIMIT_KEY_SECRET', '')
+      const GET = await loadRoute()
+
+      expect(((await (await GET(healthRequest())).json()) as HealthBody).ipKeying).toBe('unkeyed')
+    })
+
+    it("is 'keyed' when the secret is long enough to be a key", async () => {
+      stubUpstash(true)
+      upstashLimit.mockResolvedValue({ success: true })
+      vi.stubEnv('RATE_LIMIT_KEY_SECRET', KEY)
+      const GET = await loadRoute()
+
+      expect(((await (await GET(healthRequest())).json()) as HealthBody).ipKeying).toBe('keyed')
+    })
+
+    it("is 'unkeyed' when the secret is set but too short to count", async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      stubUpstash(true)
+      upstashLimit.mockResolvedValue({ success: true })
+      vi.stubEnv('RATE_LIMIT_KEY_SECRET', 'short')
+      const GET = await loadRoute()
+
+      expect(((await (await GET(healthRequest())).json()) as HealthBody).ipKeying).toBe('unkeyed')
+      spy.mockRestore()
+    })
+
+    it('never changes healthy or the status code, and never carries the key', async () => {
+      // Unkeyed is a weaker guarantee, not an outage: a monitor must not page on it.
+      stubUpstash(true)
+      upstashLimit.mockResolvedValue({ success: true })
+      vi.stubEnv('RATE_LIMIT_KEY_SECRET', '')
+      const unkeyed = await (await loadRoute())(healthRequest())
+      expect(unkeyed.status).toBe(200)
+      expect(((await unkeyed.json()) as HealthBody).healthy).toBe(true)
+
+      vi.stubEnv('RATE_LIMIT_KEY_SECRET', KEY)
+      const raw = await (await (await loadRoute())(healthRequest())).text()
+      expect(raw).not.toContain(KEY)
+    })
   })
 })
 

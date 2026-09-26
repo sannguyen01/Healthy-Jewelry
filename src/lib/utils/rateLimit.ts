@@ -2,13 +2,23 @@
 //
 // Extracted from `api/contact/route.ts`, which grew this after a security
 // audit found an in-memory limiter that could not work across serverless
-// invocations. `/api/shopify` — the route that spends the store's Shopify API
-// quota and can create real carts — had no limiter at all, which made the
-// hardened route the *less* attractive target of the two.
+// invocations. The cart proxy that used to sit at `/api/shopify` had no limiter
+// at all, which made the hardened route the *less* attractive target of the two.
 //
-// One implementation, two callers, so the two cannot drift apart the way two
-// copies would.
+// One implementation, four callers today (`/api/contact`, `/api/analytics`,
+// `/api/health`, `/search`), so they cannot drift apart the way copies would.
+//
+// ## Runtime: Node only, and checked rather than assumed
+//
+// Bucket keys are derived with `node:crypto` (see `ipKeyDerivation` below),
+// which the Edge runtime does not provide. Every caller runs on the Node
+// runtime today — none exports `runtime = 'edge'`, and there is no middleware —
+// and `rateLimit.test.ts` walks the tree and fails if an importer ever declares
+// Edge. Web Crypto would run on both, but it is async-only and would make key
+// derivation a second awaited step on every request path for a runtime nothing
+// here uses; if one ever does, that test is where the decision gets re-made.
 
+import { createHash, createHmac } from 'node:crypto'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
@@ -37,8 +47,9 @@ import { Redis } from '@upstash/redis'
  *
  * The right answer differs per route and the difference is not small:
  *
- *   · `allow` — losing the limiter costs Shopify quota. Losing checkout costs
- *     revenue. `/api/shopify` and `/api/analytics` take this.
+ *   · `allow` — losing the limiter costs quota; refusing costs a real visitor
+ *     a page or a measurement. `/api/analytics`, `/api/health` and `/search`
+ *     take this. (The cart proxy took it too, when losing checkout cost revenue.)
  *   · `deny`  — `/api/contact` sends email through a paid API. An unmetered
  *     contact form is money and reputation, so a limiter it cannot consult
  *     refuses rather than guesses.
@@ -48,6 +59,91 @@ import { Redis } from '@upstash/redis'
  * reviewer can see what it decided.
  */
 export type RateLimitFailurePosture = 'allow' | 'deny'
+
+/**
+ * How a client IP becomes a bucket key, as reported by `/api/health`.
+ *
+ *   · `keyed`   — HMAC-SHA256 under `RATE_LIMIT_KEY_SECRET`. Without the secret a
+ *                 stored key cannot be linked back to an address, even by
+ *                 enumerating all of them.
+ *   · `unkeyed` — SHA-256 of a fixed, versioned prefix and the IP. **Pseudonymous,
+ *                 not anonymous**: the prefix is in this public repository, and the
+ *                 IPv4 space is small enough to enumerate, so anyone holding a key
+ *                 and this file can recover the address. What it does buy is that
+ *                 the raw address is never written to Redis or to the in-memory
+ *                 map, and that an operator reading keys sees no addresses.
+ *
+ * The privacy page describes both, because which one is live is a deployment
+ * setting rather than a property of the code.
+ */
+export type IpKeying = 'keyed' | 'unkeyed'
+
+/**
+ * Domain separation for the unkeyed derivation.
+ *
+ * Versioned so that changing the derivation is a new namespace rather than a
+ * silent collision with keys an older deployment wrote: every bucket would reset
+ * once, which is harmless, instead of two schemes sharing a key space, which is
+ * not. The separator is a NUL, which no IP string contains, so no `ip` can be
+ * chosen to make the prefix ambiguous.
+ */
+export const UNKEYED_KEY_DOMAIN = 'hj-rate-limit-key/v1'
+
+/**
+ * The shortest `RATE_LIMIT_KEY_SECRET` that counts as a key.
+ *
+ * An HMAC under a four-character secret is brute-forceable alongside the IPv4
+ * space, and reporting `keyed` for it would be a health endpoint vouching for a
+ * protection that is not there. Thirty-two characters is what
+ * `openssl rand -base64 48` comfortably exceeds. A shorter value is treated as
+ * absent — `unkeyed`, which `/api/health` then shows — and logged once.
+ */
+export const MIN_KEY_SECRET_LENGTH = 32
+
+export interface IpKeyDerivation {
+  readonly mode: IpKeying
+  /** The bucket key for one client IP. Deterministic, so every instance agrees. */
+  readonly key: (ip: string) => string
+}
+
+/**
+ * The pure half of key derivation: a secret (or none) in, a derivation out.
+ *
+ * Deterministic across instances and deploys by construction — no salt is
+ * generated at runtime, because a per-instance salt would give each Lambda its
+ * own key space and quietly turn the distributed limiter back into
+ * `limit × instances`, the exact defect `distributed` exists to report.
+ */
+export function ipKeyDerivation(secret: string | undefined): IpKeyDerivation {
+  if (secret !== undefined && secret.length >= MIN_KEY_SECRET_LENGTH) {
+    return {
+      mode: 'keyed',
+      key: (ip) => createHmac('sha256', secret).update(ip, 'utf8').digest('hex'),
+    }
+  }
+  return {
+    mode: 'unkeyed',
+    key: (ip) =>
+      createHash('sha256').update(`${UNKEYED_KEY_DOMAIN}\0${ip}`, 'utf8').digest('hex'),
+  }
+}
+
+let warnedShortSecret = false
+
+/** Read `RATE_LIMIT_KEY_SECRET` once per limiter, saying so if it is set but too short. */
+function derivationFromEnv(): IpKeyDerivation {
+  const secret = process.env.RATE_LIMIT_KEY_SECRET
+  if (secret && secret.length < MIN_KEY_SECRET_LENGTH && !warnedShortSecret) {
+    warnedShortSecret = true
+    // The length, never the value.
+    console.error(
+      `[rateLimit] RATE_LIMIT_KEY_SECRET is set but shorter than ${MIN_KEY_SECRET_LENGTH} ` +
+        'characters, so it is ignored and client IPs fall back to the unkeyed derivation. ' +
+        "/api/health reports ipKeying: 'unkeyed' until it is replaced."
+    )
+  }
+  return ipKeyDerivation(secret)
+}
 
 export interface RateLimitPolicy {
   /** Requests allowed per window. */
@@ -105,6 +201,15 @@ export interface RateLimiter {
    * caller (and a test) can assert the difference instead of assuming.
    */
   readonly distributed: boolean
+  /**
+   * How client IPs are turned into bucket keys — see `IpKeying`.
+   *
+   * Decided once, when the limiter is built, from the environment it was built
+   * in, exactly like `distributed`. Neither implementation ever stores or sends
+   * the raw IP: the Upstash identifier and the in-memory map key are both the
+   * derived key.
+   */
+  readonly keying: IpKeying
 }
 
 const WINDOW_UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const
@@ -149,9 +254,12 @@ const MAX_TRACKED_IPS = 10_000
  * silently on the day somebody completed the UPSTASH-REDIS item in STATE.md.
  * Arming a defect by doing the right thing is the shape worth removing.
  */
-function createLocalLimiter(policy: RateLimitPolicy): RateLimiter {
+function createLocalLimiter(policy: RateLimitPolicy, derivation: IpKeyDerivation): RateLimiter {
   const windowMs = parseWindowMs(policy.window)
-  /** Per IP: the timestamps of recent hits, oldest first. */
+  /**
+   * Per derived key — never per raw IP — the timestamps of recent hits, oldest
+   * first. A heap snapshot of a long-lived Lambda is a log like any other.
+   */
   const hits = new Map<string, number[]>()
 
   /** Drop timestamps that have slid out of the window. */
@@ -174,6 +282,7 @@ function createLocalLimiter(policy: RateLimitPolicy): RateLimiter {
 
   return {
     distributed: false,
+    keying: derivation.mode,
     // Not "ok". This limiter works perfectly and is still the degraded state —
     // per-instance counting on Vercel means the effective limit is
     // `limit x instances`. Reporting health here would be reporting that the
@@ -181,21 +290,22 @@ function createLocalLimiter(policy: RateLimitPolicy): RateLimiter {
     check: async () => 'not-configured' as const,
     isLimited: async (ip: string) => {
       const now = Date.now()
+      const key = derivation.key(ip)
 
       // Amortised, not per-call. See MAX_TRACKED_IPS.
       if (hits.size > MAX_TRACKED_IPS) sweep(now)
 
-      const current = fresh(hits.get(ip) ?? [], now)
+      const current = fresh(hits.get(key) ?? [], now)
 
       if (current.length >= policy.limit) {
         // Store the pruned list even when refusing, so a caller hammering a
         // limit does not keep an ever-growing array of expired timestamps.
-        hits.set(ip, current)
+        hits.set(key, current)
         return true
       }
 
       current.push(now)
-      hits.set(ip, current)
+      hits.set(key, current)
       return false
     },
   }
@@ -214,8 +324,10 @@ function createLocalLimiter(policy: RateLimitPolicy): RateLimiter {
  * drifts.
  */
 export function createRateLimiter(policy: RateLimitPolicy): RateLimiter {
+  const derivation = derivationFromEnv()
+
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    return createLocalLimiter(policy)
+    return createLocalLimiter(policy, derivation)
   }
 
   const upstash = new Ratelimit({
@@ -226,6 +338,7 @@ export function createRateLimiter(policy: RateLimitPolicy): RateLimiter {
 
   return {
     distributed: true,
+    keying: derivation.mode,
     check: async () => {
       try {
         // The round-trip is the test; the verdict is irrelevant. What is being
@@ -240,7 +353,10 @@ export function createRateLimiter(policy: RateLimitPolicy): RateLimiter {
     },
     isLimited: async (ip: string) => {
       try {
-        const { success } = await upstash.limit(ip)
+        // The derived key, never `ip`. This identifier is what Upstash stores as
+        // part of the Redis key, so this line is the whole of the difference
+        // between the privacy page's claim and a database of visitor addresses.
+        const { success } = await upstash.limit(derivation.key(ip))
         return !success
       } catch (err) {
         // `error`, not `warn`. A configured limiter that cannot be consulted is

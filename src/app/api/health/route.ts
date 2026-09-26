@@ -12,9 +12,9 @@ import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
  * that map lives per Lambda instance, so the effective limit is
  * `limit × concurrent instances` rather than `limit` — the same single-instance
  * weakness a security audit already corrected once for `/api/contact`, and then
- * quietly reintroduced for the unauthenticated cart proxy that used to sit at
- * `/api/shopify`. That route now answers 404 and the limiter went with it; the
- * shape of the mistake is what is worth keeping here.
+ * quietly reintroduced on a later, unauthenticated route. The shape of the
+ * mistake is what is worth keeping here: a limiter that degrades without saying
+ * so.
  *
  * `/api/contact` has the same shape of gap: PR #32 made a missing
  * `RESEND_API_KEY` fail honestly at request time (503, no more silent
@@ -48,6 +48,18 @@ import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
  * (see the 2026-08-13 architecture notes in STATE.md), and `RESEND_API_KEY`
  * being unset is exactly that: a known, tracked, already-open item, not a
  * surprise.
+ *
+ * ## `ipKeying`: which privacy claim is currently true
+ *
+ * The privacy page says client IPs are pseudonymised before they become rate-limit
+ * keys, and there are two ways that can be true (see `IpKeying` in
+ * `@/lib/utils/rateLimit`): an HMAC under `RATE_LIMIT_KEY_SECRET` (`keyed`), or a
+ * SHA-256 under a fixed, published prefix, which anyone holding this repository
+ * could reverse by enumeration (`unkeyed`). Which one is live is a Vercel setting,
+ * per environment, invisible from outside — so it is reported here rather than
+ * inferred. Like `resend`, it is informational and never changes `healthy`:
+ * `unkeyed` is a weaker guarantee, not a broken deployment. The value is the mode,
+ * never the key.
  *
  * ## What it deliberately does not return
  *
@@ -192,6 +204,11 @@ export async function GET(request: Request): Promise<NextResponse> {
       // Informational only — does not affect `healthy` or the status code.
       // See the file-level doc comment for why this stays non-blocking.
       resend,
+      // Informational only, for the same reason. Read off the limiter rather than
+      // off `process.env`, so it reports what the limiter actually does rather than
+      // what the environment was meant to make it do — the two differ exactly when
+      // the secret is set but too short to count.
+      ipKeying: probe.keying,
       healthy,
       hint: healthy
         ? undefined
