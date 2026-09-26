@@ -105,6 +105,7 @@ Environment variables, in the two places they are declared.
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
 | `.env.local.example` | shopify-env shopify-host shopify-name | Local developer environment | `pnpm dev` on a fresh clone | credential names | delete the nine Shopify rows; keep Upstash and Resend | `src/tests/unit/env-example-completeness.test.ts` | WS-D |
+| `docs/runbooks/ws-d-vercel-env.md` | shopify-env shopify-name | Vercel environment variables | Read by a person before any `vercel env` change | credential names | delete when WS-D completes — a runbook for a finished removal is one somebody will re-run | `scripts/verify-commerce-contract.mjs` | WS-D |
 | `src/tests/unit/env-example-completeness.test.ts` | shopify-env shopify-name | Vitest | Merge gate | credential names | rewrite — the reconciler survives; its Shopify fixtures change name | the reconciler keeps running | WS-D |
 
 ### WS-E — DNS
@@ -114,6 +115,7 @@ Hostnames, and the one that still resolves into Shopify.
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
 | `docs/dns-domain-setup.md` | shopify-host shopify-name | DNS and domains | Any change to apex, `www` or the checkout hostname | none | rewrite — the checkout CNAME still points at `shops.myshopify.com` and is retired on a 30-day clock, not deleted on a whim | `scripts/probe-canonical-domain.mjs` | WS-E |
+| `docs/runbooks/ws-e-dns.md` | shopify-host shopify-name | DNS and domains | Read by a person before any change to apex, `www`, the checkout hostname or CAA | none | delete when WS-E completes — the checkout CNAME it names is the thing WS-E retires | `scripts/verify-premises.mjs` | WS-E |
 
 ### WS-G — Analytics and privacy
 
@@ -129,6 +131,7 @@ Everything whose deletion order is set by Shopify rather than by this repository
 
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
+| `docs/runbooks/ws-f-read-only-inventory.md` | shopify-name | Third-party access | Run once, read-only, after the connector is re-authenticated | none | delete when WS-F completes — it inventories a store that WS-F exists to close | `src/tests/unit/decommission-inventory.test.ts` | WS-F |
 | `scripts/lib/webhook-signature.mjs` | shopify-env shopify-name | Webhook HMAC | Webhook verification script | credential names | delete after the Shopify subscriptions are deleted — never before | `src/tests/unit/webhook-signature-contract.test.ts` | WS-F |
 | `scripts/verify-webhook-secret.mjs` | shopify-env shopify-name | Webhook secret verification | Manual, `pnpm verify:webhook` | credential names | delete with the webhook route, after the subscriptions | `src/tests/unit/webhook-signature-script.test.ts` | WS-F |
 | `src/app/api/webhooks/shopify/route.ts` | shopify-env shopify-name | Application | Shopify webhook delivery, HMAC-signed | commercial data | delete **after** the subscriptions are deleted in Shopify Admin — reversing this leaves Shopify retrying a failing route for its full backoff schedule | `src/tests/unit/api-webhooks-shopify-route.test.ts` | WS-F |
