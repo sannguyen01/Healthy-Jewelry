@@ -116,7 +116,6 @@ What is measured, where it goes, and how long it stays.
 
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
-| `docs/analytics.md` | shopify-name | Analytics documentation | Design review; read before any event is added | none | rewrite — replace the conversion-funnel framing with relationship-quality signals, which are what this model actually has | `src/tests/unit/analytics.test.ts` | WS-G |
 
 ### WS-F — Third-party access
 

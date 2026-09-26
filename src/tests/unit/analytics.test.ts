@@ -1,4 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { createElement } from 'react'
+import { render, screen, cleanup } from '@testing-library/react'
+import { parseSource, importsFrom } from '@/lib/analysis/tsAstScan'
+import { ConsentBanner } from '@/components/layout/ConsentBanner'
 import {
   track,
   setAnalyticsSink,
@@ -155,12 +161,17 @@ describe('event names', () => {
     }
   })
 
-  it('covers the whole funnel, so conversion is computable', () => {
-    // Headless is why this matters: Shopify's own analytics sees the hosted
-    // checkout only, so without a view event there is no denominator.
-    expect(ANALYTICS_EVENT_NAMES).toContain('product_viewed')
-    expect(ANALYTICS_EVENT_NAMES).toContain('collection_viewed')
-    expect(ANALYTICS_EVENT_NAMES).toContain('search_performed')
+  it('is exactly the three attention signals docs/analytics.md documents', () => {
+    // Was "covers the whole funnel, so conversion is computable". There is no funnel: the
+    // site sells nothing, and COMMERCE-ELIMINATION-CONTRACT.md §2 forbids conversion
+    // analytics. What is left is which pieces, collections and searches draw attention —
+    // one row of the relationship-quality table in docs/analytics.md. Equality, so an
+    // added event fails here until the document, the banner and the privacy page say so.
+    expect([...ANALYTICS_EVENT_NAMES].sort()).toEqual([
+      'collection_viewed',
+      'product_viewed',
+      'search_performed',
+    ])
   })
 
   it('carries no event a browse-only site cannot emit', () => {
@@ -217,3 +228,57 @@ describe('track never becomes load-bearing', () => {
     expect(sent[0]).toEqual(event)
   })
 })
+
+/**
+ * **What a visitor is told, held against what is measured.**
+ *
+ * The banner promised "anonymous page views and add-to-bag events" for a week after
+ * add-to-bag was deleted — and page views were never counted at all. The privacy page
+ * described a session cookie holding the consent answer; the answer is a localStorage entry
+ * that outlives the session. Both were prose nothing compared against the code, which is
+ * the gap ADR 036 names. These tests are the comparison.
+ */
+describe('the consent copy matches the measurement', () => {
+  const ROOT = process.cwd()
+  const PRIVACY = 'src/app/privacy/page.tsx'
+
+  it('the banner names what is counted, and nothing that is not', () => {
+    localStorage.removeItem(CONSENT_STORAGE_KEY)
+    render(createElement(ConsentBanner))
+    const text = screen.getByRole('dialog', { name: /analytics consent/i }).textContent ?? ''
+    cleanup()
+
+    // One phrase per event in ANALYTICS_EVENT_NAMES.
+    expect(text).toMatch(/pieces/i) // product_viewed
+    expect(text).toMatch(/collections/i) // collection_viewed
+    expect(text).toMatch(/search/i) // search_performed
+    // And none of the vocabulary of events or mechanisms that do not exist.
+    for (const absent of [/bag/i, /cart/i, /checkout/i, /page views/i, /set(s)? (a )?cookie/i]) {
+      expect(text, `the banner claims ${absent}`).not.toMatch(absent)
+    }
+  })
+
+  it('the privacy page reads the storage key and query length from the code that uses them', () => {
+    // Imported, not typed: a renamed key or a new length changes the sentence with it.
+    const sf = parseSource(PRIVACY, readFileSync(join(ROOT, PRIVACY), 'utf8'))
+    expect(importsFrom(sf, '@/lib/analytics/consent').map((b) => b.imported)).toContain(
+      'CONSENT_STORAGE_KEY'
+    )
+    expect(importsFrom(sf, '@/lib/analytics/events').map((b) => b.imported)).toContain(
+      'MAX_QUERY_LENGTH'
+    )
+  })
+
+  it('the privacy page does not describe cookies the site does not set', () => {
+    // Comments are stripped first: the page records the wrong sentences it replaced, and
+    // quoting a removed claim is the record of the fix, not the claim.
+    const prose = readFileSync(join(ROOT, PRIVACY), 'utf8')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+    for (const claim of [/session cookies/i, /analytics cookies/i, /two types of cookies/i, /hashed and\s+short-lived/i]) {
+      expect(prose, `the privacy page still says ${claim}`).not.toMatch(claim)
+    }
+    expect(prose).toMatch(/sets no cookies/i)
+  })
+})
+
