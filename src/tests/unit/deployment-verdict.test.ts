@@ -368,7 +368,6 @@ describe('buildStamp', () => {
       branch: 'main',
       builtAt: '2026-08-12T10:00:00.000Z',
       configFingerprint: 'deadbeef',
-      storeDomainInlined: true,
     })
 
     expect(stamp).toContain(`commit=${HEAD.slice(0, 7)}`)
@@ -391,7 +390,6 @@ describe('buildStamp', () => {
       branch: null,
       builtAt: null,
       configFingerprint: '00000000',
-      storeDomainInlined: false,
     })
 
     expect(stamp).toContain('commit=unknown')
