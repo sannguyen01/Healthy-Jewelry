@@ -37,6 +37,19 @@ test.describe('the egress boundary can fail', () => {
     expect(boundary.requests.some((u) => u.startsWith(TARGET))).toBe(true)
   })
 
+  test('a fetch the CSP blocks is recorded as csp-violation', async ({ page, boundary }) => {
+    boundary.expectFinding('csp-violation')
+    await page.goto('/')
+    const outcome = await page.evaluate(
+      (url) => fetch(url, { mode: 'no-cors' }).then(() => 'sent', () => 'refused'),
+      `${TARGET}/beacon`
+    )
+    // `connect-src 'self'` refuses it before it is a request. If this ever reads `sent`,
+    // the header has lost connect-src — csp-contract.test.ts should already be red.
+    expect(outcome).toBe('refused')
+    await expect.poll(() => boundary.violations.length).toBeGreaterThan(0)
+  })
+
   test('an undeclared finding fails the test that caused it', async ({ page }) => {
     // Nothing declared, so the forbidden-origin finding is unexpected and teardown throws.
     // The body itself cannot throw — the goto is fulfilled locally — so if this test ever

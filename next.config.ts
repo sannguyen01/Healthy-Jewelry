@@ -62,6 +62,55 @@ const buildInfoEnv: Record<string, string> = {
   NEXT_PUBLIC_HJ_BRANCH: process.env.VERCEL_GIT_COMMIT_REF ?? '',
 }
 
+/**
+ * **Content-Security-Policy: the browser talks to this origin and to nothing else.**
+ *
+ * There was no CSP at all until 2026-09-26, so "the CSP must lose its commerce origins" had
+ * nothing to act on, and nothing stopped a copied component from pulling a script, a font
+ * or a beacon from a vendor. Contract §12 now says the browser side approves the site and
+ * the non-network schemes and no third-party host; this header is that sentence enforced
+ * by every visitor's browser rather than only by the E2E suite.
+ *
+ * Each source is here for a reason that was measured, not assumed:
+ *
+ * - `script-src 'unsafe-inline'` — Next's App Router streams its RSC payload through inline
+ *   `self.__next_f.push(…)` scripts, and the JSON-LD blocks are inline. A nonce would remove
+ *   the need, but a nonce forces every page to render per request, and nearly every route
+ *   here is prerendered. No `'unsafe-eval'`: the production runtime does not need it, and
+ *   `csp-contract.test.ts` fails if it arrives.
+ * - `style-src 'unsafe-inline'` — React `style` props and the 410 pages' own `<style>`
+ *   block, which exists precisely so a withdrawn route renders without the CSS pipeline.
+ * - `img-src data: blob:` and `font-src data:` — inline SVG and font bytes; §12 rows.
+ * - `connect-src 'self'` — the whole egress rule in one directive. `fetch('/api/…')` only.
+ * - `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+ *
+ * **No `upgrade-insecure-requests`.** E2E serves `http://localhost:3000` and the directive
+ * would rewrite its subresources to https and fail every page; production is already
+ * https-only through the HSTS header below.
+ *
+ * **Known cost:** Vercel's preview toolbar loads from its own host, so it is blocked on
+ * preview deployments. Accepted: a preview that behaves like production is the point.
+ *
+ * Pinned by `src/tests/unit/csp-contract.test.ts`, which reads it back through
+ * `headers()` and checks every source against contract §12 and §13.
+ */
+const CONTENT_SECURITY_POLICY: Record<string, readonly string[]> = {
+  'default-src': ["'self'"],
+  'script-src': ["'self'", "'unsafe-inline'"],
+  'style-src': ["'self'", "'unsafe-inline'"],
+  'img-src': ["'self'", 'data:', 'blob:'],
+  'font-src': ["'self'", 'data:'],
+  'connect-src': ["'self'"],
+  'frame-ancestors': ["'none'"],
+  'base-uri': ["'self'"],
+  'form-action': ["'self'"],
+  'object-src': ["'none'"],
+}
+
+const contentSecurityPolicy = Object.entries(CONTENT_SECURITY_POLICY)
+  .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
+  .join('; ')
+
 const nextConfig: NextConfig = {
   env: buildInfoEnv,
   /*
@@ -97,6 +146,7 @@ const nextConfig: NextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
+          { key: 'Content-Security-Policy', value: contentSecurityPolicy },
         ],
       },
     ]
