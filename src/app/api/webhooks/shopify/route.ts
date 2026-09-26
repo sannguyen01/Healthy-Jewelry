@@ -1,7 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
-import { shopifyConfig } from '@/config/shopify'
 import { PRODUCTS_TAG, productTag, collectionTag, PURGE_NOW } from '@/lib/shopify/cacheTags'
 import { readBoundedBytes } from '@/lib/http/readBoundedBody'
 import { HANDLED_TOPIC_PREFIXES } from '@/lib/webhooks/retrySafety'
@@ -157,7 +156,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // is about *our* store. Only enforced when a store domain is configured, so
   // an unconfigured preview deployment does not reject everything.
   const shopDomain = req.headers.get('x-shopify-shop-domain')
-  const expectedDomain = shopifyConfig.storeDomain
+  // Read per request, exactly as the deleted `@/config/shopify` getter read it: the same
+  // literal (so Next inlines it at build time, as it did through the getter) and the same
+  // `?? ''` fallback. WS-A removed that module because this was its last caller; the
+  // behaviour is unchanged, and the read leaves with this route under WS-F.
+  const expectedDomain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ?? ''
   if (expectedDomain && shopDomain && shopDomain !== expectedDomain) {
     console.warn('[webhooks/shopify] rejected: delivery for a different shop', {
       received: shopDomain,

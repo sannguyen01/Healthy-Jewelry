@@ -56,17 +56,7 @@ Routes, components, API handlers, configuration and the client bundle.
 
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
-| `src/app/api/revalidate/route.ts` | shopify-env shopify-name | Application | HTTP POST with a shared secret | credential names | delete — a static catalogue is revalidated by deploying, not by purging | `src/tests/unit/api-revalidate-route.test.ts` | WS-A |
-| `src/app/api/version/route.ts` | shopify-name | Application | HTTP GET, uncached | public config | rewrite — the stale-build fingerprint stays, its Shopify fields go | `src/tests/unit/api-version-route.test.ts` | WS-A |
-| `src/config/build-info.ts` | shopify-name | Application | Build time, inlined into the client bundle | public config | rewrite — drop the store domain from the fingerprinted key set | `src/tests/unit/api-version-route.test.ts` | WS-A |
-| `src/config/shopify-public.ts` | shopify-name | Application | Imported by the client graph | public config | delete — nothing in the browser needs a store domain | `src/tests/unit/secret-exposure.test.ts` | WS-A |
-| `src/config/shopify.ts` | shopify-env shopify-name | Application | Server-side import | credential names | delete — the last server-side reader of three Shopify secrets | `src/tests/unit/config.test.ts` | WS-A |
-| `src/lib/shopify/api-version.ts` | shopify-env shopify-name | Application | Imported by `/api/version` | none | delete with `src/lib/shopify/` entirely | `src/tests/unit/api-version-contract.test.ts` | WS-A |
-| `src/tests/unit/api-revalidate-route.test.ts` | shopify-env shopify-name | Vitest | Merge gate | none | delete with its subject | the subject is gone | WS-A |
-| `src/tests/unit/api-version-route.test.ts` | shopify-env shopify-host shopify-name | Vitest | Merge gate | public config | rewrite — the fingerprint assertions survive the Shopify ones | the subject is gone | WS-A |
 | `src/tests/unit/cache-tag-contract.test.ts` | shopify-name | Vitest | Merge gate | none | delete with `cacheTags.ts` and the two routes that register tags | the subject is gone | WS-A |
-| `src/tests/unit/config-env-branches.test.ts` | shopify-env shopify-host shopify-name | Vitest | Merge gate | credential names | rewrite with the config it covers | the subject is gone | WS-A |
-| `src/tests/unit/config.test.ts` | shopify-name | Vitest | Merge gate | credential names | rewrite with the config it covers | the subject is gone | WS-A |
 | `src/tests/unit/rateLimit.test.ts` | shopify-name | Vitest | Merge gate | none | rewrite one fixture — the limiter keeps its job, its prefix changes subject | the limiter keeps running | WS-A |
 
 ### WS-B — Content
@@ -95,7 +85,6 @@ Workflows, probes, gates, fixtures and the machinery that watches them.
 | `scripts/preflight-secrets.mjs` | shopify-env shopify-host shopify-name | Smoke preflight | Production smoke, six-hourly | credential names | rewrite — it gates on five secrets that are being revoked | `src/tests/unit/preflight-secrets.test.ts` | WS-C |
 | `scripts/probe-assertion-liveness.mjs` | shopify-env shopify-host shopify-name | Mutation probe | Weekly control audit | credential names | rewrite — its env scaffolding injects a mock storefront | `src/tests/unit/probe-liveness-decision.test.ts` | WS-C |
 | `scripts/verify-premises.mjs` | shopify-name | Premise driver | Production smoke | none | rewrite with `premise-checks.mjs` | `src/tests/unit/verify-premises.test.ts` | WS-C |
-| `src/tests/unit/api-version-contract.test.ts` | shopify-env shopify-name | Vitest | Merge gate | none | delete with its subject | the subject is gone | WS-C |
 | `src/tests/unit/audit-workflow-secrets.test.ts` | shopify-env shopify-name | Vitest | Merge gate | credential names | rewrite — the auditor survives; its Shopify fixtures change name | the auditor keeps running | WS-C |
 | `src/tests/unit/deployment-verdict.test.ts` | shopify-host shopify-name | Vitest | Merge gate | public config | rewrite with the verdict library | the subject is gone | WS-C |
 | `src/tests/unit/escalation-decision.test.ts` | shopify-env shopify-host shopify-name | Vitest | Merge gate | credential names | rewrite with the escalation library | the subject is gone | WS-C |

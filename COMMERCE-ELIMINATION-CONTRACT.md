@@ -245,7 +245,6 @@ absent here fails, and a route here and absent on disk fails.
 | `/api/analytics` | route | 200 |
 | `/api/contact` | route | 200 |
 | `/api/health` | route | 200 |
-| `/api/revalidate` | route | 200 |
 | `/api/sitemap` | route | 200 |
 | `/api/version` | route | 200 |
 
@@ -254,11 +253,6 @@ absent here fails, and a route here and absent on disk fails.
 **`/api/webhooks/shopify` is deliberately absent from this table.** It answers only to an
 HMAC-signed delivery, so it is not a public route; it is in the register instead, retained
 under WS-F's ordering and scheduled for deletion rather than for approval.
-
-`/api/revalidate` **is** listed, and that is not an endorsement. It is a route this deployment
-currently serves, and the table's job is to be exhaustive about what the site answers — an
-inventory that quietly omitted a live endpoint would be worth less than no inventory. It
-carries a register row saying it goes.
 
 ## 7. Forbidden route inventory
 

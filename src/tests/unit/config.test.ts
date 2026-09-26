@@ -8,8 +8,6 @@ import {
   legalLinks,
   collectionsNav,
 } from '@/config/navigation'
-import { shopifyConfig, REVALIDATE } from '@/config/shopify'
-import { shopifyPublicConfig } from '@/config/shopify-public'
 import {
   SITE_NAME,
   SITE_URL,
@@ -111,52 +109,15 @@ describe('collectionsNav', () => {
   })
 })
 
-// ── shopify.ts ─────────────────────────────────────────────────────────────
-
-describe('shopifyConfig', () => {
-  /**
-   * Deliberately *not* `toBe('<some literal>')`.
-   *
-   * This assertion used to hardcode `'2025-01'`, which made it a **third copy** of a
-   * string that already existed in two places — and it passed happily for the seven
-   * months that version spent retired. A test that restates the implementation cannot
-   * see the implementation is wrong; it just has to be edited alongside it.
-   *
-   * What is worth asserting here is the *delegation*: the server config must read the
-   * version from the browser-safe config rather than declaring its own. Whether that
-   * version is the right one is a question about Shopify, answered in
-   * `api-version-contract.test.ts` (agreement) and by
-   * `shopifyServesThePinnedApiVersion` in `verify-production.mjs` (correctness).
-   */
-  it('takes its apiVersion from the public config rather than declaring one', () => {
-    expect(shopifyConfig.apiVersion).toBe(shopifyPublicConfig.apiVersion)
-  })
-  it('has all required keys', () => {
-    expect(shopifyConfig).toHaveProperty('storeDomain')
-    expect(shopifyConfig).toHaveProperty('storefrontAccessToken')
-    expect(shopifyConfig).toHaveProperty('adminAccessToken')
-    expect(shopifyConfig).toHaveProperty('revalidationSecret')
-  })
-  it('values default to empty string without env vars', () => {
-    expect(typeof shopifyConfig.storeDomain).toBe('string')
-    expect(typeof shopifyConfig.storefrontAccessToken).toBe('string')
-  })
-})
-
-describe('REVALIDATE', () => {
-  it('cart is 0 (always fresh)', () => {
-    expect(REVALIDATE.cart).toBe(0)
-  })
-  it('product is 3600 (1 hour)', () => {
-    expect(REVALIDATE.product).toBe(3600)
-  })
-  it('collection is 3600 (1 hour)', () => {
-    expect(REVALIDATE.collection).toBe(3600)
-  })
-  it('page is 86400 (24 hours)', () => {
-    expect(REVALIDATE.page).toBe(86400)
-  })
-})
+/*
+ * `shopifyConfig` and `REVALIDATE` were asserted here, from `config/shopify.ts` and
+ * `config/shopify-public.ts`. WS-A deleted both modules on 2026-09-25: the last reader of
+ * the store domain was the webhook route, which now reads the one variable it needs
+ * directly, and nothing read the three server secrets, the pinned vendor API version or
+ * the revalidation periods at all. A test of a deleted module is deleted with it; what
+ * the build fingerprint still covers is asserted in `config-env-branches.test.ts` and
+ * `api-version-route.test.ts`.
+ */
 
 // ── site.ts ────────────────────────────────────────────────────────────────
 

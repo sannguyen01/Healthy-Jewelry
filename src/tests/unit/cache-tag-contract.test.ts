@@ -7,8 +7,7 @@ import { parseSource, callsTo, arrayPropertyValues } from '@/lib/analysis/tsAstS
  * A cache tag is a bare string on both sides of an invalidation:
  *
  *   - a fetcher *registers* tags when it fetches;
- *   - `src/app/api/webhooks/shopify/route.ts` and `src/app/api/revalidate/route.ts`
- *     *revalidate* tags when something is said to have changed.
+ *   - a webhook or purge route *revalidates* tags when something is said to have changed.
  *
  * Nothing connects them. If the two spell a tag differently, the failure is
  * completely silent — no error, no log, no failing test. The only symptom is a
@@ -37,17 +36,39 @@ import { parseSource, callsTo, arrayPropertyValues } from '@/lib/analysis/tsAstS
  * has no fetch cache to tag.
  *
  * So **every surviving `revalidateTag` call is an orphan by construction**, and the
- * orphan check as written would now report all of them. That is not a defect in the routes:
- * they survive on purpose. The masterplan's WS-7 ordering is *delete the Shopify webhook
- * subscriptions before removing `/api/webhooks/shopify`*, those subscriptions can only be
- * deleted from Shopify Admin, and the connector reads `needs_reconnect`. Removing the
- * endpoint first would leave Shopify retrying against a failing route for its full backoff
- * schedule.
+ * orphan check as written would now report all of them. That is not a defect in the route:
+ * it survives on purpose. WS-F's ordering is *delete the Shopify webhook subscriptions
+ * before removing `/api/webhooks/shopify`*, those subscriptions can only be deleted from
+ * Shopify Admin, and the connector reads `needs_reconnect`. Removing the endpoint first
+ * would leave Shopify retrying against a failing route for its full backoff schedule.
  *
- * What is left to check, and what this file now checks:
+ * ## One revalidator left, and what that did to this file (2026-09-25)
  *
- *   1. the two revalidating routes still spell tags through the shared builders, so they
- *      cannot drift from each other while both exist;
+ * WS-A deleted `/api/revalidate`, the manual purge endpoint: a catalogue of JSON files in
+ * git is revalidated by deploying it, and the endpoint's only job was purging caches a
+ * deleted fetcher used to fill. That left **one** revalidating route and **zero**
+ * registering modules, and two of this file's checks lost their subject
+ * ([ADR 035](../../../docs/adr/035-a-control-outlives-its-subject.md)):
+ *
+ *   - *"both revalidating routes import the tag names rather than spelling them inline"*
+ *     was a rule about two files agreeing. One file cannot disagree with itself, so as
+ *     written it would have gone on passing and meant nothing. It is not kept narrowed to
+ *     one route; it is **subsumed** by the exact-set assertion below, where an inline
+ *     literal resolves to `inline:<value>` and is not in the accepted set.
+ *   - the call-count floor (`>= 5`) counted the deleted route's two calls. A floor that
+ *     silently absorbs the loss of a participant is the narrowing-by-omission ADR 007
+ *     warns about, so the count is now an equality against a named set.
+ *
+ * What this file checks now:
+ *
+ *   1. **the orphan check, re-founded.** With nothing registering tags, the orphan rule
+ *      `revalidated ⊆ registered` would condemn every call. What is still true, and still
+ *      worth failing on, is that the orphans are *exactly the known ones*: three tags, in
+ *      one file, retained under WS-F's ordering. A new `revalidateTag` anywhere else is a
+ *      purge of a tag nothing registers — a no-op that looks like an invalidation — and
+ *      fails here by file and tag. The day WS-F deletes the webhook route, the set goes
+ *      empty and this fails too, saying to delete this file with `cacheTags.ts`, rather
+ *      than passing vacuously over nothing;
  *   2. every purge still passes `PURGE_NOW` rather than a profile that keeps serving stale
  *      copy;
  *   3. the bare `collections` orphan has not come back;
@@ -64,10 +85,10 @@ const ROOT = process.cwd()
  * **Every** module, not two named files.
  *
  * The first version of this test read `src/lib/shopify/index.ts` and the webhook route by
- * name — and therefore never saw `src/app/api/revalidate/route.ts`, a third revalidation
- * surface which still called `revalidateTag('collections')`: the exact orphan this contract
- * was written to eliminate, surviving the fix that eliminated it everywhere the test
- * happened to be looking.
+ * name — and therefore never saw the manual purge route (`/api/revalidate`, deleted
+ * 2026-09-25), a third revalidation surface which still called
+ * `revalidateTag('collections')`: the exact orphan this contract was written to eliminate,
+ * surviving the fix that eliminated it everywhere the test happened to be looking.
  *
  * **A contract test that names its participants can only check the participants someone
  * remembered.** That is the second time a guardrail here was scoped narrower than the
@@ -91,14 +112,23 @@ function walkSources(dir: string): string[] {
 
 const SOURCE_FILES = [join(ROOT, 'src/app'), join(ROOT, 'src/lib')].flatMap(walkSources)
 
-const WEBHOOK_SRC = readFileSync(
-  join(ROOT, 'src/app/api/webhooks/shopify/route.ts'),
-  'utf-8',
-)
-const MANUAL_PURGE_SRC = readFileSync(
-  join(ROOT, 'src/app/api/revalidate/route.ts'),
-  'utf-8',
-)
+/** The one revalidating route left, retained under WS-F's ordering. */
+const WEBHOOK_ROUTE = 'src/app/api/webhooks/shopify/route.ts'
+
+/**
+ * **The orphans this repository knows about, and accepts, by file and tag.**
+ *
+ * Every entry is a purge of a tag no module registers — a no-op that looks like an
+ * invalidation. They are accepted rather than fixed because the route that makes them is
+ * waiting on a console action (WS-F), and deleting the calls without deleting the route
+ * would be tidying a file that is scheduled to go whole. The set is compared by equality,
+ * in both directions, so it cannot grow quietly and cannot outlive its route.
+ */
+const ACCEPTED_ORPHANS: ReadonlyArray<{ file: string; tag: string }> = [
+  { file: WEBHOOK_ROUTE, tag: 'products' },
+  { file: WEBHOOK_ROUTE, tag: 'product:<param>' },
+  { file: WEBHOOK_ROUTE, tag: 'collection:<param>' },
+]
 
 /**
  * Resolve a tag *expression* to the semantic tag it produces.
@@ -196,11 +226,53 @@ describe('cache tag contract', () => {
 
   it('covers every revalidation surface, not a hand-listed subset', () => {
     // Pins the generalisation. If someone narrows this back to named files, the next
-    // orphan hides in whatever file they forgot — which is exactly how
-    // /api/revalidate kept `collections` alive through the fix that removed it.
+    // orphan hides in whatever file they forgot — which is exactly how the manual purge
+    // route kept `collections` alive through the fix that removed it.
     const scanned = SOURCE_FILES.map((f) => relative(ROOT, f))
-    expect(scanned).toContain('src/app/api/webhooks/shopify/route.ts')
-    expect(scanned).toContain('src/app/api/revalidate/route.ts')
+    expect(scanned).toContain(WEBHOOK_ROUTE)
+  })
+
+  /**
+   * **The orphan check, re-founded for a codebase with no producer.**
+   *
+   * `revalidated ⊆ registered` cannot be asked while `registered` is empty — it would
+   * condemn every call, including the three kept on purpose. The question that still has
+   * an answer is narrower and exact: *are the orphans the ones we know about?* Asked as an
+   * equality over `file → tag` pairs, so each direction fails with its own message:
+   *
+   *   - **one more** — a new purge of a tag nothing registers. It compiles, a mocked
+   *     `next/cache` passes it, and it invalidates nothing. Exactly the orphan this file
+   *     was written for, arriving in a codebase where it can no longer be anything else;
+   *   - **one fewer** — the webhook route has gone (WS-F), or stopped purging. Either way
+   *     this file's subject is gone with it, and the right change is to delete this test
+   *     and `src/lib/shopify/cacheTags.ts` together, not to shrink the list until it
+   *     passes over nothing ([ADR 035](../../../docs/adr/035-a-control-outlives-its-subject.md)).
+   */
+  it('every revalidated tag is a known, accepted orphan — and every accepted orphan is still revalidated', () => {
+    const key = (o: { file: string; tag: string }) => `${o.file} → ${o.tag}`
+    const observed = new Set<string>()
+    for (const [tag, files] of revalidatedIn) {
+      for (const file of files) observed.add(key({ file, tag }))
+    }
+    const accepted = new Set(ACCEPTED_ORPHANS.map(key))
+
+    const unexpected = [...observed].filter((o) => !accepted.has(o)).sort()
+    const vanished = [...accepted].filter((a) => !observed.has(a)).sort()
+
+    expect(
+      unexpected,
+      `A module purges a cache tag that nothing registers:\n  ${unexpected.join('\n  ')}\n\n` +
+        `No fetch registers a cache tag any more (see the premise test above), so this call ` +
+        `invalidates nothing while reading as an invalidation. If a fetch cache has come back, ` +
+        `restore the orphan and widow checks instead; otherwise delete the call.`
+    ).toEqual([])
+    expect(
+      vanished,
+      `An accepted orphan is no longer revalidated:\n  ${vanished.join('\n  ')}\n\n` +
+        `If ${WEBHOOK_ROUTE} has been deleted (WS-F), this contract's subject is gone: delete ` +
+        `this test file and src/lib/shopify/cacheTags.ts in the same change, and remove their ` +
+        `register rows. Do not shrink ACCEPTED_ORPHANS to make this pass over an empty set.`
+    ).toEqual([])
   })
 
   /**
@@ -264,7 +336,11 @@ describe('cache tag contract', () => {
     it('finds the calls it is meant to be checking', () => {
       // Without this the two assertions below pass on an empty list, which is
       // the "covered-looking and worthless" state the suite above guards too.
-      expect(calls.length).toBeGreaterThanOrEqual(5)
+      //
+      // Was `>= 5`, and two of the five were the deleted manual purge route's. A floor
+      // that absorbs a participant's disappearance is the silent direction, so this now
+      // counts against the accepted set: one call per accepted orphan, no more, no fewer.
+      expect(calls.length).toBe(ACCEPTED_ORPHANS.length)
     })
 
     it('passes a profile at every call site', () => {
@@ -316,13 +392,17 @@ describe('cache tag contract', () => {
    * the fetcher half of it; what survives of it is the two-route version below.
    */
 
-  it('both revalidating routes import the tag names rather than spelling them inline', () => {
-    // The contract can only be *maintained* if there is one place to change. Two files
-    // with matching string literals agree today and drift tomorrow — and these two are
-    // still two files, so the rule still has work to do.
-    expect(WEBHOOK_SRC).toMatch(/from '@\/lib\/shopify\/cacheTags'/)
-    expect(MANUAL_PURGE_SRC).toMatch(/from '@\/lib\/shopify\/cacheTags'/)
-  })
+  /*
+   * 'both revalidating routes import the tag names rather than spelling them inline' was
+   * here. It asserted that two files agreed by importing one vocabulary, and on
+   * 2026-09-25 one of the two files was deleted. A rule about agreement between two
+   * participants has no subject with one, and narrowed to "the webhook route imports
+   * cacheTags" it would have kept passing while meaning nothing.
+   *
+   * What it protected is still protected, by the exact-set test above: a tag spelled as a
+   * literal resolves to `inline:<value>`, which is not an accepted orphan, so bypassing the
+   * builders fails there by file and tag.
+   */
 
   it('the tag builders produce the documented shapes', async () => {
     const { productTag, collectionTag, PRODUCTS_TAG } = await import(

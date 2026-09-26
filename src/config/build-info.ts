@@ -11,15 +11,15 @@
 //   1. **A cached build reused stale `NEXT_PUBLIC_*` values.** Those variables
 //      are inlined into the JavaScript at build time, so setting one in Vercel
 //      and redeploying changes nothing if the build cache is reused. Warned
-//      about in `env-check.ts`, the runbook and STATE.md — and not detectable
-//      from outside, because a stale bundle and a fresh one are byte-identical
-//      in every visible respect.
+//      about in the runbook and STATE.md — and not detectable from outside,
+//      because a stale bundle and a fresh one are byte-identical in every
+//      visible respect.
 //   2. **Per-environment variables.** Vercel scopes them, so Production can be
 //      configured while a Preview alias serving the same commit is not.
 //   3. **An orphaned preview alias.** A branch alias keeps serving whatever last
 //      built on that branch, forever, including after the branch is deleted. It
-//      renders, the cart works, and it is testing a snapshot of an app that no
-//      longer exists.
+//      renders, every link works, and it is a snapshot of an app that no longer
+//      exists.
 //
 // All three are the same missing capability: the page cannot identify itself.
 //
@@ -43,11 +43,22 @@
 // confidentiality measure and should not be described as one.
 
 /**
- * The two inlined values whose staleness actually breaks the storefront.
+ * The inlined value whose staleness actually breaks the site.
  *
- * `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` empty means the cart never syncs and
- * checkout produces no URL. `NEXT_PUBLIC_SITE_URL` wrong means canonical URLs,
- * Open Graph images and structured data all point somewhere else.
+ * `NEXT_PUBLIC_SITE_URL` wrong means canonical URLs, Open Graph images, the
+ * sitemap and structured data all point somewhere else — to a preview host, or
+ * to `localhost` — while every page still renders perfectly. It is the one
+ * operator-set `NEXT_PUBLIC_*` value the rendered site depends on; the
+ * `NEXT_PUBLIC_HJ_*` build facts below are minted by `next.config.ts` on every
+ * build and cannot go stale independently of the bundle they describe.
+ *
+ * There were two. `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` was fingerprinted because
+ * an empty one meant the cart never synced and checkout produced no URL. The
+ * cart and checkout are gone, nothing in the browser reads a store domain, and
+ * a fingerprint over a value nothing depends on would report a stale bundle
+ * that nobody could observe — an alarm about nothing. It was dropped from this
+ * set and from `/api/version`'s in the same change, through
+ * `FINGERPRINTED_KEYS`, so the two sides never disagree about which keys exist.
  *
  * Written as full literals, never `process.env[name]` in a loop: Next's inliner
  * is a **textual** substitution on `process.env.NEXT_PUBLIC_FOO`, so a computed
@@ -55,9 +66,20 @@
  * producing a fingerprint that looks fine and measures nothing.
  */
 const INLINED_PUBLIC_CONFIG: Readonly<Record<string, string>> = {
-  NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ?? '',
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ?? '',
 }
+
+/**
+ * The keys the fingerprint covers, in one place.
+ *
+ * `/api/version` recomputes the fingerprint from the live environment and needs
+ * the same key set to do it. It used to keep its own copy of the list, which is
+ * two copies of a fact that must agree — and a key added to one and not the
+ * other would make every deployment report stale, or none. Derived from the
+ * object above rather than declared beside it, so adding a key here is the whole
+ * change.
+ */
+export const FINGERPRINTED_KEYS: readonly string[] = Object.keys(INLINED_PUBLIC_CONFIG)
 
 /**
  * FNV-1a, 32-bit, as eight hex characters.
@@ -101,8 +123,6 @@ export interface BuildInfo {
   builtAt: string | null
   /** Fingerprint of the `NEXT_PUBLIC_*` values inlined into this bundle. */
   configFingerprint: string
-  /** Whether the store domain survived into the bundle at all. */
-  storeDomainInlined: boolean
 }
 
 /**
@@ -121,7 +141,6 @@ export const BUILD_INFO: BuildInfo = {
   branch: process.env.NEXT_PUBLIC_HJ_BRANCH || null,
   builtAt: process.env.NEXT_PUBLIC_HJ_BUILD_TIME || null,
   configFingerprint: fingerprint(INLINED_PUBLIC_CONFIG),
-  storeDomainInlined: INLINED_PUBLIC_CONFIG.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN.length > 0,
 }
 
 /**
