@@ -61,6 +61,7 @@ type Obs = {
   transport: 'ok' | 'not-resolved' | 'unreachable'
   detail?: string
   status?: number
+  redirectStatus?: number | null
   chain?: string[]
   server?: string | null
   version?: {
@@ -612,5 +613,173 @@ describe('the enumeration and the decision agree', () => {
     for (const code of CANONICAL_FINDINGS) {
       expect(emitted, `${code} is enumerated but no scenario produces it`).toContain(code)
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────────────
+// "answers 200 and redirects", which is not a thing that can happen
+// ─────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * **Found in production, in an issue body a person was meant to act on.**
+ *
+ * The 2026-09-25 control audit rewrote issue #84 with the new `apex-redirected` finding,
+ * and it read: *"healthyjewellery.com answers 200 and redirects to
+ * www.healthyjewellery.com"*. A 200 does not redirect.
+ *
+ * The two halves of that sentence came from different hops. `observe` follows the chain by
+ * design — the chain is the evidence — so the `status` it returns is whatever finally
+ * answered, which was `www`'s 200. The finding interpolated that while claiming to describe
+ * what the apex does. `verify-browse-only.mjs` printed 307 for the same redirect in the same
+ * run, from the same runner, thirty seconds apart, because it never follows one and so has
+ * only the immediate status to print. Two probes, one site, contradictory numbers.
+ *
+ * This is the same class of defect the whole 2026-09-21 change set was about: not a control
+ * that failed to fire, but one that fired and said something untrue. A reader who believes
+ * "answers 200" concludes the apex serves the site and the finding is spurious — the exact
+ * wrong conclusion, reached by trusting the tool.
+ *
+ * `redirectStatus` carries the first hop's status separately, and the guard below refuses
+ * any `apex-redirected` detail that names a status outside the 3xx range, so no future
+ * refactor can reintroduce the sentence by wiring the wrong field back in.
+ */
+describe('apex-redirected names the redirect, not the end of the chain', () => {
+  const chainToWww = { status: 200, redirectStatus: 307, chain: [APEX, WWW] }
+
+  it('names the status the apex answered with', () => {
+    const { findings } = decideCanonicalDomain({
+      observations: [ok(APEX, chainToWww), ok(WWW)],
+      apexHost: APEX,
+      expectedCommit: COMMIT,
+    })
+    const detail = findings.find((f) => f.code === 'apex-redirected')?.detail ?? ''
+
+    expect(detail).toContain(`${APEX} answers 307`)
+    expect(detail).not.toContain('answers 200')
+  })
+
+  it('never claims a non-redirect status redirects', () => {
+    // The guard on the guard, and the one that would have caught this in review. Whatever
+    // the wording becomes, the number in it must be a 3xx.
+    for (const redirectStatus of [301, 302, 307, 308]) {
+      const { findings } = decideCanonicalDomain({
+        observations: [ok(APEX, { status: 200, redirectStatus, chain: [APEX, WWW] }), ok(WWW)],
+        apexHost: APEX,
+      })
+      const detail = findings.find((f) => f.code === 'apex-redirected')?.detail ?? ''
+
+      const named = detail.match(/answers (\d{3})/)?.[1]
+      expect(named, `no status named for ${redirectStatus}`).toBeDefined()
+      expect(Number(named), `${named} is not a redirect`).toBeGreaterThanOrEqual(300)
+      expect(Number(named)).toBeLessThan(400)
+    }
+  })
+
+  it('says which host a visitor actually reaches', () => {
+    // The sentence has to survive being read by someone who has not seen the chain.
+    const { findings } = decideCanonicalDomain({
+      observations: [ok(APEX, chainToWww), ok(WWW)],
+      apexHost: APEX,
+    })
+    expect(findings.find((f) => f.code === 'apex-redirected')?.detail).toContain(
+      `${WWW} is what a visitor actually reaches`,
+    )
+  })
+
+  it('falls back to the final status rather than printing undefined', () => {
+    // An observation from before this field existed, or a hand-built one. A coarse number
+    // in an issue body beats `undefined`.
+    const { findings } = decideCanonicalDomain({
+      observations: [ok(APEX, { status: 307, chain: [APEX, WWW] }), ok(WWW)],
+      apexHost: APEX,
+    })
+    const detail = findings.find((f) => f.code === 'apex-redirected')?.detail ?? ''
+
+    expect(detail).toContain('answers 307')
+    expect(detail).not.toContain('undefined')
+  })
+})
+
+describe('observe records the redirect status alongside the final one', () => {
+  function stub(routes: Record<string, { status: number; location?: string; body?: unknown }>) {
+    return vi.fn(async (url: string | URL) => {
+      const { hostname } = new URL(String(url))
+      const route = routes[hostname]
+      if (!route) throw new Error('unrouted host')
+      return {
+        status: route.status,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'location' ? (route.location ?? null) : 'Vercel',
+        },
+        json: async () => {
+          if (route.body === undefined) throw new Error('not json')
+          return route.body
+        },
+      } as unknown as Response
+    })
+  }
+
+  const healthy = {
+    build: { commit: COMMIT, vercelEnv: 'production' },
+    runtime: { vercelEnv: 'production' },
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the first hop’s status while still following the chain', async () => {
+    vi.stubGlobal(
+      'fetch',
+      stub({
+        [APEX]: { status: 307, location: `https://${WWW}/api/version` },
+        [WWW]: { status: 200, body: healthy },
+      }),
+    )
+
+    const observation = await observe(APEX)
+
+    // Both numbers, each meaning what it says.
+    expect(observation.redirectStatus).toBe(307)
+    expect(observation.status).toBe(200)
+    expect(observation.chain).toEqual([APEX, WWW])
+  })
+
+  it('reports null when nothing redirected', async () => {
+    // Not 200, and not absent: a host that served directly has no redirect status, and
+    // null is how the decision knows to fall back rather than print a wrong number.
+    vi.stubGlobal('fetch', stub({ [APEX]: { status: 200, body: healthy } }))
+
+    expect((await observe(APEX)).redirectStatus).toBeNull()
+  })
+
+  it('keeps the first status when a chain redirects twice', async () => {
+    // 307 then 308 is one policy to a reader. The status that matters is the one the
+    // canonical host itself answers with.
+    vi.stubGlobal(
+      'fetch',
+      stub({
+        [APEX]: { status: 307, location: `https://${WWW}/api/version` },
+        [WWW]: { status: 308, location: `https://${APEX}/api/version` },
+      }),
+    )
+
+    expect((await observe(APEX)).redirectStatus).toBe(307)
+  })
+
+  it('carries it through the unparseable-Location bail-out', async () => {
+    // That branch returns early, and an early return that drops a field is how the
+    // original defect would come back.
+    vi.stubGlobal(
+      'fetch',
+      stub({
+        [APEX]: { status: 307, location: `https://${WWW}/api/version` },
+        [WWW]: { status: 302, location: 'http://' },
+      }),
+    )
+
+    const observation = await observe(APEX)
+    expect(observation.redirectStatus).toBe(307)
   })
 })
