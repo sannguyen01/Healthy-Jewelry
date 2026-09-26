@@ -9,6 +9,9 @@
   "sizes": [],
   "availability": "ask-an-ambassador",
   "badge": "new",
+  "form": {
+    "state": "unassigned"
+  },
   "media": {
     "kind": "illustration",
     "svgType": "earring-hoop"

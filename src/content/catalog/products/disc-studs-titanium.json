@@ -9,6 +9,9 @@
   "sizes": [],
   "availability": "ask-an-ambassador",
   "badge": "bestseller",
+  "form": {
+    "state": "unassigned"
+  },
   "media": {
     "kind": "illustration",
     "svgType": "earring-stud"

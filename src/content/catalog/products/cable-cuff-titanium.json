@@ -15,6 +15,9 @@
   ],
   "availability": "ask-an-ambassador",
   "badge": null,
+  "form": {
+    "state": "unassigned"
+  },
   "media": {
     "kind": "illustration",
     "svgType": "bracelet-cuff"

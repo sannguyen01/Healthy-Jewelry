@@ -8,6 +8,8 @@ import {
   MATERIAL_HANDLES,
   BADGES,
   AVAILABILITY_STATES,
+  FORMS,
+  formSchema,
   type CatalogProduct,
 } from '@/lib/catalog/schema'
 import { loadCatalog } from '@/lib/catalog'
@@ -32,6 +34,7 @@ const VALID: CatalogProduct = {
   sizes: ['5', '6', '7'],
   availability: 'ask-an-ambassador',
   badge: 'bestseller',
+  form: { state: 'unassigned' },
   media: { kind: 'illustration', svgType: 'ring-arc' },
   careInstructions: { state: 'pending' },
   sku: { state: 'pending' },
@@ -175,6 +178,43 @@ describe('an unsourced field is pending, never blank', () => {
     expect(parse({ lastReviewed: { state: 'authored', value: '2026-09-20' } })).toBe(true)
     expect(parse({ lastReviewed: { state: 'authored', value: '20-09-2026' } })).toBe(false)
     expect(parse({ lastReviewed: { state: 'authored', value: '2026-13-01' } })).toBe(false)
+  })
+})
+
+describe('form is a design taxonomy, assigned by a person', () => {
+  const parse = (form: unknown) => productSchema.safeParse({ ...VALID, form }).success
+
+  it('the vocabulary is the nine forms, and only those', () => {
+    // Contract §1: Arc, Halo, Orbit, Facet, Disc, Bar, Cuff, Split, Hoop.
+    expect([...FORMS]).toEqual(['arc', 'halo', 'orbit', 'facet', 'disc', 'bar', 'cuff', 'split', 'hoop'])
+  })
+
+  it('accepts unassigned, which is every record today', () => {
+    expect(parse({ state: 'unassigned' })).toBe(true)
+  })
+
+  it('accepts every one of the nine when assigned', () => {
+    for (const value of FORMS) expect(parse({ state: 'assigned', value })).toBe(true)
+  })
+
+  it('refuses a tenth form, a bare string, and a missing field', () => {
+    expect(parse({ state: 'assigned', value: 'dome' })).toBe(false)
+    expect(parse('arc')).toBe(false)
+    expect(parse({ state: 'assigned' })).toBe(false)
+    const withoutForm: Record<string, unknown> = { ...VALID }
+    delete withoutForm.form
+    expect(productSchema.safeParse(withoutForm).success).toBe(false)
+  })
+
+  it('refuses a form smuggled onto the unassigned arm', () => {
+    // Two discriminants' worth of meaning in one object is what the union exists to forbid.
+    expect(formSchema.safeParse({ state: 'unassigned', value: 'arc' }).success).toBe(false)
+  })
+
+  it('does not count as a pending field — it is its own burn-down', () => {
+    // `pendingFieldCount` is the content-debt ratchet (51); form assignment is a design
+    // decision counted separately by `unassignedFormCount`, so neither number moves the other.
+    expect(pendingFieldCount({ ...VALID, form: { state: 'unassigned' } })).toBe(3)
   })
 })
 

@@ -40,6 +40,7 @@ const BASE: CatalogProduct = {
   sizes: ['5', '6', '7', '8', '9', '10', '11', '12'],
   availability: 'ask-an-ambassador',
   badge: null,
+  form: { state: 'unassigned' },
   media: { kind: 'illustration', svgType: 'ring-arc' },
   careInstructions: { state: 'pending' },
   sku: { state: 'pending' },
@@ -50,7 +51,7 @@ const BASE: CatalogProduct = {
 /**
  * A catalogue product, with whatever a spec needs changed.
  *
- * Shallow by design: `media`, `sku`, `careInstructions` and `lastReviewed` are
+ * Shallow by design: `media`, `form`, `sku`, `careInstructions` and `lastReviewed` are
  * discriminated unions, and a deep merge across a union arm produces objects with two
  * discriminants — the one thing a union exists to make impossible.
  */
@@ -73,6 +74,19 @@ export function makePhotoProduct(
     },
     ...overrides,
   })
+}
+
+/**
+ * A product a person has assigned one of the nine forms.
+ *
+ * Every real record is `unassigned` today, so without this factory the `assigned` arm of the
+ * union would be exercised by no fixture at all — a branch the catalogue can hold that no
+ * spec could render.
+ */
+export function makeAssignedFormProduct(
+  overrides: Partial<CatalogProduct> = {}
+): CatalogProduct {
+  return makeProduct({ form: { state: 'assigned', value: 'arc' }, ...overrides })
 }
 
 /** A product whose illustration has not been chosen yet. */

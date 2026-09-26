@@ -10,6 +10,7 @@ import {
   getBestsellers,
   getNewArrivals,
   totalPendingFields,
+  unassignedFormCount,
 } from '@/lib/catalog'
 import { COLLECTION_HANDLES } from '@/lib/catalog/schema'
 import { rawProducts, rawCollections } from '@/lib/catalog/manifest'
@@ -54,6 +55,17 @@ const EXPECTED_COLLECTIONS = 5
  * its neighbours, which is exactly the drift `undefined` would have hidden.
  */
 const EXPECTED_PENDING_FIELDS = 51
+
+/**
+ * Products with no form assigned, today: all of them.
+ *
+ * The nine forms are a design taxonomy the owner adopted on 2026-09-26, and assigning one is
+ * a design decision rather than a data migration — so the field arrived `unassigned` on
+ * every record and this number is where the assignment is burnt down. Equality, not a
+ * ceiling (ADR 021): assigning a form moves it down in a reviewed diff, and a new record
+ * arriving unassigned moves it up in one.
+ */
+const EXPECTED_UNASSIGNED_FORMS = 17
 
 describe('the manifest lists every file, and every file exists', () => {
   it('finds catalogue files to check', () => {
@@ -293,6 +305,44 @@ describe('content debt is counted, and the count is a ratchet', () => {
     for (const product of getAllProducts()) {
       expect(product.media.kind, `${product.handle}`).toBe('illustration')
     }
+  })
+})
+
+describe('form assignment is counted, and the count is a ratchet', () => {
+  it('is exactly what the catalogue carries today', () => {
+    expect(
+      unassignedFormCount(),
+      `Unassigned forms moved from ${EXPECTED_UNASSIGNED_FORMS} to ${unassignedFormCount()}. ` +
+        `Assigning a form is a design decision: update this constant in the diff that makes it.`
+    ).toBe(EXPECTED_UNASSIGNED_FORMS)
+  })
+
+  it('is every product, because no form has been assigned yet', () => {
+    expect(EXPECTED_UNASSIGNED_FORMS).toBe(EXPECTED_PRODUCTS)
+  })
+
+  it('no record was renamed to fit the taxonomy', () => {
+    // The owner's decision: a design taxonomy, not a naming rule. These titles are the
+    // ones the catalogue shipped with; a form that required renaming one would show here.
+    expect(getAllProducts().map((p) => p.title).sort()).toEqual([
+      'Arc Band',
+      'Arc Hoops',
+      'Cable Cuff',
+      'Classic Charm',
+      'Cone Studs',
+      'Disc Charm',
+      'Disc Studs',
+      'Dome Ring',
+      'Fine Link Chain',
+      'Flat Band',
+      'Flat Bangle',
+      'Linear Bar',
+      'Link Bracelet',
+      'Orbit Pendant',
+      'Split Ring',
+      'Teardrop Pendant',
+      'Tube Drops',
+    ])
   })
 })
 

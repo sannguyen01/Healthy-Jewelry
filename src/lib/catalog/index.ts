@@ -242,6 +242,18 @@ export function totalPendingFields(): number {
   return products.reduce((sum, product) => sum + pendingFieldCount(product), 0)
 }
 
+/**
+ * How many products have not yet been assigned one of the nine forms.
+ *
+ * Every one of them, today, and deliberately: Arc, Halo, Orbit, Facet, Disc, Bar, Cuff,
+ * Split and Hoop are a design taxonomy, not a naming rule, and assigning a form is a design
+ * decision a person makes. Counted so that the assignment is a burn-down with a number on
+ * it rather than a field that is quietly filled in by whoever edits a record next.
+ */
+export function unassignedFormCount(): number {
+  return products.filter((product) => product.form.state === 'unassigned').length
+}
+
 // ── Claims ─────────────────────────────────────────────────────────────────
 //
 // Server-side only, and that is a bundle decision as much as an architectural one: these

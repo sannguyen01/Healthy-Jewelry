@@ -85,6 +85,33 @@ export const AVAILABILITY_STATES = [
   'discontinued',
 ] as const
 
+/**
+ * The nine geometric forms — a **design taxonomy**, not a naming rule.
+ *
+ * The contract's §1 lists them as the collection language the site presents. The owner's
+ * decision (2026-09-26) is that they classify pieces rather than name them: no product is
+ * renamed to fit, and a piece's form is assigned by a person, not inferred from its title.
+ * "Arc Band" is not automatically an Arc — "Dome Ring" and "Flat Band" have no form in their
+ * names at all — and a derivation that guessed would publish a design decision nobody made.
+ *
+ * Declared once, here, for the same reason as `COLLECTION_HANDLES`: every consumer imports
+ * the vocabulary rather than restating it.
+ */
+export const FORMS = ['arc', 'halo', 'orbit', 'facet', 'disc', 'bar', 'cuff', 'split', 'hoop'] as const
+
+/**
+ * A piece's form, or the explicit fact that nobody has assigned one yet.
+ *
+ * `unassigned` rather than an optional field, for the reason every unsourced field in this
+ * schema gives: `undefined` reads as "this piece has no form", which is a claim about the
+ * design. All seventeen records are `unassigned` today and `unassignedFormCount()` counts
+ * them, so assignment is a burn-down rather than drift.
+ */
+export const formSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('unassigned') }).strict(),
+  z.object({ state: z.literal('assigned'), value: z.enum(FORMS) }).strict(),
+])
+
 // ── Media ──────────────────────────────────────────────────────────────────
 
 /**
@@ -182,6 +209,7 @@ export const productSchema = z
     sizes: z.array(z.string().min(1)),
     availability: z.enum(AVAILABILITY_STATES),
     badge: z.enum(BADGES).nullable(),
+    form: formSchema,
     media: mediaSchema,
     careInstructions: careInstructionsSchema,
     sku: skuSchema,
@@ -214,6 +242,8 @@ export type CollectionHandle = (typeof COLLECTION_HANDLES)[number]
 export type MaterialHandle = (typeof MATERIAL_HANDLES)[number]
 export type Badge = (typeof BADGES)[number]
 export type Availability = (typeof AVAILABILITY_STATES)[number]
+export type Form = (typeof FORMS)[number]
+export type ProductForm = z.infer<typeof formSchema>
 
 /**
  * How many fields on this product are waiting to be authored.
