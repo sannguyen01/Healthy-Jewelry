@@ -144,6 +144,7 @@ rather than the reverse.
 | `public/**` | excluded | Binary assets. Fonts and photographs have no comment syntax and no commerce semantics. |  |
 | `.gitignore` | excluded | No extension, no comment grammar worth declaring for one file. |  |
 | `.prettierrc` | excluded | JSON without an extension; formatting configuration carries no commerce surface. |  |
+| `.github/CODEOWNERS` | excluded | Ownership rules only, with no extension and no comment grammar worth declaring for one file. Excluded from position analysis, not from the credential-value rule, which reads every tracked text file. |  |
 | `docs/adr/**` | historical | An ADR is a dated decision and is never edited to match the present. Seventeen of them mention Shopify correctly. |  |
 | `CHANGELOG.md` | historical | A log of what happened. Rewriting it to match today falsifies the account. |  |
 | `STATE.md` | historical | The engineering record, explicitly historical by construction. |  |
@@ -166,7 +167,7 @@ rather than the reverse.
 | `src/tests/unit/browse-only-copy.test.tsx` | negative-control | Forbids payment-method copy by naming the methods. | payment-provider |
 | `src/tests/unit/catalog-content.test.ts` | negative-control | Forbids commerce fields in catalogue JSON by naming them. | checkout-handoff inventory-check shopify-name |
 | `src/tests/unit/price-absence-contract.test.tsx` | negative-control | Forbids currency symbols by listing them. | — |
-| `scripts/lib/browse-only.mjs` | negative-control | The live probe that reports `shopify-host-referenced`. It must name the host it looks for. | shopify-name |
+| `scripts/lib/browse-only.mjs` | negative-control | The live probe that reports `shopify-host-referenced`. It must name the host it looks for, and since 2026-09-26 it is also the one list of vendor domains (`VENDOR_DOMAINS`) the checkout-host premise and the live-surface probe import rather than restate. | shopify-host shopify-name |
 | `src/tests/unit/browse-only-smoke.test.ts` | negative-control | Drives that probe against fixtures where the host is present and absent. | shopify-host shopify-name |
 | `scripts/lib/canonical-domain.mjs` | negative-control | Detects the apex resolving into Shopify's redirect chain. | shopify-name |
 | `src/tests/unit/canonical-domain-decision.test.ts` | negative-control | Drives it against a chain that ends at `shops.myshopify.com`. | shopify-host shopify-name |

@@ -8,8 +8,10 @@ name: Production smoke
 # the real store and the real deployment, so it is allowed to fail for reasons
 # that have nothing to do with the commit under review.
 #
-# Keeping them apart is the point. Branch protection requires `verify` and
-# `e2e`; it must never require this one, or a Shopify incident becomes a merge
+# Keeping them apart is the point. The merge gate's required contexts are the
+# three ci.yml publishes (docs/controls.json, `merge-gate`) — never the job IDs
+# `verify` and `e2e`, which this comment named until 2026-09-26 and which nothing
+# reports. It must never require this one, or an outage elsewhere becomes a merge
 # freeze.
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -167,15 +169,18 @@ jobs:
       # Premises, evaluated where they can still be evaluated.
       #
       # This used to happen inside `verify-production.mjs`, at the bottom, after the live
-      # checks. Five of its six premises took Shopify data as input and lost their subject
-      # with the read path; the sixth — the pinned API version's published expiry — is pure
-      # and still matters, because `/api/webhooks/shopify` and `/api/version` both name that
-      # version and survive until WS-7.
+      # checks. Five of its six premises took the store's data as input and lost their
+      # subject with the read path (WS-6); the sixth, the pinned API version's published
+      # expiry, went with `scripts/lib/api-version.mjs` (WS-C). What runs now is
+      # CHECKOUT-HOST-CNAME: does `checkout.<apex>` still alias the vendor, the premise WS-E's
+      # 30-day retirement clock rests on. A DNS lookup — no credential, so no gate.
       #
       # Split into its own step rather than folded into the browse-only check, because they
       # answer different questions and a reader needs to see which one spoke. A premise is
-      # never a failure: this always exits 0 and always writes `premise-drift.json`, and the
-      # reporting step below decides what reaches a person. See ADR 008 and ADR 035.
+      # never a failure: this always exits 0. It writes `premise-drift.json` whenever it got
+      # an answer — `[]` included, which the reporter below reads as "all premises hold" — and
+      # withholds it when the resolver could not answer, so a DNS timeout returns early there
+      # instead of closing a real drift issue. See ADR 008 and ADR 035.
       - name: Premise detectors
         id: premises
         if: always()

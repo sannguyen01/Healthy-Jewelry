@@ -86,11 +86,13 @@ const register = parseRegister(read(REGISTER_PATH))
  * rows in the same diff, and raising it means adding one — both of which a reviewer sees.
  *
  * 53 on 2026-09-25 (WS-A 12 · WS-B 1 · WS-C 21 · WS-D 2 · WS-E 1 · WS-G 1 · WS-F 8 · WS-I 7);
- * 40 after WS-A merged (eleven WS-A rows, the WS-G analytics row and one WS-C test row closed).
- * Recomputed by the integrator after each workstream branch merges; `pnpm
+ * 40 after WS-A merged (eleven WS-A rows, the WS-G analytics row and one WS-C test row closed);
+ * 36 after WS-C3 (six WS-C rows closed with diagnose-deployment and the API-version premise, three
+ * runbook rows opened in WS-D/E/F, and the WS-B handle-contract row closed with the exemption it
+ * guarded). Recomputed by the integrator after each workstream branch merges; `pnpm
  * verify:commerce-contract --summary` prints the live figure by workstream.
  */
-const EXPECTED_REGISTER_ROWS = 40
+const EXPECTED_REGISTER_ROWS = 36
 
 /** A file that trips nothing, used as the negative case for every rule below. */
 const INERT = { path: 'src/lib/inert.ts', source: 'export const x = 1\n' }
