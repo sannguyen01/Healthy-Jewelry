@@ -125,12 +125,25 @@ export function formatSummary(s) {
   return out
 }
 
-export function main({ log = console.log, argv = process.argv } = {}) {
-  const contract = parseContract(read(CONTRACT))
-  const register = parseRegister(read(REGISTER))
-  const files = trackedFiles()
-  const manifest = JSON.parse(read('package.json'))
-  const lockfile = read('pnpm-lock.yaml')
+/**
+ * The five inputs, read from this working tree.
+ *
+ * Separate from `main()` so a test can hand `main()` a tree it chose — a credential value,
+ * an absolute prohibition — and assert the exit code, rather than only ever asserting what
+ * this repository happens to contain today.
+ */
+export function loadTree() {
+  return {
+    contract: parseContract(read(CONTRACT)),
+    register: parseRegister(read(REGISTER)),
+    files: trackedFiles(),
+    manifest: JSON.parse(read('package.json')),
+    lockfile: read('pnpm-lock.yaml'),
+  }
+}
+
+export function main({ log = console.log, argv = process.argv, load = loadTree } = {}) {
+  const { contract, register, files, manifest, lockfile } = load()
 
   /*
    * `--draft` evaluates against an *empty* register on purpose.
