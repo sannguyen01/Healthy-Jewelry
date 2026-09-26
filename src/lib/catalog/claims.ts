@@ -148,6 +148,26 @@ export function resolveClaim(
   }
 }
 
+/**
+ * The wordings that may currently render anywhere: approved, not decided in the future, and
+ * not past expiry at `now`. Applicability is deliberately not checked — this is the
+ * allow-list for the claim-lexicon test, which asks "is this wording one somebody approved?",
+ * while `resolveClaim` answers "does it apply here?" at the point of rendering.
+ */
+export function approvedWordingSpans(registry: ClaimsRegistry, now: Date): string[] {
+  return registry.claims
+    .filter((claim) => {
+      const { decision } = claim
+      if (decision.state !== 'approved') return false
+      if (startOfDay(decision.decidedOn) > now.getTime()) return false
+      if (decision.expiresOn !== undefined && now.getTime() >= startOfDay(decision.expiresOn) + DAY_MS) {
+        return false
+      }
+      return true
+    })
+    .map((claim) => inline(claim.wording))
+}
+
 /** Collapse the `\n` line-break hints into single spaces, for every surface but a heading. */
 export function inline(text: string): string {
   return text.split('\n').map((line) => line.trim()).filter(Boolean).join(' ')
