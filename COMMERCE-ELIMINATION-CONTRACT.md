@@ -118,7 +118,11 @@ the word. A guardrail that fails on its own guardrails gets exemptions added unt
 quiet, which is the ADR 011 muting pattern pointed at a linter.
 
 So: `code` is a token outside comments in a file that executes; `prose` is a comment or
-Markdown. A comment inside a code file is **free**, deliberately. The comment above
+Markdown. A string, a template literal, a regular expression and JSX text are all `code`: a
+`//` or a `/*` inside one opens nothing, and the lexer that decides this is checked line by
+line against the TypeScript compiler (`src/tests/unit/commerce-lexer-differential.test.ts`),
+because a misread comment is a silent exemption. A comment inside a code file is **free**,
+deliberately. The comment above
 `src/app/api/webhooks/shopify/route.ts` explaining why that route is still standing is the
 most useful sentence in it, and a rule that deletes it makes the decommission harder to
 finish rather than closer to done.
@@ -134,43 +138,43 @@ rather than the reverse.
 
 <!-- contract:positions -->
 
-| Glob | Class | Why |
-|---|---|---|
-| `pnpm-lock.yaml` | excluded | Machine-generated, 212 KB, and audited by `auditPackages` against a parsed package set rather than by line scanning. |
-| `public/**` | excluded | Binary assets. Fonts and photographs have no comment syntax and no commerce semantics. |
-| `.gitignore` | excluded | No extension, no comment grammar worth declaring for one file. |
-| `.prettierrc` | excluded | JSON without an extension; formatting configuration carries no commerce surface. |
-| `docs/adr/**` | historical | An ADR is a dated decision and is never edited to match the present. Seventeen of them mention Shopify correctly. |
-| `CHANGELOG.md` | historical | A log of what happened. Rewriting it to match today falsifies the account. |
-| `STATE.md` | historical | The engineering record, explicitly historical by construction. |
-| `dependency-sweeper-state.md` | historical | A dated sweep record. |
-| `docs/browse-only-masterplan.md` | historical | The predecessor plan, self-classified historical in its own header. |
-| `docs/headless-launch-inventory.md` | historical | Evidence: what the store contained on 2026-08-12. Banner already present. |
-| `docs/shopify-decommission-inventory.md` | historical | The credential ledger. Names credentials, never values, and says so. |
-| `docs/credential-inventory.md` | historical | What exists and what it reaches, as measured. |
-| `docs/catalog-conventions.md` | superseded | Rules for editing products in Shopify Admin. |
-| `docs/go-live-runbook.md` | superseded | Leads to a working checkout that will not exist. |
-| `docs/webhooks.md` | superseded | Every subscription in it is scheduled for deletion. |
-| `docs/shopify-policies/**` | superseded | Policy drafts to be pasted into Shopify Admin. |
-| `SHOPIFY_SETUP.md` | superseded | Describes switching Shopify on. |
-| `COMMERCE-ELIMINATION-CONTRACT.md` | specification | This file names every identifier it forbids, and is the input the scanner parses. |
-| `docs/commerce-dependency-register.md` | specification | The register names the paths it tracks, and is the scanner's second input. |
-| `scripts/lib/commerce-contract.mjs` | negative-control | The scanner. |
-| `scripts/verify-commerce-contract.mjs` | negative-control | Its driver. |
-| `src/tests/unit/commerce-contract.test.ts` | negative-control | Its tests, including the mutations that prove it can fail. |
-| `src/tests/unit/commerce-route-inventory.test.ts` | negative-control | Reconciles §6 and §7 against the filesystem, `next.config.ts` and the E2E spec. It has to name the one handler excluded from the public inventory in order to justify the exclusion. |
-| `src/tests/unit/browse-only-copy.test.tsx` | negative-control | Forbids payment-method copy by naming the methods. |
-| `src/tests/unit/catalog-content.test.ts` | negative-control | Forbids commerce fields in catalogue JSON by naming them. |
-| `src/tests/unit/price-absence-contract.test.tsx` | negative-control | Forbids currency symbols by listing them. |
-| `scripts/lib/browse-only.mjs` | negative-control | The live probe that reports `shopify-host-referenced`. It must name the host it looks for. |
-| `src/tests/unit/browse-only-smoke.test.ts` | negative-control | Drives that probe against fixtures where the host is present and absent. |
-| `scripts/lib/canonical-domain.mjs` | negative-control | Detects the apex resolving into Shopify's redirect chain. |
-| `src/tests/unit/canonical-domain-decision.test.ts` | negative-control | Drives it against a chain that ends at `shops.myshopify.com`. |
-| `e2e/retired-routes.spec.ts` | negative-control | Asserts, over real HTTP, that the commerce URL space is gone. |
-| `src/tests/unit/soft-404-premise.test.ts` | negative-control | Watches a decision whose premise the decommission expires. |
-| `src/tests/unit/secret-exposure.test.ts` | negative-control | Walks the client import graph and fails if a secret becomes reachable. |
-| `src/tests/unit/decommission-inventory.test.ts` | negative-control | Reconciles the credential ledger against the inventory, in both directions. |
-| `src/tests/unit/dependency-scope.test.ts` | negative-control | Rejects dependency scope creep; names `@shopify` as the case it rejects. |
+| Glob | Class | Why | Carries |
+|---|---|---|---|
+| `pnpm-lock.yaml` | excluded | Machine-generated, 212 KB, and audited by `auditPackages` against a parsed package set rather than by line scanning. |  |
+| `public/**` | excluded | Binary assets. Fonts and photographs have no comment syntax and no commerce semantics. |  |
+| `.gitignore` | excluded | No extension, no comment grammar worth declaring for one file. |  |
+| `.prettierrc` | excluded | JSON without an extension; formatting configuration carries no commerce surface. |  |
+| `docs/adr/**` | historical | An ADR is a dated decision and is never edited to match the present. Seventeen of them mention Shopify correctly. |  |
+| `CHANGELOG.md` | historical | A log of what happened. Rewriting it to match today falsifies the account. |  |
+| `STATE.md` | historical | The engineering record, explicitly historical by construction. |  |
+| `dependency-sweeper-state.md` | historical | A dated sweep record. |  |
+| `docs/browse-only-masterplan.md` | historical | The predecessor plan, self-classified historical in its own header. |  |
+| `docs/headless-launch-inventory.md` | historical | Evidence: what the store contained on 2026-08-12. Banner already present. |  |
+| `docs/shopify-decommission-inventory.md` | historical | The credential ledger. Names credentials, never values, and says so. |  |
+| `docs/credential-inventory.md` | historical | What exists and what it reaches, as measured. |  |
+| `docs/catalog-conventions.md` | superseded | Rules for editing products in Shopify Admin. |  |
+| `docs/go-live-runbook.md` | superseded | Leads to a working checkout that will not exist. |  |
+| `docs/webhooks.md` | superseded | Every subscription in it is scheduled for deletion. |  |
+| `docs/shopify-policies/**` | superseded | Policy drafts to be pasted into Shopify Admin. |  |
+| `SHOPIFY_SETUP.md` | superseded | Describes switching Shopify on. |  |
+| `COMMERCE-ELIMINATION-CONTRACT.md` | specification | This file names every identifier it forbids, and is the input the scanner parses. | admin-api-path checkout-handoff customer-identity inventory-check payment-provider shopify-env shopify-host shopify-name storefront-token-header |
+| `docs/commerce-dependency-register.md` | specification | The register names the paths it tracks, and is the scanner's second input. | shopify-env shopify-host shopify-name |
+| `scripts/lib/commerce-contract.mjs` | negative-control | The scanner. | — |
+| `scripts/verify-commerce-contract.mjs` | negative-control | Its driver. | — |
+| `src/tests/unit/commerce-contract.test.ts` | negative-control | Its tests, including the mutations that prove it can fail. | admin-api-path cart-mutation checkout-handoff customer-identity discount-machinery draft-order graphql-endpoint inventory-check payment-provider shopify-env shopify-host shopify-name storefront-token-header |
+| `src/tests/unit/commerce-route-inventory.test.ts` | negative-control | Reconciles §6 and §7 against the filesystem, `next.config.ts` and the E2E spec. It has to name the one handler excluded from the public inventory in order to justify the exclusion. | shopify-name |
+| `src/tests/unit/browse-only-copy.test.tsx` | negative-control | Forbids payment-method copy by naming the methods. | payment-provider |
+| `src/tests/unit/catalog-content.test.ts` | negative-control | Forbids commerce fields in catalogue JSON by naming them. | checkout-handoff inventory-check shopify-name |
+| `src/tests/unit/price-absence-contract.test.tsx` | negative-control | Forbids currency symbols by listing them. | — |
+| `scripts/lib/browse-only.mjs` | negative-control | The live probe that reports `shopify-host-referenced`. It must name the host it looks for. | shopify-name |
+| `src/tests/unit/browse-only-smoke.test.ts` | negative-control | Drives that probe against fixtures where the host is present and absent. | shopify-host shopify-name |
+| `scripts/lib/canonical-domain.mjs` | negative-control | Detects the apex resolving into Shopify's redirect chain. | shopify-name |
+| `src/tests/unit/canonical-domain-decision.test.ts` | negative-control | Drives it against a chain that ends at `shops.myshopify.com`. | shopify-host shopify-name |
+| `e2e/retired-routes.spec.ts` | negative-control | Asserts, over real HTTP, that the commerce URL space is gone. | shopify-name |
+| `src/tests/unit/soft-404-premise.test.ts` | negative-control | Watches a decision whose premise the decommission expires. | shopify-name |
+| `src/tests/unit/secret-exposure.test.ts` | negative-control | Walks the client import graph and fails if a secret becomes reachable. | shopify-env shopify-name |
+| `src/tests/unit/decommission-inventory.test.ts` | negative-control | Reconciles the credential ledger against the inventory, in both directions. | shopify-name |
+| `src/tests/unit/dependency-scope.test.ts` | negative-control | Rejects dependency scope creep; names `@shopify` as the case it rejects. | — |
 
 <!-- /contract:positions -->
 
@@ -178,8 +182,19 @@ A `superseded` document must carry a **dated supersession banner in its first 15
 class is what exempts the file; the banner is what earns the class. Without it the exemption
 is silent, and a silent exemption is how an obsolete runbook reads as current.
 
-A `negative-control` file must contain an assertion. The strongest exemption in this contract
-cannot be granted to a file that checks nothing.
+A `negative-control` file must contain an assertion **in its code** — the word "expect" in a
+comment earns nothing. The strongest exemption in this contract cannot be granted to a file
+that checks nothing.
+
+`negative-control` and `specification` are whole-file exemptions, so each of those rows
+declares in **Carries** exactly which identifiers the exemption is doing work for: the ones
+in code position (anywhere, for a Markdown specification) that would otherwise be a finding.
+The scan holds the declaration to what it observes as an exact set, in both directions —
+a negative control that grows a new identifier fails until the row says so, and one that
+stops needing an entry fails until the row stops claiming it. `—` declares none; an empty
+cell on one of those rows is a finding. A glob row is reconciled against the union over the
+files it decides. Every other class leaves the column empty. Value-scope matches (§3) are
+never exempt, in any class, `excluded` included.
 
 A `specification` file must be **named in the code of some other tracked file**. The class
 exists because a document that lists every forbidden identifier cannot also assert — it is the
@@ -367,6 +382,36 @@ true of a deletion.
 | Documentation | `WS-I` | This contract, the register, ADRs, runbooks, the record. |
 
 <!-- /contract:owners -->
+
+---
+
+## Phase
+
+The decommission is in one of two states, and the contract says which. The scanner holds
+the declaration against the register in both directions, so neither state can be chosen to
+make a check pass:
+
+- **`active`** — work is outstanding. The register must have at least one row, and every row
+  must declare exactly the identifiers its file carries. An `active` contract with an empty
+  register **fails** (`phase-active-register-empty`): that is the completion condition, and
+  completion is declared here, in a reviewed edit, rather than inferred from a green run.
+- **`complete`** — the register is empty and the scanner reports nothing. A `complete`
+  contract with any register row **fails** (`phase-complete-register-nonempty`).
+
+This replaces a floor — "the register has at least twenty rows" — that encoded the opposite
+of §10 condition 5 and would have failed, and been lowered, on the day the work finished
+([ADR 035](docs/adr/035-a-control-outlives-its-subject.md)). The row count itself is pinned
+by equality in `src/tests/unit/commerce-contract.test.ts` (`EXPECTED_REGISTER_ROWS`,
+[ADR 021](docs/adr/021-a-metric-with-only-one-direction.md)): lowering it means
+deleting rows, and raising it means an edit somebody has to explain.
+
+<!-- contract:state -->
+
+| Key | Value | Why |
+|---|---|---|
+| `decommission` | `active` | 2026-09-25: the register still carries WS-A, WS-C, WS-D, WS-E, WS-F, WS-G and WS-I rows. |
+
+<!-- /contract:state -->
 
 ---
 
