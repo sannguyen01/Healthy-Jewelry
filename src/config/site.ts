@@ -36,8 +36,29 @@ if (SITE_URL.includes('healthyjewelry.com')) {
 /** Bare hostname, for prose mentions (legal copy, etc.) that need the domain without a scheme. */
 export const SITE_DOMAIN = new URL(SITE_URL).hostname
 
+/**
+ * What the site is, in one search snippet — a specification, not a promise.
+ *
+ * This read "Implant-grade … Hypoallergenic, corrosion-proof, and designed to last a
+ * lifetime" until 2026-09-26: four claims with no evidence behind them, published as the
+ * default meta description of every page that sets none of its own, and as the fallback
+ * for any product whose description is blank. It is a plain constant rather than a claim
+ * from the registry because `ContactForm.tsx` imports this module, which makes it client
+ * code, and the registry is server-only (it would ship Zod to the browser). So the snippet
+ * states only what needs no evidence: what the metals are. `claims-surfaces.test.ts` holds
+ * it to the claim lexicon like every other string.
+ */
 export const SITE_DESCRIPTION =
-  'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic, corrosion-proof, and designed to last a lifetime.'
+  'Jewelry in Grade 23 titanium, anodized niobium and 316L surgical steel, each named by its exact specification. No stones. No fillers.'
+
+/**
+ * The default page title, and the alt text of the default share image.
+ *
+ * "Implant-Grade Titanium" until 2026-09-26. "Implant grade" is a regulatory claim with a
+ * standard behind it (see the titanium materialSpec in the claims registry), and it was
+ * the first thing a search result or a browser tab said about the brand.
+ */
+export const SITE_DEFAULT_TITLE = 'Healthy Jewelry — Grade 23 Titanium, Niobium, 316L Steel'
 
 export const SITE_TAGLINE = 'Material integrity. No compromise.'
 
@@ -45,7 +66,7 @@ export const SITE_TAGLINE = 'Material integrity. No compromise.'
 
 export const SEO_DEFAULTS = {
   titleTemplate: '%s — Healthy Jewelry',
-  defaultTitle: 'Healthy Jewelry — Implant-Grade Titanium',
+  defaultTitle: SITE_DEFAULT_TITLE,
   description: SITE_DESCRIPTION,
   openGraph: {
     type: 'website' as const,
@@ -56,7 +77,7 @@ export const SEO_DEFAULTS = {
         url: `${SITE_URL}/og-default.jpg`,
         width: 1200,
         height: 630,
-        alt: 'Healthy Jewelry — Implant-Grade Titanium',
+        alt: SITE_DEFAULT_TITLE,
       },
     ],
   },

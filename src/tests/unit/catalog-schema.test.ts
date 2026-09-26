@@ -29,7 +29,7 @@ const VALID: CatalogProduct = {
   collection: 'rings',
   material: 'titanium',
   materialLabel: 'Grade 23 Titanium',
-  description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
+  description: 'Grade 23 titanium. Mirror-polished arc profile.',
   specification: '2 mm · 1.8 g',
   sizes: ['5', '6', '7'],
   availability: 'ask-an-ambassador',

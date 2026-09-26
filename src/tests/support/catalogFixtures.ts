@@ -35,7 +35,7 @@ const BASE: CatalogProduct = {
   collection: 'rings',
   material: 'titanium',
   materialLabel: 'Grade 23 Titanium',
-  description: 'Grade 23 titanium. Mirror-polished arc profile. Hypoallergenic.',
+  description: 'Grade 23 titanium. Mirror-polished arc profile.',
   specification: '2 mm · 1.8 g',
   sizes: ['5', '6', '7', '8', '9', '10', '11', '12'],
   availability: 'ask-an-ambassador',
@@ -99,7 +99,7 @@ export function makePendingMediaProduct(
 const BASE_COLLECTION: CatalogCollection = {
   handle: 'rings',
   title: 'Rings',
-  description: 'Bands and stacking rings in implant-grade metal.',
+  description: 'Architectural forms for everyday wear',
 }
 
 export function makeCollection(
