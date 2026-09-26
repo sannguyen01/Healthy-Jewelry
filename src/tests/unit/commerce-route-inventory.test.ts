@@ -279,35 +279,81 @@ describe('§7 is asserted over HTTP somewhere', () => {
    * the whole reason `e2e/retired-routes.spec.ts` reads `.status()` with `maxRedirects: 0`
    * rather than calling `.click()` and looking at the page.
    *
-   * So the last reconciliation is between the contract and that spec: a retired route with
-   * no E2E assertion is one whose behaviour nothing has ever observed. Read from source
-   * rather than imported, because importing it would execute `test.describe` outside the
-   * Playwright runner.
+   * So the last reconciliation is between the contract and that spec, and it runs both
+   * ways. Contract → spec: a retired route with no E2E assertion is one whose behaviour
+   * nothing has ever observed. Spec → contract: a literal case whose status or location
+   * disagrees with §7 is the spec asserting a *different* contract, and until 2026-09-26
+   * only the path was compared — the spec could have said `/cart` answers 410 while §7
+   * said 308, and whichever the server did, one of the two documents was wrong and nothing
+   * said which. Now each literal's `status` and `location` must equal its family's.
+   *
+   * The generated matrix in the same spec reads §7 directly and so cannot disagree with
+   * it; these literals are the hand-written half, and the half that needs checking. Read
+   * from source rather than imported, because importing the spec would execute
+   * `test.describe` outside the Playwright runner. The family matcher is the one the matrix
+   * generator uses (`e2e/support/routeMatrix.ts`), so the two cannot pick different rows,
+   * loaded per test because this block may not add a top-level import.
    */
   const spec = readFileSync(path.join(ROOT, 'e2e/retired-routes.spec.ts'), 'utf8')
   const asserted = new Set(
     [...spec.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1])
   )
+  /** The literal cases that declare an answer: `{ path, status, location }`, in that order. */
+  const cases = [
+    ...spec.matchAll(/path:\s*'([^']+)',\s*status:\s*(\d+),\s*location:\s*(?:'([^']+)'|null)\s*,/g),
+  ].map((m) => ({ path: m[1], status: Number(m[2]), location: m[3] ?? null }))
+  const familyOf = async () => (await import('../../../e2e/support/routeMatrix')).familyOf
 
   it('reads the spec', () => {
     expect(asserted.size, 'no paths parsed out of e2e/retired-routes.spec.ts').toBeGreaterThan(10)
+    // If the case regex stopped matching the table's shape, every check below would pass
+    // on an empty list. The table has 20 answered rows today.
+    expect(cases.length, 'no { path, status, location } cases parsed out of the spec').toBeGreaterThanOrEqual(19)
   })
 
-  it('every forbidden family has at least one concrete path asserted', () => {
-    const missing: string[] = []
-    for (const row of forbidden) {
-      const key = canonicalRoute(row.route)
-      const prefix = key.replace(/\/\*$/, '')
-      const covered = [...asserted].some((p) => {
-        const c = canonicalRoute(p)
-        return key.endsWith('/*') ? c === prefix || c.startsWith(`${prefix}/`) : c === key
-      })
-      if (!covered) missing.push(row.route)
-    }
+  it('every forbidden family has at least one concrete path asserted', async () => {
+    const match = await familyOf()
+    const missing = forbidden
+      .filter((row) => !cases.some((c) => match(c.path, forbidden)?.route === row.route))
+      .map((row) => row.route)
     expect(
       missing,
       'these are retired in the contract and no E2E test ever requests one. A retirement ' +
         'nothing observes is a retirement nobody has seen happen.'
     ).toEqual([])
+  })
+
+  it('every literal case belongs to a §7 family and declares exactly its answer', async () => {
+    const match = await familyOf()
+    const disagreements: string[] = []
+    for (const c of cases) {
+      const row = match(c.path, forbidden)
+      if (!row) {
+        disagreements.push(`${c.path}: no §7 row governs it — retire it in the contract first`)
+        continue
+      }
+      if (row.status !== c.status || row.location !== c.location) {
+        disagreements.push(
+          `${c.path}: spec says ${c.status} ${c.location ?? '—'}, §7 (${row.route}) says ` +
+            `${row.status} ${row.location ?? '—'}`
+        )
+      }
+    }
+    expect(
+      disagreements,
+      'The spec and the contract describe different retirements. Fix whichever is wrong — ' +
+        'the contract is the decision, so the spec usually follows it.'
+    ).toEqual([])
+  })
+
+  it('a path the spec asserts without a declared answer is not a retired route', async () => {
+    // The unknown-handle 404s share the `path:` shape but declare no status, because they
+    // are §6 routes answering for data they do not hold. A retired path written that way
+    // would escape the comparison above, so it must not be one.
+    const match = await familyOf()
+    const answered = new Set(cases.map((c) => c.path))
+    const unanswered = [...asserted].filter((p) => !answered.has(p))
+    expect(unanswered.length, 'expected the unknown-handle cases here').toBeGreaterThan(0)
+    expect(unanswered.filter((p) => match(p, forbidden) !== null)).toEqual([])
   })
 })

@@ -3,7 +3,7 @@ import { formatEgressFindings, judgeEgress } from '../../scripts/lib/egress.mjs'
 import { egressPolicy } from './contract'
 
 export { expect }
-export type { BrowserContext, Locator, Page } from '@playwright/test'
+export type { APIRequestContext, APIResponse, BrowserContext, Locator, Page, Response } from '@playwright/test'
 
 /**
  * **Every E2E test is also an egress test, whether or not it knows it.**

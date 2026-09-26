@@ -1,4 +1,13 @@
-import { test, expect } from './support/test'
+import { test, expect, type APIRequestContext, type APIResponse } from './support/test'
+import { forbiddenRoutes } from './support/contract'
+import {
+  GONE_CACHE_CONTROL,
+  MATRIX_METHODS,
+  retiredRouteMatrix,
+  wildcardPrefix,
+  type HopExpectation,
+  type MatrixMethod,
+} from './support/routeMatrix'
 
 /**
  * **The retired-route contract, asserted by status code.**
@@ -241,6 +250,168 @@ test.describe('Retired commerce routes', () => {
       expect(response.status(), `${path} should still serve`).toBe(200)
     }
   })
+})
+
+/**
+ * **The same contract, asked every way a real client asks it.**
+ *
+ * The table above is a literal list, one GET per path, and it stays that way on purpose:
+ * `commerce-route-inventory.test.ts` reads its `path:` literals and reconciles them against
+ * §7 in both directions, status and location included. What it never covered is finding 18
+ * of the decommission plan — HEAD, POST to the 308 families, trailing slashes, encoded
+ * segments and query strings — and every one of those is a request something sends.
+ *
+ * So these are generated from §7 itself (`e2e/support/routeMatrix.ts`), not copied from it:
+ * a family added to the contract is a family tested here with no edit to this file, and a
+ * status changed in the contract changes what this asserts. Every request is sent with
+ * `maxRedirects: 0` for the reason the file header gives.
+ *
+ * One test per variant, three methods inside it: a failing message names the method, and
+ * 94 tests read better in a report than 282.
+ */
+test.describe('Retired commerce routes — the §7 matrix', () => {
+  const MATRIX = retiredRouteMatrix(forbiddenRoutes)
+
+  /** Shopify's own add-to-cart body. The shape is irrelevant to a 308, and that is the point. */
+  const CART_FORM = { id: '1', quantity: '1' }
+
+  async function send(request: APIRequestContext, method: MatrixMethod, path: string) {
+    return request.fetch(path, {
+      method,
+      maxRedirects: 0,
+      ...(method === 'POST' ? { form: CART_FORM } : {}),
+    })
+  }
+
+  async function expectHop(response: APIResponse, method: MatrixMethod, path: string, hop: HopExpectation) {
+    const where = `${method} ${path}`
+    expect(response.status(), `${where} answered ${response.status()}, expected ${hop.status}`).toBe(hop.status)
+    const headers = response.headers()
+
+    if (hop.status === 308) {
+      // Asserted exactly, query included: Next carries the query string through a redirect,
+      // and a location that dropped or mangled it would strand a campaign link's attribution.
+      expect(headers['location'], `${where} redirects somewhere else`).toBe(hop.location)
+    }
+    if (hop.status === 410) {
+      expect(headers['x-robots-tag'], `${where} is an indexable 410`).toMatch(/noindex/i)
+      // What goneResponse sets. A 410 missing it has stopped going through the helper, and
+      // then the next thing to go missing from it is the X-Robots-Tag.
+      expect(headers['cache-control'], `${where} lost the 410 cache policy`).toBe(GONE_CACHE_CONTROL)
+    }
+    if (method === 'HEAD') {
+      // HEAD is GET without a body. A body here is a server that does not know what HEAD is.
+      expect((await response.body()).length, `${where} returned a body`).toBe(0)
+    }
+  }
+
+  test('the matrix covers every §7 row, in every variant shape', () => {
+    // Guard on the generator: an empty §7 parse would generate zero tests, and zero tests
+    // is indistinguishable from a passing file.
+    expect(forbiddenRoutes.length).toBeGreaterThanOrEqual(19)
+    const families = new Set(MATRIX.map((v) => v.family))
+    expect([...families].sort()).toEqual(forbiddenRoutes.map((r) => r.route).sort())
+    for (const kind of ['trailing-slash', 'query'] as const) {
+      expect(MATRIX.filter((v) => v.kind === kind).length, kind).toBeGreaterThanOrEqual(forbiddenRoutes.length)
+    }
+    expect(MATRIX.some((v) => v.path.includes('%61'))).toBe(true)
+  })
+
+  for (const variant of MATRIX) {
+    const shows = variant.then ? `${variant.first.status} → ${variant.then.status}` : `${variant.first.status}`
+    test(`${variant.path} answers ${shows} to GET, HEAD and POST [${variant.kind} of ${variant.family}]`, async ({
+      request,
+    }) => {
+      for (const method of MATRIX_METHODS) {
+        await expectHop(await send(request, method, variant.path), method, variant.path, variant.first)
+        if (variant.then) {
+          // The trailing-slash hop is Next's, not ours. What matters is that it lands on
+          // the family's answer rather than on a page — so follow it by hand, same method.
+          const next = variant.first.location as string
+          await expectHop(await send(request, method, next), method, next, variant.then)
+        }
+      }
+    })
+  }
+})
+
+/**
+ * **A 308 keeps the method. So where does a retired POST end up?**
+ *
+ * Shopify's `/cart/add` is a POST, and so is `/account/login`. A 308, unlike a 301, obliges
+ * the client to repeat the *same* method and body at the new location — so a product form
+ * submitted from a cached page, or a restored tab, re-POSTs to `/shop`. The redirect is
+ * correct and asserted above; this asks what the *destination* does with the POST, which
+ * no test had ever looked at.
+ *
+ * Measured on 2026-09-26 against `next start` (Next 16.3), for each distinct §7 destination:
+ *
+ * | Body | Destination answers | Who sends it |
+ * |---|---|---|
+ * | `application/x-www-form-urlencoded` | 200, the page | an older theme's `<form method="post">` |
+ * | `multipart/form-data` | 404 `Server action not found.` | Dawn's product form (`enctype="multipart/form-data"`) |
+ * | `application/json` | 405, `Allow: GET, HEAD` | the AJAX cart API, `/cart/add.js` |
+ *
+ * Next treats a form-encoded POST to a page as a possible server-action submission. With no
+ * action id in the body, a urlencoded one falls through to rendering the page — the visitor
+ * sees the shelf, which is what §7 promises. A multipart one is rejected by the action
+ * dispatcher with a plain-text 404, which is a dead end for a person: **a known defect,
+ * reported to the integrator, pinned here exactly** so that the fix is a deliberate edit to
+ * this table rather than a change nobody notices. The JSON case is correct as it stands: a
+ * script that believed it had added to a bag gets a failure, never a 2xx.
+ *
+ * Every case: no `Set-Cookie` (no cart or session is ever minted), and never a 5xx.
+ */
+test.describe('Retired commerce routes — a POST that follows its 308', () => {
+  const DESTINATIONS = [...new Set(forbiddenRoutes.filter((r) => r.status === 308).map((r) => r.location))]
+
+  const BODIES = [
+    { encoding: 'urlencoded', status: 200, contentType: /^text\/html/ },
+    { encoding: 'multipart', status: 404, contentType: /^text\/plain/ },
+    { encoding: 'json', status: 405, contentType: null },
+  ] as const
+
+  const CART_FIELDS = { id: '1', quantity: '1' }
+
+  function bodyFor(encoding: (typeof BODIES)[number]['encoding']) {
+    if (encoding === 'urlencoded') return { form: CART_FIELDS }
+    if (encoding === 'multipart') return { multipart: CART_FIELDS }
+    return { data: CART_FIELDS, headers: { 'content-type': 'application/json' } }
+  }
+
+  test('there are destinations to follow', () => {
+    expect(DESTINATIONS.length).toBeGreaterThanOrEqual(4)
+  })
+
+  for (const destination of DESTINATIONS) {
+    // A `:path*` family that redirects here if there is one, else the exact route, at a
+    // concrete path. `/add` is Shopify's cart verb; for the other families it is simply a
+    // segment the family must absorb.
+    const redirecting = forbiddenRoutes.filter((r) => r.status === 308 && r.location === destination)
+    const row = redirecting.find((r) => wildcardPrefix(r.route) !== null) ?? redirecting[0]
+    const prefix = wildcardPrefix(row.route)
+    const source = prefix === null ? row.route : `${prefix}/add`
+
+    for (const body of BODIES) {
+      test(`a ${body.encoding} POST to ${source} re-POSTs to ${destination} and gets ${body.status}`, async ({
+        request,
+      }) => {
+        const first = await request.post(source, { maxRedirects: 0, ...bodyFor(body.encoding) })
+        expect(first.status()).toBe(308)
+        expect(first.headers()['location']).toBe(destination)
+
+        // Followed by hand, same method and body, which is what RFC 9110 §15.4.9 requires
+        // of the client and what every browser does.
+        const landed = await request.post(destination as string, { maxRedirects: 0, ...bodyFor(body.encoding) })
+        const headers = landed.headers()
+        expect(landed.status(), `${body.encoding} POST at ${destination}`).toBe(body.status)
+        if (body.contentType) expect(headers['content-type']).toMatch(body.contentType)
+        if (body.encoding === 'multipart') expect(await landed.text()).toBe('Server action not found.')
+        if (body.encoding === 'json') expect(headers['allow'] ?? '').toMatch(/GET/)
+        expect(headers['set-cookie'], `${body.encoding} POST at ${destination} minted a cookie`).toBeUndefined()
+      })
+    }
+  }
 })
 
 /**
