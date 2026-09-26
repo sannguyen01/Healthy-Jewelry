@@ -7,7 +7,7 @@ import { CLAIM_IDS } from '@/lib/catalog/claims-schema'
 /**
  * **The words a source file can put on a page — and only those.**
  *
- * Shared by `claim-lexicon.test.tsx` and `legal-review-inventory.test.ts`, which ask two
+ * Shared by `claim-lexicon.test.tsx` and `legal-review-inventory.test.tsx`, which ask two
  * different questions of the same text: does it make a claim, and does it state a
  * commercial term.
  *
@@ -109,6 +109,26 @@ export function filesUnder(dirs: readonly string[], extensions: RegExp): string[
   }
   dirs.forEach(visit)
   return found.sort()
+}
+
+/**
+ * The text a visitor reads in a rendered tree, with a space at every element boundary.
+ *
+ * Not `textContent`, which concatenates block elements with nothing between them: a heading
+ * followed by a paragraph reads "Disclaimer of WarrantiesThe content…", and a `\b` pattern
+ * cannot see a word that has run into the next one. Measured on 2026-09-26: `textContent`
+ * hid two of /legal's three rendered "warranties" and the FAQ's "How do I buy something?"
+ * from a word-bounded counter, and would have hidden a claim set as a heading the same way.
+ * Adjacent text nodes inside one element are joined as they are, so an interpolated value
+ * mid-sentence does not split a word.
+ */
+export function visibleText(node: Node): string {
+  let text = ''
+  node.childNodes.forEach((child) => {
+    if (child.nodeType === 3) text += child.nodeValue ?? ''
+    else if (child.nodeType === 1) text += ` ${visibleText(child)} `
+  })
+  return text
 }
 
 export function read(rel: string): string {

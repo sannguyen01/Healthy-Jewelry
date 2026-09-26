@@ -6,7 +6,7 @@ import { approvedWordingSpans, resolveClaim } from '@/lib/catalog/claims'
 import type { ClaimsRegistry } from '@/lib/catalog/claims-schema'
 import { getAllProducts, getClaimsRegistry } from '@/lib/catalog'
 import { rawClaims, rawCollections, rawProducts } from '@/lib/catalog/manifest'
-import { filesUnder, jsonStrings, read, sourceStrings } from '@/tests/support/renderedStrings'
+import { filesUnder, jsonStrings, read, sourceStrings, visibleText } from '@/tests/support/renderedStrings'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { ProductCard } from '@/components/product/ProductCard'
 import { Footer } from '@/components/layout/Footer'
@@ -309,9 +309,10 @@ describe('an allowed span permits exactly itself (ADR 020: the test can fail, an
 
 // ── Rendered output ────────────────────────────────────────────────────────
 
+/** Rendered text with element boundaries kept — see `visibleText` for why not `textContent`. */
 function textOf(element: ReactElement): string {
   const { container, unmount } = render(element)
-  const text = container.textContent ?? ''
+  const text = visibleText(container)
   unmount()
   return text
 }
