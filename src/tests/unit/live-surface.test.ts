@@ -94,8 +94,9 @@ describe('requestShowsCommerce', () => {
   })
 })
 
+type Role = 'apex' | 'www' | 'deployment' | 'preview'
 type Host = {
-  role: string
+  role: Role
   host: string
   reachable: boolean
   protected?: boolean
@@ -103,7 +104,7 @@ type Host = {
   commerce: boolean
   digests: Record<string, string>
 }
-const host = (role: string, name: string, overrides: Partial<Host> = {}): Host => ({
+const host = (role: Role, name: string, overrides: Partial<Host> = {}): Host => ({
   role,
   host: name,
   reachable: true,

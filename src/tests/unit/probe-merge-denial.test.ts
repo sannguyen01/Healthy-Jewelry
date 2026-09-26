@@ -138,7 +138,7 @@ describe('pollMergeable waits out GitHub computing mergeability lazily', () => {
       delaysMs: [1, 2, 3],
       sleep: async (ms: number) => void slept.push(ms),
     })
-    expect(pr.mergeable_state).toBe('blocked')
+    expect(pr?.mergeable_state).toBe('blocked')
     expect(attempts).toBe(3)
     expect(slept).toEqual([1, 2])
   })
@@ -149,7 +149,7 @@ describe('pollMergeable waits out GitHub computing mergeability lazily', () => {
       sleep: async () => {},
     })
     expect(attempts).toBe(3)
-    expect(judgeDenial({ mergeableState: pr.mergeable_state, requiredContexts: REQUIRED }).verdict).toBe('unevaluable')
+    expect(judgeDenial({ mergeableState: pr?.mergeable_state, requiredContexts: REQUIRED }).verdict).toBe('unevaluable')
   })
 })
 

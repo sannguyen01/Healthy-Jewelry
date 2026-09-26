@@ -171,7 +171,7 @@ export function classifyClassic(reading) {
  * Exported because `probe-merge-denial.mjs` asks the same question of the same rules, and a
  * second reading of the rules shape would be a second place for GitHub's schema to drift.
  *
- * @param {Array<any>} rules the body of `GET /repos/{repo}/rules/branches/{branch}`
+ * @param {Array<any> | null | undefined} rules the body of `GET /repos/{repo}/rules/branches/{branch}`
  * @returns {string[]} sorted, de-duplicated
  */
 export function requiredContextsFromRules(rules) {
@@ -542,7 +542,7 @@ export function verdict(claim, observed) {
  * Exported for `probe-merge-denial.mjs`, which snapshots the same rules as evidence. Always
  * `GET`; there is no parameter for a method, on purpose.
  *
- * @param {{ api?: string, repo?: string, branch?: string, token?: string | undefined, fetchImpl?: typeof fetch }} [options]
+ * @param {{ api?: string, repo?: string, branch?: string, token?: string | undefined, fetchImpl?: (url: string, init: { method: string, headers: Record<string, string> }) => Promise<{ status: number, json: () => Promise<any> }> }} [options]
  * @returns {Promise<{ classic: Reading, rules: Reading, rulesets: Record<string, Reading> }>}
  */
 export async function readProtection({

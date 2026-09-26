@@ -29,7 +29,9 @@ interface Premise {
 const { VENDOR_DOMAINS } = await import('../../../scripts/lib/browse-only.mjs')
 
 const HOST = 'checkout.healthyjewellery.com'
-const CONTROL_OK = { ok: true, records: ['ns1.vercel-dns.com', 'ns2.vercel-dns.com'] }
+type Answer = { ok: true; records: string[] } | { ok: false; code: string }
+
+const CONTROL_OK: Answer = { ok: true, records: ['ns1.vercel-dns.com', 'ns2.vercel-dns.com'] }
 /**
  * The vendor's shops host, built from the one list that defines the vendor's domains
  * (`browse-only.mjs`, the contract's `negative-control` for exactly this) rather than typed
@@ -37,7 +39,7 @@ const CONTROL_OK = { ok: true, records: ['ns1.vercel-dns.com', 'ns2.vercel-dns.c
  */
 const VENDOR_SHOPS_HOST = `shops.${VENDOR_DOMAINS[0]}`
 
-const premise = (cname: object, control: object = CONTROL_OK): Premise =>
+const premise = (cname: Answer, control: Answer = CONTROL_OK): Premise =>
   checkoutHostPremise({ host: HOST, cname, control }) as Premise
 
 describe('CHECKOUT-HOST-CNAME — the premise the WS-E clock rests on', () => {
@@ -112,11 +114,12 @@ describe('CHECKOUT-HOST-CNAME — the premise the WS-E clock rests on', () => {
   })
 
   it('is blocking in every evaluable state, and names the decision it guards', () => {
-    for (const cname of [
+    const answers: Answer[] = [
       { ok: true, records: [VENDOR_SHOPS_HOST] },
       { ok: true, records: ['elsewhere.example'] },
       { ok: false, code: 'ENOTFOUND' },
-    ]) {
+    ]
+    for (const cname of answers) {
       const p = premise(cname)
       expect(p.kind).toBe('blocking')
       expect(p.decision).toContain('WS-E')

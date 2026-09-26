@@ -7,7 +7,7 @@
  *
  * Hosts: the apex (read from `src/config/site.ts`, as every other live probe here reads it),
  * `www.` + the apex, the deployment URL the apex itself reports (`/api/version` →
- * `build.vercelUrl`, a `*.vercel.app` host), and `PREVIEW_URL` when set.
+ * `build.vercelUrl`, a `*.vercel.app` host), and `--preview-url` when given.
  *
  * Paths: `/`, `/shop`, `/materials`, the first catalogue product, an unknown product, and eight
  * commerce-era URLs, each fetched with `redirect: 'manual'` and the chain walked by hand (at
@@ -31,7 +31,7 @@
  * ## Usage
  *
  *   node scripts/probe-live-surface.mjs [--out live-surface.json] [--summary live-surface.md]
- *                                       [--external-shows-commerce]
+ *                                       [--preview-url <url>] [--external-shows-commerce]
  *
  * `--external-shows-commerce` records that some retrieval outside this probe (a crawler cache,
  * a search snippet, an assistant's browsing tool) showed commerce — the input the fourth rule
@@ -75,6 +75,7 @@ export function firstHandle(dir = PRODUCT_DIR) {
  * Fetch one URL, walking redirects by hand. Never throws.
  *
  * @param {string} url
+ * @param {(url: string, init: object) => Promise<{ status: number, headers: { get: (name: string) => string | null }, text: () => Promise<string> }>} [fetchImpl]
  */
 export async function fetchChain(url, fetchImpl = fetch) {
   const chain = []
@@ -157,11 +158,14 @@ async function main() {
     const host = String(edgeIdentity.vercelUrl).replace(/^https?:\/\//, '').replace(/\/.*$/, '')
     targets.push({ role: 'deployment', host })
   }
-  if (process.env.PREVIEW_URL) {
+  // A flag rather than an environment variable: it is an input to one run, not
+  // configuration a deployment holds, and `.env.local.example` lists only the latter.
+  const previewUrl = flag('--preview-url')
+  if (previewUrl) {
     try {
-      targets.push({ role: 'preview', host: new URL(process.env.PREVIEW_URL).host })
+      targets.push({ role: 'preview', host: new URL(previewUrl).host })
     } catch {
-      console.error('PREVIEW_URL is not a URL; ignored.')
+      console.error('--preview-url is not a URL; ignored.')
     }
   }
 
