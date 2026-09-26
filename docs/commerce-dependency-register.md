@@ -84,25 +84,18 @@ Workflows, probes, gates, fixtures and the machinery that watches them.
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
 | `.github/workflows/ci.yml` | shopify-env shopify-host shopify-name | GitHub Actions | push and pull_request | credential names | rewrite — drop the mock storefront env block once no test reads it | `src/tests/unit/workflow-validity.test.ts` | WS-C |
-| `.github/workflows/diagnose-deployment.yml` | shopify-env shopify-host shopify-name | GitHub Actions | workflow_dispatch | credential names | delete with its script — it diagnoses a headless storefront | `src/tests/unit/workflow-validity.test.ts` | WS-C |
 | `.github/workflows/production-smoke.yml` | shopify-env shopify-name | GitHub Actions | Six-hourly cron | credential names | rewrite — retire the Shopify tier once the browse-only smoke files issues | `src/tests/unit/smoke-liveness.test.ts` | WS-C |
 | `docs/controls.json` | shopify-env shopify-name | Control registry | Six-hourly control audit | credential names | rewrite — retire the controls whose subject the decommission deletes (ADR 035) | `src/tests/unit/control-registry.test.ts` | WS-C |
 | `playwright.config.ts` | shopify-env shopify-host shopify-name | Playwright | Every E2E run | public config | delete the mock storefront env injected into the web server | `e2e/retired-routes.spec.ts` | WS-C |
-| `scripts/diagnose-deployment.mjs` | shopify-env shopify-host shopify-name | Deployment diagnosis | workflow_dispatch | credential names | delete — every question it asks is about a headless storefront | `src/tests/unit/deployment-verdict.test.ts` | WS-C |
-| `scripts/lib/api-version.mjs` | shopify-env shopify-name | API version pin | Premise checks, six-hourly | none | delete — a pinned vendor API version with no vendor | `src/tests/unit/api-version-contract.test.ts` | WS-C |
 | `scripts/lib/escalation.mjs` | shopify-name | Escalation decision | Production smoke | credential names | rewrite — the equivalence relation stays, its Shopify-shaped messages go | `src/tests/unit/escalation-decision.test.ts` | WS-C |
-| `scripts/lib/premise-checks.mjs` | shopify-env shopify-name | Premise detectors | Production smoke, six-hourly | none | rewrite — five of six premises are about a store that will not exist | `src/tests/unit/premise-checks.test.ts` | WS-C |
 | `scripts/preflight-secrets.mjs` | shopify-env shopify-host shopify-name | Smoke preflight | Production smoke, six-hourly | credential names | rewrite — it gates on five secrets that are being revoked | `src/tests/unit/preflight-secrets.test.ts` | WS-C |
 | `scripts/probe-assertion-liveness.mjs` | shopify-env shopify-host shopify-name | Mutation probe | Weekly control audit | credential names | rewrite — its env scaffolding injects a mock storefront | `src/tests/unit/probe-liveness-decision.test.ts` | WS-C |
 | `scripts/verify-premises.mjs` | shopify-name | Premise driver | Production smoke | none | rewrite with `premise-checks.mjs` | `src/tests/unit/verify-premises.test.ts` | WS-C |
-| `src/tests/unit/api-version-contract.test.ts` | shopify-env shopify-name | Vitest | Merge gate | none | delete with its subject | the subject is gone | WS-C |
 | `src/tests/unit/audit-workflow-secrets.test.ts` | shopify-env shopify-name | Vitest | Merge gate | credential names | rewrite — the auditor survives; its Shopify fixtures change name | the auditor keeps running | WS-C |
-| `src/tests/unit/deployment-verdict.test.ts` | shopify-host shopify-name | Vitest | Merge gate | public config | rewrite with the verdict library | the subject is gone | WS-C |
 | `src/tests/unit/escalation-decision.test.ts` | shopify-env shopify-host shopify-name | Vitest | Merge gate | credential names | rewrite with the escalation library | the subject is gone | WS-C |
 | `src/tests/unit/parser-fuzz.test.ts` | shopify-env shopify-name | Vitest | Merge gate | credential names | rewrite — the fuzzer survives; its secret-name corpus changes | the fuzzer keeps running | WS-C |
 | `src/tests/unit/preflight-secrets.test.ts` | shopify-env shopify-host shopify-name | Vitest | Merge gate | credential names | rewrite with the preflight | the subject is gone | WS-C |
-| `src/tests/unit/premise-checks.test.ts` | shopify-env shopify-name | Vitest | Merge gate | none | rewrite with the premise detectors | the subject is gone | WS-C |
-| `src/tests/unit/verify-premises.test.ts` | shopify-env shopify-name | Vitest | Merge gate | none | rewrite with the premise driver | the subject is gone | WS-C |
+| `src/tests/unit/verify-premises.test.ts` | shopify-name | Vitest | Merge gate | none | rewrite with the premise driver | the subject is gone | WS-C |
 | `vitest.config.ts` | shopify-env shopify-host shopify-name | Vitest | Every unit run | public config | delete the mock storefront env stubs once no test reads them | `src/tests/unit/vitest-env-contract.test.ts` | WS-C |
 
 ### WS-D — Infrastructure

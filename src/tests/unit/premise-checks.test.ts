@@ -1,307 +1,187 @@
 import { describe, it, expect } from 'vitest'
 
-const {
-  i18nPremise,
-  collectionSetPremise,
-  specMetafieldPremise,
-  paymentsPremise,
-  apiVersionPremise,
-  webhookDeliveryPremise,
-  formatPremises,
-} = await import('../../../scripts/lib/premise-checks.mjs')
-
-const { API_VERSION_ACCESSIBLE_UNTIL, MIGRATION_LEAD_DAYS, SHOPIFY_API_VERSION } =
-  await import('../../../scripts/lib/api-version.mjs')
+const { checkoutHostPremise, driftFileContent, formatPremises, DNS_ANSWER_CODES } = await import(
+  '../../../scripts/lib/premise-checks.mjs'
+)
 
 /**
- * **Both states, every premise.**
+ * **Every state of the premise, pointed at known answers.**
  *
  * The drifted branch is the one that never runs locally, so it is the one most likely to be
- * wrong the day it finally fires. This project has already paid for that: the
- * completed-order branch of the cart could not be exercised in development and was the half
- * that broke, which is why `checkout-journey.test.ts` guards the expiry path as carefully
- * as the order path.
+ * wrong the day it finally fires. A detector that has only ever been observed saying "fine"
+ * is not a detector (ADR 008, ADR 024).
  *
- * A detector that has only ever been observed saying "fine" is not a detector.
+ * The six premises this file used to exercise are gone with their subjects — five with the
+ * store's read path in WS-6, the API-version clock with `scripts/lib/api-version.mjs` in
+ * WS-C. `verify-premises.test.ts` records their ids. What is tested here is the one premise
+ * founded in their place, and the third state none of them ever needed: *could not ask*.
  */
 
 interface Premise {
   id: string
   decision: string
   holds: boolean
+  evaluable: boolean
   detail: string
   kind: 'blocking' | 'opportunity'
 }
 
-describe('i18n premise (ADR 005)', () => {
-  it('holds while the store is English-only', () => {
-    const p = i18nPremise([{ locale: 'en', published: true }]) as Premise
-    expect(p.holds).toBe(true)
-    expect(p.kind).toBe('opportunity')
-  })
+const { VENDOR_DOMAINS } = await import('../../../scripts/lib/browse-only.mjs')
 
-  it('drifts when a Vietnamese locale appears', () => {
-    // ADR 005's own stated prerequisite. Its arrival is the signal to revisit.
-    const p = i18nPremise([
-      { locale: 'en', published: true },
-      { locale: 'vi', published: true },
-    ]) as Premise
-
-    expect(p.holds).toBe(false)
-    expect(p.detail).toContain('vi')
-    expect(p.detail).toMatch(/revisit/i)
-  })
-
-  it('treats a regional English locale as still English', () => {
-    // `en-GB` is not translated content; flagging it would be a false alarm on day one.
-    const p = i18nPremise([{ locale: 'en' }, { locale: 'en-GB' }]) as Premise
-    expect(p.holds).toBe(true)
-  })
-
-  it('names the decision it guards', () => {
-    const p = i18nPremise([{ locale: 'en' }]) as Premise
-    expect(p.decision).toContain('005')
-  })
-})
-
-describe('collection-set premise (dynamicParams = false)', () => {
-  const known = [
-    { handle: 'rings' },
-    { handle: 'necklaces' },
-    { handle: 'earrings' },
-    { handle: 'bracelets' },
-    { handle: 'charms' },
-  ]
-
-  it('holds when Shopify has only known collections', () => {
-    const p = collectionSetPremise(known, known) as Premise
-    expect(p.holds).toBe(true)
-  })
-
-  it('exempts the Shopify built-in frontpage collection', () => {
-    // Present on every Shopify store and never one of ours. Without this the check
-    // false-positives on day one, which is how a new detector loses its reader.
-    const p = collectionSetPremise([...known, { handle: 'frontpage' }], known) as Premise
-    expect(p.holds).toBe(true)
-  })
-
-  it('drifts when Shopify has a collection hjCollections does not', () => {
-    // The regression I introduced in Round 5 and did not detect: this URL hard-404s.
-    const p = collectionSetPremise([...known, { handle: 'anklets' }], known) as Premise
-
-    expect(p.holds).toBe(false)
-    expect(p.detail).toContain('anklets')
-    expect(p.detail).toMatch(/404/)
-  })
-
-  it('is blocking, not an opportunity', () => {
-    // Customers are getting 404s. This one is not a "nice to revisit".
-    const p = collectionSetPremise([...known, { handle: 'anklets' }], known) as Premise
-    expect(p.kind).toBe('blocking')
-  })
-
-  it('does not flag ours-but-not-in-Shopify', () => {
-    // The reverse direction is harmless: a collection we know about that Shopify dropped
-    // renders an empty listing, not a 404. Flagging it would be noise.
-    const p = collectionSetPremise([{ handle: 'rings' }], known) as Premise
-    expect(p.holds).toBe(true)
-  })
-})
-
-describe('spec metafield premise', () => {
-  it('holds while no product has a spec', () => {
-    expect((specMetafieldPremise(0, 22) as Premise).holds).toBe(true)
-  })
-
-  it('drifts once a real measurement is entered', () => {
-    const p = specMetafieldPremise(3, 22) as Premise
-    expect(p.holds).toBe(false)
-    expect(p.detail).toContain('3/22')
-  })
-})
-
+const HOST = 'checkout.healthyjewellery.com'
+const CONTROL_OK = { ok: true, records: ['ns1.vercel-dns.com', 'ns2.vercel-dns.com'] }
 /**
- * The product-photography premise was promoted to a failing check on 2026-08-25 and its
- * tests moved with it, to `production-smoke-handles.test.ts`'s
- * `classifyPhotographyCoverage` block. See the note in `scripts/lib/premise-checks.mjs`.
+ * The vendor's shops host, built from the one list that defines the vendor's domains
+ * (`browse-only.mjs`, the contract's `negative-control` for exactly this) rather than typed
+ * here as a second copy.
  */
+const VENDOR_SHOPS_HOST = `shops.${VENDOR_DOMAINS[0]}`
 
-/**
- * The premise with a **date on it**, which makes it the clearest case for the whole idea.
- *
- * Shopify publishes exactly when an API version stops being served, and on that day every
- * request falls forward to a different API with a 200 and no signal. That already happened
- * here — `2025-01` was pinned for roughly seven months past its retirement and nothing went
- * red. See ADR 009.
- *
- * The clock is injected so all three branches run in CI today. The `expiring` and `expired`
- * branches are, by construction, ones that can never be observed locally otherwise.
- */
-describe('API version premise (ADR 009)', () => {
-  const deadline = new Date(API_VERSION_ACCESSIBLE_UNTIL)
-  const daysBefore = (n: number) => new Date(deadline.getTime() - n * 86_400_000)
+const premise = (cname: object, control: object = CONTROL_OK): Premise =>
+  checkoutHostPremise({ host: HOST, cname, control }) as Premise
 
-  it('holds while the pinned version is comfortably accessible', () => {
-    const p = apiVersionPremise(daysBefore(MIGRATION_LEAD_DAYS + 60)) as Premise
+describe('CHECKOUT-HOST-CNAME — the premise the WS-E clock rests on', () => {
+  it('holds while the hostname still CNAMEs to the vendor', () => {
+    const p = premise({ ok: true, records: [VENDOR_SHOPS_HOST] })
+    expect(p.id).toBe('CHECKOUT-HOST-CNAME')
+    expect(p.evaluable).toBe(true)
     expect(p.holds).toBe(true)
-    expect(p.id).toBe('SHOPIFY-API-VERSION')
-    expect(p.detail).toContain(SHOPIFY_API_VERSION)
+    expect(p.detail).toContain(VENDOR_SHOPS_HOST)
   })
 
-  it('drifts inside the migration lead time, before anything is broken', () => {
-    const p = apiVersionPremise(daysBefore(MIGRATION_LEAD_DAYS - 10)) as Premise
+  it('tolerates the trailing root dot a resolver may return', () => {
+    expect(premise({ ok: true, records: [`${VENDOR_SHOPS_HOST}.`] }).holds).toBe(true)
+  })
+
+  it('drifts when the hostname resolves somewhere else', () => {
+    // Somebody changed DNS outside the plan. Named, because the target is the finding.
+    const p = premise({ ok: true, records: ['cname.vercel-dns.com'] })
+    expect(p.evaluable).toBe(true)
     expect(p.holds).toBe(false)
-    expect(p.detail).toContain('Migrate')
+    expect(p.detail).toContain('cname.vercel-dns.com')
+    expect(p.detail).toMatch(/outside the plan/)
   })
 
-  it('drifts once the version has retired, and says how long ago', () => {
-    const p = apiVersionPremise(new Date(deadline.getTime() + 45 * 86_400_000)) as Premise
+  it('does not accept a lookalike as the vendor', () => {
+    // Label-anchored: a name that merely contains the vendor's domain is somebody else's.
+    const p = premise({ ok: true, records: [`${VENDOR_SHOPS_HOST}.attacker.example`] })
     expect(p.holds).toBe(false)
-    expect(p.detail).toContain('45')
-    expect(p.detail).toContain('stopped being served')
   })
 
-  /**
-   * `opportunity`, not `blocking`, and the distinction is load-bearing. While the version
-   * is still accessible there is a scheduled window to migrate calmly, and turning the run
-   * red over a future date is how a signal becomes noise. The *breakage* case — Shopify
-   * already serving something else — is a hard check in verify-production.mjs instead.
-   */
-  it('is an opportunity, never a red build', () => {
-    for (const at of [daysBefore(365), daysBefore(1), new Date(deadline.getTime() + 86_400_000)]) {
-      expect((apiVersionPremise(at) as Premise).kind).toBe('opportunity')
+  it('drifts on NXDOMAIN — the name was deleted outside the plan', () => {
+    const p = premise({ ok: false, code: 'ENOTFOUND' })
+    expect(p.evaluable).toBe(true)
+    expect(p.holds).toBe(false)
+    expect(p.detail).toMatch(/NXDOMAIN/)
+  })
+
+  it('drifts on ENODATA — the name is now an address record, not an alias', () => {
+    const p = premise({ ok: false, code: 'ENODATA' })
+    expect(p.evaluable).toBe(true)
+    expect(p.holds).toBe(false)
+    expect(p.detail).toMatch(/no longer a CNAME/)
+  })
+
+  it.each(['ESERVFAIL', 'ETIMEOUT', 'ECONNREFUSED', 'EREFUSED', 'SOMETHING-NEW'])(
+    '%s is the resolver failing, never drift',
+    (code) => {
+      // The unsafe direction for a premise is inventing drift out of a broken resolver: a
+      // `premise-drift` issue claiming DNS changed, filed because a runner timed out.
+      const p = premise({ ok: false, code })
+      expect(p.evaluable).toBe(false)
+      expect(p.detail).toContain(code)
+      expect(p.detail).toMatch(/not evidence that DNS changed/)
+    }
+  )
+
+  it('is unevaluable when the control lookup fails, whatever the checkout answer says', () => {
+    // A resolver that answers NXDOMAIN for everything would otherwise read as "the checkout
+    // hostname was deleted". The apex's own NS records are the control.
+    const p = premise({ ok: false, code: 'ENOTFOUND' }, { ok: false, code: 'ENOTFOUND' })
+    expect(p.evaluable).toBe(false)
+    expect(p.detail).toMatch(/control lookup/)
+    expect(p.detail).toMatch(/This is not drift/)
+  })
+
+  it('is unevaluable when the control answered with nothing', () => {
+    expect(premise({ ok: true, records: [VENDOR_SHOPS_HOST] }, { ok: true, records: [] }).evaluable).toBe(false)
+  })
+
+  it('treats exactly NXDOMAIN and ENODATA as answers', () => {
+    expect([...DNS_ANSWER_CODES].sort()).toEqual(['ENODATA', 'ENOTFOUND'])
+  })
+
+  it('is blocking in every evaluable state, and names the decision it guards', () => {
+    for (const cname of [
+      { ok: true, records: [VENDOR_SHOPS_HOST] },
+      { ok: true, records: ['elsewhere.example'] },
+      { ok: false, code: 'ENOTFOUND' },
+    ]) {
+      const p = premise(cname)
+      expect(p.kind).toBe('blocking')
+      expect(p.decision).toContain('WS-E')
+      expect(p.decision).toContain('docs/runbooks/ws-e-dns.md')
     }
   })
-
-  it('points at the ADR that records the decision', () => {
-    expect((apiVersionPremise() as Premise).decision).toContain('009')
-  })
 })
 
-describe('payments premise — the one that expires by itself', () => {
-  it('reports unverifiable while no order exists', () => {
-    const p = paymentsPremise(0, []) as Premise
+describe('driftFileContent — what the reporting step is allowed to conclude', () => {
+  const holding = premise({ ok: true, records: [VENDOR_SHOPS_HOST] })
+  const drifted = premise({ ok: true, records: ['elsewhere.example'] })
+  const unevaluable = premise({ ok: false, code: 'ETIMEOUT' })
 
-    expect(p.holds).toBe(true)
-    expect(p.detail).toMatch(/supportedDigitalWallets/)
-    expect(p.detail).toMatch(/upgrades itself/i)
+  it('writes an empty array when every premise was asked and holds', () => {
+    // The reporter closes an open drift issue on `[]`. Only a real all-clear may say that.
+    expect(driftFileContent([holding])).toEqual([])
   })
 
-  it('upgrades to a real assertion once an order exists', () => {
-    // The premise "not machine-verifiable" stops being true the moment
-    // Order.paymentGatewayNames has something to read.
-    const p = paymentsPremise(1, ['Bank Deposit']) as Premise
-
-    expect(p.holds).toBe(true)
-    expect(p.detail).toContain('Bank Deposit')
-    expect(p.detail).toMatch(/expired/i)
+  it('writes nothing when a premise could not be asked and nothing drifted', () => {
+    // `[]` here would close a real drift issue on the strength of a timeout. A missing file
+    // makes the reporter return early — the honest answer to an unanswered question.
+    expect(driftFileContent([unevaluable])).toBeNull()
+    expect(driftFileContent([holding, unevaluable])).toBeNull()
   })
 
-  it('drifts when orders exist but name no gateway', () => {
-    // Orders without a payment gateway mean money is not being taken — the exact outcome
-    // the blocker exists to prevent, now detectable.
-    const p = paymentsPremise(2, []) as Premise
-
-    expect(p.holds).toBe(false)
-    expect(p.detail).toMatch(/none names a payment gateway/i)
+  it('always writes a drifted premise, even beside an unevaluable one', () => {
+    const content = driftFileContent([drifted, unevaluable])
+    expect(content).toHaveLength(1)
+    expect(content?.[0].id).toBe('CHECKOUT-HOST-CNAME')
+    expect(content?.[0].holds).toBe(false)
   })
 
-  it('de-duplicates gateway names across orders', () => {
-    const p = paymentsPremise(3, ['Bank Deposit', 'Bank Deposit']) as Premise
-    expect(p.detail.match(/Bank Deposit/g)).toHaveLength(1)
+  it('never lists an unevaluable premise as drifted', () => {
+    expect(driftFileContent([drifted, unevaluable])).not.toContainEqual(unevaluable)
   })
 })
 
 describe('formatPremises', () => {
-  const holding = [i18nPremise([{ locale: 'en' }]), specMetafieldPremise(0, 22)] as Premise[]
-
   it('says so plainly when everything holds', () => {
-    const { drifted, summary } = formatPremises(holding)
-    expect(drifted).toHaveLength(0)
-    expect(summary).toMatch(/All 2 premises hold/)
+    expect(formatPremises([holdingPremise()]).summary).toBe('All 1 premises hold.')
   })
 
-  it('names every drifted premise in the summary', () => {
-    const drifted = [...holding, specMetafieldPremise(1, 22)] as Premise[]
-    const result = formatPremises(drifted)
-
+  it('names drifted and unevaluable premises separately', () => {
+    const result = formatPremises([
+      premise({ ok: true, records: ['elsewhere.example'] }),
+      premise({ ok: false, code: 'ETIMEOUT' }),
+    ])
     expect(result.drifted).toHaveLength(1)
-    expect(result.summary).toContain('SHOPIFY-SPEC-METAFIELD')
+    expect(result.unevaluable).toHaveLength(1)
+    expect(result.summary).toMatch(/1 of 2 premises have drifted/)
+    expect(result.summary).toMatch(/1 of 2 could not be evaluated/)
   })
 
-  it('marks drifted lines distinctly from holding ones', () => {
-    // The output is read at a glance in a job summary; a reader must not have to compare
-    // sentences to find the one that changed.
+  it('marks the three states distinctly', () => {
+    // Read at a glance in a job summary: a reader must not have to compare sentences to
+    // find the one that changed, or mistake "could not ask" for "changed".
     const { lines } = formatPremises([
-      i18nPremise([{ locale: 'en' }]),
-      i18nPremise([{ locale: 'en' }, { locale: 'vi' }]),
-    ] as Premise[])
-
-    expect(lines[0].startsWith('·')).toBe(true)
-    expect(lines[1].startsWith('!')).toBe(true)
+      holdingPremise(),
+      premise({ ok: true, records: ['elsewhere.example'] }),
+      premise({ ok: false, code: 'ETIMEOUT' }),
+    ])
+    expect(lines.map((l: string) => l[0])).toEqual(['·', '!', '?'])
   })
 })
 
-/**
- * **The gap this names is the one nothing could see.**
- *
- * `verify-webhook-secret.mjs` reports "SECRET CORRECT" and the runbook read as though
- * that meant webhooks work. It does not: the probe is a request this project signed
- * itself, so it tests the *route*, not the *subscription*. A store with no webhook
- * configured at all passes it identically.
- *
- * And the obvious cross-check does not work either — `webhookSubscriptions` returns only
- * the querying app's own, so Admin-UI webhooks are invisible to it by design. Confirmed
- * against the live store: `[]`, with no way to distinguish "none configured" from
- * "configured in the Admin UI".
- *
- * So this is not a check to fix, it is an unknown to name — and one that expires by
- * itself, exactly like `paymentsPremise`.
- */
-describe('webhook delivery premise', () => {
-  it('holds while no order exists, because delivery is genuinely unverifiable', () => {
-    const p = webhookDeliveryPremise(0, 0) as Premise
-    expect(p.holds).toBe(true)
-    expect(p.id).toBe('SHOPIFY-WEBHOOK-DELIVERY')
-  })
-
-  it('states what verify:webhook does NOT prove', () => {
-    // The sentence that stops the next reader trusting a green tick too far.
-    const { detail } = webhookDeliveryPremise(0, 0) as Premise
-    expect(detail).toMatch(/does not confirm Shopify sends/i)
-  })
-
-  it('explains why an empty subscription list proves nothing', () => {
-    const { detail } = webhookDeliveryPremise(0, 0) as Premise
-    expect(detail).toMatch(/invisible to webhookSubscriptions/i)
-  })
-
-  /** The expiry. An order means there was something to deliver. */
-  it('drifts once orders exist with no visible subscription', () => {
-    const p = webhookDeliveryPremise(3, 0) as Premise
-    expect(p.holds).toBe(false)
-    expect(p.detail).toContain('3 order(s)')
-    expect(p.detail).toMatch(/Notifications/)
-  })
-
-  it('holds again when orders exist and a subscription is visible', () => {
-    const p = webhookDeliveryPremise(3, 2) as Premise
-    expect(p.holds).toBe(true)
-    expect(p.detail).toContain('2 app-owned')
-  })
-
-  /**
-   * Blocking, not opportunity: an order placed with no working webhook means the
-   * cached catalogue never revalidates and nothing records the sale downstream.
-   * That is broken now, not a decision worth revisiting.
-   */
-  it('is blocking in every state', () => {
-    for (const [orders, subs] of [
-      [0, 0],
-      [3, 0],
-      [3, 2],
-    ]) {
-      expect((webhookDeliveryPremise(orders, subs) as Premise).kind).toBe('blocking')
-    }
-  })
-})
+function holdingPremise(): Premise {
+  return premise({ ok: true, records: [VENDOR_SHOPS_HOST] })
+}

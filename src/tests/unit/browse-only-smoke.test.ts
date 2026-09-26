@@ -13,6 +13,8 @@ const {
   BROWSE_ONLY_FINDINGS,
   COMMERCE_MARKERS,
   FORBIDDEN_HOST_PATTERN,
+  VENDOR_DOMAINS,
+  isVendorHost,
 } = await import('../../../scripts/lib/browse-only.mjs')
 const { sitemapPathFromRobots, handlesFromSitemap, resolveRedirect } = await import(
   '../../../scripts/verify-browse-only.mjs'
@@ -222,6 +224,42 @@ describe('the host pattern matches hosts, not prose', () => {
   it('does not fire on the word Shopify in prose', () => {
     // Docs and legal copy may legitimately name the platform the brand left.
     expect(hosts('We no longer sell through Shopify.')).toEqual([])
+  })
+})
+
+/**
+ * **One definition of the vendor's hosts, read two ways.**
+ *
+ * `FORBIDDEN_HOST_PATTERN` finds a host inside a body; `isVendorHost` judges a value that is
+ * already a hostname (a CNAME target, a redirect). The premise detector for the checkout
+ * hostname reads the second, so if the two lists drifted, the premise and the body scan
+ * would disagree about what "the vendor" means.
+ */
+describe('isVendorHost agrees with the body pattern', () => {
+  const vendor = (label: string, domain: string) => `${label}.${domain}`
+
+  it('every vendor domain is one the body pattern matches', () => {
+    for (const domain of VENDOR_DOMAINS) {
+      expect(`see https://${vendor('cdn', domain)}/x`.match(FORBIDDEN_HOST_PATTERN)).not.toBeNull()
+    }
+  })
+
+  it('accepts the domains and their subdomains, including a trailing root dot', () => {
+    for (const domain of VENDOR_DOMAINS) {
+      expect(isVendorHost(domain)).toBe(true)
+      expect(isVendorHost(vendor('shops', domain))).toBe(true)
+      expect(isVendorHost(`${vendor('shops', domain)}.`)).toBe(true)
+      expect(isVendorHost(vendor('SHOPS', domain).toUpperCase())).toBe(true)
+    }
+  })
+
+  it('rejects lookalikes that are not label-anchored', () => {
+    for (const domain of VENDOR_DOMAINS) {
+      expect(isVendorHost(`not${domain}`)).toBe(false)
+      expect(isVendorHost(`${domain}.attacker.example`)).toBe(false)
+    }
+    expect(isVendorHost('')).toBe(false)
+    expect(isVendorHost('cname.vercel-dns.com')).toBe(false)
   })
 })
 

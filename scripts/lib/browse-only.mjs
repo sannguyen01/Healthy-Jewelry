@@ -78,6 +78,44 @@ export function isAttributable(observation) {
 export const FORBIDDEN_HOST_PATTERN = /\b[\w.-]*\.?(?:myshopify\.com|shopify\.com|shopifycdn\.(?:com|net))\b/gi
 
 /**
+ * The vendor's registrable domains, as a list rather than as a pattern.
+ *
+ * {@link FORBIDDEN_HOST_PATTERN} scans a *body* for a host embedded in text; this answers
+ * the narrower question "is this hostname the vendor's?" about a value that is already a
+ * hostname — a CNAME target, a redirect `Location`, a deployment alias. The two must not
+ * disagree, and `browse-only-smoke.test.ts` holds them together: every domain here is one
+ * the body pattern matches.
+ *
+ * Kept in this file for the reason the file is classified `negative-control` in the
+ * contract: a detector has to name what it detects. The premise detector for the checkout
+ * hostname and the live-surface probe import this rather than carrying a second copy of the
+ * vendor's name in running code — one definition of "the vendor's hosts", read by three
+ * checks, is the property ADR 032 asks of the site's own hostname.
+ */
+export const VENDOR_DOMAINS = /** @type {const} */ ([
+  'myshopify.com',
+  'shopify.com',
+  'shopifycdn.com',
+  'shopifycdn.net',
+])
+
+/**
+ * Is this hostname one of the vendor's, or a subdomain of one?
+ *
+ * Anchored at a label boundary, so `notmyshopify.com.example` and `myshopify.com.evil` are
+ * not the vendor, and a trailing root dot — which a resolver may return on a CNAME — is
+ * tolerated rather than read as a different name.
+ *
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+export function isVendorHost(hostname) {
+  const host = String(hostname ?? '').trim().toLowerCase().replace(/\.$/, '')
+  if (host === '') return false
+  return VENDOR_DOMAINS.some((domain) => host === domain || host.endsWith(`.${domain}`))
+}
+
+/**
  * Commerce markers that must not survive in a served page.
  *
  * Deliberately narrow and structural. Matching the word "cart" anywhere would fire on the
