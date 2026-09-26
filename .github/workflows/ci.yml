@@ -5,6 +5,14 @@ on:
     branches: [main, develop]
   push:
     branches: [main, develop]
+  # Harmless while no merge queue exists: nothing emits the event, so nothing runs. It is
+  # here so that enabling a queue cannot stall it. A queue waits for the required contexts
+  # to report on the queue's own temporary branch, and without this trigger they never do —
+  # every queued pull request sits until it times out, and the queue reads as broken rather
+  # than as missing a trigger. See the `dependency-scope` job for the one check that behaves
+  # differently here, and docs/runbooks/main-ruleset.md for why strict mode, not a queue, is
+  # the recommendation until that is revisited.
+  merge_group:
 
 # A push supersedes the run already in flight for the same ref. PR #8 spent
 # roughly 108 billable minutes across four pushes because every superseded run
@@ -234,6 +242,20 @@ jobs:
   dependency-scope:
     name: Dependency scope
     runs-on: ubuntu-latest
+    # **Skipped on `merge_group`, deliberately, and a skipped required check reports success.**
+    #
+    # This job reads the pull request's description and diffs its head against its base. A
+    # merge-queue run has neither: the event carries a temporary `gh-readonly-queue/…` ref, no
+    # pull request number, and no description. So in a queue this job skips, and GitHub counts
+    # a skipped required context as passing — which is the right outcome only because the
+    # same pull request's own `pull_request` run already evaluated the identical dependency
+    # diff against the identical description before it could be queued. The queue changes the
+    # *base* the head is merged onto, and a dependency-scope question is about the head's own
+    # manifest change, which the queue does not alter.
+    #
+    # The hole that leaves, stated rather than implied: a description edited after that
+    # pull_request run is not re-read in the queue. Strict mode (branch up to date) is the
+    # recommendation over a merge queue until this is revisited — docs/runbooks/main-ruleset.md.
     if: github.event_name == 'pull_request'
     # Declared at job scope, and only here. This is the one job in the workflow that
     # spends the token, and `permissions:` at workflow scope would have silently narrowed
