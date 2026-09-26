@@ -142,6 +142,13 @@ export function loadTree() {
   }
 }
 
+/**
+ * @param {object} [options]
+ * @param {(line: string) => unknown} [options.log]
+ * @param {string[]} [options.argv]
+ * @param {() => object} [options.load]  a tree to judge instead of this one; see `loadTree()`
+ * @returns {number} the exit code
+ */
 export function main({ log = console.log, argv = process.argv, load = loadTree } = {}) {
   const { contract, register, files, manifest, lockfile } = load()
 
