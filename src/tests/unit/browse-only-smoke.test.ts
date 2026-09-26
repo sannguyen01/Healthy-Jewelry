@@ -15,6 +15,8 @@ const {
   FORBIDDEN_HOST_PATTERN,
   VENDOR_DOMAINS,
   isVendorHost,
+  detectVisiblePrice,
+  visibleText,
 } = await import('../../../scripts/lib/browse-only.mjs')
 const { sitemapPathFromRobots, handlesFromSitemap, resolveRedirect } = await import(
   '../../../scripts/verify-browse-only.mjs'
@@ -316,6 +318,61 @@ describe('handles are read out of a real sitemap body', () => {
     expect(handlesFromSitemap({ transport: 'ok', status: 200, body: '<urlset></urlset>' })).toEqual(
       []
     )
+  })
+})
+
+/**
+ * **A rendered price, the one commerce residue the structural markers could not see.**
+ *
+ * Every marker above is a JSON-LD key or a test id. A paragraph reading `1.450.000₫`, or the
+ * historical live defect `Dome Ring · 112.00` (STATE.md, 2026-08-05 — a fallback product
+ * with no currency at all), passed this probe as clean. Both directions are pinned here: the
+ * money it must catch, and the numbers a titanium site legitimately prints that it must not.
+ */
+describe('a visible price is a finding', () => {
+  it.each([
+    ['dong, dotted thousands', '<p>1.450.000₫</p>'],
+    ['dong, spaced', '<p>1.450.000 ₫</p>'],
+    ['dong entity', '<p>1.450.000&#8363;</p>'],
+    ['dong letter', '<span>890.000đ</span>'],
+    ['VND after', '<p>1450000 VND</p>'],
+    ['VND before', '<p>VND 1.450.000</p>'],
+    ['USD', '<p>USD 89</p>'],
+    ['US dollar', '<p>US$89</p>'],
+    ['dollar', '<p>$89.00</p>'],
+    ['the historical live defect', '<h3>Dome Ring</h3><span> · </span><span>112.00</span>'],
+    ['grouped amount alone', '<p>2.150.000</p>'],
+  ])('catches %s', (_label, html) => {
+    expect(detectVisiblePrice(`<!doctype html><html><body>${html}</body></html>`)).not.toEqual([])
+  })
+
+  it.each([
+    ['a material grade', 'Grade 23 titanium (Ti-6Al-4V ELI), ASTM F136'],
+    ['a steel grade', '316L surgical steel'],
+    ['a measurement', 'Band width 1.60 mm, thickness 1.2mm'],
+    ['a percentage', '6.00% aluminium'],
+    ['a contrast ratio', 'measured 4.50:1 on the background'],
+    ['a date', 'Last reviewed 2026-09-25'],
+    ['a version', 'v1.2.3 build 16.3.4'],
+    ['a phone number', '+84 28 3822 1234'],
+    ['a Vietnamese word', 'Trang sức đẹp và đơn giản'],
+    ['a price inside JSON-LD, which the markers judge instead', '<script type="application/ld+json">{"price":"112.00"}</script>'],
+    ['the render payload', '<script>self.__next_f.push([1,"$89.00"])</script>'],
+  ])('ignores %s', (_label, html) => {
+    expect(detectVisiblePrice(`<!doctype html><html><body>${html}</body></html>`)).toEqual([])
+  })
+
+  it('reports it through the decision, naming the page and the amount', () => {
+    const runs = cleanRun()
+    runs[0] = { ...runs[0], body: '<!doctype html><html><p>1.450.000₫</p></html>' }
+    const result = assessBrowseOnly({ expectedHandles: HANDLES, observations: runs, sitemapHandles: HANDLES })
+    const finding = result.findings.find((f: { code: string }) => f.code === 'commerce-visible-price')
+    expect(finding?.detail).toContain('1.450.000₫')
+    expect(result.verdict).toBe('findings')
+  })
+
+  it('reads visible text, not markup', () => {
+    expect(visibleText('<p>a<b>b</b></p><script>x</script><style>y</style>')).toBe(' a b ')
   })
 })
 
@@ -734,6 +791,7 @@ describe('the enumeration and the decision agree', () => {
     '<link href="https://schema.org/InStock">' +
     '<button data-testid="add-to-bag"></button>' +
     '<button data-testid="checkout-button"></button>' +
+    '<p>Dome Ring · 112.00</p>' +
     '</html>'
 
   // One scenario per code, driven through the real function.

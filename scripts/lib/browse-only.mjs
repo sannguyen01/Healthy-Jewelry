@@ -136,6 +136,74 @@ export const COMMERCE_MARKERS = [
 ]
 
 /**
+ * The text a visitor would read, out of an HTML body.
+ *
+ * Scripts and styles go first — a Next.js page carries its whole render payload again inside
+ * `<script>` tags, and JSON-LD lives there too; both are judged by {@link COMMERCE_MARKERS},
+ * not here. Then tags, then the handful of entities a price is likely to be written with.
+ * Not an HTML parser, and it does not need to be one: the question is "does a price-shaped
+ * string reach the reader", and a regex that strips too little errs toward reporting.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+export function visibleText(html) {
+  return String(html ?? '')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;|&#160;|&#xa0;/gi, ' ')
+    .replace(/&#8363;|&#x20ab;/gi, '₫')
+    .replace(/&#36;|&dollar;/gi, '$')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+}
+
+/**
+ * Price shapes, in the forms this site has actually shown and the ones it could.
+ *
+ * **Why this exists: the probe could not see the defect it was built after.** Every marker in
+ * {@link COMMERCE_MARKERS} is structural — JSON-LD keys, test ids — so a page rendering
+ * `1.450.000₫` in a paragraph, or the historical `Dome Ring · 112.00` (STATE.md, 2026-08-05:
+ * a fallback product with no currency at all), passed as clean. A rendered price is the most
+ * visible commerce residue there is and it was the one kind this check was blind to.
+ *
+ * Each pattern needs a digit beside the currency, because the site legitimately says "VND"
+ * nowhere and "đ" inside Vietnamese words everywhere a localised page ever exists. The bare
+ * decimal is the loosest and is fenced accordingly: two decimals exactly, not part of a longer
+ * number or a ratio, and not followed by a unit — `1.60 mm` is a measurement, `112.00` is not.
+ */
+export const PRICE_PATTERNS = /** @type {const} */ ([
+  { id: 'dong-symbol', pattern: /\d(?:[\d.,\s]*\d)?\s?₫|₫\s?\d/u },
+  { id: 'dong-letter', pattern: /\d(?:[\d.,]*\d)?\s?đ(?![\p{L}\p{N}])/u },
+  { id: 'currency-code', pattern: /\b(?:VND|USD|EUR|GBP)\s?\d|\d(?:[\d.,]*\d)?\s?(?:VND|USD|EUR|GBP)\b/ },
+  { id: 'us-dollar', pattern: /\bUS\$\s?\d/ },
+  { id: 'dollar', pattern: /\$\s?\d/ },
+  { id: 'grouped-amount', pattern: /(?<![\d.,])\d{1,3}(?:\.\d{3}){2,}(?![\d.,]*\d)/ },
+  {
+    id: 'decimal-amount',
+    pattern: /(?<![\d.,:])\d{1,3}(?:,\d{3})*\.\d{2}(?![\d.,:]|\s?(?:%|(?:mm|cm|m|g|mg|kg|µm|x|in|ct)\b))/,
+  },
+])
+
+/**
+ * Every price shape visible in a body, at most one per pattern, with the text that matched.
+ *
+ * @param {string} html
+ * @returns {Array<{ id: string, match: string }>}
+ */
+export function detectVisiblePrice(html) {
+  const text = visibleText(html)
+  const found = []
+  for (const { id, pattern } of PRICE_PATTERNS) {
+    const m = text.match(pattern)
+    if (m) found.push({ id, match: m[0].trim() })
+  }
+  return found
+}
+
+/**
  * Every finding code this module can emit.
  *
  * Composed rather than hand-listed for the commerce half, because those are derived from
@@ -166,6 +234,8 @@ export const BROWSE_ONLY_FINDINGS = /** @type {const} */ ([
   'sitemap-omits-product',
   'sitemap-lists-unknown-product',
   ...COMMERCE_MARKERS.map((m) => `commerce-${m.id}`),
+  // Not a marker: a price is judged on visible text, not matched as a structural key.
+  'commerce-visible-price',
 ])
 
 /**
@@ -427,6 +497,18 @@ export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles
           `${observation.path} references ${hosts.join(', ')}. A browse-only site must not ` +
           `reach a Shopify host — an allowlisted CDN outlives the code that needed it, and ` +
           `an image still loading from it is a live dependency on an account being closed.`,
+      })
+    }
+
+    // Blocking, like every commerce marker. A price a visitor can read is the most visible
+    // commerce residue there is, and until 2026-09-26 the one kind this probe could not see.
+    const prices = observation.body ? detectVisiblePrice(observation.body) : []
+    if (prices.length > 0) {
+      findings.push({
+        code: 'commerce-visible-price',
+        detail:
+          `${observation.path} renders a price: ${prices.map((p) => `"${p.match}"`).join(', ')}. ` +
+          `Nothing on this site can be bought, so no surface may show an amount.`,
       })
     }
 
