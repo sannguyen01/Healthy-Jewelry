@@ -183,7 +183,11 @@ export const PRICE_PATTERNS = /** @type {const} */ ([
   { id: 'grouped-amount', pattern: /(?<![\d.,])\d{1,3}(?:\.\d{3}){2,}(?![\d.,]*\d)/ },
   {
     id: 'decimal-amount',
-    pattern: /(?<![\d.,:])\d{1,3}(?:,\d{3})*\.\d{2}(?![\d.,:]|\s?(?:%|(?:mm|cm|m|g|mg|kg|µm|x|in|ct)\b))/,
+    // At least two integer digits, or a thousands separator. The first version accepted one,
+    // and the first run over a real production build flagged the FAQ's ring-size advice —
+    // "divide by 3.14" — as a price. A one-digit bare decimal is a constant or a measurement
+    // far more often than an amount, and a one-digit amount almost always carries a currency.
+    pattern: /(?<![\d.,:])(?:\d{2,3}|\d{1,3}(?:,\d{3})+)\.\d{2}(?![\d.,:]|\s?(?:%|(?:mm|cm|m|g|mg|kg|µm|x|in|ct)\b))/,
   },
 ])
 

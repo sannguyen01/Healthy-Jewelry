@@ -342,6 +342,7 @@ describe('a visible price is a finding', () => {
     ['dollar', '<p>$89.00</p>'],
     ['the historical live defect', '<h3>Dome Ring</h3><span> · </span><span>112.00</span>'],
     ['grouped amount alone', '<p>2.150.000</p>'],
+    ['a thousands-separated amount', '<p>1,450.00</p>'],
   ])('catches %s', (_label, html) => {
     expect(detectVisiblePrice(`<!doctype html><html><body>${html}</body></html>`)).not.toEqual([])
   })
@@ -356,6 +357,8 @@ describe('a visible price is a finding', () => {
     ['a version', 'v1.2.3 build 16.3.4'],
     ['a phone number', '+84 28 3822 1234'],
     ['a Vietnamese word', 'Trang sức đẹp và đơn giản'],
+    // Found by running the detector over a real production build: the FAQ's sizing advice.
+    ['a constant in sizing advice', 'measure the length in millimeters, and divide by 3.14 to get your diameter'],
     ['a price inside JSON-LD, which the markers judge instead', '<script type="application/ld+json">{"price":"112.00"}</script>'],
     ['the render payload', '<script>self.__next_f.push([1,"$89.00"])</script>'],
   ])('ignores %s', (_label, html) => {
