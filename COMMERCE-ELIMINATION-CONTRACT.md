@@ -403,3 +403,91 @@ re-permits and who approved it. A change that adds a register row must name the 
 will remove it. A change that adds a `superseded` or `negative-control` classification must
 carry the banner or the assertion that earns it — the checks will refuse it otherwise, which is
 the point.
+
+---
+
+## 12. Approved egress
+
+Where this deployment may send bytes, per side. Everything not listed here is refused —
+this is an allowlist, because the failure it exists for is a request nobody decided to
+make: a theme snippet, an SDK's telemetry beacon, a font or image pulled from a vendor CDN
+by a component that was copied rather than written.
+
+Two sides, because they are two different questions asked by two different harnesses:
+
+- **`browser`** — every request any page makes, recorded by the automatic Playwright
+  fixture in `e2e/support/test.ts` on every E2E test, and enforced in production by the
+  `Content-Security-Policy` in `next.config.ts` (`connect-src 'self'`, pinned by
+  `src/tests/unit/csp-contract.test.ts`). The browser talks to the site and to nothing
+  else. `self` means the origin being served in that run, which is why it is a keyword: the
+  E2E server is `http://localhost:3000` and production is not.
+- **`server`** — every outbound call a route handler makes, recorded by stubbing `fetch` in
+  `src/tests/unit/server-egress.test.ts`. Two processors, each named in the privacy page.
+
+Pattern shapes, and no others: `self`; a non-network scheme (`data:`, `blob:`, `about:`);
+`https://host` (exactly that host, default port); `https://*.host` (any host *beneath*
+`host`, not `host` itself). Parsed by `scripts/lib/egress.mjs`, which throws on anything
+else rather than matching nothing.
+
+<!-- contract:egress-allowed -->
+
+| Origin pattern | Side | Why |
+|---|---|---|
+| `self` | browser | The site's own origin: pages, `/_next/static`, self-hosted fonts, the Open Graph image routes, `/api/analytics` and `/api/contact`. |
+| `data:` | browser | Inline SVG and image bytes the page already holds. Not a network request. |
+| `blob:` | browser | Object URLs a page creates from its own data. Not a network request. |
+| `about:` | browser | `about:blank`, the document every frame starts as. Not a network request. |
+| `https://api.resend.com` | server | Contact delivery from `/api/contact`, and the key check in `/api/health`. |
+| `https://*.upstash.io` | server | Rate limiting. The REST endpoint is a per-database subdomain, so the apex itself is not approved. |
+
+<!-- /contract:egress-allowed -->
+
+## 13. Forbidden egress
+
+Hosts this deployment must never contact, from either side, in any build. A row matches its
+host **and every host beneath it**, on a label boundary: `cdn.` in front of a forbidden host
+is the same vendor, while letters glued to the front of one are somebody else's domain —
+which §12 already refuses without this table's help.
+
+**§13 outranks §12.** A host that falls under both is forbidden, so an approval written
+wider than intended cannot reopen a closed vendor by being wide.
+
+Read by the browser fixture and the server harness through `scripts/lib/egress.mjs`, by
+`src/tests/unit/csp-contract.test.ts` against every CSP directive, and by
+`scripts/scan-build-artifacts.mjs` against every file the build emits — client chunks,
+prerendered HTML and RSC payloads, server chunks and source maps.
+
+Several rows are subsumed by a broader one and are listed anyway. They are the hosts a
+storefront theme, a checkout or a payment button actually calls, and a reviewer searching
+this table for the hostname in a failing request should find it by name.
+
+<!-- contract:egress-forbidden -->
+
+| Host pattern | Why |
+|---|---|
+| `myshopify.com` | The storefront and Storefront API host family. No runtime read path exists. |
+| `shopify.com` | The platform itself: Admin API, accounts, and the hosted checkout's asset hosts. |
+| `cdn.shopify.com` | Product photographs and theme assets. The catalogue ships its own imagery. |
+| `shopifycdn.com` | The platform's secondary asset CDN. |
+| `shopifysvc.com` | Platform services behind storefront scripts. |
+| `monorail-edge.shopifysvc.com` | Storefront analytics beacons — conversion tracking, which §2 forbids. |
+| `shop.app` | The accelerated-checkout wallet and its buyer-identity service. |
+| `stripe.com` | Payment processing. No payment is taken on this domain. |
+| `js.stripe.com` | The payment element script. A payment path begins by loading it. |
+| `paypal.com` | Payment processing and its checkout buttons. |
+| `paypalobjects.com` | Payment button assets. |
+| `braintreegateway.com` | Payment processing. |
+| `adyen.com` | Payment processing. |
+| `klarna.com` | Deferred payment. |
+| `afterpay.com` | Deferred payment. |
+| `vnpay.vn` | Domestic payment gateway. |
+| `zalopay.vn` | Domestic wallet payments. |
+| `momo.vn` | Domestic wallet payments. |
+| `easypost.com` | Shipping rates and labels. Fulfilment is arranged by a person. |
+| `goshippo.com` | Shipping rates and labels. |
+| `taxjar.com` | Sales-tax calculation. Tax applies to a transaction, and there is none. |
+| `avalara.com` | Tax calculation. |
+| `avalara.net` | Tax calculation API hosts. |
+| `checkout.healthyjewellery.com` | The retired checkout hostname. It resolves into the platform until WS-E retires it, so a link to it is a link into a checkout. |
+
+<!-- /contract:egress-forbidden -->

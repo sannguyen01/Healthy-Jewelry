@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+
+const ROOT = path.resolve(import.meta.dirname, '../../..')
 
 const {
   compileOriginPattern,
@@ -239,6 +243,46 @@ describe('hostOfCspSource', () => {
   it('returns null for keywords and scheme sources', () => {
     for (const t of ["'self'", "'none'", "'unsafe-inline'", 'data:', 'blob:', 'https:']) {
       expect(hostOfCspSource(t), t).toBeNull()
+    }
+  })
+})
+
+describe('the real contract: §12 and §13 as this repository declares them', () => {
+  /*
+   * The fixtures above prove the judge; these prove the document it is handed is shaped
+   * the way the two harnesses assume. Read, not copied: a list duplicated here would be a
+   * second allowlist, and the reason `egress.mjs` exists is that there should be one.
+   */
+  const real = parseEgress(readFileSync(path.join(ROOT, 'COMMERCE-ELIMINATION-CONTRACT.md'), 'utf8'))
+
+  it('parses, with rows on both sides and a non-empty denylist', () => {
+    expect(real.allowed.filter((r: { side: string }) => r.side === 'browser').length).toBeGreaterThan(0)
+    expect(real.allowed.filter((r: { side: string }) => r.side === 'server').length).toBeGreaterThan(0)
+    expect(real.forbidden.length).toBeGreaterThan(10)
+  })
+
+  it('approves no third-party host for the browser', () => {
+    // The design, not a coincidence of today's table: the browser talks to the site and to
+    // nothing else, so a browser-side row naming a host is a design change and must fail
+    // here until somebody deletes this assertion on purpose.
+    const hostRows = real.allowed.filter(
+      (r: { side: string; kind: string }) => r.side === 'browser' && r.kind !== 'self' && r.kind !== 'scheme'
+    )
+    expect(hostRows).toEqual([])
+  })
+
+  it('approves server hosts over https only', () => {
+    for (const row of real.allowed.filter((r: { side: string; kind: string }) => r.side === 'server')) {
+      expect(row.scheme, row.pattern).toBe('https:')
+    }
+  })
+
+  it('forbids nothing it also approves', () => {
+    // §13 outranks §12, so an overlap would be silently resolved in the safe direction —
+    // and an approval nothing can ever use is an entry that misleads its reader.
+    for (const row of real.allowed.filter((r: { host?: string }) => r.host)) {
+      const probe = row.kind === 'subdomains' ? `x.${row.host}` : row.host
+      expect(forbiddenRowFor(probe, real.forbidden), row.pattern).toBeNull()
     }
   })
 })
