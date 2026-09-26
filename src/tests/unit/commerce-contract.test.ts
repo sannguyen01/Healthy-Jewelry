@@ -65,9 +65,14 @@ const register = parseRegister(read(REGISTER_PATH))
 /** A file that trips nothing, used as the negative case for every rule below. */
 const INERT = { path: 'src/lib/inert.ts', source: 'export const x = 1\n' }
 
+type Row = { path: string; identifiers: string[] }
+
+/** A register row as `parseRegister` returns it, reduced to the two cells the rules read. */
+const row = (p: string, ...identifiers: string[]): Row => ({ path: p, identifiers })
+
 /** Drive `evaluate` over a handful of files with a contract that is the real one. */
-function run(files: { path: string; source: string }[], retained: string[] = []) {
-  return evaluate({ files, contract, retained: new Set(retained) })
+function run(files: { path: string; source: string }[], rows: Row[] = []) {
+  return evaluate({ files, contract, register: rows })
 }
 
 /*
@@ -217,21 +222,23 @@ describe('positions: code, prose, and the line between them', () => {
   })
 
   /*
-   * The known limit, asserted rather than left to be discovered.
+   * The limit this used to record, inverted.
    *
-   * This is a lexer: `//` inside a string literal ends the code half early. The direction
-   * is safe — a token moves from `code` to `prose`, which weakens a finding rather than
-   * inventing one — but "safe" is a claim, and an unstated limit reads as a clean bill of
-   * health.
+   * Until 2026-09-25 this test asserted the opposite — that a `//` inside a string *was*
+   * read as a comment — under a comment calling that direction "safe, because it weakens
+   * a finding rather than inventing one". For a prohibition scanner that is the unsafe
+   * direction: a comment is free, so a misread comment is a silent exemption, and the
+   * misread was hiding an `absolute` finding in this repository when it was measured.
    */
-  it('a slash-slash inside a string literal is mis-read as a comment, and that is recorded', () => {
-    const { prose } = splitPositions('const u = "https://shop.myshopify.com"\n', 'c-style')
-    expect(prose[0]).toContain('myshopify.com')
+  it('a slash-slash inside a string literal is code, not a comment', () => {
+    const { code, prose } = splitPositions('const u = "https://shop.myshopify.com"\n', 'c-style')
+    expect(code[0]).toContain('myshopify.com')
+    expect(prose[0]).toBe('')
   })
 
   it('an unknown extension has no language', () => {
     expect(languageOf('public/logo.png')).toBe(null)
-    expect(languageOf('src/app/page.tsx')).toBe('c-style')
+    expect(languageOf('src/app/page.tsx')).toBe('c-style-jsx')
     expect(languageOf('docs/x.md')).toBe('all-prose')
   })
 })
@@ -316,7 +323,9 @@ describe('each rule fires, and each rule declines to fire', () => {
     const file = { path: 'src/lib/bag.ts', source: 'await cartCreate(input)\n' }
     expect(ruleCodes(run([file]))).toContain('absolute-prohibition-in-code')
     // …not even with a register row, which is the whole point of the scope.
-    expect(ruleCodes(run([file], ['src/lib/bag.ts']))).toContain('absolute-prohibition-in-code')
+    expect(ruleCodes(run([file], [row('src/lib/bag.ts', 'cart-mutation')]))).toContain(
+      'absolute-prohibition-in-code'
+    )
   })
 
   it('rule 3 — a comment inside a code file is free', () => {
@@ -329,13 +338,13 @@ describe('each rule fires, and each rule declines to fire', () => {
   it('rule 5 — a staged identifier in code needs a register row, and a row satisfies it', () => {
     const file = { path: 'src/config/thing.ts', source: "const d = process.env.SHOPIFY_STORE_DOMAIN\n" }
     expect(ruleCodes(run([file]))).toContain('unregistered-commerce-reference')
-    expect(ruleCodes(run([file], ['src/config/thing.ts']))).toEqual([])
+    expect(ruleCodes(run([file], [row('src/config/thing.ts', 'shopify-env', 'shopify-name')]))).toEqual([])
   })
 
   it('rule 5 — a new document describing Shopify as current is a finding', () => {
     const file = { path: 'docs/how-to-reconnect.md', source: 'Reconnect the Shopify storefront.\n' }
     expect(ruleCodes(run([file]))).toContain('undeclared-commerce-document')
-    expect(ruleCodes(run([file], ['docs/how-to-reconnect.md']))).toEqual([])
+    expect(ruleCodes(run([file], [row('docs/how-to-reconnect.md', 'shopify-name')]))).toEqual([])
   })
 
   it('rule 6 — a superseded document without its banner is a finding', () => {
@@ -346,7 +355,7 @@ describe('each rule fires, and each rule declines to fire', () => {
     }
     const without = { path: 'docs/old.md', source: '# Old\n\nShopify things.\n' }
     const go = (f: { path: string; source: string }) =>
-      evaluate({ files: [f], contract: { ...contract, positions }, retained: new Set() }).findings.map(
+      evaluate({ files: [f], contract: { ...contract, positions }, register: [] }).findings.map(
         (x: { code: string }) => x.code
       )
     expect(go(without)).toContain('superseded-without-banner')
@@ -368,7 +377,7 @@ describe('each rule fires, and each rule declines to fire', () => {
     const findings = evaluate({
       files: [{ path: 'docs/old.md', source: buried }],
       contract: { ...contract, positions },
-      retained: new Set(),
+      register: [],
     }).findings.map((x: { code: string }) => x.code)
     expect(findings).toContain('superseded-without-banner')
   })
@@ -378,7 +387,7 @@ describe('each rule fires, and each rule declines to fire', () => {
     const spec = { path: 'SPEC.md', source: 'forbidden: shopify\n' }
     const reader = { path: 'scripts/check.mjs', source: "readFileSync('SPEC.md')\n" }
     const go = (files: { path: string; source: string }[]) =>
-      evaluate({ files, contract: { ...contract, positions }, retained: new Set() }).findings.map(
+      evaluate({ files, contract: { ...contract, positions }, register: [] }).findings.map(
         (x: { code: string }) => x.code
       )
     expect(go([spec])).toContain('specification-nothing-reads')
@@ -392,7 +401,7 @@ describe('each rule fires, and each rule declines to fire', () => {
     const findings = evaluate({
       files: [spec, citer],
       contract: { ...contract, positions },
-      retained: new Set(),
+      register: [],
     }).findings.map((x: { code: string }) => x.code)
     expect(findings).toContain('specification-nothing-reads')
   })
@@ -406,7 +415,7 @@ describe('each rule fires, and each rule declines to fire', () => {
       evaluate({
         files: [{ path: 'src/tests/unit/fake.test.ts', source }],
         contract: { ...contract, positions },
-        retained: new Set(),
+        register: [],
       }).findings.map((x: { code: string }) => x.code)
     expect(go('const forbidden = /shopify/\n')).toContain('negative-control-asserts-nothing')
     expect(go('expect(src).not.toMatch(/shopify/)\n')).not.toContain(
@@ -416,13 +425,13 @@ describe('each rule fires, and each rule declines to fire', () => {
   })
 
   it('rule 8 — a register row for a file the scan never saw is a phantom', () => {
-    expect(ruleCodes(run([INERT], ['src/deleted-last-week.ts']))).toContain(
+    expect(ruleCodes(run([INERT], [row('src/deleted-last-week.ts', 'shopify-name')]))).toContain(
       'register-names-missing-file'
     )
   })
 
   it('rule 8 — a register row for a file that no longer matches is spent', () => {
-    expect(ruleCodes(run([INERT], [INERT.path]))).toContain('register-row-is-spent')
+    expect(ruleCodes(run([INERT], [row(INERT.path, 'shopify-name')]))).toContain('register-row-is-spent')
   })
 
   it('rule 9 — a classification glob matching nothing is a finding', () => {
@@ -430,7 +439,7 @@ describe('each rule fires, and each rule declines to fire', () => {
     const findings = evaluate({
       files: [INERT],
       contract: { ...contract, positions },
-      retained: new Set(),
+      register: [],
     }).findings
     expect(findings.map((f: { code: string }) => f.code)).toContain('classification-matches-nothing')
   })
@@ -461,7 +470,17 @@ describe('each rule fires, and each rule declines to fire', () => {
       'specification-nothing-reads',
       'register-names-missing-file',
       'register-row-is-spent',
+      'register-identifiers-undeclared',
+      'register-identifiers-overdeclared',
+      'register-duplicate-path',
+      'register-unknown-identifier',
+      'exemption-carries-undeclared',
+      'exemption-carries-overdeclared',
+      'exemption-carries-malformed',
       'classification-matches-nothing',
+      'contract-state-invalid',
+      'phase-active-register-empty',
+      'phase-complete-register-nonempty',
       'prohibited-package',
       'prohibited-transitive-package',
       'unknown-language',
@@ -543,7 +562,7 @@ describe('the boundary holds, here, now', () => {
     })
     .filter((f): f is { path: string; source: string } => f !== null)
 
-  const result = evaluate({ files, contract, retained: retainedPaths(register) })
+  const result = evaluate({ files, contract, register })
 
   it('scans a real tree rather than an empty one', () => {
     // Without this the assertion below passes on a broken `git ls-files`, which is the
