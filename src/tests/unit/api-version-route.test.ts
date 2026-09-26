@@ -237,7 +237,12 @@ describe('the payload is exactly the fingerprint, in both directions', () => {
     const version = await (await GET()).json()
 
     const { decideCanonicalDomain } = await import('../../../scripts/lib/canonical-domain.mjs')
-    const observe = (v: unknown) => [
+    // The probe's own `HostObservation['version']` shape: the fields it reads, and no more.
+    type VersionBody = {
+      build?: { commit?: string | null; vercelEnv?: string | null }
+      runtime?: { vercelEnv?: string | null }
+    }
+    const observe = (v: VersionBody) => [
       {
         host: 'healthyjewellery.com',
         transport: 'ok' as const,
