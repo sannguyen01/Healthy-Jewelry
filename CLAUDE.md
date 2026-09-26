@@ -192,12 +192,13 @@ ways, clipping, spread across ratios, buy-control position) and
   `docs/commerce-elimination-masterplan.md` for the nine workstreams that burn the register
   down. A new file carrying a commerce identifier is a defect until somebody classifies it —
   `executable` is the default class.
-- **What is deliberately still standing**: `src/lib/shopify/cacheTags.ts` and
-  `api-version.ts`, because `/api/webhooks/shopify`, `/api/revalidate` and `/api/version`
-  still import them. The webhook subscriptions must be deleted in the platform console
-  *before* the endpoint is removed, or it retries against a failing route for its full
-  backoff schedule. That is the masterplan's **WS-F** ordering (the browse-only plan called
-  it WS-7), and the connector is currently `needs_reconnect`.
+- **What is deliberately still standing**: `src/lib/shopify/cacheTags.ts`, because
+  `/api/webhooks/shopify` still imports it. `/api/revalidate`, `src/config/shopify*.ts` and
+  `src/lib/shopify/api-version.ts` were deleted by WS-A on 2026-09-25, and `/api/version`
+  now reports the build fingerprint with no vendor block. The webhook subscriptions must be
+  deleted in the platform console *before* the endpoint is removed, or it retries against a
+  failing route for its full backoff schedule. That is the masterplan's **WS-F** ordering
+  (the browse-only plan called it WS-7), and the connector is currently `needs_reconnect`.
 - Hooks: `src/lib/hooks/useReveal.ts` — IntersectionObserver scroll-reveal hook, returns `[ref, visible]` tuple, triggers once then disconnects
 
 ### No prices, anywhere
