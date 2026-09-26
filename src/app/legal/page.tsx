@@ -82,9 +82,15 @@ export default function LegalPage() {
                 {LEGAL_EMAIL}
               </a>
             </p>
+            {/*
+              "specializing in implant-grade metals" until 2026-09-26. The rest of this page is
+              a legal instrument and is WS-H's to revise; this was the one sentence in it that
+              asserted a regulatory property of the metals rather than a legal fact, so it is
+              the one sentence changed.
+            */}
             <p style={bodyStyle}>
-              Healthy Jewelry is a premium jewelry brand specializing in implant-grade metals: Grade
-              23 Titanium, Niobium, and 316L Surgical Steel.
+              Healthy Jewelry is a premium jewelry brand working in three metals: Grade 23
+              Titanium, Niobium, and 316L Surgical Steel.
             </p>
           </div>
 

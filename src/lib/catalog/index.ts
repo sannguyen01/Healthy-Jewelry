@@ -40,7 +40,7 @@ import {
   type MaterialHandle,
 } from './schema'
 import { rawClaims, rawCollections, rawProducts } from './manifest'
-import { loadClaimsRegistry, type ClaimId, type ClaimsRegistry } from './claims-schema'
+import { CLAIM_IDS, loadClaimsRegistry, type ClaimId, type ClaimsRegistry } from './claims-schema'
 import {
   approvedWordings,
   documentedStandard,
@@ -294,6 +294,20 @@ export function approvedClaimTexts(ids: readonly ClaimId[], context: ClaimContex
   return approvedWordings(claimsRegistry, ids, context, renderTime())
 }
 
+/**
+ * Narrow claim ids held as plain strings — `hj-data.ts` keeps them that way so the
+ * materials copy does not import the catalogue — or throw naming the one that is not real.
+ * A throw rather than a cast: an unknown id silently rendering nothing would look exactly
+ * like a claim nobody has approved yet.
+ */
+export function asClaimIds(ids: readonly string[]): ClaimId[] {
+  return ids.map((id) => {
+    const known = CLAIM_IDS.find((c) => c === id)
+    if (!known) throw new Error(`"${id}" is not a claim id in src/lib/catalog/claims-schema.ts.`)
+    return known
+  })
+}
+
 /** The exact designation of a metal — a specification, so it always renders. */
 export function materialDesignation(material: MaterialHandle): string {
   return findMaterialSpec(claimsRegistry, material).designation
@@ -310,10 +324,15 @@ export function materialStandard(material: MaterialHandle, context: ClaimContext
  * `hj-data.ts` keeps its handles as plain strings on purpose (see its header), so the
  * narrowing happens once, here, at the edge where a material becomes a claim context.
  */
-export function materialContext(handle: string): ClaimContext {
+export function toMaterialHandle(handle: string): MaterialHandle {
   const material = MATERIAL_HANDLES.find((m) => m === handle)
   if (!material) throw new Error(`"${handle}" is not one of the catalogue's materials.`)
-  return { kind: 'material', material }
+  return material
+}
+
+/** The claim context for one metal, from a materials-copy handle. */
+export function materialContext(handle: string): ClaimContext {
+  return { kind: 'material', material: toMaterialHandle(handle) }
 }
 
 /** The claim context for one product page. */

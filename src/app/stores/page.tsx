@@ -7,7 +7,9 @@ import { CONTACT_EMAIL, SITE_DOMAIN } from '@/config/site'
 export const metadata: Metadata = {
   title: 'Locations',
   description:
-    'Healthy Jewelry is arranged through ambassadors and shipped worldwide with free delivery. Showroom appointments available; flagship store coming 2026.',
+    // Neutralised with /shipping's and /terms' on 2026-09-26: "shipped worldwide with free
+    // delivery" is a commercial term, and in a search snippet it reads as a store's offer.
+    'How to see and arrange a Healthy Jewelry piece: through an ambassador, or by showroom appointment.',
 }
 
 export default function StoresPage() {

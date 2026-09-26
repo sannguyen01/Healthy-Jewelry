@@ -1,7 +1,11 @@
 import { ImageResponse } from 'next/og'
+import { claimText } from '@/lib/catalog'
 
 export const runtime = 'edge'
-export const alt = 'Healthy Jewelry — Implant-Grade Titanium'
+// A literal rather than SITE_DEFAULT_TITLE: Next reads `alt` from this module's exports, and
+// a literal is the form it is guaranteed to resolve. Said "Implant-Grade Titanium" until
+// 2026-09-26 — the share card is the brand's most-copied sentence.
+export const alt = 'Healthy Jewelry — Grade 23 Titanium, Niobium, 316L Steel'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -26,11 +30,12 @@ export default function Image() {
           HEALTHY JEWELRY
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          <span style={{ fontSize: 88, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 0.95, display: 'flex' }}>IMPLANT-GRADE</span>
+          <span style={{ fontSize: 88, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 0.95, display: 'flex' }}>GRADE 23</span>
           <span style={{ fontSize: 88, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 0.95, display: 'flex' }}>TITANIUM</span>
         </div>
         <div style={{ marginTop: 36, fontSize: 22, color: '#6B6762', letterSpacing: '0.04em', display: 'flex' }}>
-          Metal that works with your body.
+          {/* The positioning line is a pending claim; the card renders what the page does. */}
+          {claimText('brand-positioning', { kind: 'site' })}
         </div>
         <div style={{ position: 'absolute', bottom: 64, right: 80, display: 'flex', gap: 12 }}>
           {['GRADE 23 TITANIUM', 'NIOBIUM', '316L SURGICAL STEEL'].map((mat) => (

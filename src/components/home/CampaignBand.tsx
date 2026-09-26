@@ -1,13 +1,19 @@
 import Link from 'next/link'
+import { claimText } from '@/lib/catalog'
 
 interface CampaignBandProps {
   headline?: string
   body?: string
 }
 
+/**
+ * The body is a claim — "Grade 23 titanium passes through the body without reaction" — so
+ * its default comes from the registry and renders the neutral fallback until a reviewer
+ * approves it. A server component, which is what lets it read the registry directly.
+ */
 export function CampaignBand({
   headline = 'SCIENCE BEFORE AESTHETICS.',
-  body = 'Every piece engineered for biocompatibility. Grade 23 titanium passes through the body without reaction. That’s not a feature — it’s the foundation.',
+  body = claimText('campaign-band', { kind: 'site' }),
 }: CampaignBandProps) {
   return (
     <section

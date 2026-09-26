@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { hjMaterials } from '@/lib/data/hj-data'
+import { approvedClaimTexts, asClaimIds, materialContext } from '@/lib/catalog'
 
 const ordinals = ['01', '02', '03']
 
@@ -61,7 +62,10 @@ export function MaterialsSection() {
         >
           <Image
             src="/images/lifestyle/philosophy-waterproof.jpg"
-            alt="Titanium jewelry worn in water, showing waterproof, non-corrosion material integrity"
+            // Alt text describes the photograph. It also asserted "waterproof, non-corrosion
+            // material integrity" until 2026-09-26 — a corrosion claim read aloud to every
+            // screen-reader user, with nothing behind it.
+            alt="Titanium jewelry worn in water"
             fill
             sizes="200px"
             style={{ objectFit: 'cover' }}
@@ -151,9 +155,13 @@ export function MaterialsSection() {
               {material.body}
             </p>
 
-            {/* Pill badges for properties */}
+            {/* Pill badges: specification first, then any claim approved for this metal.
+                Today that second list is empty for all three — see hj-data.ts. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {material.properties.map((prop) => (
+              {[
+                ...material.properties,
+                ...approvedClaimTexts(asClaimIds(material.claims), materialContext(material.handle)),
+              ].map((prop) => (
                 <span
                   key={prop}
                   style={{

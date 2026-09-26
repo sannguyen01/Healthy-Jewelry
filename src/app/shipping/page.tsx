@@ -8,7 +8,10 @@ import { ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
 export const metadata: Metadata = {
   title: 'Shipping & Returns',
   description:
-    'Free shipping on all Healthy Jewelry orders worldwide. 7–14 day international delivery. 30-day returns.',
+    // A search snippet, so it says what the page is for rather than restating the terms as
+    // an offer: "Free shipping on all … orders worldwide" read as an online store in search
+    // results, on a site that takes no orders. The terms themselves are unchanged below.
+    'How a piece arranged with a Healthy Jewelry ambassador is delivered, returned or exchanged.',
 }
 
 const sectionHeadStyle: React.CSSProperties = {

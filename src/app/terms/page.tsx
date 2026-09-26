@@ -8,7 +8,10 @@ import { CONTACT_EMAIL, ORDER_REFERENCE_HINT, SITE_DOMAIN } from '@/config/site'
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description:
-    'Terms of Service for Healthy Jewelry. Lifetime warranty against corrosion. Free returns within 30 days.',
+    // A search snippet, so it says what the page is for. "Lifetime warranty against
+    // corrosion. Free returns within 30 days." read as an online store's promise in search
+    // results, on a site that takes no orders. The terms themselves are unchanged below.
+    'The terms that govern use of this website, and pieces arranged with a Healthy Jewelry ambassador.',
 }
 
 const sectionHeadStyle: React.CSSProperties = {
@@ -98,7 +101,8 @@ export default function TermsPage() {
           <div>
             <h2 style={sectionHeadStyle}>Products and Pricing</h2>
             <p style={bodyStyle}>
-              All products are made from implant-grade metals: Grade 23 Titanium, Niobium, or 316L
+              {/* "implant-grade" removed 2026-09-26 — a material claim, not a term. */}
+              All products are made from one of three metals: Grade 23 Titanium, Niobium, or 316L
               Surgical Steel. Product descriptions and material specifications are accurate to the
               best of our knowledge.
             </p>
@@ -205,10 +209,14 @@ export default function TermsPage() {
               If it corrodes, we replace it — no questions asked.
             </p>
             <p style={bodyStyle}>
+              {/*
+                The warranty is a legal instrument and stands as written, for WS-H's review.
+                Its second sentence did not: "implant-grade titanium, niobium, and 316L
+                surgical steel do not corrode under normal wear conditions" was a claim about
+                the metals, not a term, and was removed on 2026-09-26.
+              */}
               All Healthy Jewelry pieces carry a lifetime warranty against corrosion, tarnishing,
-              and metal degradation. This warranty reflects our confidence in the materials:
-              implant-grade titanium, niobium, and 316L surgical steel do not corrode under normal
-              wear conditions.
+              and metal degradation.
             </p>
             <p style={bodyStyle}>
               The warranty covers manufacturing defects and corrosion failure. It does not cover

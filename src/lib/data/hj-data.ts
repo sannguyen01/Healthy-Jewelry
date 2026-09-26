@@ -73,9 +73,9 @@ export const hjMaterials: HJMaterial[] = [
   {
     handle: 'titanium',
     title: 'Grade 23 Titanium',
-    subtitle: 'Ti-6Al-4V ELI',
+    subtitle: 'Titanium alloy',
     body: 'Titanium alloyed with aluminum and vanadium, in its Extra Low Interstitial grade — the alloy family used in aerospace structures. About 45% lighter than steel.',
-    properties: ['Grade 23', 'Ti-6Al-4V ELI', '45% lighter than steel'],
+    properties: ['Ti-6Al-4V ELI', '45% lighter than steel'],
     claims: ['implant-grade', 'hypoallergenic', 'saltwater-resistant', 'colour-stability', 'mri-safe'],
   },
   {
