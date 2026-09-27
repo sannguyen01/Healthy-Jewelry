@@ -521,6 +521,7 @@
     "protects. A decision is reasoning that is wrong out loud when violated."
   ],
   "decisionAdrs": {
+    "docs/adr/037-a-reconciliation-at-the-wrong-grain.md": "A rule about the grain at which a reconciliation compares: a table parsed and reduced to a key before comparing has thrown away the columns it was meant to check. Its mechanism is the commerce-elimination-boundary control, which ADR 036 already classifies; this records why that control compares identifier sets rather than paths, and why a lexer that hides findings is erring in the unsafe direction.",
     "docs/adr/001-two-webhook-secrets.md": "Records which of two secrets Shopify signs with. A fact about an external system, not a mechanism that can go missing.",
     "docs/adr/002-cart-completion-discriminator.md": "A code-level discriminator. Its absence is a failing test, not a silent one.",
     "docs/adr/003-client-server-config-split.md": "A module boundary. Violating it is a lint or type error at the point of violation.",

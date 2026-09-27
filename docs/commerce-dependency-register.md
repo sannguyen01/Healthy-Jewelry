@@ -78,12 +78,12 @@ Workflows, probes, gates, fixtures and the machinery that watches them.
 | `scripts/lib/escalation.mjs` | shopify-name | Escalation decision | Production smoke | credential names | rewrite — the equivalence relation stays, its Shopify-shaped messages go | `src/tests/unit/escalation-decision.test.ts` | WS-C |
 | `scripts/preflight-secrets.mjs` | shopify-env shopify-host shopify-name | Smoke preflight | Production smoke, six-hourly | credential names | rewrite — it gates on five secrets that are being revoked | `src/tests/unit/preflight-secrets.test.ts` | WS-C |
 | `scripts/probe-assertion-liveness.mjs` | shopify-env shopify-host shopify-name | Mutation probe | Weekly control audit | credential names | rewrite — its env scaffolding injects a mock storefront | `src/tests/unit/probe-liveness-decision.test.ts` | WS-C |
-| `scripts/verify-premises.mjs` | shopify-name | Premise driver | Production smoke | none | rewrite with `premise-checks.mjs` | `src/tests/unit/verify-premises.test.ts` | WS-C |
+| `scripts/verify-premises.mjs` | shopify-name | Premise driver | Production smoke | none | delete when the retired-premise record goes — since 2026-09-26 it drives only CHECKOUT-HOST-CNAME, and the vendor name it carries is the list of premise ids retired with their subject | `src/tests/unit/verify-premises.test.ts` | WS-C |
 | `src/tests/unit/audit-workflow-secrets.test.ts` | shopify-env shopify-name | Vitest | Merge gate | credential names | rewrite — the auditor survives; its Shopify fixtures change name | the auditor keeps running | WS-C |
 | `src/tests/unit/escalation-decision.test.ts` | shopify-env shopify-host shopify-name | Vitest | Merge gate | credential names | rewrite with the escalation library | the subject is gone | WS-C |
 | `src/tests/unit/parser-fuzz.test.ts` | shopify-env shopify-name | Vitest | Merge gate | credential names | rewrite — the fuzzer survives; its secret-name corpus changes | the fuzzer keeps running | WS-C |
 | `src/tests/unit/preflight-secrets.test.ts` | shopify-env shopify-host shopify-name | Vitest | Merge gate | credential names | rewrite with the preflight | the subject is gone | WS-C |
-| `src/tests/unit/verify-premises.test.ts` | shopify-name | Vitest | Merge gate | none | rewrite with the premise driver | the subject is gone | WS-C |
+| `src/tests/unit/verify-premises.test.ts` | shopify-name | Vitest | Merge gate | none | delete with the driver's retired-premise record | the subject is gone | WS-C |
 | `vitest.config.ts` | shopify-env shopify-host shopify-name | Vitest | Every unit run | public config | delete the mock storefront env stubs once no test reads them | `src/tests/unit/vitest-env-contract.test.ts` | WS-C |
 
 ### WS-D — Infrastructure
