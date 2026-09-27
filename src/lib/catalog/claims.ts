@@ -104,6 +104,27 @@ export function findClaim(registry: ClaimsRegistry, id: ClaimId): ClaimRecord {
   return claim
 }
 
+type ApprovedDecision = Extract<ClaimRecord['decision'], { state: 'approved' }>
+
+/** The end of `expiresOn` in UTC: an approval is valid through the whole of its last day. */
+const validThrough = (expiresOn: string): number => startOfDay(expiresOn) + DAY_MS
+
+/**
+ * Why an approval is not live at `now`, or `null` when it is.
+ *
+ * One rule with two readers — the renderer (`resolveClaim`) and the claim-lexicon test's
+ * allow-list (`approvedWordingSpans`) — so the page and the test that polices it cannot
+ * disagree about the day a wording may start or must stop appearing.
+ */
+function approvalLapse(decision: ApprovedDecision, now: Date): 'decided-in-future' | 'past-expiry' | null {
+  // An approval dated tomorrow is a typo or a pre-emptive edit. Either way nobody has
+  // approved anything *yet*, and ADR 029 records the same shape reading as permanently
+  // fresh for an acceptance clock.
+  if (startOfDay(decision.decidedOn) > now.getTime()) return 'decided-in-future'
+  if (decision.expiresOn !== undefined && now.getTime() >= validThrough(decision.expiresOn)) return 'past-expiry'
+  return null
+}
+
 /**
  * The single decision: wording or fallback, and why.
  *
@@ -129,17 +150,8 @@ export function resolveClaim(
     case 'expired':
       return fallback('expired')
     case 'approved': {
-      // An approval dated tomorrow is a typo or a pre-emptive edit. Either way nobody has
-      // approved anything *yet*, and ADR 029 records the same shape reading as permanently
-      // fresh for an acceptance clock.
-      if (startOfDay(decision.decidedOn) > now.getTime()) return fallback('decided-in-future')
-      // Valid through the whole of `expiresOn`, in UTC.
-      if (
-        decision.expiresOn !== undefined &&
-        now.getTime() >= startOfDay(decision.expiresOn) + DAY_MS
-      ) {
-        return fallback('past-expiry')
-      }
+      const lapse = approvalLapse(decision, now)
+      if (lapse) return fallback(lapse)
       if (!claim.evidence.some((e) => covers(e.appliesTo, context))) {
         return fallback('not-applicable')
       }
@@ -156,21 +168,13 @@ export function resolveClaim(
  */
 export function approvedWordingSpans(registry: ClaimsRegistry, now: Date): string[] {
   return registry.claims
-    .filter((claim) => {
-      const { decision } = claim
-      if (decision.state !== 'approved') return false
-      if (startOfDay(decision.decidedOn) > now.getTime()) return false
-      if (decision.expiresOn !== undefined && now.getTime() >= startOfDay(decision.expiresOn) + DAY_MS) {
-        return false
-      }
-      return true
-    })
+    .filter(({ decision }) => decision.state === 'approved' && approvalLapse(decision, now) === null)
     .map((claim) => inline(claim.wording))
 }
 
 /** Collapse the `\n` line-break hints into single spaces, for every surface but a heading. */
 export function inline(text: string): string {
-  return text.split('\n').map((line) => line.trim()).filter(Boolean).join(' ')
+  return lines(text).join(' ')
 }
 
 /** Split on the `\n` line-break hints, for a heading that sets the claim on several lines. */
@@ -251,8 +255,7 @@ export function claimsNearingExpiry(
   const found: ExpiringClaim[] = []
   for (const claim of registry.claims) {
     if (claim.decision.state !== 'approved' || claim.decision.expiresOn === undefined) continue
-    const end = startOfDay(claim.decision.expiresOn) + DAY_MS
-    const daysRemaining = Math.ceil((end - now.getTime()) / DAY_MS)
+    const daysRemaining = Math.ceil((validThrough(claim.decision.expiresOn) - now.getTime()) / DAY_MS)
     if (daysRemaining <= days) {
       found.push({ id: claim.id, expiresOn: claim.decision.expiresOn, daysRemaining })
     }

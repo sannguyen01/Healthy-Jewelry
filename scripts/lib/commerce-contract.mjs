@@ -480,19 +480,28 @@ export function proseMaskHash(source) {
   return mask
 }
 
-/** Lines of `source`, each split into its code half and its prose half by `mask`. */
+/**
+ * Lines of `source`, each split into its code half and its prose half by `mask`.
+ *
+ * Copied a run at a time rather than a character at a time: a line changes position at most
+ * a few times, and this runs over every tracked file on every merge.
+ */
 export function linesFromMask(source, mask) {
   const lines = source.split('\n')
-  const code = new Array(lines.length).fill('')
-  const prose = new Array(lines.length).fill('')
+  const code = new Array(lines.length)
+  const prose = new Array(lines.length)
   let offset = 0
   for (let li = 0; li < lines.length; li += 1) {
     const text = lines[li]
     let c = ''
     let p = ''
-    for (let k = 0; k < text.length; k += 1) {
-      if (mask[offset + k] === 1) p += text[k]
-      else c += text[k]
+    for (let k = 0; k < text.length; ) {
+      const inProse = mask[offset + k] === 1
+      let end = k + 1
+      while (end < text.length && (mask[offset + end] === 1) === inProse) end += 1
+      if (inProse) p += text.slice(k, end)
+      else c += text.slice(k, end)
+      k = end
     }
     code[li] = c
     prose[li] = p
@@ -518,13 +527,10 @@ export function linesFromMask(source, mask) {
  * repository and is asserted by fixtures only.
  */
 export function splitPositions(source, language) {
-  const lines = source.split('\n')
-
-  if (language === 'all-prose') {
-    return { code: new Array(lines.length).fill(''), prose: lines.slice() }
-  }
-  if (language === 'none') {
-    return { code: lines.slice(), prose: new Array(lines.length).fill('') }
+  if (language === 'all-prose' || language === 'none') {
+    const lines = source.split('\n')
+    const empty = new Array(lines.length).fill('')
+    return language === 'all-prose' ? { code: empty, prose: lines } : { code: lines, prose: empty }
   }
   if (language === 'hash') {
     return linesFromMask(source, proseMaskHash(source))
@@ -635,7 +641,7 @@ export function tableRows(block) {
 }
 
 /** Strip the backticks this repository writes identifiers in. */
-const unticked = (s) => s.replace(/^`|`$/g, '')
+export const unticked = (s) => s.replace(/^`|`$/g, '')
 
 /** A space- or comma-separated list of identifier ids, backticks optional. */
 const idList = (cell) =>
@@ -660,6 +666,18 @@ export function parseCarries(cell) {
 
 /** The decommission's phases, in the only order they may be declared. */
 export const PHASES = ['active', 'complete']
+
+const ROUTE_WILDCARD = /\/:[A-Za-z_][A-Za-z0-9_]*\*$/
+
+/**
+ * The static prefix of a §7 `:path*` family, or `null` for an exact route.
+ *
+ * Here rather than in either reader of §7, because there are two — the E2E route matrix and
+ * the live-surface probe — and each needs to know which rows are families.
+ */
+export function wildcardPrefix(route) {
+  return ROUTE_WILDCARD.test(route) ? route.replace(ROUTE_WILDCARD, '') : null
+}
 
 /**
  * Parse the whole contract into the shape the rules below consume.
@@ -981,10 +999,12 @@ export function disposition(hit, klass, language) {
   // and claims expire on the register's clock, not the linter's.
   if (hit.position === 'prose' && !proseOnlyFile) return 'free'
 
-  // ── Rule 2. An absolute prohibition in running code is never retained.
-  if (hit.scope === 'absolute' && !proseOnlyFile) return exemptByClass ? 'class' : 'absolute'
-
+  // A class exemption excuses any hit, absolute ones included: a negative control has to
+  // name what it forbids. It is not a blank cheque — the row's `Carries` must name the id.
   if (exemptByClass) return 'class'
+
+  // ── Rule 2. An absolute prohibition in running code is never retained by the register.
+  if (hit.scope === 'absolute' && !proseOnlyFile) return 'absolute'
 
   // ── Rule 4. A superseded document may say anything, because its banner has
   //           already told the reader not to act on it. The banner is checked below.
@@ -1035,13 +1055,20 @@ export function evaluate({ files, contract, register = [] }) {
     rowsByPath.get(row.path).push(row)
   }
 
+  // Compiled once, not once per file per row. One pass per file then answers both
+  // questions: which rows match (for `classification-matches-nothing`) and which decides
+  // the class — the last match, as `classifyIndex()` states.
+  const globs = contract.positions.map((p) => globToRegExp(p.glob))
+
   for (const file of files) {
-    const at = classifyIndex(file.path, contract.positions)
+    let at = -1
+    globs.forEach((re, i) => {
+      if (!re.test(file.path)) return
+      matchedRows.add(i)
+      at = i
+    })
     const klass = at === -1 ? 'executable' : contract.positions[at].klass
     classCounts[klass] = (classCounts[klass] ?? 0) + 1
-    contract.positions.forEach((p, i) => {
-      if (globToRegExp(p.glob).test(file.path)) matchedRows.add(i)
-    })
 
     // ── Rule 1. A credential value is a leak in any position, in any class — `excluded`
     //            included, and files with no declared language included. It runs before
@@ -1181,13 +1208,15 @@ export function evaluate({ files, contract, register = [] }) {
   // second keeps a specification honest, because only the second breaks when the
   // specification changes shape.
   for (const spec of specifications) {
-    const readers = files.filter((f) => {
+    // `some`, not `filter`: one reader is the whole condition, and lexing the rest of the
+    // tree to count more of them was half the cost of this function.
+    const read = files.some((f) => {
       if (f.path === spec) return false
       const lang = languageOf(f.path)
       if (lang === null || lang === 'all-prose') return false
       return splitPositions(f.source, lang).code.some((l) => l.includes(spec))
     })
-    if (readers.length === 0) {
+    if (!read) {
       findings.push({
         code: 'specification-nothing-reads',
         path: spec,

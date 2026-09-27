@@ -100,6 +100,7 @@ export function judgeDenial({ mergeableState, requiredContexts, checkRuns = [], 
     .filter(([, state]) => state !== 'passing')
     .map(([c]) => c)
     .sort()
+  const unmetList = unmet.map((c) => `"${c}" (${contexts[c]})`).join(', ')
   const result = (verdict, reason, detail) => ({ verdict, reason, contexts, unmet, detail })
 
   if (requiredContexts === null || requiredContexts === undefined) {
@@ -143,9 +144,8 @@ export function judgeDenial({ mergeableState, requiredContexts, checkRuns = [], 
       ? result(
           'denied',
           'required-context-unmet',
-          `GitHub reports "blocked", and the required context(s) ${unmet
-            .map((c) => `"${c}" (${contexts[c]})`)
-            .join(', ')} have not passed on the head commit. The gate refused a known-bad ` +
+          `GitHub reports "blocked", and the required context(s) ${unmetList} have not passed ` +
+            `on the head commit. The gate refused a known-bad ` +
             `pull request without anyone pressing merge.`
         )
       : result(
@@ -162,9 +162,8 @@ export function judgeDenial({ mergeableState, requiredContexts, checkRuns = [], 
       ? result(
           'NOT-DENIED',
           'mergeable-with-unmet-required-context',
-          `GitHub reports "${mergeableState}" — the merge button works — while ${unmet
-            .map((c) => `"${c}" (${contexts[c]})`)
-            .join(', ')} has not passed. The gate did not hold: a bypass actor, a context ` +
+          `GitHub reports "${mergeableState}" — the merge button works — while ${unmetList} ` +
+            `has not passed. The gate did not hold: a bypass actor, a context ` +
             `name that does not match what CI publishes, or a ruleset that is not active.`
         )
       : result(
@@ -205,16 +204,12 @@ export async function pollMergeable(
   fetchPr,
   { delaysMs = [2_000, 4_000, 8_000, 16_000], sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}
 ) {
-  let attempts = 0
-  let pr = null
-  for (let i = 0; i <= delaysMs.length; i += 1) {
-    attempts += 1
-    pr = await fetchPr()
+  for (let i = 0; ; i += 1) {
+    const pr = await fetchPr()
     const state = pr?.mergeable_state
-    if (state && state !== 'unknown') break
-    if (i < delaysMs.length) await sleep(delaysMs[i])
+    if ((state && state !== 'unknown') || i === delaysMs.length) return { pr, attempts: i + 1 }
+    await sleep(delaysMs[i])
   }
-  return { pr, attempts }
 }
 
 /**

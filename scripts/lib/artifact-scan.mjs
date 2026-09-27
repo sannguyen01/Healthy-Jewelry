@@ -92,6 +92,8 @@
  * assets ([ADR 024](../../docs/adr/024-a-tool-never-pointed-at-a-known-answer.md)).
  */
 
+import { forbiddenHostPattern, forbiddenRowFor } from './egress.mjs'
+
 // ── Which assets, and what kind ────────────────────────────────────────────
 
 /** The kinds this scanner judges, in the order the report prints them. */
@@ -197,28 +199,21 @@ export function compileDetectors(contract, forbiddenHosts, secretValues = []) {
     })
   }
 
-  // One detector for every §13 host, most specific first so a match is attributed to the
-  // row that names it (`cdn.<vendor>` rather than `<vendor>`). A host finding is `staged`
-  // when the host itself carries a staged identifier — the vendor's own domains are on the
-  // same shrinking surface as its name — and `absolute` otherwise: nothing excuses a
-  // payment or tax host anywhere.
-  const hosts = [...forbiddenHosts].map((r) => r.host).sort((a, b) => b.length - a.length)
+  // One detector for every §13 host, each match attributed to the most specific row that
+  // names it (`cdn.<vendor>` rather than `<vendor>`) — both halves are egress.mjs's, so this
+  // scan, the E2E fixture and the server harness cannot disagree about a host. A host
+  // finding is `staged` when the host itself carries a staged identifier — the vendor's own
+  // domains are on the same shrinking surface as its name — and `absolute` otherwise:
+  // nothing excuses a payment or tax host anywhere.
   detectors.push({
     rule: 'forbidden-host',
     id: null,
     scope: null,
-    regex: new RegExp(
-      `(?<![a-z0-9-])(?:[a-z0-9-]+\\.)*(?:${hosts.map(escapeRegExp).join('|')})(?![a-z0-9-])`,
-      'gi'
-    ),
-    resolve: (text) => {
-      const host = text.toLowerCase()
-      const row = hosts.find((h) => host === h || host.endsWith(`.${h}`))
-      return {
-        id: row,
-        scope: staged.some((s) => new RegExp(s.source, 'i').test(host)) ? 'staged' : 'absolute',
-      }
-    },
+    regex: forbiddenHostPattern(forbiddenHosts),
+    resolve: (text) => ({
+      id: forbiddenRowFor(text, forbiddenHosts)?.host,
+      scope: staged.some((s) => s.pattern.test(text)) ? 'staged' : 'absolute',
+    }),
   })
 
   // §5, as the bundler writes it: a module path through `node_modules`. `.pnpm/<name>@v`
@@ -516,7 +511,7 @@ export function formatReport(result, { limit = 25 } = {}) {
     lines.push('  skipped, with the reason:')
     for (const [reason, c] of skippedEntries) lines.push(`    ${String(c.files).padStart(5)} files  ${kb(c.bytes).padStart(10)}  ${reason}`)
   }
-  lines.push('  staged allowance (derived from WS-F register rows and the build):')
+  lines.push(`  staged allowance (derived from ${RETAINING_WORKSTREAMS.join(', ')} register rows and the build):`)
   if (result.allowance.routes.length === 0) lines.push('    none — no retained route')
   for (const r of result.allowance.routes) {
     lines.push(`    /${r.route}: ${r.ownFiles} own file(s) under ${r.dir}; ${r.exclusiveChunks.length} chunk(s) only it loads`)

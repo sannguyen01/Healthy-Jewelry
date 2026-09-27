@@ -35,6 +35,12 @@
 export const BROWSE_ONLY_VERDICTS = ['clean', 'findings', 'unevaluable']
 
 /**
+ * A handle no catalogue will ever hold, used to prove that unknown handles 404. One value
+ * for every probe that asks, so two probes cannot disagree about which product is fictional.
+ */
+export const UNKNOWN_HANDLE = 'this-product-does-not-exist-hj-probe'
+
+/**
  * A response this probe could not attribute to the site.
  *
  * Same guard `probe-canonical-domain.mjs` needed, for the same reason: a sandbox or a

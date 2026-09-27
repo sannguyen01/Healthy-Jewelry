@@ -40,7 +40,7 @@
  * it happens to be run in ([ADR 024](../../docs/adr/024-a-tool-never-pointed-at-a-known-answer.md)).
  */
 
-import { section, tableRows } from './commerce-contract.mjs'
+import { section, tableRows, unticked } from './commerce-contract.mjs'
 
 /** The two places a request can come from. Anything else in the `Side` column is a typo. */
 export const SIDES = ['browser', 'server']
@@ -55,8 +55,6 @@ export const SIDES = ['browser', 'server']
  * parses as a scheme rather than as a malformed origin.
  */
 const NON_NETWORK_SCHEMES = new Set(['data:', 'blob:', 'about:'])
-
-const unticked = (s) => s.replace(/^`|`$/g, '').trim()
 
 /** A DNS name, lower-case, at least two labels. Deliberately strict: a pattern is a key. */
 const HOSTNAME = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]$/
@@ -122,7 +120,7 @@ export function parseEgress(markdown) {
   })
 
   const forbidden = tableRows(section(markdown, 'egress-forbidden')).map((cells) => {
-    const host = unticked(cells[0]).toLowerCase()
+    const host = unticked(cells[0]).trim().toLowerCase()
     if (!HOSTNAME.test(host)) {
       throw new Error(
         `§13 host pattern \`${cells[0]}\` is not a bare hostname. A §13 row matches that ` +
@@ -152,11 +150,43 @@ export function parseEgress(markdown) {
  * front of a forbidden host is the same vendor, but a forbidden host with letters glued
  * to its front is somebody else's domain. `evil-<host>` is not forbidden by this; it is
  * simply not approved, which §12 already refuses.
+ *
+ * **The most specific row wins**, whatever the table order. §13 lists a vendor's apex
+ * above its subdomains, so first-match would attribute every subdomain to the apex row and
+ * the subdomain rows could never be named — and the three harnesses that call this (the
+ * E2E fixture, the server harness, the artifact scan) would each have to re-sort to get a
+ * useful answer, which is how one of them came to carry its own copy of this rule.
  */
 export function forbiddenRowFor(hostname, forbidden) {
   const host = String(hostname).toLowerCase().replace(/\.$/, '')
   if (!host) return null
-  return forbidden.find((row) => host === row.host || host.endsWith(`.${row.host}`)) ?? null
+  let best = null
+  for (const row of forbidden) {
+    if ((host === row.host || host.endsWith(`.${row.host}`)) && row.host.length > (best?.host.length ?? -1)) {
+      best = row
+    }
+  }
+  return best
+}
+
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Every §13 host, and every host beneath one, as a pattern for finding them in text — a
+ * built asset, a served page. Global, so a caller collects every match; attribute each
+ * match to its row with `forbiddenRowFor`.
+ *
+ * Bounded on both sides by a character that cannot continue a hostname, which is the
+ * label-boundary rule `forbiddenRowFor` states, applied to free text: a forbidden host with
+ * letters glued to its front is somebody else's domain.
+ */
+export function forbiddenHostPattern(forbidden) {
+  if (!forbidden?.length) throw new Error('no §13 hosts to build a pattern from')
+  const hosts = forbidden.map((r) => r.host).sort((a, b) => b.length - a.length)
+  return new RegExp(
+    `(?<![a-z0-9-])(?:[a-z0-9-]+\\.)*(?:${hosts.map(escapeRegExp).join('|')})(?![a-z0-9-])`,
+    'gi'
+  )
 }
 
 /** The §12 row a URL falls under on one side, or `null`. */
@@ -250,15 +280,18 @@ export function hostOfCspSource(token) {
   return host || null
 }
 
-/** Human-readable lines for a set of findings. Never prints anything but URLs. */
+/** One finding, as a sentence. Never prints anything but URLs. */
+export function describeEgressFinding(f, side) {
+  const what =
+    f.code === 'forbidden-origin'
+      ? `forbidden by §13 (${f.rule})`
+      : f.code === 'unapproved-origin'
+        ? `not approved by §12 for the ${side} side`
+        : 'not a URL the parser accepts'
+  return `${f.origin} — ${what}; ${f.count} request(s), e.g. ${f.example}`
+}
+
+/** Human-readable lines for a set of findings, one per finding, indented for a report. */
 export function formatEgressFindings(findings, side) {
-  return findings.map((f) => {
-    const what =
-      f.code === 'forbidden-origin'
-        ? `forbidden by §13 (${f.rule})`
-        : f.code === 'unapproved-origin'
-          ? `not approved by §12 for the ${side} side`
-          : 'not a URL the parser accepts'
-    return `  ${f.origin} — ${what}; ${f.count} request(s), e.g. ${f.example}`
-  })
+  return findings.map((f) => `  ${describeEgressFinding(f, side)}`)
 }

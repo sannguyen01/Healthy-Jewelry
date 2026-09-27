@@ -6,6 +6,8 @@ const ROOT = path.resolve(import.meta.dirname, '../../..')
 
 const {
   compileOriginPattern,
+  describeEgressFinding,
+  forbiddenHostPattern,
   forbiddenRowFor,
   formatEgressFindings,
   hostOfCspSource,
@@ -228,6 +230,39 @@ describe('forbiddenRowFor', () => {
     expect(forbiddenRowFor('site.test', policy.forbidden)).toBeNull()
     expect(forbiddenRowFor('mycheckout.site.test', policy.forbidden)).toBeNull()
     expect(forbiddenRowFor('', policy.forbidden)).toBeNull()
+  })
+
+  it('names the most specific row, whichever order the table lists them in', () => {
+    const apexFirst = [{ host: 'pay.test' }, { host: 'js.pay.test' }]
+    const apexLast = [...apexFirst].reverse()
+    for (const rows of [apexFirst, apexLast]) {
+      expect(forbiddenRowFor('js.pay.test', rows)?.host).toBe('js.pay.test')
+      expect(forbiddenRowFor('cdn.js.pay.test', rows)?.host).toBe('js.pay.test')
+      expect(forbiddenRowFor('api.pay.test', rows)?.host).toBe('pay.test')
+    }
+  })
+})
+
+describe('forbiddenHostPattern', () => {
+  const find = (text: string) => text.match(forbiddenHostPattern([{ host: 'pay.test' }, { host: 'js.pay.test' }])) ?? []
+
+  it('finds a forbidden host and every host beneath it in free text', () => {
+    expect(find('<script src="https://js.pay.test/v3"></script> and cdn.pay.test')).toEqual(['js.pay.test', 'cdn.pay.test'])
+  })
+
+  it('refuses a lookalike glued to the front, on the same boundary forbiddenRowFor keeps', () => {
+    expect(find('evilpay.test my-pay.test pay.tester')).toEqual([])
+  })
+
+  it('refuses to build a pattern from nothing, which would match nothing', () => {
+    expect(() => forbiddenHostPattern([])).toThrow(/no §13 hosts/)
+  })
+})
+
+describe('describeEgressFinding', () => {
+  it('is the report line without its indent, so a caller never pairs lines by index', () => {
+    const f = { code: 'unapproved-origin', origin: 'https://x.example', count: 2, example: 'https://x.example/a' }
+    expect(formatEgressFindings([f], 'browser')).toEqual([`  ${describeEgressFinding(f, 'browser')}`])
   })
 })
 

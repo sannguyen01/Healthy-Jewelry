@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { parseContract } from '../../scripts/lib/commerce-contract.mjs'
 import { parseEgress } from '../../scripts/lib/egress.mjs'
+import type { ForbiddenRouteRow } from './routeMatrix'
 
 /**
  * **`COMMERCE-ELIMINATION-CONTRACT.md`, as the E2E suite reads it.**
@@ -22,12 +23,7 @@ const text = readFileSync(CONTRACT_PATH, 'utf8')
 const parsed = parseContract(text)
 
 /** §7, one row per retired route family. */
-export const forbiddenRoutes = parsed.routesForbidden as ReadonlyArray<{
-  route: string
-  status: number
-  location: string | null
-  why: string
-}>
+export const forbiddenRoutes = parsed.routesForbidden as ReadonlyArray<ForbiddenRouteRow>
 
 /** §6, one row per route the site serves. */
 export const approvedRoutes = parsed.routesApproved as ReadonlyArray<{

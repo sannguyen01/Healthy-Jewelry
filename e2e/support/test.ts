@@ -1,5 +1,5 @@
 import { test as base, expect } from '@playwright/test'
-import { formatEgressFindings, judgeEgress } from '../../scripts/lib/egress.mjs'
+import { describeEgressFinding, judgeEgress } from '../../scripts/lib/egress.mjs'
 import { egressPolicy } from './contract'
 
 export { expect }
@@ -86,8 +86,7 @@ export class Boundary {
       forbidden: egressPolicy.forbidden,
       side: 'browser',
     }) as { code: BoundaryKind }[]
-    const lines = formatEgressFindings(egress, 'browser') as string[]
-    const out: BoundaryFinding[] = egress.map((f, i) => ({ kind: f.code, detail: lines[i].trim() }))
+    const out: BoundaryFinding[] = egress.map((f) => ({ kind: f.code, detail: describeEgressFinding(f, 'browser') }))
 
     const seen = new Set<string>()
     for (const v of this.violations) {
@@ -123,36 +122,39 @@ export const test = base.extend<{ boundary: Boundary }>({
       })
       // The binding survives navigation; `window.__cspViolations` does not. Both are kept:
       // the binding is what reaches teardown, and the array is what a person debugging a
-      // page in the inspector can read.
-      await context.exposeBinding('__hjReportCspViolation', (_source, v: CspViolation) => {
-        boundary.violations.push(v)
-      })
-      await context.addInitScript(() => {
-        window.__cspViolations = []
-        document.addEventListener(
-          'securitypolicyviolation',
-          (e) => {
-            const v = {
-              directive: e.effectiveDirective || e.violatedDirective,
-              blockedURI: e.blockedURI,
-              sourceFile: e.sourceFile,
-              line: e.lineNumber,
-            }
-            window.__cspViolations?.push(v)
-            void window.__hjReportCspViolation?.(v)
-          },
-          true
-        )
-      })
+      // page in the inspector can read. Installed together: the init script looks the
+      // binding up only when an event fires, so neither waits on the other.
+      await Promise.all([
+        context.exposeBinding('__hjReportCspViolation', (_source, v: CspViolation) => {
+          boundary.violations.push(v)
+        }),
+        context.addInitScript(() => {
+          window.__cspViolations = []
+          document.addEventListener(
+            'securitypolicyviolation',
+            (e) => {
+              const v = {
+                directive: e.effectiveDirective || e.violatedDirective,
+                blockedURI: e.blockedURI,
+                sourceFile: e.sourceFile,
+                line: e.lineNumber,
+              }
+              window.__cspViolations?.push(v)
+              void window.__hjReportCspViolation?.(v)
+            },
+            true
+          )
+        }),
+      ])
 
       await use(boundary)
 
       // Late events: a violation raised just before the test body returned may still be in
       // flight through the binding, so each open page's own list is read and merged too.
-      for (const page of context.pages()) {
-        const pending = await page.evaluate(() => window.__cspViolations ?? []).catch(() => [])
-        boundary.violations.push(...pending)
-      }
+      const pending = await Promise.all(
+        context.pages().map((page) => page.evaluate(() => window.__cspViolations ?? []).catch(() => []))
+      )
+      boundary.violations.push(...pending.flat())
 
       const { unexpected, missing } = boundary.verdict()
       if (unexpected.length === 0 && missing.length === 0) return

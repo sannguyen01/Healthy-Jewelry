@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 
 const {
   classifyDiscrepancy,
@@ -8,12 +10,20 @@ const {
   probePaths,
   renderSummary,
   requestShowsCommerce,
-  RETIRED_PATHS,
+  retiredPaths,
   UNKNOWN_PRODUCT_PATH,
   MAX_REDIRECTS,
 } = await import('../../../scripts/lib/live-surface.mjs')
 const { fetchChain, firstHandle } = await import('../../../scripts/probe-live-surface.mjs')
-const { VENDOR_DOMAINS } = await import('../../../scripts/lib/browse-only.mjs')
+const { FORBIDDEN_HOST_PATTERN, UNKNOWN_HANDLE, VENDOR_DOMAINS } = await import('../../../scripts/lib/browse-only.mjs')
+const { parseContract } = await import('../../../scripts/lib/commerce-contract.mjs')
+const { forbiddenHostPattern, parseEgress } = await import('../../../scripts/lib/egress.mjs')
+
+/** The real contract, as the probe reads it: §7 for the paths, §13 for the hosts. */
+const CONTRACT = readFileSync(path.resolve(import.meta.dirname, '../../../COMMERCE-ELIMINATION-CONTRACT.md'), 'utf8')
+const ROUTES_FORBIDDEN: { route: string }[] = parseContract(CONTRACT).routesForbidden
+const FORBIDDEN = parseEgress(CONTRACT).forbidden as { host: string }[]
+const HOSTS = forbiddenHostPattern(FORBIDDEN)
 
 /**
  * **Where in the chain commerce appears, pointed at known answers.**
@@ -32,19 +42,34 @@ describe('detectBody — the detectors, on the historical defect and on clean pa
     ['1.450.000₫', html('<p>Arc Band</p><p>1.450.000₫</p>')],
     ['Dome Ring · 112.00 — the live defect STATE.md records', html('<h3>Dome Ring</h3> · <span>112.00</span>')],
   ])('sees a visible price: %s', (_label, body) => {
-    const result = detectBody(body)
+    const result = detectBody(body, HOSTS)
     expect(result.visiblePrice.length).toBeGreaterThan(0)
     expect(result.commerce).toBe(true)
   })
 
   it('sees an Offer in JSON-LD', () => {
-    const result = detectBody(html('<script type="application/ld+json">{"@type":"Offer","price":"1"}</script>'))
+    const result = detectBody(html('<script type="application/ld+json">{"@type":"Offer","price":"1"}</script>'), HOSTS)
     expect(result.jsonLd).toEqual(expect.arrayContaining(['offer-jsonld', 'price-jsonld']))
     expect(result.commerce).toBe(true)
   })
 
+  it('sees a §13 host the vendor-only pattern it replaced was blind to', () => {
+    // The probe once matched four vendor domains while §13 forbids payment, wallet and tax
+    // hosts too; a live page loading one of those read as `clean`.
+    const unseen = FORBIDDEN.find((r) => !new RegExp(FORBIDDEN_HOST_PATTERN.source, 'i').test(r.host))
+    expect(unseen, '§13 has no host outside the vendor pattern, so this case proves nothing').toBeDefined()
+    const result = detectBody(html(`<script src="https://${unseen!.host}/v3"></script>`), HOSTS)
+    expect(result.vendorHosts).toEqual([unseen!.host])
+    expect(result.commerce).toBe(true)
+  })
+
+  it('refuses to run without the §13 pattern, rather than seeing no host at all', () => {
+    expect(() => detectBody(html('<p>x</p>'), undefined as unknown as RegExp)).toThrow(/§13 host pattern/)
+    expect(() => detectBody(html('<p>x</p>'), /x/)).toThrow(/§13 host pattern/)
+  })
+
   it('sees the vendor host', () => {
-    const result = detectBody(html(`<img src="https://cdn.${VENDOR_DOMAINS[1]}/s/x.jpg">`))
+    const result = detectBody(html(`<img src="https://cdn.${VENDOR_DOMAINS[1]}/s/x.jpg">`), HOSTS)
     expect(result.vendorHosts).toEqual([`cdn.${VENDOR_DOMAINS[1]}`])
     expect(result.commerce).toBe(true)
   })
@@ -56,11 +81,11 @@ describe('detectBody — the detectors, on the historical defect and on clean pa
     ['a form posting to a cart', '<form action="/cart/add" method="post"></form>'],
     ['the removed test id', '<div data-testid="add-to-bag"></div>'],
   ])('sees a purchase control: %s', (_label, inner) => {
-    expect(detectBody(html(inner)).purchaseControls.length).toBeGreaterThan(0)
+    expect(detectBody(html(inner), HOSTS).purchaseControls.length).toBeGreaterThan(0)
   })
 
   it('does not call prose about the absence of a checkout a control', () => {
-    const result = detectBody(html('<p>There is no checkout on this site. Ask an ambassador.</p>'))
+    const result = detectBody(html('<p>There is no checkout on this site. Ask an ambassador.</p>'), HOSTS)
     expect(result.purchaseControls).toEqual([])
     expect(result.commerce).toBe(false)
   })
@@ -68,13 +93,13 @@ describe('detectBody — the detectors, on the historical defect and on clean pa
   it('records purchase-era copy as an observation that never makes a page commerce', () => {
     // Present in source today pending legal review; a failure here would be red on text
     // nobody in CI may change.
-    const result = detectBody(html('<p>Free shipping worldwide. 30-day returns and a full refund. Dispatched in a day. Lifetime warranty.</p>'))
+    const result = detectBody(html('<p>Free shipping worldwide. 30-day returns and a full refund. Dispatched in a day. Lifetime warranty.</p>'), HOSTS)
     expect(result.purchaseEraCopy).toEqual(['free-shipping', 'returns', 'refund', 'dispatch', 'warranty'])
     expect(result.commerce).toBe(false)
   })
 
   it('is clean on a clean page', () => {
-    const result = detectBody(html('<h1>Grade 23 titanium</h1><p>Ti-6Al-4V ELI, 1.60 mm band.</p>'))
+    const result = detectBody(html('<h1>Grade 23 titanium</h1><p>Ti-6Al-4V ELI, 1.60 mm band.</p>'), HOSTS)
     expect(result).toMatchObject({ visiblePrice: [], jsonLd: [], vendorHosts: [], purchaseControls: [], commerce: false })
   })
 })
@@ -193,11 +218,21 @@ describe("classifyDiscrepancy — the owner's four rules", () => {
 })
 
 describe('what is asked, and how far a redirect is followed', () => {
-  it('probes the public pages, one real product, the unknown product and every retired path', () => {
-    const paths = probePaths('arc-band-titanium').map((p: { path: string }) => p.path)
+  it('probes the public pages, one real product, the unknown product and one path per §7 row', () => {
+    const paths = probePaths('arc-band-titanium', ROUTES_FORBIDDEN).map((p: { path: string }) => p.path)
     expect(paths.slice(0, 5)).toEqual(['/', '/shop', '/materials', '/products/arc-band-titanium', UNKNOWN_PRODUCT_PATH])
-    expect(paths.slice(5)).toEqual([...RETIRED_PATHS])
-    expect(RETIRED_PATHS).toHaveLength(8)
+    expect(paths.slice(5)).toEqual(retiredPaths(ROUTES_FORBIDDEN))
+    expect(paths.slice(5)).toHaveLength(ROUTES_FORBIDDEN.length)
+    expect(UNKNOWN_PRODUCT_PATH).toBe(`/products/${UNKNOWN_HANDLE}`)
+  })
+
+  it('probes a §7 route as written, and a family by one path beneath it', () => {
+    expect(retiredPaths([{ route: '/cart' }, { route: '/cart/:path*' }, { route: '/api/auth/login' }])).toEqual([
+      '/cart',
+      '/cart/test',
+      '/api/auth/login',
+    ])
+    expect(() => retiredPaths([])).toThrow(/§7 retires no route/)
   })
 
   it('reads the first catalogue handle from the product filenames', () => {

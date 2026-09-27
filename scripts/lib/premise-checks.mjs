@@ -208,6 +208,9 @@ export function checkoutHostPremise({ host, cname, control }) {
   }
 }
 
+/** Asked, answered, and not holding. An unevaluable premise has not drifted; it is unknown. */
+const isDrifted = (p) => p.evaluable !== false && !p.holds
+
 /**
  * What `premise-drift.json` should contain, or `null` when it must not be written.
  *
@@ -228,7 +231,7 @@ export function checkoutHostPremise({ host, cname, control }) {
  * @returns {Premise[] | null}
  */
 export function driftFileContent(premises) {
-  const drifted = premises.filter((p) => p.evaluable !== false && !p.holds)
+  const drifted = premises.filter(isDrifted)
   if (drifted.length > 0) return drifted
   if (premises.some((p) => p.evaluable === false)) return null
   return []
@@ -240,7 +243,7 @@ export function driftFileContent(premises) {
  * @param {Premise[]} premises
  */
 export function formatPremises(premises) {
-  const drifted = premises.filter((p) => p.evaluable !== false && !p.holds)
+  const drifted = premises.filter(isDrifted)
   const unevaluable = premises.filter((p) => p.evaluable === false)
   const mark = (p) => (p.evaluable === false ? '?' : p.holds ? '·' : '!')
   const lines = premises.map((p) => `${mark(p)} ${p.id} — ${p.detail}`)

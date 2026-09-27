@@ -49,6 +49,8 @@ import { pathToFileURL } from 'node:url'
 
 import { isAttributable } from './lib/browse-only.mjs'
 import { apexHostFromSiteConfig } from './lib/canonical-domain.mjs'
+import { parseContract } from './lib/commerce-contract.mjs'
+import { forbiddenHostPattern, parseEgress } from './lib/egress.mjs'
 import {
   classifyDiscrepancy,
   detectBody,
@@ -169,7 +171,11 @@ async function main() {
     }
   }
 
-  const paths = probePaths(firstHandle())
+  // §7 and §13 from the one parse the merge gate uses: the routes this site retired and the
+  // hosts it may never load are the contract's answer, not this probe's.
+  const contractText = fs.readFileSync(path.join(ROOT, 'COMMERCE-ELIMINATION-CONTRACT.md'), 'utf8')
+  const paths = probePaths(firstHandle(), parseContract(contractText).routesForbidden)
+  const forbiddenHosts = forbiddenHostPattern(parseEgress(contractText).forbidden)
   const requests = []
   const hosts = []
   /** @type {Record<string, string[]>} */
@@ -217,14 +223,14 @@ async function main() {
           bytes: answer.body?.length ?? 0,
           commit: identity.commit,
           attributable,
-          detectors: attributable ? detectBody(answer.body) : null,
+          detectors: attributable ? detectBody(answer.body, forbiddenHosts) : null,
           detail: answer.detail ?? null,
         }
         requests.push(record)
 
         // A host that cannot be reached, or that answers with a deployment-protection 401,
-        // will answer the other twenty-five requests the same way. Recorded once, then skipped,
-        // so a dead host costs one timeout rather than twenty-six.
+        // will answer every other request the same way. Recorded once, then skipped, so a dead
+        // host costs one timeout rather than one per path per pass.
         if (!attributable) {
           dead = true
           continue

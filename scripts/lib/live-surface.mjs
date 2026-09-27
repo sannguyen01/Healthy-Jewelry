@@ -22,52 +22,50 @@
 // so each rule is reachable from a fixture rather than from whatever production happens to be
 // doing on the day (ADR 024, ADR 030).
 //
-// The vendor's hostnames and the structural commerce markers are imported from
-// `browse-only.mjs` rather than restated: that file is the contract's `negative-control` for
-// exactly those names, and a second copy here would be a second list to drift.
+// Nothing here keeps its own list. The retired routes are contract §7 and the forbidden hosts
+// are §13, both handed in by the probe from the one parse the merge gate uses; the structural
+// commerce markers and the price detector are `browse-only.mjs`'s. A hand-kept copy of §7 here
+// had already lost the retired API endpoints and the pre-repositioning categories, and a
+// four-domain host pattern could not see a payment host at all.
 
-import {
-  COMMERCE_MARKERS,
-  FORBIDDEN_HOST_PATTERN,
-  detectVisiblePrice,
-  sameSite,
-  visibleText,
-} from './browse-only.mjs'
+import { COMMERCE_MARKERS, UNKNOWN_HANDLE, detectVisiblePrice, sameSite, visibleText } from './browse-only.mjs'
+import { wildcardPrefix } from './commerce-contract.mjs'
 
-/** A handle no catalogue will ever hold; must answer 404. Same value `verify-browse-only.mjs` uses. */
-export const UNKNOWN_PRODUCT_PATH = '/products/this-product-does-not-exist-hj-probe'
+/** A product no catalogue will ever hold; must answer 404. */
+export const UNKNOWN_PRODUCT_PATH = `/products/${UNKNOWN_HANDLE}`
 
 /**
- * Commerce-era URLs. Any of them answering 2xx is commerce resurrected; a 3xx, 404 or 410 is
- * the retirement working. The *expected* status of each is the contract's §7 and is asserted
- * over real HTTP by `e2e/retired-routes.spec.ts` — not restated here, because this probe asks a
- * different question: not "is the status exactly right" but "is anything live behind it".
+ * Commerce-era URLs to probe, one per contract §7 row: the route itself, or one path beneath
+ * a `:path*` family. Any of them answering 2xx is commerce resurrected; a 3xx, 404 or 410 is
+ * the retirement working. The *expected* status of each is asserted over real HTTP by
+ * `e2e/retired-routes.spec.ts` — not here, because this probe asks a different question: not
+ * "is the status exactly right" but "is anything live behind it".
+ *
+ * @param {ReadonlyArray<{ route: string }>} routesForbidden `parseContract(...).routesForbidden`
  */
-export const RETIRED_PATHS = /** @type {const} */ ([
-  '/checkout',
-  '/checkouts/test',
-  '/orders/test',
-  '/discount/test',
-  '/cart',
-  '/account',
-  '/collections/test',
-  '/policies/privacy-policy',
-])
+export function retiredPaths(routesForbidden) {
+  if (!routesForbidden?.length) throw new Error('§7 retires no route, so there is nothing to probe')
+  return routesForbidden.map(({ route }) => {
+    const prefix = wildcardPrefix(route)
+    return prefix === null ? route : `${prefix}/test`
+  })
+}
 
 /**
  * Every path to probe, in order.
  *
  * @param {string | null} firstHandle the first product handle in the catalogue, or null
+ * @param {ReadonlyArray<{ route: string }>} routesForbidden contract §7
  * @returns {Array<{ path: string, kind: 'public' | 'unknown' | 'retired' }>}
  */
-export function probePaths(firstHandle) {
+export function probePaths(firstHandle, routesForbidden) {
   return [
     { path: '/', kind: 'public' },
     { path: '/shop', kind: 'public' },
     { path: '/materials', kind: 'public' },
     ...(firstHandle ? [{ path: `/products/${firstHandle}`, kind: 'public' }] : []),
     { path: UNKNOWN_PRODUCT_PATH, kind: 'unknown' },
-    ...RETIRED_PATHS.map((path) => ({ path, kind: 'retired' })),
+    ...retiredPaths(routesForbidden).map((path) => ({ path, kind: 'retired' })),
   ]
 }
 
@@ -170,15 +168,20 @@ const PURCHASE_CONTROLS = [
  * Everything the detectors say about one body.
  *
  * `commerce` is true only for the blocking detectors — a visible price, a JSON-LD offer, a
- * vendor host, a purchase control. The purchase-era lexicon never sets it.
+ * forbidden host, a purchase control. The purchase-era lexicon never sets it.
  *
  * @param {string} body
+ * @param {RegExp} forbiddenHosts every §13 host, as `egress.mjs`'s `forbiddenHostPattern` builds
+ *   it — the payment and wallet hosts as well as the vendor's own
  */
-export function detectBody(body) {
+export function detectBody(body, forbiddenHosts) {
+  if (!(forbiddenHosts instanceof RegExp) || !forbiddenHosts.global) {
+    throw new Error('detectBody needs the §13 host pattern (global), or it can see no host at all')
+  }
   const text = String(body ?? '')
   const visiblePrice = detectVisiblePrice(text)
   const jsonLd = COMMERCE_MARKERS.filter((m) => m.id.endsWith('-jsonld') && m.pattern.test(text)).map((m) => m.id)
-  const vendorHosts = [...new Set(text.match(new RegExp(FORBIDDEN_HOST_PATTERN.source, 'gi')) ?? [])].sort()
+  const vendorHosts = [...new Set((text.match(forbiddenHosts) ?? []).map((h) => h.toLowerCase()))].sort()
   const purchaseControls = PURCHASE_CONTROLS.filter((c) => c.pattern.test(text)).map((c) => c.id)
   const readable = visibleText(text)
   const purchaseEraCopy = PURCHASE_ERA_LEXICON.filter((t) => t.pattern.test(readable)).map((t) => t.id)

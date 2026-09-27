@@ -25,6 +25,8 @@
  * the same parser the merge-gate scanner uses.
  */
 
+import { wildcardPrefix as contractWildcardPrefix } from '../../scripts/lib/commerce-contract.mjs'
+
 /** One §7 row, as `parseContract(...).routesForbidden` yields it. */
 export interface ForbiddenRouteRow {
   route: string
@@ -82,12 +84,8 @@ export const QUERY_VARIANTS = ['?discount=CODE', '?utm_source=x'] as const
  */
 export const GONE_CACHE_CONTROL = 'public, max-age=3600'
 
-const WILDCARD = /\/:[A-Za-z_][A-Za-z0-9_]*\*$/
-
-/** The static prefix of a `:path*` family, or `null` for an exact route. */
-export function wildcardPrefix(route: string): string | null {
-  return WILDCARD.test(route) ? route.replace(WILDCARD, '') : null
-}
+/** The static prefix of a `:path*` family, or `null` for an exact route. Shared with the live probe. */
+export const wildcardPrefix: (route: string) => string | null = contractWildcardPrefix
 
 /**
  * The §7 row that governs a concrete path, the way Next's matcher would pick it.
