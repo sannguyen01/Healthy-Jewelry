@@ -96,9 +96,10 @@ export function findClaimTerms(text: string, allowed: readonly string[] = []): L
 
   const hits: LexiconHit[] = []
   for (const term of CLAIM_LEXICON) {
-    const global = new RegExp(term.pattern.source, term.pattern.flags.includes('g') ? term.pattern.flags : `${term.pattern.flags}g`)
+    // `matchAll` demands the global flag. A Set, because `new RegExp(src, 'gig')` throws.
+    const global = new RegExp(term.pattern.source, [...new Set(`${term.pattern.flags}g`)].join(''))
     for (const m of remaining.matchAll(global)) {
-      const at = m.index ?? 0
+      const at = m.index
       hits.push({
         term: term.id,
         match: m[0],
