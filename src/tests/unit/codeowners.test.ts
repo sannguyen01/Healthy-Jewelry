@@ -26,9 +26,8 @@ const ROOT = resolve(__dirname, '../../..')
  * delete the entry here — the rule in CODEOWNERS stays.
  */
 const PENDING: Record<string, string> = {
-  // The claims registry (S11) is created by the content workstream's branch (WS-B). CODEOWNERS
-  // names it so the boundary is owned from the first commit that adds a claim.
-  '/src/content/claims/': 'created by WS-B (claims registry) on a sibling branch',
+  // Empty since 2026-09-26: `/src/content/claims/` was listed here while the claims registry
+  // lived on WS-B's branch, and left the day that branch merged — the assertion below said so.
 }
 
 /** The boundary-defining paths the decommission plan names. Pinned, so none can drop out. */

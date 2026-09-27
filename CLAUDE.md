@@ -6,6 +6,15 @@ Healthy Jewelry is a premium titanium and non-corrosion metal jewelry brand. Imp
 **Positioning**: *Metal that works with your body.*
 No stones. No gemstones. No healing crystals. No chakras. Pure material science.
 
+**These lines are the brand's intent, not publishable copy.** "Implant-grade", "biocompatible",
+"for people with metal sensitivities" and the positioning line itself are *claims*, and since
+2026-09-25 (the owner's "enforce now" decision) a claim renders only when a named reviewer has
+approved it against a document that covers the piece. Each is a pending record in
+`src/content/claims/`; until it is approved the site renders the record's neutral fallback, and
+`src/tests/unit/claim-lexicon.test.tsx` fails on the wording anywhere else in rendered copy. Write
+the specification ("Grade 23 titanium, Ti-6Al-4V ELI") and route anything more through
+`claimText()` in `src/lib/catalog/claims.ts`.
+
 Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 
 ## Tech Stack

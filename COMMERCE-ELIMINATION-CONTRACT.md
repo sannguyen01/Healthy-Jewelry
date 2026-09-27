@@ -46,8 +46,13 @@ Five things, and it is measured against them:
 
 1. **Explain the materials accurately.** Grade 23 titanium, anodized niobium, 316L surgical
    steel — and only where the claim has supporting documentation behind it.
-2. **Present the geometric collection language.** Arc, Halo, Orbit, Facet, Disc, Bar, Cuff,
-   Split, Hoop.
+2. **Classify pieces by a geometric design taxonomy.** Nine forms — Arc, Halo, Orbit, Facet,
+   Disc, Bar, Cuff, Split, Hoop — classify pieces; they do not name them. A form is assigned to a
+   piece by a person and recorded on its catalogue record as `{ state: 'assigned', value }`; it is
+   never inferred from a title, and until it is assigned the record says `unassigned`. No product
+   is renamed to fit the taxonomy (owner's decision, 2026-09-25). Held by `FORMS` in
+   `src/lib/catalog/schema.ts` and by `unassignedFormCount()`, pinned with equality in
+   `catalog-content.test.ts`.
 3. **Carry the travel-memory story** and show where an ambassador encounter continues.
 4. **Offer low-pressure, non-commerce contact paths.** Social profiles, the approved inquiry
    route, ambassador follow-up, location and event information where it exists.
@@ -165,7 +170,7 @@ rather than the reverse.
 | `src/tests/unit/commerce-contract.test.ts` | negative-control | Its tests, including the mutations that prove it can fail. | admin-api-path cart-mutation checkout-handoff customer-identity discount-machinery draft-order graphql-endpoint inventory-check payment-provider shopify-env shopify-host shopify-name storefront-token-header |
 | `src/tests/unit/commerce-route-inventory.test.ts` | negative-control | Reconciles §6 and §7 against the filesystem, `next.config.ts` and the E2E spec. It has to name the one handler excluded from the public inventory in order to justify the exclusion. | shopify-name |
 | `src/tests/unit/browse-only-copy.test.tsx` | negative-control | Forbids payment-method copy by naming the methods. | payment-provider |
-| `src/tests/unit/catalog-content.test.ts` | negative-control | Forbids commerce fields in catalogue JSON by naming them. | checkout-handoff inventory-check shopify-name |
+| `src/tests/unit/catalog-content.test.ts` | negative-control | Forbids commerce fields in catalogue JSON. Since 2026-09-26 it reads that list from §8 rather than restating it, so it names only the vendor. | shopify-name |
 | `src/tests/unit/price-absence-contract.test.tsx` | negative-control | Forbids currency symbols by listing them. | — |
 | `scripts/lib/browse-only.mjs` | negative-control | The live probe that reports `shopify-host-referenced`. It must name the host it looks for, and since 2026-09-26 it is also the one list of vendor domains (`VENDOR_DOMAINS`) the checkout-host premise and the live-surface probe import rather than restate. | shopify-host shopify-name |
 | `src/tests/unit/browse-only-smoke.test.ts` | negative-control | Drives that probe against fixtures where the host is present and absent. | shopify-host shopify-name |
@@ -424,7 +429,7 @@ check beside it — not inferred from a successful deploy.
 | 5 | The scanner reports zero blocking findings with an empty register | `pnpm verify:commerce-contract` |
 | 6 | No commerce package is declared or locked | `auditPackages` |
 | 7 | No commerce environment variable or CI secret remains | `pnpm audit:secrets`; `vercel env ls` |
-| 8 | Material claims render only against referenced evidence | content-schema validation |
+| 8 | Material claims render only against referenced evidence | `claims-registry.test.ts` (a claim resolves to its wording only when approved, current and evidenced) and `claim-lexicon.test.tsx` (nothing renders outside approved wording) |
 | 9 | Every form and analytics event reaches only an approved Company-controlled system | privacy owner's sign-off, recorded |
 | 10 | Historical record retention, retrieval ownership and account closure are documented and approved | `docs/shopify-decommission-inventory.md`, every row dated with evidence |
 
