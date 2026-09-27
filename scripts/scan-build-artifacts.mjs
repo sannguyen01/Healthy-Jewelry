@@ -87,7 +87,9 @@ export function collectAssets(root, dirs = ['.next', 'public']) {
       }
       if (entry.isDirectory()) {
         const probe = classifyArtifact(`${child}/`)
-        // Skip a whole directory in one step when the classifier would skip its contents.
+        // Skip a whole directory in one step when the classifier would skip its contents. An
+        // unrecognised directory is still walked: a `.map` or `.nft.json` inside one classifies
+        // as a sourcemap or a trace on its own, and those are judged wherever they land.
         if ('skip' in probe && probe.skip !== 'not a directory this scanner knows how to judge') {
           const size = dirSize(path.join(root, child))
           skipped[probe.skip] ??= { files: 0, bytes: 0 }
@@ -99,11 +101,12 @@ export function collectAssets(root, dirs = ['.next', 'public']) {
         continue
       }
       const kind = classifyArtifact(child)
-      const buf = readFileSync(path.join(root, child))
       if ('skip' in kind) {
-        skip(kind.skip, buf.length)
+        // Sized, not read: a skipped file is counted in the report and judged by nothing.
+        skip(kind.skip, lstatSync(path.join(root, child)).size)
         continue
       }
+      const buf = readFileSync(path.join(root, child))
       if (buf.includes(0)) {
         skip('binary — fonts, images, wasm', buf.length)
         continue

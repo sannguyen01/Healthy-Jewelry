@@ -85,7 +85,9 @@ export function ProductDetail({ product }: ProductDetailProps) {
       {/* Columns and gap live in globals.css. They were inline here with a
           `<style>` tag overriding them at 768px — the `!important` existed only
           because an inline value cannot otherwise lose to a media query. */}
-      <ProductViewTracker product={product} />
+      <ProductViewTracker
+        product={{ handle: product.handle, collection: product.collection, material: product.material }}
+      />
       <div className="hj-detail-grid">
         {/* Left — photograph, gallery, or illustration */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

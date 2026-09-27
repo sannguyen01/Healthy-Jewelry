@@ -360,4 +360,18 @@ export function productMaterialNotes(product: CatalogProduct): {
   }
 }
 
+/**
+ * The chips a metal shows: its specification properties, then each of its claims that is
+ * approved for that metal at render time. One rule for the two surfaces that render
+ * `hjMaterials` — the homepage section and `/materials` — so they cannot disagree about
+ * the same metal.
+ */
+export function materialChips(material: {
+  handle: string
+  properties: readonly string[]
+  claims: readonly string[]
+}): string[] {
+  return [...material.properties, ...approvedClaimTexts(asClaimIds(material.claims), materialContext(material.handle))]
+}
+
 export type { CatalogProduct, CatalogCollection, CollectionHandle, ClaimId, ClaimContext }

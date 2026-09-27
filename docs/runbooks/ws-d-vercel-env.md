@@ -28,17 +28,25 @@ in the table below.
 Remove, in every environment that lists them — inventory first rather than trusting this list:
 
 ```
-NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN   SHOPIFY_STORE_DOMAIN
-SHOPIFY_STOREFRONT_ACCESS_TOKEN    SHOPIFY_ADMIN_ACCESS_TOKEN
-SHOPIFY_REVALIDATION_SECRET        SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID
-SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET
+SHOPIFY_STORE_DOMAIN               SHOPIFY_STOREFRONT_ACCESS_TOKEN
+SHOPIFY_ADMIN_ACCESS_TOKEN         SHOPIFY_REVALIDATION_SECRET
+SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_SECRET
 SHOPIFY_CUSTOMER_ACCOUNT_SESSION_SECRET
 ```
 
-**`SHOPIFY_WEBHOOK_SECRET` is last and is not in that list.** It goes only after WS-F has
-deleted the webhook subscriptions in Shopify and the route has been removed — the register's
-ordering constraint. Removing it first leaves Shopify retrying signed deliveries at a route
-that can no longer verify them.
+**Two variables are last, and neither is in that list:**
+
+- **`SHOPIFY_WEBHOOK_SECRET`** — the route's signature check. Removed first, Shopify keeps
+  retrying signed deliveries at a route that can no longer verify them.
+- **`NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN`** — the route's *which shop* check. The route enforces it
+  only when it is set (so an unconfigured preview does not reject everything), which means
+  removing it does not break anything visibly: the check simply stops happening, and any
+  delivery signed with the secret is accepted whatever shop it names. A control that turns
+  itself off without a sound is the worst way for one to fail, so it stays exactly as long as
+  the secret does.
+
+Both go only after WS-F has deleted the webhook subscriptions in Shopify and the route has been
+removed — the register's ordering constraint. After that nothing reads either.
 
 **Keep** `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` and `RESEND_API_KEY` (and
 `RATE_LIMIT_KEY_SECRET` where it is set). `/api/contact` still consumes a paid service and
@@ -85,8 +93,8 @@ Filled in only when observed. Names, never values. An empty cell is the honest s
 | Step | Observed (in words) | Environments | Date | By |
 |---|---|---|---|---|
 | `vercel env ls` inventory recorded | | production · preview · development | | |
-| Eight commerce variables removed | | | | |
-| `SHOPIFY_WEBHOOK_SECRET` removed (after WS-F) | | | | |
+| The seven variables in the step 2 list removed | | | | |
+| `SHOPIFY_WEBHOOK_SECRET` and `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` removed (after WS-F) | | | | |
 | Upstash and Resend variables confirmed kept | | | | |
 | Cache-free production redeploy (deployment id) | | production | | |
 | `/api/version` `bundleIsStale: false` | | production | | |

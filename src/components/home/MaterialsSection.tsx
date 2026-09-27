@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import { hjMaterials } from '@/lib/data/hj-data'
-import { approvedClaimTexts, asClaimIds, materialContext } from '@/lib/catalog'
+import { materialChips } from '@/lib/catalog'
 
 const ordinals = ['01', '02', '03']
 
@@ -158,10 +158,7 @@ export function MaterialsSection() {
             {/* Pill badges: specification first, then any claim approved for this metal.
                 Today that second list is empty for all three — see hj-data.ts. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {[
-                ...material.properties,
-                ...approvedClaimTexts(asClaimIds(material.claims), materialContext(material.handle)),
-              ].map((prop) => (
+              {materialChips(material).map((prop) => (
                 <span
                   key={prop}
                   style={{

@@ -11,7 +11,7 @@ import { ProductDetail } from '@/components/product/ProductDetail'
 import { ProductCard } from '@/components/product/ProductCard'
 import { Footer } from '@/components/layout/Footer'
 import { productJsonLd, organizationJsonLd } from '@/components/seo/JsonLd'
-import HomePage, { metadata as homeMetadata } from '@/app/page'
+import HomePage, { generateMetadata as homeMetadata } from '@/app/page'
 import MaterialsPage, { metadata as materialsMetadata } from '@/app/materials/page'
 import FAQPage, { metadata as faqMetadata } from '@/app/faq/page'
 import AboutPage, { metadata as aboutMetadata } from '@/app/about/page'
@@ -351,7 +351,7 @@ describe('no rendered page makes a claim', () => {
 
   it.each([
     ['layout', layoutMetadata],
-    ['/', homeMetadata],
+    ['/', homeMetadata()],
     ['/materials', materialsMetadata],
     ['/faq', faqMetadata],
     ['/about', aboutMetadata],

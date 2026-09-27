@@ -18,8 +18,18 @@ import { track } from '@/lib/analytics'
  * Behaviour is unchanged: the same `product_viewed` event once per mount, the same picker.
  */
 
-/** Reports one `product_viewed` per mount. Renders nothing. */
-export function ProductViewTracker({ product }: { product: CatalogProduct }) {
+/**
+ * Reports one `product_viewed` per mount. Renders nothing.
+ *
+ * Takes the three fields the event carries, not the product: a server component's props to a
+ * client component are serialised into every visitor's page payload, and the whole record —
+ * sizes, media, care copy, the pending-field markers — would ride along to send one event.
+ */
+export function ProductViewTracker({
+  product,
+}: {
+  product: Pick<CatalogProduct, 'handle' | 'collection' | 'material'>
+}) {
   // The ref guards React's development double-invoke, which would otherwise double every
   // page-view number and teach everyone to halve it.
   const viewReported = useRef(false)

@@ -34,7 +34,12 @@ interface Section {
   items: QAItem[]
 }
 
-const sections: Section[] = [
+/**
+ * A function, not a constant: six answers resolve claims, and a claim is resolved at render
+ * time — an approval that lapses, or one whose date arrives, changes this page on the next
+ * render rather than on the next process start.
+ */
+const sections = (): Section[] => [
   {
     title: 'Materials',
     items: [
@@ -158,7 +163,7 @@ export default function FAQPage() {
             gap: '64px',
           }}
         >
-          {sections.map((section) => (
+          {sections().map((section) => (
             <div key={section.title}>
               <p
                 style={{

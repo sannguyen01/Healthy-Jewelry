@@ -113,6 +113,23 @@ describe('requestShowsCommerce', () => {
     expect(requestShowsCommerce({ kind: 'retired', status, detectors: { commerce: false } })).toBe(false)
   })
 
+  it('a retired path that redirects is judged by its own answer, not by where the redirect lands', async () => {
+    // The shape the probe records: `fetchChain` follows `/cart` -> 308 -> `/shop` and ends on
+    // `/shop`'s 200. Judged on that final status, eleven §7 rows read as live commerce on a
+    // healthy site and every audit blamed the deployed commit.
+    const fake = async (url: string) =>
+      new URL(url).pathname === '/cart'
+        ? new Response(null, { status: 308, headers: { location: '/shop' } })
+        : new Response(html('<h1>Shop</h1>'), { status: 200 })
+    const answer = await fetchChain(`https://${APEX}/cart`, fake)
+    expect(answer.chain.map((h: { status: number }) => h.status)).toEqual([308, 200])
+    expect(answer.transport).toBe('ok')
+    const record = { kind: 'retired', status: answer.status ?? 0, chain: answer.chain, detectors: detectBody(answer.body ?? '', HOSTS) }
+    expect(requestShowsCommerce(record)).toBe(false)
+
+    expect(requestShowsCommerce({ kind: 'retired', status: 200, chain: [{ status: 200 }], detectors: null })).toBe(true)
+  })
+
   it('a public page is commerce only when a blocking detector fired', () => {
     expect(requestShowsCommerce({ kind: 'public', status: 200, detectors: { commerce: true } })).toBe(true)
     expect(requestShowsCommerce({ kind: 'public', status: 200, detectors: null })).toBe(false)

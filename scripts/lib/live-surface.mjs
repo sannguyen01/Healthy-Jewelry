@@ -200,12 +200,16 @@ export function detectBody(body, forbiddenHosts) {
  * Whether one observed request is commerce, all things considered.
  *
  * A retired path answering 2xx is commerce by itself, whatever its body says: a cart URL that
- * serves a page is a cart URL that works.
+ * serves a page is a cart URL that works. **Its own answer** — the first hop — not the end of
+ * the chain: the probe follows same-site redirects, so `/cart` → 308 → `/shop` ends on
+ * `/shop`'s 200, and judging that would call eleven of §7's rows commerce on a healthy site.
+ * What `/shop` serves is `/shop`'s question, and the public probe of `/shop` asks it.
  *
- * @param {{ kind: string, status: number, detectors?: { commerce: boolean } | null }} request
+ * @param {{ kind: string, status: number, chain?: { status: number }[], detectors?: { commerce: boolean } | null }} request
  */
 export function requestShowsCommerce(request) {
-  if (request.kind === 'retired' && request.status >= 200 && request.status < 300) return true
+  const own = request.chain?.[0]?.status ?? request.status
+  if (request.kind === 'retired' && own >= 200 && own < 300) return true
   return request.detectors?.commerce === true
 }
 

@@ -32,17 +32,23 @@ import { dedupeInOrder, stripByMaterial } from '@/lib/utils/homepageStrips'
  */
 const SITE = { kind: 'site' } as const
 
-export const metadata: Metadata = {
-  title: SITE_DEFAULT_TITLE,
-  description:
-    'Jewelry in Grade 23 titanium, anodized niobium and 316L surgical steel — rings, necklaces, earrings, bracelets and charms, each named by its exact specification.',
-  openGraph: {
+/**
+ * A function rather than a constant because the share description resolves a claim, and a
+ * claim is resolved at render time: an exported `metadata` object is built once, at import.
+ */
+export function generateMetadata(): Metadata {
+  return {
     title: SITE_DEFAULT_TITLE,
-    description: `${claimText('brand-positioning', SITE)} No stones. No fillers. Pure material integrity.`,
-    siteName: 'Healthy Jewelry',
-    locale: 'en_US',
-    type: 'website',
-  },
+    description:
+      'Jewelry in Grade 23 titanium, anodized niobium and 316L surgical steel — rings, necklaces, earrings, bracelets and charms, each named by its exact specification.',
+    openGraph: {
+      title: SITE_DEFAULT_TITLE,
+      description: `${claimText('brand-positioning', SITE)} No stones. No fillers. Pure material integrity.`,
+      siteName: 'Healthy Jewelry',
+      locale: 'en_US',
+      type: 'website',
+    },
+  }
 }
 
 /**

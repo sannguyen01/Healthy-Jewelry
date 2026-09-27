@@ -1,7 +1,12 @@
 import { ImageResponse } from 'next/og'
 import { claimText } from '@/lib/catalog'
 
-export const runtime = 'edge'
+// The Node runtime, like `products/[handle]/opengraph-image`. This card was `runtime = 'edge'`
+// while it drew only literals; its tagline is now a claim resolved through the catalogue, and
+// on Edge that one import carried Zod, every catalogue record and the claims registry into the
+// edge bundle, validated again on every cold start, to draw one sentence. On Node the card is
+// prerendered at build (`○` in the route table, where Edge made it `ƒ`), so it has no cold start.
+
 // A literal rather than SITE_DEFAULT_TITLE: Next reads `alt` from this module's exports, and
 // a literal is the form it is guaranteed to resolve. Said "Implant-Grade Titanium" until
 // 2026-09-26 — the share card is the brand's most-copied sentence.

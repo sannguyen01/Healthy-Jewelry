@@ -5,9 +5,8 @@ import { Footer } from '@/components/layout/Footer'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { hjMaterials } from '@/lib/data/hj-data'
 import {
-  approvedClaimTexts,
-  asClaimIds,
   claimText,
+  materialChips,
   materialContext,
   materialDesignation,
   materialStandard,
@@ -29,9 +28,13 @@ export const metadata: Metadata = {
  * "Yes"/"Excellent" in every cell until 2026-09-26 — twelve claims in a grid, none with a
  * source. Those claims are pending in the registry and appear as chips on each material
  * above once approved. What stays in the grid is what the metals are: the designation, the
- * relative weight the page already stated, and the standard — which reads "Under review"
- * until a document supports it, because naming a standard is a certification claim about
- * the stock.
+ * relative weight the page already stated, and the standard — `null` until a document
+ * supports it, because naming a standard is a certification claim about the stock. The
+ * table *cell* says "Under review"; the data never does, so no copy edit can turn a missing
+ * standard into a documented one.
+ *
+ * Module scope is safe here and only here: a documented standard depends on the registry,
+ * not on the clock. Anything that resolves a claim is computed per render, below.
  */
 const TABLE_MATERIALS = hjMaterials.map((m) => {
   const context = materialContext(m.handle)
@@ -39,9 +42,11 @@ const TABLE_MATERIALS = hjMaterials.map((m) => {
   return {
     handle: m.handle,
     designation: materialDesignation(material),
-    standard: materialStandard(material, context) ?? 'Under review',
+    standard: materialStandard(material, context),
   }
 })
+
+const UNDOCUMENTED_STANDARD = 'Under review'
 
 const WEIGHT: Record<string, string> = {
   titanium: 'Lightweight',
@@ -52,7 +57,7 @@ const WEIGHT: Record<string, string> = {
 const COMPARISON_ROWS = [
   { property: 'Designation', cells: TABLE_MATERIALS.map((m) => m.designation) },
   { property: 'Weight', cells: TABLE_MATERIALS.map((m) => WEIGHT[m.handle] ?? '—') },
-  { property: 'Standard', cells: TABLE_MATERIALS.map((m) => m.standard) },
+  { property: 'Standard', cells: TABLE_MATERIALS.map((m) => m.standard ?? UNDOCUMENTED_STANDARD) },
 ] as const
 
 /**
@@ -61,7 +66,7 @@ const COMPARISON_ROWS = [
  * names the designations and says why no standard appears.
  */
 function standardsAnswer(): string {
-  const documented = TABLE_MATERIALS.filter((m) => m.standard !== 'Under review')
+  const documented = TABLE_MATERIALS.filter((m) => m.standard !== null)
   const designations = TABLE_MATERIALS.map((m) => m.designation).join(', ')
   if (documented.length === 0) {
     return (
@@ -76,12 +81,16 @@ function standardsAnswer(): string {
 const SITE = { kind: 'site' } as const
 
 /**
+ * A function, not a constant: two answers resolve claims, and a claim is resolved at render
+ * time — an approval that lapses, or one whose date arrives, changes the page on the next
+ * render rather than on the next process start.
+ *
  * Questions are kept, never silently dropped; three were rewritten because the question
  * itself asserted the claim ("Are these metals safe for sensitive skin?", "Is this jewelry
  * MRI-safe?", "What does implant-grade mean?"). Answers whose whole content was a claim come
  * from the registry and render their fallback until approved.
  */
-const FAQ = [
+const faq = () => [
   {
     q: 'How do these metals behave against skin?',
     a: claimText('materials-faq-skin', SITE),
@@ -100,7 +109,7 @@ const FAQ = [
     q: 'Which standards do these metals meet?',
     a: standardsAnswer(),
   },
-] as const
+]
 
 const MATERIAL_NUMBERS = ['01', '02', '03'] as const
 
@@ -217,10 +226,7 @@ export default function MaterialsPage() {
                 </p>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '0 0 32px' }}>
-                  {[
-                    ...material.properties,
-                    ...approvedClaimTexts(asClaimIds(material.claims), materialContext(material.handle)),
-                  ].map((prop) => (
+                  {materialChips(material).map((prop) => (
                     <span
                       key={prop}
                       className="material-tag"
@@ -361,7 +367,7 @@ export default function MaterialsPage() {
               maxWidth: '760px',
             }}
           >
-            {FAQ.map((item, i) => (
+            {faq().map((item, i) => (
               <div
                 key={i}
                 style={{
