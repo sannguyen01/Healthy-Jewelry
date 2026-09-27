@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './support/test'
 
 /**
  * What a product page shows, now that it no longer sells anything.

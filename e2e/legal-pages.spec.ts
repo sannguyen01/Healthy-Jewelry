@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './support/test'
 
 /**
  * The static content pages, smoke-covered as a set.
