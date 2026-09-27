@@ -133,6 +133,49 @@ export function goneRoute(copy: GoneCopy) {
 }
 
 /**
+ * **A retired path with a successor: browsing is redirected, a stale action is told why.**
+ *
+ * The 308 families in contract §7 — `/cart`, `/account`, `/collections`, `/policies`,
+ * `/stones`, `/crystals` — were `next.config.ts` redirects until 2026-09-27, and a config
+ * redirect answers every method the same way. A 308 obliges the client to repeat the method
+ * and body at the successor, so an old theme's product form re-POSTed to `/shop`, and what
+ * `/shop` did with it depended on the encoding: the page as if the action had worked
+ * (urlencoded), a bare `text/plain` "Server action not found." (multipart — every prerendered
+ * page bypasses to the server-action dispatcher on that content type), or a bare 405. Config
+ * redirects run before any application code sees the method, so the destination could not
+ * tell a stale cart POST from anything else. A route handler sees it here, at the URL the
+ * visitor actually used.
+ *
+ * - `GET` and `HEAD` keep the 308, query string carried, exactly as the config redirect
+ *   answered — `e2e/retired-routes.spec.ts`'s §7 matrix asserts that byte for byte, so the
+ *   move changes nothing for anyone browsing.
+ * - Every other method answers the 410 page for this family. Nothing was *moved* for an
+ *   action — there is no bag to add to — so the honest answer is the withdrawn-capability
+ *   one, with the same two ways on that every 410 here offers.
+ *
+ * Spread into a route module exactly like {@link goneRoute}.
+ */
+export function retiredRoute({ successor, copy }: { successor: string; copy: GoneCopy }) {
+  const redirect = (request: Request): Response =>
+    new Response(null, {
+      status: 308,
+      // Relative, as Next's own redirect emits it; the query survives so a campaign link keeps
+      // its attribution through the hop.
+      headers: { Location: `${successor}${new URL(request.url).search}` },
+    })
+  const gone = (): Response => goneResponse(copy)
+  return {
+    GET: redirect,
+    HEAD: redirect,
+    POST: gone,
+    PUT: gone,
+    PATCH: gone,
+    DELETE: gone,
+    OPTIONS: gone,
+  }
+}
+
+/**
  * The sentence every one of these pages ends on.
  *
  * Shared because it is the *point* of the page: a 410 that only says no has answered the

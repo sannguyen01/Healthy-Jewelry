@@ -313,6 +313,16 @@ than 410". It is *does a destination exist that answers the visitor's actual que
 and a login both have one. A checkout does not, and sending somebody to `/shop` after they
 clicked Checkout tells them nothing about why they cannot buy.
 
+**What a 308 answers to an action.** A 308 row redirects *browsing*: GET and HEAD. Every other
+method on a 308 path answers **410**, with the same explanatory page and headers as a 410 row,
+from `retiredRoute()` in `src/lib/http/goneResponse.ts`. A 308 obliges the client to repeat the
+method and body at the successor, so until 2026-09-27 a stale product form re-POSTed to `/shop`
+and ended on a 200 that implied it had worked, a bare "Server action not found." (multipart) or
+a bare 405 (`text/plain`, JSON). Somebody who pressed "Add to bag" is not looking for the shelf;
+they are owed the sentence that says nothing was added. `commerce-route-inventory.test.ts`
+calls each handler to hold every 308 row to both halves, and the E2E matrix follows every hop
+of a stale POST in five encodings to the page a person would read.
+
 ---
 
 ## 8. Permitted content data model

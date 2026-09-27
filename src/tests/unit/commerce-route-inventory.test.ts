@@ -33,9 +33,14 @@ const { parseContract } = await import('../../../scripts/lib/commerce-contract.m
  * ## Why three sources and not one
  *
  * The contract is the claim. The other two are the implementation, and they are *separate*
- * implementations that must agree: `next.config.ts` answers the 308s before a request ever
- * reaches the application, and the `route.ts` files under `src/app` answer the 410s inside
- * it. (Spelled out rather than globbed: a `**` followed by a slash closes a block comment,
+ * implementations that must agree: `next.config.ts` may answer a redirect before a request
+ * ever reaches the application, and the `route.ts` files under `src/app` answer inside it.
+ * Since 2026-09-27 every §7 308 is a `route.ts` too — `retiredRoute()` answers GET and HEAD
+ * with the redirect and every other method with the 410 page, because a config redirect
+ * answers a stale POST with a 308 and the client repeats the POST at the successor. So the
+ * 308 check below **calls each handler** rather than reading its source: it asks what the
+ * route answers, which is the only question a regex over a file could get wrong
+ * ([ADR 007](../../../docs/adr/007-regex-guardrails-have-unknown-coverage.md)). (Spelled out rather than globbed: a `**` followed by a slash closes a block comment,
  * and the error it produces names a line thirty lines below the real one.) A single
  * reconciliation against one of them would leave the other free to drift.
  *
@@ -70,9 +75,52 @@ const filesystemPages = pageRoutes(readAppDir)
 const filesystemHandlers = routeHandlerPaths(readAppDir)
 
 const nextConfig = (await import('../../../next.config')).default as {
-  redirects: () => Promise<{ source: string; destination: string; permanent?: boolean }[]>
+  redirects?: () => Promise<{ source: string; destination: string; permanent?: boolean }[]>
 }
-const redirects = await nextConfig.redirects()
+/** Empty today: every §7 redirect is a route handler. Kept so a config redirect is still reconciled. */
+const redirects = (await nextConfig.redirects?.()) ?? []
+
+/**
+ * Which on-disk handler Next would dispatch a concrete path to — a small model of the App
+ * Router's matching, enough for this tree: a static segment beats a dynamic one, `[x]` is one
+ * segment, `[...x]` one or more, `[[...x]]` zero or more. Used both ways: a 308 row must be
+ * served by the handler that owns it, and a 404 row must be served by none.
+ */
+function handlerFor(concrete: string): string | null {
+  const segments = concrete.split('/').filter(Boolean)
+  const score = (raw: string): number | null => {
+    const parts = raw.split('/').filter(Boolean)
+    let points = 0
+    for (let i = 0; i < parts.length; i += 1) {
+      const part = parts[i]
+      if (part.startsWith('[[...')) return i <= segments.length ? points : null
+      if (part.startsWith('[...')) return i < segments.length ? points : null
+      if (i >= segments.length) return null
+      if (part.startsWith('[')) continue
+      if (part !== segments[i]) return null
+      points += 1
+    }
+    return parts.length === segments.length ? points + 1 : null
+  }
+  let best: string | null = null
+  let bestScore = -1
+  for (const raw of filesystemHandlers) {
+    const s = score(raw)
+    if (s !== null && s > bestScore) {
+      best = raw
+      bestScore = s
+    }
+  }
+  return best
+}
+
+/** One concrete request path for a §7 row: the route itself, or a path beneath its family. */
+const concretePathOf = (route: string) => (route.includes(':path*') ? route.replace('/:path*', '/add') : route)
+
+/** The handler module at an on-disk route, loaded through the same alias the app uses. */
+async function loadHandler(raw: string) {
+  return (await import(/* @vite-ignore */ `@/app${raw}/route`)) as Record<string, (r: Request) => Response>
+}
 
 const approved = contract.routesApproved as { route: string; kind: string; status: number }[]
 const forbidden = contract.routesForbidden as {
@@ -108,7 +156,8 @@ describe('the inventory is reading something', () => {
   it('finds pages, handlers, redirects and contract rows', () => {
     expect(filesystemPages.length, 'no page routes found under src/app').toBeGreaterThan(10)
     expect(filesystemHandlers.length, 'no route handlers found').toBeGreaterThan(5)
-    expect(redirects.length, 'next.config.ts declares no redirects').toBeGreaterThan(5)
+    // No `redirects.length` floor any more: the §7 308s are route handlers, and the config
+    // declaring none is the expected state. The 308 check below has its own guard.
     expect(approved.length, '§6 is empty').toBeGreaterThan(10)
     expect(forbidden.length, '§7 is empty').toBeGreaterThan(10)
   })
@@ -183,17 +232,41 @@ describe('§7 — the forbidden route inventory matches what answers', () => {
     expect(absentRows.length).toBeGreaterThan(2)
   })
 
-  it('every declared 308 is a real redirect, to the declared destination', () => {
+  it('every declared 308 redirects GET and HEAD to its destination, and answers a stale action 410', async () => {
+    /*
+     * Asked of the handler, not of its source. Each row is resolved to the handler Next would
+     * dispatch a concrete path of it to, and that handler is called: GET and HEAD must be a
+     * permanent redirect to the declared location — 308, never 307, which would let a crawler
+     * keep the old URL indefinitely — and POST must be the 410 page. A config redirect is
+     * still accepted for GET, but it cannot pass the POST half: it answers every method with
+     * the 308, which is how a multipart product form ended on "Server action not found.".
+     */
     const configured = new Map(redirects.map((r) => [canonicalRoute(r.source), r]))
+    let checked = 0
     for (const row of redirectRows) {
-      const key = canonicalRoute(row.route)
-      const actual = configured.get(key)
-      expect(actual, `${row.route} is declared a 308 and next.config.ts has no rule for it`).toBeDefined()
-      expect(actual!.destination, `${row.route} redirects somewhere else`).toBe(row.location)
-      // `permanent: true` is Next's spelling of 308. A 307 would let a crawler keep the old
-      // URL indefinitely, which defeats the point of retiring it.
-      expect(actual!.permanent, `${row.route} is not permanent`).toBe(true)
+      const concrete = concretePathOf(row.route)
+      const raw = handlerFor(concrete)
+      expect(
+        raw,
+        `${row.route} is declared a 308 and no route handler serves ${concrete}` +
+          (configured.has(canonicalRoute(row.route))
+            ? ' — next.config.ts redirects it, and a config redirect answers a stale POST with a 308 too'
+            : '')
+      ).not.toBeNull()
+      const handler = await loadHandler(raw!)
+      for (const method of ['GET', 'HEAD'] as const) {
+        const response = handler[method](new Request(`http://origin${concrete}?utm_source=x`, { method }))
+        expect(response.status, `${method} ${concrete} (${raw})`).toBe(308)
+        expect(response.headers.get('location'), `${method} ${concrete} redirects somewhere else`).toBe(
+          `${row.location}?utm_source=x`
+        )
+      }
+      const post = handler.POST(new Request(`http://origin${concrete}`, { method: 'POST' }))
+      expect(post.status, `a stale POST to ${concrete} is not the 410 page`).toBe(410)
+      expect(post.headers.get('x-robots-tag'), `POST ${concrete}`).toMatch(/noindex/i)
+      checked += 1
     }
+    expect(checked, 'no 308 row was checked').toBe(redirectRows.length)
   })
 
   it('every redirect in next.config.ts is declared in §7', () => {
@@ -248,6 +321,9 @@ describe('§7 — the forbidden route inventory matches what answers', () => {
     for (const row of absentRows) {
       const key = canonicalRoute(row.route)
       expect(served.has(key), `${row.route} is declared 404 and something serves it`).toBe(false)
+      // And no catch-all swallows it: a `[[...path]]` one level up would serve it without its
+      // canonical spelling ever appearing on disk.
+      expect(handlerFor(concretePathOf(row.route)), `${row.route} is declared 404 and a handler matches it`).toBeNull()
       expect(redirected.has(key), `${row.route} is declared 404 and something redirects it`).toBe(false)
     }
   })

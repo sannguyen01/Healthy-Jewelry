@@ -151,121 +151,22 @@ const nextConfig: NextConfig = {
       },
     ]
   },
-  async redirects() {
-    return [
-      /*
-       * Retired commerce routes.
-       *
-       * 308, not 307 or 302: these are permanent, and a permanent redirect is what lets a
-       * crawler retire the old URL instead of re-checking it forever. `permanent: true` is
-       * Next's spelling of 308.
-       *
-       * Both have a successor that answers the visitor's actual question — a bag becomes
-       * the shelf it was filled from, an account becomes the person who replaces it. That
-       * is why they redirect and `/checkout` does not: a withdrawn capability has no
-       * successor, so it answers 410 from its own route handler. See
-       * `src/app/checkout/route.ts`.
-       *
-       * Asserted by status code, over HTTP, in `e2e/retired-routes.spec.ts` — `toHaveURL()`
-       * passes on a soft 200 that merely renders the destination.
-       */
-      {
-        source: '/cart',
-        destination: '/shop',
-        permanent: true,
-      },
-      /*
-       * `/cart/add`, `/cart/change`, `/cart/update`, `/cart/clear` — Shopify's cart
-       * endpoints, and the reason this needs a wildcard rather than the bare path above.
-       * They are reachable from any cached page, any restored tab and any theme snippet
-       * that outlived the theme, and several of them are `POST`. A redirect answers a POST
-       * too, which is what makes this the right mechanism here: the visitor lands on the
-       * shelf rather than on a 405.
-       */
-      {
-        source: '/cart/:path*',
-        destination: '/shop',
-        permanent: true,
-      },
-      {
-        source: '/account',
-        destination: '/contact',
-        permanent: true,
-      },
-      /*
-       * `/account/login`, `/account/register`, `/account/orders`, `/account/addresses`.
-       *
-       * Customer accounts were built and never switched on, so no visitor has credentials
-       * to use here. The destination is the same as the bare path's for the same reason: a
-       * login becomes the person who replaces it.
-       */
-      {
-        source: '/account/:path*',
-        destination: '/contact',
-        permanent: true,
-      },
-      /*
-       * Shopify's collection URL space.
-       *
-       * `/collections/<handle>` and `/collections/all` are what a storefront publishes and
-       * what search engines indexed. They redirect rather than 410 because — unlike a
-       * checkout — a successor genuinely exists: the shelf is still there, it is just at
-       * `/shop` now.
-       *
-       * Deliberately **not** mapped handle-by-handle onto `/shop/<handle>`. Shopify's
-       * handle set was never identical to this catalogue's five, it included the built-in
-       * `frontpage` (ADR 008's exemption, and the source of a real hard-404 on the site's
-       * only bestseller), and a per-handle map would be a second collection inventory to
-       * keep in step with `COLLECTION_HANDLES`. One destination that is always correct
-       * beats five that are correct until somebody renames a collection.
-       */
-      {
-        source: '/collections',
-        destination: '/shop',
-        permanent: true,
-      },
-      {
-        source: '/collections/:path*',
-        destination: '/shop',
-        permanent: true,
-      },
-      /*
-       * `/policies/privacy-policy`, `/policies/terms-of-service`, `/policies/refund-policy`,
-       * `/policies/shipping-policy` — the four URLs Shopify's hosted checkout linked from
-       * its footer.
-       *
-       * They go to `/legal`, which is this site's index of the same documents, rather than
-       * being mapped individually. A visitor following a policy link wants *the policies*,
-       * and the site's own four pages do not correspond one-to-one with Shopify's — there
-       * is no refund policy here, because there is nothing to refund.
-       */
-      {
-        source: '/policies/:path*',
-        destination: '/legal',
-        permanent: true,
-      },
-      {
-        source: '/stones',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/crystals',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/stones/:path*',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/crystals/:path*',
-        destination: '/',
-        permanent: true,
-      },
-    ]
-  },
+  /*
+   * **No `redirects()`.** The retired commerce families — `/cart`, `/account`, `/collections`,
+   * `/policies`, `/stones`, `/crystals` — were twelve config redirects here until 2026-09-27.
+   * They are route handlers now (`src/app/<family>/[[...path]]/route.ts`, all through
+   * `retiredRoute()` in `src/lib/http/goneResponse.ts`), because a config redirect runs before
+   * any code sees the method and answers a stale POST with the same 308 as a GET. A 308
+   * obliges the client to repeat the POST at the successor, and a multipart one — the old
+   * theme's product form — ended on a bare "Server action not found." at `/shop`. The
+   * handlers keep the 308 for GET and HEAD, query string carried, and answer every other
+   * method with the 410 page at the URL the visitor used.
+   *
+   * The cost is recorded rather than hidden: a legacy GET now invokes a function instead of
+   * matching an edge rule. Legacy traffic is small and falling; `retired-route-matrix` in
+   * `docs/controls.json` carries it as a known limit. A new redirect belongs in contract §7
+   * first, and `commerce-route-inventory.test.ts` reconciles whichever mechanism serves it.
+   */
 }
 
 export default nextConfig

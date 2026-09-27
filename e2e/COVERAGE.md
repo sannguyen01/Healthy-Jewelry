@@ -28,6 +28,12 @@ check too: a stale exception is an assertion nobody re-examined.
 /checkouts/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code. Shopify's hosted-checkout URL space, retired as 410; `page.goto` cannot tell a 410 from a 200 because Playwright follows both and renders the body. The spec asserts the status on GET and on a stale POST, the noindex header, and that the body hands the visitor to an ambassador.
 /orders/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code. This site holds no orders and must not imply it can find one; the same 410-vs-200 argument as /checkout applies, so navigation would assert nothing.
 /discount/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code, plus a query-string case asserting `?discount=CODE` is not honoured on a live page. A discount is a price claim, and this site publishes no prices.
+/cart/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: the §7 matrix asserts the 308 to /shop for GET and HEAD in every variant, and the stale-action block follows a POST in five encodings to the 410 page it must end on. A browser test submits the old theme's multipart product form from a page and reads what a person sees. `page.goto` alone would follow the 308 and assert /shop.
+/account/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to /contact for GET and HEAD, and a stale sign-in POST followed to the 410 page, which says nothing entered was sent or saved.
+/collections/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to /shop for GET and HEAD across the matrix, and a stale POST followed to the 410 page.
+/policies/[...path] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to /legal for GET and HEAD, and a stale POST followed to the 410 page. The bare /policies is deliberately not served.
+/stones/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to / for GET and HEAD, and a stale POST followed to the 410 page.
+/crystals/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: as /stones/[[...path]].
 /api/contact — e2e/contact.spec.ts intercepts it to drive the form's success, failure and 503 states, and src/tests/unit/api-contact-route.test.ts exercises the handler. Between them both sides of the contract are covered.
 ```
 

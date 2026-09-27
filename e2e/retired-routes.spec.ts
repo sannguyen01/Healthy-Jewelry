@@ -3,6 +3,7 @@ import { forbiddenRoutes } from './support/contract'
 import {
   GONE_CACHE_CONTROL,
   MATRIX_METHODS,
+  expectationFor,
   retiredRouteMatrix,
   wildcardPrefix,
   type HopExpectation,
@@ -46,6 +47,16 @@ import {
  * All four answer 410 and none of them can be meaningfully `goto`-ed: Playwright follows a
  * 410 and renders its body, so a navigation test passes identically whether the route
  * answers 410 or 200. The status read below is the only assertion that distinguishes them.
+ *
+ * And the six `retiredRoute()` families, which redirect browsing and answer an action with
+ * their 410 page — `goto` would follow the 308 and assert the successor, never the route:
+ *
+ * - `/cart/[[...path]]`
+ * - `/account/[[...path]]`
+ * - `/collections/[[...path]]`
+ * - `/policies/[...path]`
+ * - `/stones/[[...path]]`
+ * - `/crystals/[[...path]]`
  */
 
 /** What each retired URL must answer, and why that status rather than another. */
@@ -319,16 +330,19 @@ test.describe('Retired commerce routes — the §7 matrix', () => {
 
   for (const variant of MATRIX) {
     const shows = variant.then ? `${variant.first.status} → ${variant.then.status}` : `${variant.first.status}`
-    test(`${variant.path} answers ${shows} to GET, HEAD and POST [${variant.kind} of ${variant.family}]`, async ({
+    test(`${variant.path} answers ${shows} to GET and HEAD, and its §7 answer to POST [${variant.kind} of ${variant.family}]`, async ({
       request,
     }) => {
       for (const method of MATRIX_METHODS) {
-        await expectHop(await send(request, method, variant.path), method, variant.path, variant.first)
-        if (variant.then) {
+        // A 308 family redirects browsing and answers an action with its 410 page —
+        // `expectationFor` is the one place that rule is written (contract §7).
+        const { first, then } = expectationFor(variant, method, forbiddenRoutes)
+        await expectHop(await send(request, method, variant.path), method, variant.path, first)
+        if (then) {
           // The trailing-slash hop is Next's, not ours. What matters is that it lands on
           // the family's answer rather than on a page — so follow it by hand, same method.
-          const next = variant.first.location as string
-          await expectHop(await send(request, method, next), method, next, variant.then)
+          const next = first.location as string
+          await expectHop(await send(request, method, next), method, next, then)
         }
       }
     })
@@ -336,82 +350,146 @@ test.describe('Retired commerce routes — the §7 matrix', () => {
 })
 
 /**
- * **A 308 keeps the method. So where does a retired POST end up?**
+ * **A stale action on a retired path must end somewhere a person can read.**
  *
- * Shopify's `/cart/add` is a POST, and so is `/account/login`. A 308, unlike a 301, obliges
- * the client to repeat the *same* method and body at the new location — so a product form
- * submitted from a cached page, or a restored tab, re-POSTs to `/shop`. The redirect is
- * correct and asserted above; this asks what the *destination* does with the POST, which
- * no test had ever looked at.
+ * Shopify's `/cart/add` is a POST, and so is `/account/login`. A 308, unlike a 301, obliges the
+ * client to repeat the *same* method and body at the new location — so until 2026-09-27 a
+ * product form submitted from a cached page or a restored tab re-POSTed to `/shop`, and what
+ * `/shop` did with it depended on the encoding. Measured against `next start` (Next 16.3) at
+ * `228fdaf`, following the chain the way a browser does:
  *
- * Measured on 2026-09-26 against `next start` (Next 16.3), for each distinct §7 destination:
+ * | Body | Where it ended |
+ * |---|---|
+ * | `application/x-www-form-urlencoded` | 200, the shelf — as if the action had simply worked |
+ * | `multipart/form-data` (Dawn's product form) | 404 `text/plain` "Server action not found." |
+ * | `text/plain` (the third HTML form enctype) | 405 `text/plain` "Method Not Allowed" |
+ * | `application/json` (the AJAX cart API) | 405 |
  *
- * | Body | Destination answers | Who sends it |
- * |---|---|---|
- * | `application/x-www-form-urlencoded` | 200, the page | an older theme's `<form method="post">` |
- * | `multipart/form-data` | 404 `Server action not found.` | Dawn's product form (`enctype="multipart/form-data"`) |
- * | `application/json` | 405, `Allow: GET, HEAD` | the AJAX cart API, `/cart/add.js` |
+ * The block that stood here pinned that table as expected behaviour, so the suite was green on
+ * a visitor dead end. The mechanism is in the build output: every prerendered page carries
+ * `experimentalBypassFor: [next-action header, content-type multipart/form-data]`, so a
+ * multipart POST skips the static page and lands in the server-action dispatcher, which has no
+ * action to find. And `next.config.ts` redirects run before any application code sees the
+ * method, so no fix at the destination could tell a stale cart POST from anything else.
  *
- * Next treats a form-encoded POST to a page as a possible server-action submission. With no
- * action id in the body, a urlencoded one falls through to rendering the page — the visitor
- * sees the shelf, which is what §7 promises. A multipart one is rejected by the action
- * dispatcher with a plain-text 404, which is a dead end for a person: **a known defect,
- * reported to the integrator, pinned here exactly** so that the fix is a deliberate edit to
- * this table rather than a change nobody notices. The JSON case is correct as it stands: a
- * script that believed it had added to a bag gets a failure, never a 2xx.
- *
- * Every case: no `Set-Cookie` (no cart or session is ever minted), and never a 5xx.
+ * So the 308 families became route handlers (`retiredRoute()` in `src/lib/http/goneResponse.ts`):
+ * GET and HEAD keep the 308 to the successor, and every other method answers the 410 page
+ * that explains what happened, at the URL the visitor actually used. This block follows every
+ * hop by hand — `maxRedirects: 0`, the method kept on a 307/308 and turned into GET on a 303,
+ * as RFC 9110 §15.4 requires of the client — and judges only **the final, human-facing
+ * response**: it must be the 410 explanation, never a framework 404/405/500 and never a 2xx
+ * page that implies the action went through. No hop may mint a cookie.
  */
-test.describe('Retired commerce routes — a POST that follows its 308', () => {
-  const DESTINATIONS = [...new Set(forbiddenRoutes.filter((r) => r.status === 308).map((r) => r.location))]
+test.describe('Retired commerce routes — a stale action ends honestly', () => {
+  type Encoding = 'urlencoded' | 'multipart' | 'text-plain' | 'json' | 'no-body'
+  const ENCODINGS: readonly Encoding[] = ['urlencoded', 'multipart', 'text-plain', 'json', 'no-body']
 
-  const BODIES = [
-    { encoding: 'urlencoded', status: 200, contentType: /^text\/html/ },
-    { encoding: 'multipart', status: 404, contentType: /^text\/plain/ },
-    { encoding: 'json', status: 405, contentType: null },
-  ] as const
-
+  /** Shopify's own add-to-cart fields. Their content is irrelevant; their encoding is the point. */
   const CART_FIELDS = { id: '1', quantity: '1' }
 
-  function bodyFor(encoding: (typeof BODIES)[number]['encoding']) {
-    if (encoding === 'urlencoded') return { form: CART_FIELDS }
-    if (encoding === 'multipart') return { multipart: CART_FIELDS }
-    return { data: CART_FIELDS, headers: { 'content-type': 'application/json' } }
-  }
-
-  test('there are destinations to follow', () => {
-    expect(DESTINATIONS.length).toBeGreaterThanOrEqual(4)
-  })
-
-  for (const destination of DESTINATIONS) {
-    // A `:path*` family that redirects here if there is one, else the exact route, at a
-    // concrete path. `/add` is Shopify's cart verb; for the other families it is simply a
-    // segment the family must absorb.
-    const redirecting = forbiddenRoutes.filter((r) => r.status === 308 && r.location === destination)
-    const row = redirecting.find((r) => wildcardPrefix(r.route) !== null) ?? redirecting[0]
-    const prefix = wildcardPrefix(row.route)
-    const source = prefix === null ? row.route : `${prefix}/add`
-
-    for (const body of BODIES) {
-      test(`a ${body.encoding} POST to ${source} re-POSTs to ${destination} and gets ${body.status}`, async ({
-        request,
-      }) => {
-        const first = await request.post(source, { maxRedirects: 0, ...bodyFor(body.encoding) })
-        expect(first.status()).toBe(308)
-        expect(first.headers()['location']).toBe(destination)
-
-        // Followed by hand, same method and body, which is what RFC 9110 §15.4.9 requires
-        // of the client and what every browser does.
-        const landed = await request.post(destination as string, { maxRedirects: 0, ...bodyFor(body.encoding) })
-        const headers = landed.headers()
-        expect(landed.status(), `${body.encoding} POST at ${destination}`).toBe(body.status)
-        if (body.contentType) expect(headers['content-type']).toMatch(body.contentType)
-        if (body.encoding === 'multipart') expect(await landed.text()).toBe('Server action not found.')
-        if (body.encoding === 'json') expect(headers['allow'] ?? '').toMatch(/GET/)
-        expect(headers['set-cookie'], `${body.encoding} POST at ${destination} minted a cookie`).toBeUndefined()
-      })
+  function bodyFor(encoding: Encoding) {
+    switch (encoding) {
+      case 'urlencoded':
+        return { form: CART_FIELDS }
+      case 'multipart':
+        return { multipart: CART_FIELDS }
+      case 'text-plain':
+        return { data: 'id=1\r\nquantity=1\r\n', headers: { 'content-type': 'text/plain' } }
+      case 'json':
+        return { data: CART_FIELDS, headers: { 'content-type': 'application/json' } }
+      case 'no-body':
+        return {}
     }
   }
+
+  /** One concrete URL per 308 row: the route itself, or a path beneath its `:path*` family. */
+  const SOURCES = forbiddenRoutes
+    .filter((r) => r.status === 308)
+    .map((r) => {
+      const prefix = wildcardPrefix(r.route)
+      return prefix === null ? r.route : `${prefix}/add`
+    })
+
+  async function followByHand(request: APIRequestContext, path: string, encoding: Encoding) {
+    let method = 'POST'
+    let body: object = bodyFor(encoding)
+    let current = path
+    const hops: { method: string; path: string; status: number; setCookie: string | undefined }[] = []
+    for (let i = 0; i < 5; i += 1) {
+      const response = await request.fetch(current, { method, maxRedirects: 0, ...body })
+      const headers = response.headers()
+      hops.push({ method, path: current, status: response.status(), setCookie: headers['set-cookie'] })
+      const location = headers['location']
+      if (response.status() >= 300 && response.status() < 400 && location) {
+        // 307 and 308 repeat the method and body; 303 (and, in practice, 301/302) become a GET.
+        if (![307, 308].includes(response.status())) {
+          method = 'GET'
+          body = {}
+        }
+        const next = new URL(location, `http://origin${current}`)
+        current = `${next.pathname}${next.search}`
+        continue
+      }
+      return { final: response, hops }
+    }
+    throw new Error(`${path}: more than five hops — a loop, not a destination`)
+  }
+
+  test('there are retired paths with a successor to follow', () => {
+    // Guard on the generator: a §7 parse with no 308 rows would generate no tests below.
+    expect(SOURCES.length).toBeGreaterThanOrEqual(8)
+  })
+
+  for (const source of SOURCES) {
+    test(`a stale POST to ${source} ends on the 410 explanation, whatever its encoding`, async ({ request }) => {
+      for (const encoding of ENCODINGS) {
+        const { final, hops } = await followByHand(request, source, encoding)
+        const chain = hops.map((h) => `${h.method} ${h.path} → ${h.status}`).join(', ')
+        const where = `${encoding} POST to ${source} (${chain})`
+        const text = await final.text()
+
+        expect(final.status(), `${where} ended on ${final.status()}: ${text.slice(0, 80)}`).toBe(410)
+        expect(final.headers()['content-type'], `${where} is not a page a person can read`).toMatch(/^text\/html/)
+        expect(text, `${where} ended on a framework message`).not.toMatch(/Server action not found|Method Not Allowed/i)
+        // A next step, not just a status: the successor the GET would have reached, or a person.
+        expect(text, `${where} offers no way on`).toMatch(/href="\/(shop|contact|legal)?"/)
+        expect(final.headers()['x-robots-tag'], `${where} is indexable`).toMatch(/noindex/i)
+        for (const hop of hops) {
+          expect(hop.setCookie, `${where}: ${hop.method} ${hop.path} minted a cookie`).toBeUndefined()
+        }
+      }
+    })
+  }
+
+  test('a stale multipart product form, submitted from a page, shows a person what happened', async ({ page }) => {
+    // The request-level tests above cannot see what a browser renders. This is the scenario the
+    // defect was about: a cached product page's form — `enctype="multipart/form-data"`, as the
+    // old theme's was — submitted from this origin, landing wherever the browser takes it.
+    await page.goto('/')
+    const landed = page.waitForResponse((r) => new URL(r.url()).pathname === '/cart/add')
+    await page.evaluate(() => {
+      const form = document.createElement('form')
+      form.method = 'post'
+      form.action = '/cart/add'
+      form.enctype = 'multipart/form-data'
+      for (const [name, value] of Object.entries({ id: '1', quantity: '1' })) {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = name
+        input.value = value
+        form.appendChild(input)
+      }
+      document.body.appendChild(form)
+      form.submit()
+    })
+    const response = await landed
+    await page.waitForLoadState('domcontentloaded')
+
+    expect(response.status(), 'the form submission did not end on the 410').toBe(410)
+    await expect(page.locator('h1')).toContainText(/no longer accepts online orders/i)
+    await expect(page.locator('body')).not.toContainText(/Server action not found/i)
+    await expect(page.locator('a[href="/shop"]')).toBeVisible()
+  })
 })
 
 /**
