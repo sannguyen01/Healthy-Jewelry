@@ -70,8 +70,6 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN:
         process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN || 'placeholder.myshopify.com',
-      SHOPIFY_STOREFRONT_ACCESS_TOKEN:
-        process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || 'placeholder-token',
       NEXT_PUBLIC_SITE_URL: 'http://localhost:3000',
       SHOPIFY_WEBHOOK_SECRET: process.env.SHOPIFY_WEBHOOK_SECRET || 'placeholder-secret',
     },

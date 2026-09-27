@@ -102,10 +102,8 @@ function runTests(sentinel) {
     NEXT_PUBLIC_SITE_URL:
       sentinel.runner === 'vitest' ? 'https://healthyjewellery.com' : 'http://localhost:3000',
     SHOPIFY_STORE_DOMAIN: 'mock.myshopify.com',
-    SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'mock_token',
     NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: 'mock.myshopify.com',
     SHOPIFY_WEBHOOK_SECRET: 'mock_webhook_secret',
-    SHOPIFY_REVALIDATION_SECRET: 'mock_revalidation_secret',
     CI: 'true',
   }
 

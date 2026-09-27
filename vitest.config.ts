@@ -45,10 +45,8 @@ export default defineConfig({
      */
     env: {
       SHOPIFY_STORE_DOMAIN: 'mock.myshopify.com',
-      SHOPIFY_STOREFRONT_ACCESS_TOKEN: 'mock_token',
       NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: 'mock.myshopify.com',
       SHOPIFY_WEBHOOK_SECRET: 'mock_webhook_secret',
-      SHOPIFY_REVALIDATION_SECRET: 'mock_revalidation_secret',
       // The unit suite asserts the production site constant
       // (src/tests/unit/config.test.ts), while the build and the E2E server need
       // localhost — the same name legitimately means different things per step,
