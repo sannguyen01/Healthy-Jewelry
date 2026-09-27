@@ -18,7 +18,7 @@
   "controls": [
     {
       "id": "merge-gate",
-      "claims": "main requires both CI check runs to pass before a pull request can merge",
+      "claims": "main requires the three CI check runs, up to date with main, through a pull request, with no bypass actor, before a pull request can merge",
       "status": "not-configured",
       "requiredContexts": [
         "Lint · Type-check · Unit tests · Build",
@@ -29,8 +29,8 @@
       "probe": "scripts/probe-branch-protection.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": true,
-      "knownLimit": "The probe reports; it cannot enable protection, and it deliberately still exits 0 on an honestly-documented absence — failing a scheduled audit over a console action nobody in CI can perform would make the audit a permanent red that people learn to ignore. What changed is that the finding now reaches a person: the audit opens and updates one merge-gate-unenforced issue when the acceptance goes stale, or when ADR 015's own precondition is met. Until 2026-08-31 this probe's finding went into a log file and stopped, which made it the only control here whose result nothing carried.",
-      "humanAction": "GitHub → Settings → Branches → add a rule for main. Required contexts are the exact strings in requiredContexts; run `pnpm exec vitest run required-checks-contract` first, which proves they are the strings GitHub publishes today. Never type `verify` or `e2e` — those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
+      "knownLimit": "The probe reports; it cannot enable protection, and it deliberately still exits 0 on an honestly-documented absence — failing a scheduled audit over a console action nobody in CI can perform would make the audit a permanent red that people learn to ignore. What changed is that the finding now reaches a person: the audit opens and updates one merge-gate-unenforced issue when the acceptance goes stale, or when ADR 015's own precondition is met. Until 2026-08-31 this probe's finding went into a log file and stopped, which made it the only control here whose result nothing carried. Since 2026-09-26 the probe reads repository rulesets as well as classic protection (a ruleset-only gate read as `absent` before), and judges strict mode, a required pull request and bypass actors as well as contexts. It cannot see a ruleset's bypass list with the workflow token — GitHub shows bypass_actors only to a writer — so without CONTROL_AUDIT_TOKEN a ruleset-governed main reads `unevaluable`, never `absent` or `enforced`. Code-owner review is reported, never required: with one human maintainer it deadlocks, because GitHub blocks self-approval.",
+      "humanAction": "Follow docs/runbooks/main-ruleset.md: create the ruleset from its JSON (the three exact contexts, strict, a pull request required, no bypass actors), read it back with scripts/probe-branch-protection.mjs, then prove a known-bad pull request is refused with scripts/probe-merge-denial.mjs — which reads mergeability and never presses merge, because main auto-deploys. Run `pnpm exec vitest run required-checks-contract` first. Never type `verify` or `e2e`: those are job IDs and would register two contexts nothing reports, blocking every PR permanently.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
       "acceptedSince": "2026-09-15",
@@ -66,12 +66,12 @@
     },
     {
       "id": "commerce-elimination-boundary",
-      "claims": "no commerce identifier, package, route or document can enter this repository without being classified in COMMERCE-ELIMINATION-CONTRACT.md or owned by a row in docs/commerce-dependency-register.md",
+      "claims": "no commerce identifier, package, route or document can enter this repository without being classified in COMMERCE-ELIMINATION-CONTRACT.md or owned by a row in docs/commerce-dependency-register.md; every register row and every whole-file exemption declares exactly the identifiers it excuses, reconciled as sets in both directions",
       "status": "configured",
       "probe": "scripts/verify-commerce-contract.mjs",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Three limits, each measured rather than assumed. (1) The position split is a lexer, not a parser: a `//` inside a string literal ends the code half early, which moves a token from `code` to `prose` and so weakens a finding rather than inventing one \u2014 asserted as a known limit in commerce-contract.test.ts rather than left to be discovered. (2) It reads tracked text files, so it cannot see a commerce dependency reached at runtime through a generated path, an env var assembled from fragments, or anything untracked \u2014 the bundle-level question belongs to a build-output scan, which does not exist yet. (3) `negative-control` and `specification` are whole-file exemptions: a file classified either way may carry any identifier anywhere in it, so a genuine regression inside one of those files would not be seen. Each class has an earning condition that is itself checked, which bounds the blast radius without removing it.",
+      "knownLimit": "Three limits, each measured, two of them narrowed on 2026-09-26 (ADR 037). (1) The position split is a hand-written lexer — strings, templates with nested `${}`, regex literals, JSX — not a parser. commerce-lexer-differential.test.ts checks it line by line against the TypeScript compiler's own comment ranges on every tracked JS/TS file and fails on any disagreement, so its coverage is measured for the C family; the old lexer misread 661 lines in 67 files, and one misread hid an absolute finding, which is why 'weakens a finding rather than inventing one' was never the safe direction for a prohibition scanner. The `#` family (YAML, shell, dotenv) has no second implementation and is asserted by fixtures only; regex-versus-division is decided from the previous token, so `if (x) /re/` is outside it — the differential would name the file. (2) It reads tracked text files, so it cannot see a dependency reached at runtime through a generated path, an env var assembled from fragments, or anything untracked; what the build emits is scripts/scan-build-artifacts.mjs's question (control build-artifact-boundary). (3) `negative-control` and `specification` rows now declare in §4 `Carries` the exact identifiers their exemption covers, held as a set in both directions; what remains unseen is a further occurrence of an already-carried identifier inside such a file, and anything in `historical` files, which stay whole-file exempt by design.",
       "adr": "docs/adr/036-a-prohibition-in-prose-is-not-a-boundary.md",
       "backstop": "control:merge-gate"
     },
@@ -231,19 +231,19 @@
       "probeRunsIn": ".github/workflows/production-smoke.yml",
       "probeLibrary": "scripts/lib/premise-checks.mjs",
       "selfMonitoring": true,
-      "knownLimit": "One premise, down from six, and the narrowing is the limit worth stating. Five took Shopify data as input — shop locales, the collection set, spec metafields, order and payment counts, app-owned webhook subscriptions — and lost their subject when the read path went (WS-6, ADR 035). Only SHOPIFY-API-VERSION survives, because it is pure: a clock against a published retirement date. It still matters while /api/webhooks/shopify and /api/version name that version, which is until WS-7. It used to run downstream of a preflight that had not passed since 2026-08-15, so it was not running at all; its own step now needs no credential and carries no gate, which fixes that and buys nothing about the store, because nothing can currently see the store.",
+      "knownLimit": "One premise, and a different one. The six it held all lost their subject — five with the store's read path, SHOPIFY-API-VERSION with scripts/lib/api-version.mjs on 2026-09-26 — and a collector of nothing would write [] every run, which the reporter reads as 'all premises hold' (ADR 035). CHECKOUT-HOST-CNAME replaces them: checkout.<apex> still aliases the vendor's shops host, which is the premise WS-E's thirty-day retirement clock rests on. It is a DNS lookup with an NS control; a resolver that cannot answer is `unevaluable`, and then no drift file is written, so a timeout cannot close a real drift issue. It sees DNS only: it cannot tell who changed a record, and it is expected to drift — and be retired with the hostname — at the end of the WS-E clock.",
       "adr": "docs/adr/008-decisions-need-premise-detectors.md",
       "backstop": "control:smoke-liveness"
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 14 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 33 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
       "humanAction": "None while this reads green. When it opens an `assertions-dead` issue, read the log in the issue body before acting \u2014 it carries two different findings. A *dead* sentinel means a test executed deliberately-broken code and stayed green, so the invariant it names is unprotected now and the fix is in that test. A probe that *refused to start*, or evaluated nothing, means the control is dark and says nothing either way about the suite; the fix is in the probe or the job around it. That reporting channel did not exist until 2026-09-21: the step was `continue-on-error` with its only trace a cell in a job summary, and it had been refusing to start on every scheduled run because the steps above it write untracked `.log` files that `git status --porcelain` counts as a dirty tree.",
-      "knownLimit": "Covers 13 declared sentinels, not the whole suite \u2014 and only the 11 with a vitest runner are evaluated on a schedule, because the two Playwright ones each need a production build. Both counts are reconciled against SENTINELS by sentinel-inventory.test.ts; this entry claimed seventeen until 2026-09-21, and the control-audit job summary claimed twelve, and nothing compared either to the thirteen that exist. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move — which is why the probe reports `unapplicable` loudly rather than skipping.",
+      "knownLimit": "Covers 33 declared sentinels, not the whole suite \u2014 and only the 31 with a vitest runner are evaluated on a schedule, because the two Playwright ones each need a production build. Both counts are reconciled against SENTINELS by sentinel-inventory.test.ts; this entry claimed seventeen until 2026-09-21, and the control-audit job summary claimed twelve, and nothing compared either to the thirteen that exist. A dead assertion outside that set is invisible to it, and the sentinel anchors are exact strings that a refactor will move — which is why the probe reports `unapplicable` loudly rather than skipping.",
       "adr": "docs/adr/020-a-test-that-cannot-fail-is-documentation.md",
       "backstop": "human:weekly"
     },
@@ -326,7 +326,7 @@
       "probe": "src/tests/unit/rate-limit-prefix-uniqueness.test.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Static by necessity, not by preference. With Upstash unconfigured — every test environment today — the in-memory fallback allocates a fresh Map per limiter and ignores the prefix entirely, so a collision is invisible to any test that drives requests through a route and appears only in production. A prefix built from a constant rather than written inline would also be missed, which is why the check asserts it found at least five limiters.",
+      "knownLimit": "Static by necessity, not by preference. With Upstash unconfigured — every test environment today — the in-memory fallback allocates a fresh Map per limiter and ignores the prefix entirely, so a collision is invisible to any test that drives requests through a route and appears only in production. A prefix built from a constant rather than written inline would also be missed, which is why the check asserts it found at least three limiters (there are four since /api/revalidate was deleted on 2026-09-25).",
       "backstop": "control:merge-gate"
     },
     {
@@ -337,6 +337,177 @@
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
       "knownLimit": "Reconciles the declared environments, not the measured coverage. A module whose branch count depends on some *other* ambient difference — a locale, a TZ, a Node minor — is outside it. The real defence against that class is a test stubbing both arms, as config-env-branches.test.ts does for src/config; this control only removes the one difference that had already cost three red CI runs on 2026-09-18 while every local run was clean.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "contact-send-honesty",
+      "claims": "/api/contact reports success only when the mail provider returns a message id, and logs a refusal by error name and status code only, never the visitor's name, address or message",
+      "status": "configured",
+      "probe": "src/tests/unit/api-contact-route.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "The provider is mocked at the module boundary in the shape resend@6.28.1 returns ({ data, error }, never a throw on an API error — which is how the route answered { success: true } for refused sends until 2026-09-25: the old mock resolved { id } at the top level, so the suite could not see it). A future SDK major that changed the shape would pass these tests against a stale fixture. A successful send is not logged, so delivery volume is not observable from the logs.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "rate-limit-ip-pseudonymisation",
+      "claims": "no client IP is written to a rate-limit store: bucket keys are HMAC-SHA256 under RATE_LIMIT_KEY_SECRET, or SHA-256 under a versioned domain-separation prefix when that is unset, and /api/health reports which",
+      "status": "configured",
+      "probe": "src/tests/unit/rateLimit.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "The in-memory fallback's map key is not observable from a test, so only the Upstash identifier is asserted directly; a mutation that keyed the map on the raw IP would stay green. 'unkeyed' is pseudonymous, not anonymous: the prefix is public and the IPv4 space is enumerable, which the privacy page says in those words. The Node-runtime premise the HMAC depends on is checked by an AST walk of importers that sees only a literal `export const runtime = 'edge'`.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "analytics-sink-allowlist",
+      "claims": "the /api/analytics log line carries exactly the fields the AnalyticsEvent union defines, so a price or any other undeclared field posted to it is dropped rather than logged",
+      "status": "configured",
+      "probe": "src/tests/unit/api-analytics-route.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Equality with the union is enforced at compile time by `satisfies Record<EventField, …>`, so it depends on tsc running in the gate; the test pins the runtime side. The allowlist is the union's field set, not per event: a direct POST can attach one event's field to another, bounded and sanitised.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "live-surface-evidence",
+      "claims": "any commerce the live site serves is classified by where in the chain it appears — source/build, alias/DNS/CDN, external retrieval, or clean — from dated, hashed, build-identified responses across apex, www and the deployment URL",
+      "status": "configured",
+      "probe": "scripts/probe-live-surface.mjs",
+      "probeLibrary": "scripts/lib/live-surface.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "selfMonitoring": false,
+      "knownLimit": "Report-only: it files no issue and its exit 1 is absorbed by continue-on-error, because the purchase-era copy it observes (shipping and returns terms) is in source pending WS-H legal review, and a red that nobody in CI can clear is the ADR 011 muting pattern. HTTP only — cookies, storage and service workers are e2e/fresh-session.spec.ts's question. A Vercel-protected deployment URL (401) cannot be compared, so commerce on the edge with the deployment unobserved is `unevaluable` rather than guessed. The visible-price detector is a regex over stripped HTML, pinned both ways by fixtures and by a clean run over 35 prerendered pages; its coverage beyond those is unknown (ADR 007). The external-retrieval input is a flag a human sets; nothing measures it.",
+      "backstop": "human:weekly"
+    },
+    {
+      "id": "merge-denial-proof",
+      "claims": "GitHub refuses to merge a known-bad pull request into main, proven by reading mergeability and the failing required check rather than by attempting the merge",
+      "status": "not-configured",
+      "probe": "scripts/probe-merge-denial.mjs",
+      "probeLibrary": "scripts/lib/merge-denial.mjs",
+      "probeRunsIn": "docs/runbooks/main-ruleset.md",
+      "selfMonitoring": false,
+      "knownLimit": "A one-off proof, run by hand against a canary pull request: it proves the gate held at that moment for that head commit, not afterwards — probe-branch-protection.mjs is what keeps asking. It trusts GitHub's mergeable_state as the definition of 'would be refused'. It cannot merge by construction (one GET-only helper, statically asserted by its test), so it cannot show the refusal message a person would see.",
+      "humanAction": "After creating the ruleset from docs/runbooks/main-ruleset.md: grant permission to push a canary branch whose required check fails on purpose, then run step 3 of that runbook and record the `denied` evidence it prints. Never press merge on the canary: main auto-deploys to production.",
+      "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
+      "backstop": "human:weekly",
+      "acceptedSince": "2026-09-26",
+      "acceptedWhy": "Not configured because the thing it proves does not exist yet: main has no ruleset, so a canary would read NOT-DENIED by definition. It becomes runnable the day the owner creates the ruleset from the runbook, and it is a one-off proof by design rather than a schedule."
+    },
+    {
+      "id": "codeowners-coverage",
+      "claims": "every file that defines the commerce boundary, the control registry or the deploy configuration has a named owner, and every ownership rule matches a tracked file",
+      "status": "configured",
+      "probe": "src/tests/unit/codeowners.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Ownership requests a review; it does not block one. Required code-owner review deadlocks a one-maintainer repository — GitHub blocks self-approval — so it stays off until a second human reviewer exists. Rules are held to root-anchored, glob-free paths so matching has one answer; the matcher does not implement GitHub's full gitignore grammar.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "safety-denylist-parity",
+      "claims": "docs/safety.md lists exactly the paths gate.yaml denies to an unattended loop",
+      "status": "configured",
+      "probe": "src/tests/unit/safety-denylist-parity.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Compares the two lists, not their effect: it cannot tell whether the loop actually honours gate.yaml. The prose list omitted vercel.json for a month before this existed.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "claims-registry",
+      "claims": "a health, skin, imaging, regulatory, corrosion or durability claim renders its proposed wording only when a named reviewer has approved it, the approval is current, and a cited document covers the thing described; otherwise it renders its neutral fallback",
+      "status": "configured",
+      "probe": "src/tests/unit/claims-registry.test.ts",
+      "probeLibrary": "src/lib/catalog/claims.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": false,
+      "knownLimit": "It governs claims that arrive as registry records; a claim written straight into copy never reaches the resolver, which is claim-lexicon's job. Expiry changes what renders and never fails a build (ADR 029), so a lapsed approval reverts silently until a scheduled claimsNearingExpiry() probe exists. Evidence is a document reference and a reviewer's name; nothing verifies the document says what the reviewer recorded. Under the owner's 'enforce now' decision (2026-09-25) every record is pending, so today it proves the fallback path and, by fixture, the approved path.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "claim-lexicon",
+      "claims": "no rendered page, component, config constant, metadata field or catalogue record states a health, skin, imaging, regulatory or corrosion claim outside an approved claim's exact wording",
+      "status": "configured",
+      "probe": "src/tests/unit/claim-lexicon.test.tsx",
+      "probeLibrary": "src/lib/catalog/claim-lexicon.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "A word list, so its coverage is a floor (ADR 007): each term is generalised from wording that was live on the site, and a claim in words nobody has used yet passes. Rendered checks cover the pages the test imports; the source scan covers src/app, src/components, src/config and src/lib/data, and in src/content only rendered fields. Text reached at runtime from outside those, or split across elements inside a word, is invisible.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "legal-review-inventory",
+      "claims": "commercial terms of sale (free shipping, returns, refunds, warranty, dispatch and delivery times, a purchase route) change only with a WS-H legal-review decision, and appear on no surface outside the pages that hold them",
+      "status": "configured",
+      "probe": "src/tests/unit/legal-review-inventory.test.tsx",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "It counts; it does not judge. A reworded term that keeps every count equal passes, and a term phrased outside its patterns is invisible. /privacy and the API routes are excluded from containment by stated reason. The pins record the text as it stood on 2026-09-26; whether any of it is lawful or still honoured is the adviser's question, not this test's.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "build-artifact-boundary",
+      "claims": "nothing the contract forbids reaches the build output: no commerce identifier or forbidden host in any client asset, no absolute-scope identifier or credential-shaped value anywhere, and vendor residue in server output only where a registered WS-F route compiles it",
+      "status": "configured",
+      "probe": "scripts/scan-build-artifacts.mjs",
+      "probeLibrary": "scripts/lib/artifact-scan.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "It reads what `next build` emitted on the runner, and PR builds restore .next/cache; builds on main run cold, so the deployed commit's artifact is always scanned from a clean build. It judges text: a value assembled at runtime from fragments, or fetched rather than bundled, is invisible to it — that is the egress controls' question. The staged-residue allowance is derived from the register's WS-F rows and the build's own chunk graph, so it shrinks to nothing on the day the webhook route is deleted. A matched credential-shaped value is reported by identifier, file and offset, never printed.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "browser-egress-boundary",
+      "claims": "no page in any E2E journey requests an origin outside contract §12's browser allowlist or any §13 host, and none triggers a Content-Security-Policy violation",
+      "status": "configured",
+      "probe": "e2e/support/test.ts",
+      "probeLibrary": "scripts/lib/egress.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "It sees what the specs visit, through context.on('request'); a request the CSP blocks never reaches that listener, which is why violations are collected separately. Coverage is the union of the journeys the specs take, not every reachable page state. e2e-fixture-boundary.test.ts fails any spec that imports `test` from @playwright/test directly, so a new spec cannot step outside the fixture.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "server-egress-boundary",
+      "claims": "the API route handlers reach only contract §12's server allowlist — the mail provider and the rate-limit store — and nothing in §13",
+      "status": "configured",
+      "probe": "src/tests/unit/server-egress.test.ts",
+      "probeLibrary": "scripts/lib/egress.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "It sees only globalThis.fetch: a handler that opened a raw socket, or an SDK that brought its own HTTP client, would be invisible. The SDKs are deliberately not mocked — a mocked SDK never calls fetch and the test would pass on an empty list — and two anti-vacuity assertions prove the stub is in their path. The webhook route is not exercised: it answers only an HMAC-signed delivery, makes no outbound call, and goes with WS-F.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "csp-contract",
+      "claims": "every response carries a Content-Security-Policy whose connect-src is exactly 'self', with no forbidden host in any directive and no 'unsafe-eval'",
+      "status": "configured",
+      "probe": "src/tests/unit/csp-contract.test.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "script-src and style-src keep 'unsafe-inline': a nonce would force every page to render dynamically and give up static generation, so the policy's strength is in connect-src, object-src, base-uri and frame-ancestors rather than in script origins. The Vercel preview toolbar (vercel.live) is blocked on previews, deliberately.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "retired-route-matrix",
+      "claims": "every retired commerce URL answers its contract §7 status and location for GET, HEAD and a stale POST, with and without a trailing slash, an encoded segment or a query string, asserted by status code without following redirects",
+      "status": "configured",
+      "probe": "e2e/retired-routes.spec.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "The variants are generated from §7, so a route family missing from the contract is missing from the matrix too — commerce-route-inventory.test.ts reconciles §7 against the filesystem and next.config.ts to close that. Concrete examples stand in for each `:path*` family; an exotic path shape no example resembles is not exercised.",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "fresh-session-storage",
+      "claims": "a visitor who opens every approved page leaves with no cookie, no sessionStorage, no service worker, no Cache Storage and no IndexedDB, and with at most the one consent key in localStorage — and only after answering the banner",
+      "status": "configured",
+      "probe": "e2e/fresh-session.spec.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "It covers the journeys the spec takes on the two configured browser projects; storage written by a flow it does not exercise is not seen. The contact form's positive control stubs /api/contact, so it proves the form still submits, not that mail is delivered — contact-send-honesty and server-egress-boundary cover the server half.",
       "backstop": "control:merge-gate"
     }
   ],
