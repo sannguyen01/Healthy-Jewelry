@@ -126,6 +126,10 @@ export const CANONICAL_FINDINGS = /** @type {const} */ ([
  *   see {@link classifyResponseOrigin}.
  * @property {string} [detail] transport failure description, when not `ok`
  * @property {number} [status] final HTTP status, after following redirects
+ * @property {number | null} [redirectStatus] the status of the FIRST hop that redirected,
+ *   or null when nothing did. Kept apart from `status` because a followed chain ends at the
+ *   status of whatever answered, and a finding about a redirect has to name the redirect —
+ *   see the "answers 200 and redirects" sentence this field exists to make impossible.
  * @property {string[]} [chain] hostnames traversed in order, ending with the one that answered
  * @property {string | null} [server] the `server` response header
  * @property {{ build?: { commit?: string | null, vercelEnv?: string | null },
@@ -280,11 +284,18 @@ export function decideCanonicalDomain({ observations, apexHost, expectedCommit =
       // absolute URL this application emits — JSON-LD, the OG card, the sitemap, the
       // canonical link, every `SITE_URL` interpolation — names a host that serves nothing
       // but a hand-off, and a crawler following a 307 is told the move is temporary.
+      // `redirectStatus`, never `status`. The chain was followed, so `status` is what the
+      // *destination* answered — 200 — and interpolating it produced "answers 200 and
+      // redirects", a sentence describing two different hops as though they were one.
+      // Falls back to `status` only so a caller that predates the field still gets a
+      // number rather than `undefined` in an issue body.
+      const answered = o.redirectStatus ?? o.status
       add(
         'apex-redirected',
-        `${apexHost} answers ${o.status} and redirects to ${landed}, so the canonical ` +
-          `origin serves no content of its own. The redirect belongs on ${landed}, ` +
-          `pointing at ${apexHost}, and it should be permanent (308).`
+        `${apexHost} answers ${answered} and redirects to ${landed}, so the canonical ` +
+          `origin serves no content of its own — ${landed} is what a visitor actually ` +
+          `reaches. The redirect belongs on ${landed}, pointing at ${apexHost}, and it ` +
+          `should be permanent (308).`
       )
     } else if (o.host !== apexHost && landed !== apexHost && !apexHandsOver) {
       // `www` is expected to hand over to the apex. Serving its own copy is not an outage,
