@@ -184,7 +184,7 @@
     },
     {
       "id": "dependency-scope-gate",
-      "claims": "a pull request cannot raise the major of next, react, react-dom or any @shopify/* package without a written rationale in its description",
+      "claims": "a pull request cannot raise the major of next, react or react-dom without a written rationale in its description",
       "status": "configured",
       "probe": "scripts/audit-dependency-scope.mjs",
       "probeRunsIn": ".github/workflows/ci.yml",

@@ -68,13 +68,13 @@ now has a check that can fail (§4, §10).
 
 | Fact | Value | Source |
 |---|---|---|
-| Unit tests | **107 files · 3225 passed · 6 skipped · 0 failed** | `pnpm exec vitest run` |
+| Unit tests | **107 files · 3244 passed · 6 skipped · 0 failed** (98.49% statements) | `pnpm exec vitest run --coverage` |
 | E2E | **696 passed · 8 skipped · 0 failed** (chromium + mobile, production build) | `pnpm e2e` |
 | E2E before this work | 462 passed | same, at `1b6ae81` |
 | Registered controls | **45** (29 before) | `docs/controls.json` |
 | Mutation sentinels | **33** — all **31** vitest sentinels proven `alive` | `node scripts/probe-assertion-liveness.mjs` |
 | Build-output scan | 238 client assets · 317 server files · 149 source maps inspected · **0 blocking** | `node scripts/scan-build-artifacts.mjs` |
-| Register rows | **53 → 36** | `pnpm verify:commerce-contract --summary` |
+| Register rows | **53 → 34** | `pnpm verify:commerce-contract --summary` |
 | CI on PR #90 | all three required contexts green at each pushed integration step | GitHub checks |
 
 Register burn-down by workstream:
@@ -83,7 +83,7 @@ Register burn-down by workstream:
 |---|---|---|---|
 | A | 12 | 1 | revalidate route, vendor config, API-version module and their tests; version route rewritten |
 | B | 1 | 0 | the handle-contract test's built-in exemption left with its subject |
-| C | 21 | 14 | diagnose-deployment, the API-version pin and premise, their tests |
+| C | 21 | 12 | diagnose-deployment, the API-version pin and premise, their tests; then the escalation caveat's vendor-specific cause and the Playwright web server's commerce env, the only two rows a row-by-row audit found closable before WS-F |
 | D | 2 | 3 | +1 runbook |
 | E | 1 | 2 | +1 runbook |
 | F | 8 | 9 | +1 runbook; the webhook route and its HMAC utilities stay, by design |
@@ -281,7 +281,7 @@ production-build E2E, then preview probes.
 |---|---|---|---|
 | 1 | `main` refuses a pull request with a failing required check | `probe-merge-denial.mjs` against a canary, `denied` | waiting on the ruleset |
 | 2 | A clean clone builds and tests without commerce credentials | CI on a fresh runner | met, except the webhook's mock secret |
-| 3 | The register is empty under the phase rule | `verify:commerce-contract`, phase `complete` | 36 rows |
+| 3 | The register is empty under the phase rule | `verify:commerce-contract`, phase `complete` | 34 rows |
 | 4 | Source, lockfile, build output, browser traffic and server calls show no commerce dependency | scanner, `auditPackages`, artifact scan, egress fixture, server harness | met, except the retained route |
 | 5 | Every legacy path and the checkout host give the approved answer | retired-route matrix; live-surface probe | paths met; host waits on WS-E |
 | 6 | No environment holds an unnecessary commerce variable | `vercel env ls` per runbook | waiting on WS-D |

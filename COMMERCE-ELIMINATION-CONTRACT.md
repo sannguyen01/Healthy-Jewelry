@@ -164,7 +164,7 @@ rather than the reverse.
 | `docs/shopify-policies/**` | superseded | Policy drafts to be pasted into Shopify Admin. |  |
 | `SHOPIFY_SETUP.md` | superseded | Describes switching Shopify on. |  |
 | `COMMERCE-ELIMINATION-CONTRACT.md` | specification | This file names every identifier it forbids, and is the input the scanner parses. | admin-api-path checkout-handoff customer-identity inventory-check payment-provider shopify-env shopify-host shopify-name storefront-token-header |
-| `docs/commerce-dependency-register.md` | specification | The register names the paths it tracks, and is the scanner's second input. | shopify-env shopify-host shopify-name |
+| `docs/commerce-dependency-register.md` | specification | The register names the paths it tracks, and is the scanner's second input. | shopify-env shopify-name |
 | `scripts/lib/commerce-contract.mjs` | negative-control | The scanner. | — |
 | `scripts/verify-commerce-contract.mjs` | negative-control | Its driver. | — |
 | `src/tests/unit/commerce-contract.test.ts` | negative-control | Its tests, including the mutations that prove it can fail. | admin-api-path cart-mutation checkout-handoff customer-identity discount-machinery draft-order graphql-endpoint inventory-check payment-provider shopify-env shopify-host shopify-name storefront-token-header |

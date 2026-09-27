@@ -74,8 +74,6 @@ Workflows, probes, gates, fixtures and the machinery that watches them.
 | `.github/workflows/ci.yml` | shopify-env shopify-host shopify-name | GitHub Actions | push and pull_request | credential names | rewrite — drop the mock storefront env block once no test reads it | `src/tests/unit/workflow-validity.test.ts` | WS-C |
 | `.github/workflows/production-smoke.yml` | shopify-env shopify-name | GitHub Actions | Six-hourly cron | credential names | rewrite — retire the Shopify tier once the browse-only smoke files issues | `src/tests/unit/smoke-liveness.test.ts` | WS-C |
 | `docs/controls.json` | shopify-env shopify-name | Control registry | Six-hourly control audit | credential names | rewrite — retire the controls whose subject the decommission deletes (ADR 035) | `src/tests/unit/control-registry.test.ts` | WS-C |
-| `playwright.config.ts` | shopify-env shopify-host shopify-name | Playwright | Every E2E run | public config | delete the mock storefront env injected into the web server | `e2e/retired-routes.spec.ts` | WS-C |
-| `scripts/lib/escalation.mjs` | shopify-name | Escalation decision | Production smoke | credential names | rewrite — the equivalence relation stays, its Shopify-shaped messages go | `src/tests/unit/escalation-decision.test.ts` | WS-C |
 | `scripts/preflight-secrets.mjs` | shopify-env shopify-host shopify-name | Smoke preflight | Production smoke, six-hourly | credential names | rewrite — it gates on five secrets that are being revoked | `src/tests/unit/preflight-secrets.test.ts` | WS-C |
 | `scripts/probe-assertion-liveness.mjs` | shopify-env shopify-host shopify-name | Mutation probe | Weekly control audit | credential names | rewrite — its env scaffolding injects a mock storefront | `src/tests/unit/probe-liveness-decision.test.ts` | WS-C |
 | `scripts/verify-premises.mjs` | shopify-name | Premise driver | Production smoke | none | delete when the retired-premise record goes — since 2026-09-26 it drives only CHECKOUT-HOST-CNAME, and the vendor name it carries is the list of premise ids retired with their subject | `src/tests/unit/verify-premises.test.ts` | WS-C |
@@ -102,7 +100,7 @@ Hostnames, and the one that still resolves into Shopify.
 
 | Path | Identifiers | Owning system | Trigger | Data | Action | Proven by | Workstream |
 |---|---|---|---|---|---|---|---|
-| `docs/dns-domain-setup.md` | shopify-host shopify-name | DNS and domains | Any change to apex, `www` or the checkout hostname | none | rewrite — the checkout CNAME still points at `shops.myshopify.com` and is retired on a 30-day clock, not deleted on a whim | `scripts/probe-canonical-domain.mjs` | WS-E |
+| `docs/dns-domain-setup.md` | shopify-name | DNS and domains | Any change to apex, `www` or the checkout hostname | none | rewrite — what remains is the warning not to complete the vendor's "Connect existing domain" flow, true until the store closes (WS-F); the checkout CNAME and its 30-day clock are `docs/runbooks/ws-e-dns.md`'s | `scripts/probe-canonical-domain.mjs` | WS-E |
 | `docs/runbooks/ws-e-dns.md` | shopify-host shopify-name | DNS and domains | Read by a person before any change to apex, `www`, the checkout hostname or CAA | none | delete when WS-E completes — the checkout CNAME it names is the thing WS-E retires | `scripts/verify-premises.mjs` | WS-E |
 
 ### WS-G — Analytics and privacy

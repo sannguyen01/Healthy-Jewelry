@@ -41,9 +41,8 @@ import { intersection, settle, OVERHANG_TOLERANCE_PX } from './support/viewportF
  * One product per distinct viewBox ratio, covering all five that shipped. Fewer than
  * five and the spread assertion below is measuring a subset of the problem.
  *
- * Every handle resolves through the static fallback catalogue (`src/lib/data/hj-data.ts`),
- * which is what the suite serves: `placeholder.myshopify.com` cannot be fetched, so
- * `isShopifyConfigured()` is false and every product renders the illustration branch.
+ * Every handle resolves through the reviewed catalogue (`src/content/catalog/`), the only
+ * product source there is; a product with no photograph renders the illustration branch.
  */
 const REPRESENTATIVES = [
   { handle: 'arc-band-titanium', svgType: 'ring-arc', ratio: '1:1' },

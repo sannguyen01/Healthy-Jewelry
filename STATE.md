@@ -41,7 +41,7 @@ of one workstream itself.
 
 **Measured at the end:** 107 unit files / 3225 passed; E2E 696 passed (462 before); 45 controls
 (29 before); all 31 vitest sentinels alive; the build-output scan clean over 238 client assets;
-register 53 → 36 rows. What is left is almost all console, credential, DNS and legal work,
+register 53 → 34 rows. What is left is almost all console, credential, DNS and legal work,
 each with a runbook that starts read-only and ends with an empty evidence table. The first of
 them is the `main` ruleset, and nothing in PR #90 should merge before it exists.
 
@@ -54,6 +54,17 @@ told the owner to remove the one variable the retained webhook route uses for it
 check, which switches off silently when the variable is absent; it now leaves with the signing
 secret, after WS-F. Neither had a failing test, because each was correct in isolation: the
 probe's detectors were right, and the runbook's list was right about every other variable.
+
+**Then every remaining register row was audited for what a repository could close before WS-F.**
+Of 36, two closed: the smoke-escalation caveat named the vendor as a likely cause of a live
+failure, and the Playwright web server was handed two commerce values only the webhook route
+reads. The rest are tied to live state — the webhook route, the smoke workflow's real secrets,
+two decommissioned tokens still configured in repository settings, the checkout CNAME's clock
+— or are dated records whose precision is the point. Rewording those to hide a vendor's name
+would have closed rows by making the history vaguer, which is a burn-down metric being gamed
+rather than work being finished. Two real errors surfaced on the way: the dependency-scope
+control still claimed to cover the vendor's packages, and the DNS guide still offered the
+vendor's hosted customer-accounts pages on a brand subdomain, which contract §3 forbids.
 
 ## Session note — 2026-09-25
 

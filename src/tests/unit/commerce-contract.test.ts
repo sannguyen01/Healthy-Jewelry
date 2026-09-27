@@ -89,10 +89,12 @@ const register = parseRegister(read(REGISTER_PATH))
  * 40 after WS-A merged (eleven WS-A rows, the WS-G analytics row and one WS-C test row closed);
  * 36 after WS-C3 (six WS-C rows closed with diagnose-deployment and the API-version premise, three
  * runbook rows opened in WS-D/E/F, and the WS-B handle-contract row closed with the exemption it
- * guarded). Recomputed by the integrator after each workstream branch merges; `pnpm
- * verify:commerce-contract --summary` prints the live figure by workstream.
+ * guarded); 34 on 2026-09-27, when a row-by-row audit found the only two a repository could
+ * close before WS-F — the escalation caveat's vendor-specific cause and the Playwright web
+ * server's commerce env, both WS-C. Recomputed by the integrator after each change that closes
+ * a row; `pnpm verify:commerce-contract --summary` prints the live figure by workstream.
  */
-const EXPECTED_REGISTER_ROWS = 36
+const EXPECTED_REGISTER_ROWS = 34
 
 /** A file that trips nothing, used as the negative case for every rule below. */
 const INERT = { path: 'src/lib/inert.ts', source: 'export const x = 1\n' }

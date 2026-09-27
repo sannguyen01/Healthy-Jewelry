@@ -67,11 +67,11 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     // Covers a cold `next build` on a shared runner as well as server startup.
     timeout: 180_000,
+    // Only what a page reads. The two commerce values this block used to inject were
+    // read by the webhook route alone, which no E2E spec exercises; CI still sets them for
+    // the build through ci.yml's env until that route leaves under WS-F.
     env: {
-      NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN:
-        process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN || 'placeholder.myshopify.com',
       NEXT_PUBLIC_SITE_URL: 'http://localhost:3000',
-      SHOPIFY_WEBHOOK_SECRET: process.env.SHOPIFY_WEBHOOK_SECRET || 'placeholder-secret',
     },
   },
 })

@@ -30,7 +30,7 @@ executes every part a repository can.
   runbooks for the console-only work.
 - **WS-A deletions:** `/api/revalidate`, the vendor config modules, the API-version pin,
   diagnose-deployment; the mock commerce environment shrinks to what the webhook route reads.
-- Register 53 → 36 rows. 45 controls, 33 sentinels, all 31 vitest sentinels alive.
+- Register 53 → 34 rows. 45 controls, 33 sentinels, all 31 vitest sentinels alive.
 - **Review pass on the integrated diff.** Two CI failures fixed at the cause: the lexer
   differential parsed every tracked script twice and passed 5s under coverage; the claim
   detector's two unreachable branches put it under the per-file branch floor. `/simplify`
