@@ -98,9 +98,21 @@ export function compilerProseMask(filePath: string, source: string): Uint8Array 
   return mask
 }
 
+/**
+ * One compiler pass per file, shared by every comparison that needs it. The whole-tree
+ * checks below ask for each file's mask twice — once for identifiers, once for lines — and
+ * the parse and the token walk are the whole cost of this file.
+ */
+const masks = new WeakMap<File, Uint8Array>()
+function compilerMaskOf(file: File): Uint8Array {
+  let mask = masks.get(file)
+  if (!mask) masks.set(file, (mask = compilerProseMask(file.path, file.source)))
+  return mask
+}
+
 /** `occurrences()`, re-derived from the compiler's comment ranges instead of the scanner's. */
 export const compilerOccurrences: Scanner = (file, c) => {
-  const { code, prose } = linesFromMask(file.source, compilerProseMask(file.path, file.source))
+  const { code, prose } = linesFromMask(file.source, compilerMaskOf(file))
   const found: Occurrence[] = []
   for (const ident of c.identifiers as { id: string; pattern: RegExp }[]) {
     for (const [position, lines] of [
@@ -136,7 +148,7 @@ export function identifierDisagreements(file: File, scanner: Scanner = occurrenc
 export function lineDisagreements(file: File): string[] {
   const language = languageOf(file.path)
   const ours = splitPositions(file.source, language)
-  const theirs = linesFromMask(file.source, compilerProseMask(file.path, file.source))
+  const theirs = linesFromMask(file.source, compilerMaskOf(file))
   const out: string[] = []
   ours.code.forEach((l: string, i: number) => {
     if (l !== theirs.code[i]) {
@@ -247,6 +259,15 @@ describe('the comparator can fail', () => {
   })
 })
 
+/**
+ * The whole-tree checks are O(tracked files) through the TypeScript compiler: about 2.5s on
+ * a laptop in isolation, and past vitest's 5s default on a 4-vCPU CI runner with coverage on
+ * and every other spec file competing for the same cores — which is how this first went red.
+ * The budget is for the tree, not a tolerance for a slow lexer: a pathological regression
+ * shows up as minutes, and the mask cache above keeps the second check near free.
+ */
+const WHOLE_TREE_TIMEOUT_MS = 60_000
+
 describe('every tracked script, lexed twice', () => {
   const files: File[] = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
     .toString('utf8')
@@ -271,7 +292,7 @@ describe('every tracked script, lexed twice', () => {
         'code or comment. Where the scanner says prose and the compiler says code, a finding is ' +
         'being hidden. Fix the lexer in scripts/lib/commerce-contract.mjs, never the file.'
     ).toEqual([])
-  })
+  }, WHOLE_TREE_TIMEOUT_MS)
 
   it('agrees on the split of every line, identifier or not', () => {
     const found = files.flatMap((f) => lineDisagreements(f))
@@ -281,5 +302,5 @@ describe('every tracked script, lexed twice', () => {
         `check above would say so — but each is a finding that will be hidden or invented the ` +
         `day one lands there.`
     ).toEqual([])
-  })
+  }, WHOLE_TREE_TIMEOUT_MS)
 })
