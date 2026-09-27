@@ -31,6 +31,15 @@ executes every part a repository can.
 - **WS-A deletions:** `/api/revalidate`, the vendor config modules, the API-version pin,
   diagnose-deployment; the mock commerce environment shrinks to what the webhook route reads.
 - Register 53 → 36 rows. 45 controls, 33 sentinels, all 31 vitest sentinels alive.
+- **Review pass on the integrated diff.** Two CI failures fixed at the cause: the lexer
+  differential parsed every tracked script twice and passed 5s under coverage; the claim
+  detector's two unreachable branches put it under the per-file branch floor. `/simplify`
+  gave the §13 host matcher, §7 route reading and claim liveness rule one home each, and made
+  the scanner 3× faster with byte-identical output. `/code-review` found the live-surface
+  probe calling a retired route that correctly redirects "commerce" (it judged where the
+  redirect landed), the WS-D runbook removing the variable the webhook's shop-domain check
+  needs, and claims resolved once at import rather than at render — all fixed.
+  `/security-review` found nothing at the reporting bar.
 
 ## 2026-09-25 — PR #88: The commerce boundary becomes something the build checks
 

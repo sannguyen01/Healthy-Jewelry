@@ -45,6 +45,16 @@ register 53 → 36 rows. What is left is almost all console, credential, DNS and
 each with a runbook that starts read-only and ends with an empty evidence table. The first of
 them is the `main` ruleset, and nothing in PR #90 should merge before it exists.
 
+**The review pass found two defects the gate had passed, and both were the same shape as the
+ones above: a control that would have reported something false.** The live-surface probe
+follows same-site redirects, so `/cart` → 308 → `/shop` ended on `/shop`'s 200, and every
+retired route that redirects — eleven of §7's rows — would have read as live commerce and blamed
+the deployed commit. It now judges a retired path by its own first answer. And the WS-D runbook
+told the owner to remove the one variable the retained webhook route uses for its *which shop*
+check, which switches off silently when the variable is absent; it now leaves with the signing
+secret, after WS-F. Neither had a failing test, because each was correct in isolation: the
+probe's detectors were right, and the runbook's list was right about every other variable.
+
 ## Session note — 2026-09-25
 
 **Every prohibition this repository wrote as prose has been violated at least once, and

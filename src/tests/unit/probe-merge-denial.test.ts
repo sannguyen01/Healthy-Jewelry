@@ -151,6 +151,24 @@ describe('pollMergeable waits out GitHub computing mergeability lazily', () => {
     expect(attempts).toBe(3)
     expect(judgeDenial({ mergeableState: pr?.mergeable_state, requiredContexts: REQUIRED }).verdict).toBe('unevaluable')
   })
+
+  it('asks once and never sleeps when the first answer is already known, or when there is no backoff', async () => {
+    // The two edges of the loop's exit condition: a known state on the first read, and an
+    // empty schedule, where the only read is also the last.
+    for (const [delaysMs, state] of [
+      [[1, 2], 'blocked'],
+      [[], 'unknown'],
+    ] as const) {
+      const slept: number[] = []
+      const { pr, attempts } = await pollMergeable(async () => ({ mergeable_state: state }), {
+        delaysMs: [...delaysMs],
+        sleep: async (ms: number) => void slept.push(ms),
+      })
+      expect(attempts).toBe(1)
+      expect(pr?.mergeable_state).toBe(state)
+      expect(slept).toEqual([])
+    }
+  })
 })
 
 describe('the evidence record', () => {
