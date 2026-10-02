@@ -36,6 +36,12 @@ follows #90 (#93). ADR 038 is the pattern.
   `denied` now also requires draft/conflict/behind readings and head–merge agreement.
 - **Review.** `/code-review` (high) found ten defects in this work — the worst a `/policies` 308
   turned into a 404 — all fixed; `/security-review` found nothing reportable.
+- **Assertion liveness.** The full probe over the finished branch found 37 of 38 vitest
+  sentinels alive. `merge-denial-attribution` was dead: its mutation ORed in `mergeable`, the old
+  name of judgeDenial's "merge button works" local, and the gate-evidence commit had renamed that
+  local and added a `mergeable` *parameter* that every NOT-DENIED fixture left null. The anchor
+  still matched, so nothing but the probe could tell. The NOT-DENIED fixtures now also run under
+  the ready preconditions, and the sentinel names `buttonWorks` again: 38 of 38 alive.
 - **Agents.** Two were started and both stopped on the account session limit within minutes,
   leaving nothing. One integrator after that, by the owner's direction.
 
