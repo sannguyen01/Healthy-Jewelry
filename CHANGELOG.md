@@ -21,6 +21,11 @@ user-visible or architecturally significant changes.
 - **A sentinel a rename had killed is alive again.** `merge-denial-attribution` still applied
   after a refactor gave its variable a new meaning, and stayed green; the full liveness probe
   found it, and all 38 vitest sentinels are alive.
+- **The hero card's 60% cap can no longer be raised silently.** Its sentinel had been dead since
+  it was written: the cap never binds and the spec read its ceiling from the cap. The number is
+  now pinned to CLAUDE.md, and a separate browser sentinel proves the measurement fires.
+- **The claim-expiry experiment says what it did not prove.** Every verdict names the surfaces no
+  page carried before expiry. Today that is JSON-LD, because no claim reaches structured data.
 - [ADR 038](docs/adr/038-what-a-control-observes-is-not-what-it-claims.md); `AGENTS.md` lists the
   actions no agent takes; the masterplan's §6 is a state machine whose transitions need a recorded
   observation.

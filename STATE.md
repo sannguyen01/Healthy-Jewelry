@@ -42,6 +42,23 @@ follows #90 (#93). ADR 038 is the pattern.
   local and added a `mergeable` *parameter* that every NOT-DENIED fixture left null. The anchor
   still matched, so nothing but the probe could tell. The NOT-DENIED fixtures now also run under
   the ready preconditions, and the sentinel names `buttonWorks` again: 38 of 38 alive.
+- **The two browser sentinels, run by hand** (they need a production build and only run under
+  `--with-e2e`, never in the six-hourly audit). `product-tile-bound` is alive (10 tests red).
+  `hero-card-bound` had been **dead since it was written on 2026-08-28**. The card measures at
+  most 0.514 of the photograph, so the 0.60 cap never binds, and the hero spec reads its ceiling
+  from the same token. Raised to 0.98, nothing rendered moved and the ceiling moved with it: 48
+  passed. The claim "no more than 60%" could be changed silently. It is now two sentinels:
+  - `hero-card-bound` is a vitest sentinel. A `doc-numeric-claims` row pins the token to
+    CLAUDE.md's stated 0.60.
+  - `hero-card-measured` is a browser sentinel. It forces the card past its cap, which proves
+    the measurement fires.
+
+  That makes 41 sentinels, 39 vitest.
+- **Claim expiry, JSON-LD.** The question named JSON-LD and the experiment reads it, but no
+  builder routes a claim into structured data, so it was `false` in every baseline and silently
+  outside the verdict. Every verdict now names its `unexercised` surfaces. Re-run on `09fafad`:
+  **PASS** (2026-10-02T15:31:48.099Z). `/`, `/about` and `/materials` were each STALE once, then
+  a HIT without the wording; the share card regenerated; `unexercised: ['jsonLd']`.
 - **Agents.** Two were started and both stopped on the account session limit within minutes,
   leaving nothing. One integrator after that, by the owner's direction.
 

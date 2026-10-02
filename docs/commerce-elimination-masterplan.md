@@ -181,13 +181,13 @@ fail by a sentinel in `scripts/lib/sentinels.mjs`.
 
 | WS | Done in the repository | What remains | Blocked by |
 |---|---|---|---|
-| **A** Application | revalidate route, vendor config and API-version module deleted; version route keeps the fingerprint; contact honesty; IP pseudonymisation | the webhook route and `cacheTags.ts` | WS-F ordering |
-| **B** Content | claims registry; enforce-now copy; form taxonomy (17 unassigned); §8 read from the contract; legal-review inventory | a named reviewer approving claims against documents; a person assigning forms | evidence and reviewers |
-| **C** CI/CD | exact-set scanner; differential lexer; phase state; artifact scan; egress, CSP, route matrix, fresh session; ruleset-aware probe; merge-denial proof; live-surface probe; premise; CODEOWNERS; `merge_group` | retire the production-smoke vendor tier (`preflight-secrets.mjs`) with WS-F | WS-F |
+| **A** Application | revalidate route, vendor config and API-version module deleted; version route keeps the fingerprint; contact honesty; IP pseudonymisation; the 308 families are route handlers, so a stale action ends on its 410 page rather than re-posting to the successor (2026-10-02) | the webhook route and `cacheTags.ts` | WS-F ordering |
+| **B** Content | claims registry; enforce-now copy; form taxonomy (17 unassigned); §8 read from the contract; legal-review inventory; an expired approval leaves the served page within `CLAIM_WITHDRAWAL_BOUND_SECONDS` plus one request, measured by build-and-serve experiment (2026-10-02) | a named reviewer approving claims against documents; a person assigning forms; an expiry reminder to that reviewer, built with the first approval | evidence and reviewers |
+| **C** CI/CD | exact-set scanner; differential lexer; phase state; artifact scan; egress, CSP, route matrix, fresh session; ruleset-aware probe; merge-denial proof; live-surface probe; premise; CODEOWNERS; `merge_group`; denial withheld on draft, conflict, behind or head/merge disagreement; live surface read under a streaming cap and attributed after identity, with an issue a person must `/ack` (2026-10-02) | the canary, once the ruleset exists; retire the production-smoke vendor tier (`preflight-secrets.mjs`) with WS-F | the owner's ruleset; WS-F |
 | **D** Infrastructure | mock environment reduced to what code reads; runbook | remove variables from Vercel in all three environments; cold rebuild and scan | dashboard access |
 | **E** DNS | premise watching the checkout host; runbook | apex/`www` fix; the thirty-day checkout-host clock; CAA | dashboard access |
 | **F** Third-party | read-only inventory runbook | reconnect; inventory; reconcile 22 vs 17 products; delete subscriptions; delete the route; revoke by blast radius | connector re-authentication |
-| **G** Privacy | privacy page and banner truthful; analytics without a funnel; data-flow record with empty sign-off | a named privacy owner's sign-off; a way to withdraw consent as easily as it is given | a person |
+| **G** Privacy | privacy page and banner truthful; analytics without a funnel; data-flow record with empty sign-off; one strict schema per analytics event, search recorded as facets and never text; consent withdrawn from every footer and `/privacy` as easily as it is given (2026-10-02) | a named privacy owner's sign-off | a person |
 | **H** Retention | the finding (`ordersCount: 0`, dated correctly) | a Vietnam-qualified adviser's decision on retention, commercial terms and account closure | an adviser |
 | **I** Documentation | this file; ADR 037; agent guidance; records | closes with the last register row | every other WS |
 
@@ -369,6 +369,19 @@ discarded; ADR 038 records why that is the same lesson as the four findings. A h
 code review then found ten defects in the review's own changes — among them a `/policies` 308
 it had turned into a 404 — and all ten were fixed before the records were written.
 
+**The close-out ran the instruments against themselves.** The full liveness probe found
+`merge-denial-attribution` killed by the review's own rename. It was revived, and 38 of 38 vitest
+sentinels were alive. The two browser sentinels were then run by hand.
+
+`hero-card-bound` had been dead since 2026-08-28: a cap that never binds, read back by the spec
+that measures against it. It is now two sentinels, one pinning the number and one proving the
+measurement fires; 41 in all.
+
+The claim experiment was made to name what it did not exercise. JSON-LD carries no claim, so a
+PASS cannot speak for it. Its re-run on the final code PASSes and says so.
+
+The preview of this review could not be probed: see §12.
+
 ## 12. What could not be verified here, and why
 
 | Claim | Verifiable here? | Why not |
@@ -377,5 +390,6 @@ it had turned into a 404 — and all ten were fixed before the records were writ
 | The live site's HTML, headers and build identity | no | outbound requests to the domain are refused by this environment's proxy; the live-surface probe runs in GitHub Actions instead |
 | The checkout hostname still aliases the vendor | **yes**, 2026-09-26 | DNS resolves here; the premise holds |
 | Vercel variables, domains and deployment protection | no | no dashboard access; on 2026-10-02 the Vercel connector answered 403 for the team scope, so §7 records the owner's 2026-09-27 observations as theirs |
+| This review's preview deployment (`PREVIEW_VERIFIED`'s evidence) | no, re-tried 2026-10-02 | the environment's proxy refuses the preview's `*.vercel.app` host as it refuses the apex and `www` (CONNECT 403), and the connector's protection bypass answered 403 for the same team scope. The preview is reported Ready by its own bot; that is the platform's word, not an observation, so `PREVIEW_VERIFIED` stays unreached |
 | Webhook subscriptions, apps and the 22-vs-17 delta | no | the connector needs re-authentication |
 | Whether any material claim is *true* | no | not a property of a repository; the claims reviewer's question |
