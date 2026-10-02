@@ -276,7 +276,7 @@
       "probe": "e2e/hero-legibility.spec.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "The probe measures the card against the cap it reads from --hj-hero-card-max-ratio, so it cannot see the cap itself being raised: the card measures at most 0.514 of the photograph and 0.60 never binds, so at 0.98 nothing rendered moves and the ceiling moves with it (48 passed, 2026-10-02). The number is pinned instead by a doc-numeric-claims row against CLAUDE.md's stated 0.60, and the browser sentinel hero-card-measured proves the measurement fires on a card that outgrows its cap. That sentinel needs a production build and runs only under --with-e2e, never in the six-hourly audit.",
+      "knownLimit": "The probe measures the card against the cap it reads from --hj-hero-card-max-ratio, so it cannot see the cap itself being raised: the card measures at most 0.514 of the photograph and 0.60 never binds, so at 0.98 nothing rendered moves and the ceiling moves with it (48 passed, 2026-10-02). The number is pinned instead by a doc-numeric-claims row that reads every declaration of the token in src (stylesheet rules, media queries, style-object keys, setProperty) against CLAUDE.md's stated 0.60, and the browser sentinel hero-card-measured proves the measurement fires on a card that outgrows its cap. That sentinel needs a production build and runs only under --with-e2e, never in the six-hourly audit.",
       "adr": "docs/adr/013-a-protection-that-can-only-grow.md",
       "backstop": "control:merge-gate"
     },

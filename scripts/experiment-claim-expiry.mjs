@@ -174,11 +174,14 @@ async function main() {
   const json = JSON.stringify(report, null, 2)
   if (out) fs.writeFileSync(out, `${json}\n`)
   console.log(json)
-  // The verdict's limit, said where a person reads it rather than only inside the JSON.
-  if (judgement.unexercised.length > 0) {
+  // The verdict's limit, said where a person reads it rather than only inside the JSON. An
+  // unevaluable run is not a PASS with caveats, so it says what went wrong instead.
+  if (judgement.verdict === 'unevaluable') {
+    console.error(`[experiment] unevaluable (${judgement.reason}): the fixture's wording never rendered on the real clock`)
+  } else if (judgement.unexercised.length > 0) {
     console.error(
-      `[experiment] ${judgement.verdict} says nothing about: ${judgement.unexercised.join(', ')} — ` +
-        'inspected on every page, carried the wording on none before expiry'
+      `[experiment] ${judgement.verdict} cannot show withdrawal on: ${judgement.unexercised.join(', ')} — ` +
+        'no page carried the wording there before expiry'
     )
   }
   fs.rmSync(dir, { recursive: true, force: true })

@@ -112,11 +112,16 @@ export function wordingOn(html, wording) {
  * - `unevaluable` when the baseline (real clock) never showed the wording anywhere: the fixture
  *   did not render, so its later absence would prove nothing (ADR 020's vacuous green).
  * - `FAIL` when, after the clock passed expiry, any surface that carried the wording in the
- *   baseline still carries it on the last attempt.
- * - `PASS` when every such surface lost it — and the record says on which attempt, because "the
- *   first request after expiry was stale" is part of the measured bound, not a detail.
- * - Every verdict lists `unexercised`: surfaces inspected on every page that carried the wording
- *   on none in the baseline, so their absence afterwards proves nothing either way.
+ *   baseline still carries it on the last attempt — or any surface carries it there at all,
+ *   carried before or not (`appeared: true`): expired wording served is the failure, wherever it
+ *   turns up.
+ * - `PASS` when every such surface lost it and none gained it — and the record says on which
+ *   attempt, because "the first request after expiry was stale" is part of the measured bound,
+ *   not a detail.
+ * - Every verdict lists `unexercised`: surfaces that no page carried in the baseline. A PASS
+ *   proves withdrawal for exactly the (page, surface) pairs in `carried` — a surface carried on
+ *   one page is exercised on that page, not on the others — and for an unexercised surface it
+ *   proves only that the wording did not appear there.
  *
  * @param {{ baseline: Record<string, { visible: boolean, metadata: boolean, jsonLd: boolean }>, attempts: Record<string, Array<{ visible: boolean, metadata: boolean, jsonLd: boolean, cache?: string | null }>> }} observed
  */
@@ -129,9 +134,9 @@ export function judgeExpiry({ baseline, attempts }) {
       if (present) carried.push({ path, surface })
     }
   }
-  // Inspected on every page and carried on none: the verdict says nothing about these. JSON-LD
-  // is the standing case — no builder routes a claim into structured data — and a PASS that did
-  // not name it would read as if it covered the surface the brief asked about.
+  // Carried on no page: the verdict cannot show withdrawal there. JSON-LD is the standing case —
+  // no builder routes a claim into structured data — and a PASS that did not name it would read
+  // as if it covered the surface the brief asked about.
   const unexercised = [...inspected].filter((s) => !carried.some((c) => c.surface === s)).sort()
   if (carried.length === 0) {
     return { verdict: 'unevaluable', reason: 'fixture-never-rendered', carried, unexercised, lingering: [], withdrawnAt: {} }
@@ -147,6 +152,13 @@ export function judgeExpiry({ baseline, attempts }) {
     }
     const first = series.findIndex((a) => !a[surface])
     withdrawnAt[`${path} ${surface}`] = first + 1
+  }
+  for (const [path, series] of Object.entries(attempts)) {
+    const last = series[series.length - 1]
+    for (const surface of inspected) {
+      const wasCarried = carried.some((c) => c.path === path && c.surface === surface)
+      if (last?.[surface] && !wasCarried) lingering.push({ path, surface, attempts: series.length, appeared: true })
+    }
   }
   return lingering.length > 0
     ? { verdict: 'FAIL', reason: 'expired-wording-still-served', carried, unexercised, lingering, withdrawnAt }

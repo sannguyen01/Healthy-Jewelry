@@ -20,7 +20,7 @@ user-visible or architecturally significant changes.
   conflict-free, up-to-date pull request whose head and merge commit agree.
 - **A sentinel a rename had killed is alive again.** `merge-denial-attribution` still applied
   after a refactor gave its variable a new meaning, and stayed green; the full liveness probe
-  found it, and all 38 vitest sentinels are alive.
+  found it.
 - **The hero card's 60% cap can no longer be raised silently.** Its sentinel had been dead since
   it was written: the cap never binds and the spec read its ceiling from the cap. The number is
   now pinned to CLAUDE.md, and a separate browser sentinel proves the measurement fires.

@@ -53,9 +53,12 @@ describe('judgeDenial — each verdict from a known answer', () => {
   })
 
   // Under READY too, because that is how a canary the gate let through actually reads — not a
-  // draft, no conflicts, up to date. Without it the preconditions arrived null here, and a
-  // mutation that misread a working merge button as a block stayed green: it fell through to
-  // `precondition-unknown` on a fixture no real canary would produce.
+  // draft, no conflicts, up to date. Both rows matter. The "unread" rows catch a working button
+  // misread as a block (`|| buttonWorks`): it falls through to `precondition-unknown`, which is
+  // not NOT-DENIED. The "ready" rows are the only ones that catch the same mistake written
+  // against the `mergeable` *parameter* (`|| mergeable`) — null in every unread fixture, so a
+  // no-op there. That form is what merge-denial-attribution read after 7cdb6ea renamed the
+  // local, and with only unread rows it stayed green.
   it.each([
     ['clean', 'unread', {}],
     ['unstable', 'unread', {}],

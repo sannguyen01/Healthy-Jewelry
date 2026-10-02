@@ -181,6 +181,17 @@ describe('judgeExpiry — every verdict from a fixture', () => {
     expect(result).toMatchObject({ verdict: 'PASS', unexercised: [] })
   })
 
+  it('FAIL when the expired wording appears after expiry on a surface the baseline never carried', () => {
+    // An unexercised surface is not a blind one: wording that turns up there afterwards is
+    // still expired wording being served, whatever the baseline said.
+    const result = judgeExpiry({
+      baseline: { '/': { ...off, visible: true } },
+      attempts: { '/': [{ ...off, jsonLd: true, cache: 'HIT' }] },
+    })
+    expect(result.verdict).toBe('FAIL')
+    expect(result.lingering).toEqual([{ path: '/', surface: 'jsonLd', attempts: 1, appeared: true }])
+  })
+
   it('unevaluable names every surface, because none was exercised', () => {
     expect(judgeExpiry({ baseline: { '/': off }, attempts: { '/': [off] } }).unexercised).toEqual(['jsonLd', 'metadata', 'visible'])
   })
