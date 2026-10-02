@@ -93,6 +93,32 @@ const cssValue = (name: string): string => {
 const ratioOnBg = (name: string) => Number(contrastRatio(token(name), token('bg')).toFixed(2))
 
 /**
+ * Every value a custom property is *declared* with anywhere in `src` (tests aside): stylesheet
+ * rules and inline style objects alike. `cssValue` reads the first match in globals.css, which
+ * is right for a token declared once and blind to a second declaration that wins in the
+ * browser — a media query, a scoped rule, a `style={{ '--x': … }}`. A pin built on it is two
+ * values wide; one built on this is exactly as wide as the cascade.
+ */
+function declarationsOf(name: string, dir = 'src'): string[] {
+  const found: string[] = []
+  for (const entry of readdirSync(join(ROOT, dir))) {
+    const rel = join(dir, entry)
+    if (rel === join('src', 'tests')) continue
+    if (statSync(join(ROOT, rel)).isDirectory()) found.push(...declarationsOf(name, rel))
+    else if (/\.(css|tsx?)$/.test(entry)) {
+      const source = read(rel)
+      // `--x: v;` in CSS; `'--x': 'v'` and `['--x' as string]: 'v'` as style-object keys.
+      const declared = new RegExp(`--${name}['"]?(?:\\s+as\\s+[\\w.]+)?\\]?\\s*:\\s*['"]?([^;'",}\\n]+)`, 'g')
+      // `el.style.setProperty('--x', 'v')`.
+      const set = new RegExp(`setProperty\\(\\s*['"\`]--${name}['"\`]\\s*,\\s*['"\`]?([^'"\`)]+)`, 'g')
+      for (const m of source.matchAll(declared)) found.push(m[1].trim())
+      for (const m of source.matchAll(set)) found.push(m[1].trim())
+    }
+  }
+  return found
+}
+
+/**
  * Claims about current state, each with the source that decides it.
  *
  * `context` locates the claim; `actual()` resolves the truth. A claim whose context no
@@ -131,8 +157,8 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**105 unit spec files**',
-    claimed: '105',
+    context: '**108 unit spec files**',
+    claimed: '108',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
@@ -191,6 +217,20 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     context: '`--hj-product-tile-max` (560px)',
     claimed: '560px',
     actual: () => cssValue('hj-product-tile-max'),
+  },
+  {
+    // The only check on this number. The card measures at most 0.514 of the photograph, so
+    // 0.60 never binds, and the hero spec reads its ceiling from this same token: raised to
+    // 0.98, nothing rendered moves and the spec's ceiling moves with it — 48 passed, measured
+    // 2026-10-02. NUMERIC skips it too (no unit). Every declaration in src is read, not the
+    // first one in globals.css: a media query or a scoped rule that redeclared it would raise
+    // the computed cap the spec measures against while the first match still read 0.60. And
+    // because a context must state its own claimed value, a wider card edits CLAUDE.md as
+    // well as this line — the reviewed change ADR 013 asks for.
+    doc: 'CLAUDE.md',
+    context: '`--hj-hero-card-max-ratio` (0.60)',
+    claimed: '0.60',
+    actual: () => declarationsOf('hj-hero-card-max-ratio').join(', '),
   },
   {
     doc: 'CLAUDE.md',
@@ -331,6 +371,18 @@ describe('every live claim matches its source', () => {
       `${claim.doc} no longer contains "${claim.context}". Either the prose changed and ` +
         `this entry must follow it, or the claim was deleted and the entry should be too.`
     ).toBe(true)
+
+    // Without this, a changed number is fixed by editing `claimed` here alone: the document's
+    // context still reads the old figure, still matches, and the prose is stale again. With it,
+    // the number in this table and the number in the document are the same characters.
+    // A compound claim (`hex|ratio`) states each of its parts.
+    for (const part of claim.claimed.split('|')) {
+      expect(
+        claim.context,
+        `the context for ${claim.doc} does not state its own claimed value "${part}", so ` +
+          `the document could keep an old number while this entry tracks the new one.`
+      ).toContain(part)
+    }
 
     expect(
       claim.actual(),

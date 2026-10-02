@@ -133,6 +133,52 @@ export function goneRoute(copy: GoneCopy) {
 }
 
 /**
+ * **A retired path with a successor: browsing is redirected, a stale action is told why.**
+ *
+ * The 308 families in contract §7 — `/cart`, `/account`, `/collections`, `/policies`,
+ * `/stones`, `/crystals` — were `next.config.ts` redirects until 2026-09-27, and a config
+ * redirect answers every method the same way. A 308 obliges the client to repeat the method
+ * and body at the successor, so an old theme's product form re-POSTed to `/shop`, and what
+ * `/shop` did with it depended on the encoding: the page as if the action had worked
+ * (urlencoded), a bare `text/plain` "Server action not found." (multipart — every prerendered
+ * page bypasses to the server-action dispatcher on that content type), or a bare 405. Config
+ * redirects run before any application code sees the method, so the destination could not
+ * tell a stale cart POST from anything else. A route handler sees it here, at the URL the
+ * visitor actually used.
+ *
+ * - `GET` and `HEAD` keep the 308, query string carried, exactly as the config redirect
+ *   answered — `e2e/retired-routes.spec.ts`'s §7 matrix asserts that byte for byte, so the
+ *   move changes nothing for anyone browsing.
+ * - Every other method answers the 410 page for this family. Nothing was *moved* for an
+ *   action — there is no bag to add to — so the honest answer is the withdrawn-capability
+ *   one, with the same two ways on that every 410 here offers.
+ *
+ * Spread into a route module exactly like {@link goneRoute}.
+ */
+export function retiredRoute({ successor, copy }: { successor: string; copy: GoneCopy }) {
+  const redirect = (request: Request): Response =>
+    new Response(null, {
+      status: 308,
+      headers: {
+        // Relative, as Next's own redirect emits it; the query survives so a campaign link keeps
+        // its attribution through the hop.
+        Location: `${successor}${new URL(request.url).search}`,
+        // A config redirect was an edge rule and cost nothing per request; a handler is a
+        // function. `s-maxage` lets the edge answer repeats itself, so a legacy URL costs one
+        // invocation per path per day rather than one per crawl.
+        'Cache-Control': RETIRED_REDIRECT_CACHE_CONTROL,
+      },
+    })
+  // Every method `goneRoute` answers, with browsing redirected: one method map, so a method
+  // added there is answered here too — the reason `goneRoute` returns a map at all.
+  return { ...goneRoute(copy), GET: redirect, HEAD: redirect }
+}
+
+/** How long a retired path's 308 may be reused: an hour in a browser, a day at the edge. */
+export const RETIRED_REDIRECT_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400'
+
+
+/**
  * The sentence every one of these pages ends on.
  *
  * Shared because it is the *point* of the page: a 410 that only says no has answered the
@@ -147,3 +193,20 @@ export const AMBASSADOR_NEXT_STEP =
 
 /** The other half: there is still a catalogue, and it is still worth looking at. */
 export const BROWSE_NEXT_STEP = '<a href="/shop">Browse the catalogue</a>'
+
+/**
+ * What `/stones` and `/crystals` say to an action — one copy for the two pre-repositioning
+ * families, which retired the same category for the same reason. It names what the range is
+ * now and never the retired category: the brand's PROHIBITED list forbids that copy outright,
+ * and a 410 page is still a page.
+ */
+export const RETIRED_CATEGORY_COPY: GoneCopy = {
+  title: 'This page no longer exists — Healthy Jewellery',
+  heading: 'This page no longer exists.',
+  paragraphs: [
+    'Healthy Jewellery now makes pieces in Grade 23 titanium, niobium and 316L surgical steel ' +
+      'only. Nothing you submitted was sent or saved.',
+    BROWSE_NEXT_STEP,
+    AMBASSADOR_NEXT_STEP,
+  ],
+}

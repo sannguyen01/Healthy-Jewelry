@@ -103,6 +103,26 @@ export type ClaimMaterial = (typeof MATERIAL_HANDLES)[number]
 
 // ── Building blocks ────────────────────────────────────────────────────────
 
+/**
+ * **The longest an expired approval can stay in a page a visitor is served, in seconds** — plus
+ * the one request that notices.
+ *
+ * `resolveClaim()` decides at render time, and for a prerendered page render time was the build:
+ * measured on 2026-09-27 (`scripts/experiment-claim-expiry.mjs` against `228fdaf`), an approval
+ * two days past `expiresOn` was still in the homepage hero, its `<meta>` description and every
+ * Footer, on eight cache HITs out of eight. Nothing re-rendered a page because a date passed.
+ *
+ * So the claim-bearing segments revalidate on this interval: the root layout (every page renders
+ * the Footer's positioning line) and the default share card. Next requires those exports to be
+ * literals, so each repeats the number, and `claim-expiry.test.ts` holds both to this constant.
+ * Under stale-while-revalidate the first request after the window still receives the old page
+ * and triggers the new one — the bound is the window plus that request, stated rather than
+ * rounded away. An hour because an approval's granularity is a day: the cost is one
+ * regeneration per page per hour of traffic, and the gain is that a lapsed claim stops being
+ * served without anyone remembering to redeploy.
+ */
+export const CLAIM_WITHDRAWAL_BOUND_SECONDS = 3600
+
 const isoDate = z.iso.date()
 
 /**

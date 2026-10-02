@@ -237,7 +237,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 33 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 41 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -276,6 +276,7 @@
       "probe": "e2e/hero-legibility.spec.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
+      "knownLimit": "The probe measures the card against the cap it reads from --hj-hero-card-max-ratio, so it cannot see the cap itself being raised: the card measures at most 0.514 of the photograph and 0.60 never binds, so at 0.98 nothing rendered moves and the ceiling moves with it (48 passed, 2026-10-02). The number is pinned instead by a doc-numeric-claims row that reads every declaration of the token in src (stylesheet rules, media queries, style-object keys, setProperty) against CLAUDE.md's stated 0.60, and the browser sentinel hero-card-measured proves the measurement fires on a card that outgrows its cap. That sentinel needs a production build and runs only under --with-e2e, never in the six-hourly audit.",
       "adr": "docs/adr/013-a-protection-that-can-only-grow.md",
       "backstop": "control:merge-gate"
     },
@@ -361,34 +362,54 @@
     },
     {
       "id": "analytics-sink-allowlist",
-      "claims": "the /api/analytics log line carries exactly the fields the AnalyticsEvent union defines, so a price or any other undeclared field posted to it is dropped rather than logged",
+      "claims": "the /api/analytics log line carries only an event that passes that event's own strict schema \u2014 a product, collection or material handle the catalogue publishes and counts no larger than the catalogue \u2014 and no free text at all: a search is recorded as the collections and metals it named, never the query",
       "status": "configured",
       "probe": "src/tests/unit/api-analytics-route.test.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Equality with the union is enforced at compile time by `satisfies Record<EventField, …>`, so it depends on tsc running in the gate; the test pins the runtime side. The allowlist is the union's field set, not per event: a direct POST can attach one event's field to another, bounded and sanitised.",
+      "knownLimit": "Schema and event type are held equal in both directions by tsc (`EVENT_SCHEMAS` and `exact` in the route), so that half depends on the type-check running in the gate; the tests pin the runtime half with forged payloads in every field of every event. It governs this pipeline only: /search?q= is a URL, and the hosting platform's request logs record URLs (docs/data-flow-record.md). A count bounded by the catalogue size is still a number a forger chooses \u2014 it cannot carry an identifier, but it can carry noise.",
       "backstop": "control:merge-gate"
     },
     {
+      "id": "consent-withdrawal",
+      "claims": "a visitor who allowed measurement can withdraw from any page — 'Measurement preferences' in the footer, and on /privacy, reopens the consent prompt showing the current answer — and after Decline the next page sends nothing to /api/analytics",
+      "probe": "e2e/analytics.spec.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "status": "configured",
+      "selfMonitoring": true,
+      "backstop": "control:merge-gate",
+      "knownLimit": "Withdrawal stops future records; it does not delete log lines already written while consent was granted, and the privacy page says so rather than implying otherwise. The browser test covers the footer path on the configured projects; the reopen logic is also pinned in src/tests/unit/analytics.test.ts. Whether the retention and lawful-basis cells in docs/data-flow-record.md are satisfied is the privacy owner's question, not this control's."
+    },
+    {
       "id": "live-surface-evidence",
-      "claims": "any commerce the live site serves is classified by where in the chain it appears — source/build, alias/DNS/CDN, external retrieval, or clean — from dated, hashed, build-identified responses across apex, www and the deployment URL",
+      "claims": "any commerce the live site serves is attributed only after identity is observed — whether apex and www serve one build, whether a host answers one path the same way cold and warm, whether the edge agrees with the deployment it names — from dated, hashed, build-identified responses read under a streaming byte cap that reports truncation",
       "status": "configured",
       "probe": "scripts/probe-live-surface.mjs",
       "probeLibrary": "scripts/lib/live-surface.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
-      "knownLimit": "Report-only: it files no issue and its exit 1 is absorbed by continue-on-error, because the purchase-era copy it observes (shipping and returns terms) is in source pending WS-H legal review, and a red that nobody in CI can clear is the ADR 011 muting pattern. HTTP only — cookies, storage and service workers are e2e/fresh-session.spec.ts's question. A Vercel-protected deployment URL (401) cannot be compared, so commerce on the edge with the deployment unobserved is `unevaluable` rather than guessed. The visible-price detector is a regex over stripped HTML, pinned both ways by fixtures and by a clean run over 35 prerendered pages; its coverage beyond those is unknown (ADR 007). The external-retrieval input is a flag a human sets; nothing measures it.",
+      "knownLimit": "HTTP only — cookies, storage and service workers are e2e/fresh-session.spec.ts's question. A Vercel-protected deployment URL (401) cannot be compared, so commerce on the edge with the deployment unobserved, or with no comparable commit or body, is `unevaluable` rather than guessed; a body longer than the 2 MB read cap is `unevaluable` unless commerce was found in what was read. The visible-price detector is a regex over stripped HTML, pinned both ways by fixtures and by a clean run over 35 prerendered pages; its coverage beyond those is unknown (ADR 007). Cold/warm variance can also be an ISR regeneration landing between the two passes, now that pages revalidate hourly. The external-retrieval input is a flag a human sets; nothing measures it. The purchase-era copy it records is never part of the classification.",
       "backstop": "human:weekly"
     },
     {
+      "id": "live-surface-acknowledgement",
+      "claims": "every non-clean or unevaluable live-surface classification opens or updates one issue with a deadline; an /ack from an owner, member or collaborator is required within 72h, the CODEOWNERS humans are mentioned exactly once when it is missed, a changed finding restarts the clock, and a clean report closes the issue",
+      "probe": "scripts/lib/live-surface-issue.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "status": "configured",
+      "selfMonitoring": false,
+      "backstop": "human:weekly",
+      "knownLimit": "Runs only where control-audit.yml runs — the default branch, on its schedule — so it does nothing until this lands on main. An acknowledgement records that a person has seen the finding, not that it is fixed; the issue stays open until the report is clean. Only the first 100 comments are read for an /ack. A probe that produced no JSON says nothing here; the step's own outcome reports that."
+    },
+    {
       "id": "merge-denial-proof",
-      "claims": "GitHub refuses to merge a known-bad pull request into main, proven by reading mergeability and the failing required check rather than by attempting the merge",
+      "claims": "GitHub refuses to merge a known-bad pull request into main, proven by reading mergeability and the failing required check rather than by attempting the merge — and attributed to that check only when the canary is read as not a draft, free of conflicts, not behind its base, and the test merge commit does not disagree with the head",
       "status": "not-configured",
       "probe": "scripts/probe-merge-denial.mjs",
       "probeLibrary": "scripts/lib/merge-denial.mjs",
       "probeRunsIn": "docs/runbooks/main-ruleset.md",
       "selfMonitoring": false,
-      "knownLimit": "A one-off proof, run by hand against a canary pull request: it proves the gate held at that moment for that head commit, not afterwards — probe-branch-protection.mjs is what keeps asking. It trusts GitHub's mergeable_state as the definition of 'would be refused'. It cannot merge by construction (one GET-only helper, statically asserted by its test), so it cannot show the refusal message a person would see.",
+      "knownLimit": "A one-off proof, run by hand against a canary pull request: it proves the gate held at that moment for that head commit, not afterwards — probe-branch-protection.mjs is what keeps asking. It trusts GitHub's mergeable_state as the definition of 'would be refused', and since 2026-09-27 rules out the other causes of 'blocked' by separate readings (draft, mergeable, behind_by), because GitHub reported a draft PR as 'clean'. E2E is skipped on a canary whose verify fails (needs: verify) and GitHub counts that skip as satisfied, so the denial rests on the verify context alone. It cannot merge by construction (one GET-only helper, statically asserted by its test), so it cannot show the refusal message a person would see.",
       "humanAction": "After creating the ruleset from docs/runbooks/main-ruleset.md: grant permission to push a canary branch whose required check fails on purpose, then run step 3 of that runbook and record the `denied` evidence it prints. Never press merge on the canary: main auto-deploys to production.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
@@ -423,7 +444,7 @@
       "probeLibrary": "src/lib/catalog/claims.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": false,
-      "knownLimit": "It governs claims that arrive as registry records; a claim written straight into copy never reaches the resolver, which is claim-lexicon's job. Expiry changes what renders and never fails a build (ADR 029), so a lapsed approval reverts silently until a scheduled claimsNearingExpiry() probe exists. Evidence is a document reference and a reviewer's name; nothing verifies the document says what the reviewer recorded. Under the owner's 'enforce now' decision (2026-09-25) every record is pending, so today it proves the fallback path and, by fixture, the approved path.",
+      "knownLimit": "It governs claims that arrive as registry records; a claim written straight into copy never reaches the resolver, which is claim-lexicon's job. Expiry changes what renders and never fails a build (ADR 029). What renders reaches visitors within CLAIM_WITHDRAWAL_BOUND_SECONDS (3600) plus the one stale request that triggers regeneration: until 2026-09-27 every page was prerendered with no revalidation, and scripts/experiment-claim-expiry.mjs measured an approval two days past expiry still served on 8 cache HITs out of 8 at 228fdaf. That experiment is manual and re-run when the rendering mode or Next's major version changes; claim-expiry.test.ts holds the revalidate literals to the bound on every PR. No reviewer is reminded before an approval lapses (claimsNearingExpiry() has no scheduled caller) — a precondition of the first approval, since none exists. Evidence is a document reference and a reviewer's name; nothing verifies the document says what the reviewer recorded. Under the owner's 'enforce now' decision (2026-09-25) every record is pending, so today it proves the fallback path and, by fixture, the approved path.",
       "backstop": "control:merge-gate"
     },
     {
@@ -492,12 +513,12 @@
     },
     {
       "id": "retired-route-matrix",
-      "claims": "every retired commerce URL answers its contract §7 status and location for GET, HEAD and a stale POST, with and without a trailing slash, an encoded segment or a query string, asserted by status code without following redirects",
+      "claims": "every retired commerce URL answers its contract §7 status and location for GET and HEAD, with and without a trailing slash, an encoded segment or a query string, asserted by status code without following redirects — and a stale action (POST in five encodings) on a 308 path, followed hop by hop, ends on that family's 410 page, never on a framework 404/405 or a page that implies it worked",
       "status": "configured",
       "probe": "e2e/retired-routes.spec.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "The variants are generated from §7, so a route family missing from the contract is missing from the matrix too — commerce-route-inventory.test.ts reconciles §7 against the filesystem and next.config.ts to close that. Concrete examples stand in for each `:path*` family; an exotic path shape no example resembles is not exercised.",
+      "knownLimit": "The variants are generated from §7, so a route family missing from the contract is missing from the matrix too — commerce-route-inventory.test.ts reconciles §7 against the filesystem and calls each retiredRoute() handler to close that. Concrete examples stand in for each `:path*` family; an exotic path shape no example resembles is not exercised. Since 2026-09-27 the 308 families are route handlers rather than next.config.ts redirects (a config redirect answers every method with the 308), so a legacy GET invokes a function where it used to match an edge rule. The 308 carries s-maxage=86400, so the edge answers repeats; the residual cost is about one invocation per legacy path per day.",
       "backstop": "control:merge-gate"
     },
     {
@@ -540,6 +561,7 @@
     "docs/adr/033-a-premise-that-expired-mid-decommission.md": "A rule about when a monitor must report a transition rather than a level, and about where an expired premise is repaired \u2014 at the evidence, not at the assumption. It refines the smoke-liveness control rather than adding one: the `stopped` verdict lives in that control's existing probe, its claims line now says so, and a second entry naming the same probe would be two answers to one question. Its enforcement is smoke-liveness.test.ts, eight assertions shown to fail against three mutations, which fail by name in the fast gate.",
     "docs/adr/028-a-fixture-is-the-input-you-thought-of.md": "A rule about how verification tools are tested before being relied upon, like ADR 007 is about how guardrails are written and ADR 024 about pointing them at a known answer. It constrains the entries rather than being one, and its enforcement is parser-fuzz.test.ts, which fails by name in the fast gate.",
     "docs/adr/035-a-control-outlives-its-subject.md": "A rule about what to do with a control when the thing it measures is deleted: re-found it, suspend it behind a premise detector that fails when the conditions return, or delete it and record the removal where the claim was \u2014 never narrow it to keep it green. Like ADR 007 (how guardrails are written), ADR 024 (pointing them at a known answer) and ADR 028 (testing them before relying on them), it constrains the entries in this registry rather than being one. Its enforcement is the premise detector the ADR itself installs: cache-tag-contract.test.ts asserts that nothing registers a cache tag and names, by name, the two suspended assertions that must be restored the moment anything does. That runs in the fast gate and fails loudly, which is what makes this a guardrail rather than a control.",
+    "docs/adr/038-what-a-control-observes-is-not-what-it-claims.md": "A rule about how a control states and proves what it observes: its knownLimit names the grain it observes, a fix starts from a falsifying example run against the real artifact, an instrument must FAIL the known-bad and PASS the known-good before its verdict counts, and attribution reads a recorded observation. Like ADR 024 it constrains the entries in this registry rather than being one; its enforcement is the sentinels added with it (retired-action-gone, bounded-response-read, live-surface-identity-before-cause, live-surface-ack-standing, denial-preconditions, claim-withdrawal-bound, consent-withdrawal), each seen red before it was registered, and claim-expiry.test.ts's check that the experiment's clock moves the clock the cache reads.",
   "docs/adr/026-a-capability-is-not-a-verdict.md": "A rule about how a control decides whether it may run: gate on what a check needs, not on whether the whole setup is valid. Its enforcement is preflight-secrets.test.ts and the workflow's own conditions, which fail loudly in the fast gate."
   },
   "$backstopComment": [

@@ -1,7 +1,93 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-09-27
+Last refreshed by hand: 2026-10-02
+
+## Session note — 2026-10-02
+
+**A green PR was asked what a visitor, a log and the gate actually receive, and four of its
+controls answered at the wrong grain.** The owner's direction replaced a proposal for more
+workstreams and more agents with four release-review questions and the gate. Each question was
+answered with a falsifying example run against the real artifact *before* any fix, on the PR that
+follows #90 (#93). ADR 038 is the pattern.
+
+- **Stale actions.** At `228fdaf` a stale POST to a retired 308 path re-POSTed to the successor:
+  urlencoded ended on a 200 page as if it had worked, multipart on a bare "Server action not
+  found." (confirmed in Chromium — every prerendered page carries `experimentalBypassFor`
+  multipart), `text/plain` and JSON on a bare 405. The spec pinned that table as expected. Now
+  route handlers via `retiredRoute()`; 304/304 retired-route E2E on both projects.
+- **Analytics.** At `228fdaf` a forged `product_viewed` carrying `query` logged
+  `customer@example.com order 10001`. Now strict per-event schemas over catalogue values; search
+  reports `searchFacets()`, never text; "Measurement preferences" in every footer and on
+  `/privacy` reopens consent.
+- **Claim expiry, measured by `scripts/experiment-claim-expiry.mjs`.** Fixture approval expiring
+  the day of the build; a server running on the real clock whose `Date` and `performance` clocks
+  then jump two days:
+  - `228fdaf` — **FAIL** (2026-10-02T09:29:10.524Z): 24 requests over `/`, `/about`, `/materials`, every one a cache HIT still carrying the expired wording; share card unchanged.
+  - `9555256` — **PASS** (2026-10-02T09:30:04.891Z): first request STALE (the stated "plus one request"), second HIT with the wording gone from hero, metadata and every Footer; share card regenerated.
+  - The experiment's first design moved only `Date` (Next's cache reads `performance`) and
+    started a second server after the move; its FAIL for the fixed build, and its earlier
+    `228fdaf` FAIL, were discarded. A test now runs the preload in a child process and checks
+    both clocks.
+- **Live surface.** The 2 MB cap was applied after `response.text()` downloaded everything;
+  attribution ran before identity. Now a streaming cap with `truncated`, identity before cause,
+  and an issue a named person must `/ack` within 72h.
+- **Gate evidence.** GitHub reported PR #90 `mergeable_state: clean` while it was a draft, so
+  `denied` now also requires draft/conflict/behind readings and head–merge agreement.
+- **Review.** `/code-review` (high) found ten defects in this work — the worst a `/policies` 308
+  turned into a 404 — all fixed; `/security-review` found nothing reportable. A second
+  `/code-review` over the close-out (`c9a035c..20fbd26`) found nine. Six were fixed in `f8389b5`,
+  and the seventh in part:
+  - expired wording that *appears* after expiry is now FAIL;
+  - the hero-cap pin reads every declaration in `src`;
+  - every `LIVE` doc-number row must state its own value.
+
+  The spec's token-read ceiling, browser sentinels outside the audit, and commit-type history
+  stay as they are, with reasons in the commit.
+- **Assertion liveness.** The full probe over the finished branch found 37 of 38 vitest
+  sentinels alive. `merge-denial-attribution` was dead: its mutation ORed in `mergeable`, the old
+  name of judgeDenial's "merge button works" local, and the gate-evidence commit had renamed that
+  local and added a `mergeable` *parameter* that every NOT-DENIED fixture left null. The anchor
+  still matched, so nothing but the probe could tell. The NOT-DENIED fixtures now also run under
+  the ready preconditions, and the sentinel names `buttonWorks` again: 38 of 38 alive.
+- **The two browser sentinels, run by hand** (they need a production build and only run under
+  `--with-e2e`, never in the six-hourly audit). `product-tile-bound` is alive (10 tests red).
+  `hero-card-bound` had been **dead since it was written on 2026-08-28**. The card measures at
+  most 0.514 of the photograph, so the 0.60 cap never binds, and the hero spec reads its ceiling
+  from the same token. Raised to 0.98, nothing rendered moved and the ceiling moved with it: 48
+  passed. The claim "no more than 60%" could be changed silently. It is now two sentinels:
+  - `hero-card-bound` is a vitest sentinel. A `doc-numeric-claims` row pins the token to
+    CLAUDE.md's stated 0.60.
+  - `hero-card-measured` is a browser sentinel. It forces the card past its cap, which proves
+    the measurement fires.
+
+  That makes 41 sentinels, 39 vitest. After the second review below, the full probe on `f8389b5`
+  found all 39 vitest sentinels alive; the two browser ones are alive by hand.
+- **Claim expiry, JSON-LD.** The question named JSON-LD and the experiment reads it, but no
+  builder routes a claim into structured data, so it was `false` in every baseline and silently
+  outside the verdict. Every verdict now names its `unexercised` surfaces. Re-run on `09fafad`:
+  **PASS** (2026-10-02T15:31:48.099Z). `/`, `/about` and `/materials` were each STALE once, then
+  a HIT without the wording; the share card regenerated; `unexercised: ['jsonLd']`.
+- **Agents.** Two were started and both stopped on the account session limit within minutes,
+  leaving nothing. One integrator after that, by the owner's direction.
+
+### Still blocked, and on what
+
+- **The merge gate does not hold yet.** The owner reported the `main` ruleset created and read
+  back, and the canary ran on 2026-10-02 as PR #94: one failing unit test, ready for review.
+  - `verify` failed, yet GitHub read `mergeable_state: unstable` twice. The merge button works on a
+    red pull request, so the verdict is **NOT-DENIED**.
+  - A wrong context name would read `blocked`, so the likelier causes are in the ruleset itself:
+    enforcement set to *Evaluate*, a target that misses `main`, or a missing required-checks rule.
+  - The agent session could not read the rules (its token was refused), so the owner checks them
+    in Settings → Rules, or by running `probe-branch-protection.mjs` with an admin-read token.
+  - #94 stays open and unmerged. Once corrected it should read `blocked` with no new push; then it
+    is closed and its branch deleted.
+- The owner's 2026-09-27 platform observations (apex 307 → www; commerce variables still set;
+  no `RATE_LIMIT_KEY_SECRET` in the project inventory) are recorded in masterplan §7 as theirs:
+  this session's Vercel connector answered 403 for the team scope.
+- Contact copy ("Message sent" means provider acceptance) and a delivery-and-reply test are a
+  person's judgement; claims, privacy sign-off and retention stay with their owners.
 
 ## Session note — 2026-09-27
 

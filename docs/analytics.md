@@ -41,11 +41,12 @@ component → track(event) → consent gate → sendBeacon → POST /api/analyti
   They are not free strings, because a typo'd event name is a metric that silently does not exist.
 - **`src/lib/analytics/consent.ts`** holds pure functions over a stored choice. The default is off.
 - **`src/lib/analytics/index.ts`** holds `track()`: one gate, one sink, one place to change.
-  It sanitises the search query at the boundary, never throws, and never becomes
-  load-bearing.
-- **`src/app/api/analytics/route.ts`** is the same-origin sink. It rejects any name outside the
-  union, copies an allowlist of fields that is a compile-time equality with the union
-  (`satisfies Record<EventField, …>`), rate-limits, and writes one structured log line.
+  No event carries free text, so there is nothing to sanitise at this boundary. It never
+  throws, and never becomes load-bearing.
+- **`src/app/api/analytics/route.ts`** is the same-origin sink. It validates each event against
+  **its own** strict Zod schema (`EVENT_SCHEMAS`), held to the event's type in both directions
+  by the compiler, drops the whole event on any unexpected field or out-of-range value,
+  rate-limits, and writes one structured log line.
 
 ## The event schema, as implemented
 
@@ -53,26 +54,35 @@ Three events. `ANALYTICS_EVENT_NAMES` is the runtime list and the only place to 
 
 | Event | Fired from | Fields |
 |---|---|---|
-| `product_viewed` | `ProductDetail`, once on mount | `handle` (string), `collection` (string), `material` (string) |
-| `collection_viewed` | `/shop/[collection]`, via `TrackView` | `collection` (string), `productCount` (number) |
-| `search_performed` | `/search`, via `TrackView` | `query` (string), `resultCount` (number) |
+| `product_viewed` | `ProductDetail`, once on mount | `handle`, `collection`, `material` |
+| `collection_viewed` | `/shop/[collection]`, via `TrackView` | `collection`, `productCount` |
+| `search_performed` | `/search`, via `TrackView` | `resultCount`, `facets` — the collections and metals the query named, from `searchFacets()`; never the query |
 
-What the sink does to each field before writing it:
+What the sink accepts — anything else drops **the whole event**, because a record that is
+partly forged is not partly true:
 
-| Field | Bound at the route |
+| Field | Accepted values |
 |---|---|
-| `handle` | string, first 128 characters, empty dropped |
-| `collection`, `material` | string, first 64 characters, empty dropped |
-| `productCount`, `resultCount` | finite number, otherwise dropped |
-| `query` | first 64 characters (`MAX_QUERY_LENGTH`), trimmed and lower-cased. This is done at the client **and** again at the route |
-| anything else | **dropped**. That includes `value`, `currency`, `quantity`, `itemCount` and `reason`, which the sink still copied until 2026-09-25 after the events that carried them were gone |
+| `handle` | a product handle the catalogue holds |
+| `collection` | one of `COLLECTION_HANDLES` |
+| `material` | one of `MATERIAL_HANDLES` |
+| `productCount`, `resultCount` | an integer from 0 to the number of products in the catalogue |
+| `facets` | a list of distinct collection or material handles |
+| any field the event does not define | **rejected** — including `query`, and `value`, `currency`, `quantity`, `itemCount` and `reason`, which the sink still copied until 2026-09-25 |
 
-The allowlist is the union's field set, not each event's own, so a direct POST of
-`product_viewed` carrying a `query` is logged with that query, sanitised. That is a known
-limit. Every field is bounded, and the one free-text field is sanitised whichever event
-carries it. Enforced by `src/tests/unit/analytics.test.ts` (the gate, the names and the
-client-side sanitising) and `src/tests/unit/api-analytics-route.test.ts` (what reaches the
-log line).
+**Every value a log line can hold is one the catalogue already publishes.** Until 2026-09-27
+the sink's allowlist was the union of every event's fields, so a direct POST of
+`product_viewed` carrying a `query` was logged with it; the query was lower-cased and cut to
+64 characters, which bounded how much of a pasted email address or order number was written,
+not whether it was. The search event now carries facets instead of text, so the words a
+visitor types stay on the page they typed them into. Enforced by
+`src/tests/unit/api-analytics-route.test.ts` (forged payloads in every field of every event,
+none of which reaches the log) and `src/tests/unit/analytics.test.ts` (the gate, the names,
+the range of `searchFacets`).
+
+**Known limit:** `/search?q=…` is a URL, and the hosting platform's own request logs record
+URLs. That is outside this pipeline and not something this route can change; it is recorded
+in `docs/data-flow-record.md` rather than implied away.
 
 ## Where a record goes, and nowhere else
 
@@ -101,13 +111,18 @@ entirely unavailable. "We could not tell" has to mean no.
 
 The answer is **one `localStorage` entry**, `hj-analytics-consent`, holding `granted` or
 `denied`. It is not a cookie, because a cookie would travel with every request and change
-how the edge cache treats it. It persists until the visitor clears the site's data, which is
-also, today, the only way to change the answer: the banner does not return once answered.
+how the edge cache treats it. It persists until the visitor changes it or clears the site's
+data. **Changing it is as easy as giving it:** "Measurement preferences", in the footer of
+every page and on `/privacy`, reopens the same banner showing the current answer
+(`CONSENT_OPEN_EVENT` in `consent.ts`). `track()` reads the answer on every call, so Decline
+stops the very next event. It does not delete records already written, and the privacy page
+says so.
 Both buttons are real buttons of equal weight, because a "reject" hidden behind a link is a
 dark pattern whatever the copy says.
 
-The banner names what is counted: which pieces and collections are viewed, and what is
-searched for. A new event changes that sentence in the same commit.
+The banner names what is counted: which pieces and collections are viewed, and how many
+results a search finds — never what is typed. A new event changes that sentence in the same
+commit.
 
 `e2e/analytics.spec.ts` asserts, in a real browser, that nothing reaches `/api/analytics`
 before an answer and nothing after Decline. It also asserts that the gate *opens* after

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
+  CONSENT_OPEN_EVENT,
   readConsent,
   writeConsent,
   shouldAskForConsent,
@@ -32,20 +33,51 @@ import {
  */
 export function ConsentBanner() {
   const [consent, setConsent] = useState<ConsentState | null>(null)
+  // How many times "Measurement preferences" has asked for the prompt since it last closed:
+  // 0 = not reopened. A counter rather than a flag so a second request while the prompt is
+  // already open still moves focus to it. Withdrawal has to be as easy as consent was, so the
+  // prompt that asked is the prompt that changes it.
+  const [openRequests, setOpenRequests] = useState(0)
+  const reopened = openRequests > 0
+  const dialog = useRef<HTMLDivElement>(null)
+  // Where focus was when the prompt was asked for, so a keyboard user is returned there after
+  // choosing instead of being dropped at the top of the document.
+  const returnFocus = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     setConsent(readConsent(window.localStorage))
+    const reopen = () => {
+      if (document.activeElement instanceof HTMLElement && !dialog.current?.contains(document.activeElement)) {
+        returnFocus.current = document.activeElement
+      }
+      setConsent(readConsent(window.localStorage))
+      setOpenRequests((n) => n + 1)
+    }
+    window.addEventListener(CONSENT_OPEN_EVENT, reopen)
+    return () => window.removeEventListener(CONSENT_OPEN_EVENT, reopen)
   }, [])
 
-  if (consent === null || !shouldAskForConsent(consent)) return null
+  // Focus follows the visitor's request: the button they pressed is in the footer, and the
+  // dialog it opened is pinned to the viewport corner — a keyboard user must not have to hunt.
+  useEffect(() => {
+    if (openRequests > 0) dialog.current?.querySelector('button')?.focus()
+  }, [openRequests])
+
+  if (consent === null || (!shouldAskForConsent(consent) && !reopened)) return null
 
   const choose = (next: 'granted' | 'denied') => {
     writeConsent(window.localStorage, next)
     setConsent(next)
+    setOpenRequests(0)
+    if (reopened) {
+      returnFocus.current?.focus()
+      returnFocus.current = null
+    }
   }
 
   return (
     <div
+      ref={dialog}
       role="dialog"
       aria-label="Analytics consent"
       style={{
@@ -99,12 +131,15 @@ export function ConsentBanner() {
           page opens, which collection, and what is typed into search (shortened).
           It said "page views and add-to-bag events" until 2026-09-25 — the second
           no longer exists, and the first was never true: other pages send nothing.
-          The list is `ANALYTICS_EVENT_NAMES` in `src/lib/analytics/events.ts`; a new
-          event is a change to this sentence in the same commit.
+          It said "what is searched for here" until 2026-09-27; a search now reports
+          only how many results it found and which collections or metals it named
+          (`searchFacets`), never the words. The list is `ANALYTICS_EVENT_NAMES` in
+          `src/lib/analytics/events.ts`; a new event is a change to this sentence in
+          the same commit.
         */}
-        If you allow it, we count which pieces and collections are viewed and what is
-        searched for here — the item, never you. No cookies, no identifiers, no tracking
-        across sites; your answer is kept in this browser.{' '}
+        If you allow it, we count which pieces and collections are viewed and how many
+        results a search finds — never what you type, and never you. No cookies, no
+        identifiers, no tracking across sites; your answer is kept in this browser.{' '}
         <Link
           href="/privacy"
           style={{ color: 'var(--titanium-text)', textDecoration: 'underline' }}
@@ -113,12 +148,38 @@ export function ConsentBanner() {
         </Link>
       </p>
 
+      {reopened && consent !== 'unset' && (
+        <p
+          data-testid="consent-current"
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'var(--text-xs, 0.75rem)',
+            color: 'var(--graphite)',
+            margin: 0,
+          }}
+        >
+          {consent === 'granted'
+            ? 'Currently allowed. Decline stops measurement from the next page you open.'
+            : 'Currently declined. Nothing is measured unless you choose Allow.'}
+        </p>
+      )}
+
       {/* Equal weight. A reject hidden behind a link is a dark pattern. */}
       <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
-        <button type="button" onClick={() => choose('denied')} className="btn-ghost">
+        <button
+          type="button"
+          onClick={() => choose('denied')}
+          className="btn-ghost"
+          aria-pressed={consent === 'denied'}
+        >
           Decline
         </button>
-        <button type="button" onClick={() => choose('granted')} className="btn-ghost">
+        <button
+          type="button"
+          onClick={() => choose('granted')}
+          className="btn-ghost"
+          aria-pressed={consent === 'granted'}
+        >
           Allow
         </button>
       </div>

@@ -21,6 +21,12 @@
  * An approved claim past its expiry quietly reverts to its fallback, and
  * `claimsNearingExpiry()` is the pure input for a scheduled probe that tells the person who
  * can act.
+ *
+ * **"At render time" was "at build time" until 2026-09-27.** Every page was prerendered with no
+ * revalidation, so a lapsed approval stayed in served HTML until the next deploy — measured, not
+ * inferred (`scripts/experiment-claim-expiry.mjs`, FAIL on `228fdaf`). The claim-bearing segments
+ * now revalidate within `CLAIM_WITHDRAWAL_BOUND_SECONDS`, and the same experiment is the proof
+ * that the served artifact, not just this function, lets go of the wording.
  */
 
 import { MATERIAL_HANDLES, type MaterialHandle } from './schema'
