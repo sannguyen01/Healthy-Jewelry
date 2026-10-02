@@ -1,7 +1,53 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-09-27
+Last refreshed by hand: 2026-10-02
+
+## Session note — 2026-10-02
+
+**A green PR was asked what a visitor, a log and the gate actually receive, and four of its
+controls answered at the wrong grain.** The owner's direction replaced a proposal for more
+workstreams and more agents with four release-review questions and the gate. Each question was
+answered with a falsifying example run against the real artifact *before* any fix, on the PR that
+follows #90 (#93). ADR 038 is the pattern.
+
+- **Stale actions.** At `228fdaf` a stale POST to a retired 308 path re-POSTed to the successor:
+  urlencoded ended on a 200 page as if it had worked, multipart on a bare "Server action not
+  found." (confirmed in Chromium — every prerendered page carries `experimentalBypassFor`
+  multipart), `text/plain` and JSON on a bare 405. The spec pinned that table as expected. Now
+  route handlers via `retiredRoute()`; 304/304 retired-route E2E on both projects.
+- **Analytics.** At `228fdaf` a forged `product_viewed` carrying `query` logged
+  `customer@example.com order 10001`. Now strict per-event schemas over catalogue values; search
+  reports `searchFacets()`, never text; "Measurement preferences" in every footer and on
+  `/privacy` reopens consent.
+- **Claim expiry, measured by `scripts/experiment-claim-expiry.mjs`.** Fixture approval expiring
+  the day of the build; a server running on the real clock whose `Date` and `performance` clocks
+  then jump two days:
+  - `228fdaf` — **FAIL** (2026-10-02T09:29:10.524Z): 24 requests over `/`, `/about`, `/materials`, every one a cache HIT still carrying the expired wording; share card unchanged.
+  - `9555256` — **PASS** (2026-10-02T09:30:04.891Z): first request STALE (the stated "plus one request"), second HIT with the wording gone from hero, metadata and every Footer; share card regenerated.
+  - The experiment's first design moved only `Date` (Next's cache reads `performance`) and
+    started a second server after the move; its FAIL for the fixed build, and its earlier
+    `228fdaf` FAIL, were discarded. A test now runs the preload in a child process and checks
+    both clocks.
+- **Live surface.** The 2 MB cap was applied after `response.text()` downloaded everything;
+  attribution ran before identity. Now a streaming cap with `truncated`, identity before cause,
+  and an issue a named person must `/ack` within 72h.
+- **Gate evidence.** GitHub reported PR #90 `mergeable_state: clean` while it was a draft, so
+  `denied` now also requires draft/conflict/behind readings and head–merge agreement.
+- **Review.** `/code-review` (high) found ten defects in this work — the worst a `/policies` 308
+  turned into a 404 — all fixed; `/security-review` found nothing reportable.
+- **Agents.** Two were started and both stopped on the account session limit within minutes,
+  leaving nothing. One integrator after that, by the owner's direction.
+
+### Still blocked, and on what
+
+- **No ruleset on `main`** — the canary is not run until the owner creates it and reads it back
+  (`docs/runbooks/main-ruleset.md`). Permission for the canary itself is already given.
+- The owner's 2026-09-27 platform observations (apex 307 → www; commerce variables still set;
+  no `RATE_LIMIT_KEY_SECRET` in the project inventory) are recorded in masterplan §7 as theirs:
+  this session's Vercel connector answered 403 for the team scope.
+- Contact copy ("Message sent" means provider acceptance) and a delivery-and-reply test are a
+  person's judgement; claims, privacy sign-off and retention stay with their owners.
 
 ## Session note — 2026-09-27
 

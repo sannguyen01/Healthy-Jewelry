@@ -4,6 +4,24 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-10-02 — PR #93: Release review for #90 — four controls asked what they actually observe
+
+- **A stale action on a retired path ends on a page a person can read.** The 308 families are
+  route handlers (`retiredRoute()`): browsing keeps the 308, every other method answers the 410
+  page. A multipart product form no longer dead-ends on "Server action not found.".
+- **A forged beacon cannot put a visitor's words into the log.** One strict schema per event;
+  search records the collections and metals it named, never the text. Consent can be withdrawn
+  from every page.
+- **An expired claim approval leaves the served page within an hour**, proven by a build-and-serve
+  experiment that fails on the old build and passes on the new.
+- **The live-surface probe reads under a real byte cap**, settles which build each host serves
+  before naming a cause, and opens an issue a named person must acknowledge.
+- **The canary proof** attributes a block to the failing check only for a non-draft,
+  conflict-free, up-to-date pull request whose head and merge commit agree.
+- [ADR 038](docs/adr/038-what-a-control-observes-is-not-what-it-claims.md); `AGENTS.md` lists the
+  actions no agent takes; the masterplan's §6 is a state machine whose transitions need a recorded
+  observation.
+
 ## 2026-09-27 — PR #90: Masterplan v2 — the boundary compared at the right grain, and five live defects
 
 A proposed revision of the decommission plan was measured against the repository before it
