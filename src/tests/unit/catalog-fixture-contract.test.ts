@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { productSchema, collectionSchema } from '@/lib/catalog/schema'
 import {
   BASE_PRODUCT,
+  makeAssignedFormProduct,
   makeCollection,
   makePendingMediaProduct,
   makePhotoProduct,
@@ -22,8 +23,8 @@ import {
  * specification line — so the component was proven against a record no page would ever
  * receive, and the empty-spec branch it exercised was one the site did not have.
  *
- * Every exported factory is checked, not only the base: `makePhotoProduct` and
- * `makePendingMediaProduct` each replace a discriminated-union arm, which is exactly
+ * Every exported factory is checked, not only the base: `makePhotoProduct`,
+ * `makePendingMediaProduct` and `makeAssignedFormProduct` each replace a discriminated-union arm, which is exactly
  * where a shallow spread can produce something well-typed and invalid.
  */
 describe('the shared catalogue fixture is a record the catalogue could hold', () => {
@@ -44,6 +45,14 @@ describe('the shared catalogue fixture is a record the catalogue could hold', ()
 
   it('the pending-illustration variant validates', () => {
     expect(productSchema.safeParse(makePendingMediaProduct()).success).toBe(true)
+  })
+
+  it('the assigned-form variant validates', () => {
+    expect(productSchema.safeParse(makeAssignedFormProduct()).success).toBe(true)
+  })
+
+  it('the base product is unassigned, as every real record is today', () => {
+    expect(BASE_PRODUCT.form).toEqual({ state: 'unassigned' })
   })
 
   it('the collection fixture validates', () => {

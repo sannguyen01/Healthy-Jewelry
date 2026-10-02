@@ -1,7 +1,70 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-09-25
+Last refreshed by hand: 2026-09-27
+
+## Session note — 2026-09-27
+
+**A plan was measured against the repository before it was executed, and the measurement
+rewrote it.** A brief proposed masterplan v2: protect `main` first, resolve a live-site
+discrepancy, strengthen the boundary, run nine workstreams to a definition of done. Read
+against v1 it looked like a refinement. Measured against the tree it contained 25 defects,
+omissions and false premises — and one of them would have deployed a known-bad commit to
+production: its exit test for branch protection was to open a failing PR and see whether
+GitHub refused the merge, on a repository where `main` auto-deploys. The proof is now
+read-only (`scripts/probe-merge-denial.mjs`), and cannot merge by construction.
+
+**The control PR #88 shipped on 2026-09-25 was reconciling at the wrong grain.** The register
+compared *paths*; its Identifiers column was parsed and never read, and two rows had already
+drifted. Its lexer's documented limit — `//` in a string, "the safe direction" — understated a
+worse one: `/*` in a glob string swallowed the next thirty lines, 661 lines in 67 files were
+misread, and one misread hid an absolute finding. ADR 037. On its first day the exact-set rule
+caught two real drifts in opposite directions during integration, which the file-level rule
+would have passed.
+
+**Five things were live on the site, and none had gone red:** the contact form answered
+success when the mail provider *refused* the message (the SDK returns an error rather than
+throwing); the privacy page said IPs were hashed while the raw address was the Redis key; the
+consent banner named an event that no longer exists; the analytics sink still logged
+price-shaped fields; and skin, biocompatibility, imaging and regulatory claims rendered with no
+evidence behind them — including "nickel-free" on 316L, which is nickel-bearing by
+specification. The owner chose *enforce now*: every unevidenced claim renders its neutral
+fallback until a named reviewer approves it against a document.
+
+**How the work was run, and what stopped it.** Five workstream agents in isolated worktrees,
+one integrator owning every hot file, each branch merged alone with the full gate after it. The
+account session limit stopped every agent, repeatedly, across five windows. Checkpoint commits
+after every deliverable meant a stop lost at most one; pushing each gated integration meant a
+stop lost time and never work; fresh agents with focused briefs replaced resumes of contexts
+that had grown past four hundred thousand tokens. The integrator finished the last deliverable
+of one workstream itself.
+
+**Measured at the end:** 107 unit files / 3225 passed; E2E 696 passed (462 before); 45 controls
+(29 before); all 31 vitest sentinels alive; the build-output scan clean over 238 client assets;
+register 53 → 34 rows. What is left is almost all console, credential, DNS and legal work,
+each with a runbook that starts read-only and ends with an empty evidence table. The first of
+them is the `main` ruleset, and nothing in PR #90 should merge before it exists.
+
+**The review pass found two defects the gate had passed, and both were the same shape as the
+ones above: a control that would have reported something false.** The live-surface probe
+follows same-site redirects, so `/cart` → 308 → `/shop` ended on `/shop`'s 200, and every
+retired route that redirects — eleven of §7's rows — would have read as live commerce and blamed
+the deployed commit. It now judges a retired path by its own first answer. And the WS-D runbook
+told the owner to remove the one variable the retained webhook route uses for its *which shop*
+check, which switches off silently when the variable is absent; it now leaves with the signing
+secret, after WS-F. Neither had a failing test, because each was correct in isolation: the
+probe's detectors were right, and the runbook's list was right about every other variable.
+
+**Then every remaining register row was audited for what a repository could close before WS-F.**
+Of 36, two closed: the smoke-escalation caveat named the vendor as a likely cause of a live
+failure, and the Playwright web server was handed two commerce values only the webhook route
+reads. The rest are tied to live state — the webhook route, the smoke workflow's real secrets,
+two decommissioned tokens still configured in repository settings, the checkout CNAME's clock
+— or are dated records whose precision is the point. Rewording those to hide a vendor's name
+would have closed rows by making the history vaguer, which is a burn-down metric being gamed
+rather than work being finished. Two real errors surfaced on the way: the dependency-scope
+control still claimed to cover the vendor's packages, and the DNS guide still offered the
+vendor's hosted customer-accounts pages on a brand subdomain, which contract §3 forbids.
 
 ## Session note — 2026-09-25
 

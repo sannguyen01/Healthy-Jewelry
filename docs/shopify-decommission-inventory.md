@@ -91,7 +91,7 @@ and it cannot be re-checked by the next person. Write what was observed, in word
 
 ## Retention — a finding, not advice
 
-`docs/headless-launch-inventory.md` records `ordersCount: 0` as of 2026-08-08, and the store has
+`docs/headless-launch-inventory.md` records `ordersCount: 0` as of 2026-08-12 (corrected 2026-09-26: this line said 2026-08-08, a date its own source does not carry), and the store has
 never had a confirmed payment provider. On that evidence there are **no transaction records, no
 customer records and no payment data** to retain, and the Vietnamese tax and consumer-law exposure
 the decommission brief anticipated is empty.

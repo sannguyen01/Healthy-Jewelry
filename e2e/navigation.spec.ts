@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from './support/test'
 
 /**
  * The search control lives in two places depending on width, and these tests run

@@ -131,14 +131,14 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**92 unit spec files**',
-    claimed: '92',
+    context: '**105 unit spec files**',
+    claimed: '105',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
     doc: CONVENTIONS,
-    context: '**15 E2E spec files**',
-    claimed: '15',
+    context: '**17 E2E spec files**',
+    claimed: '17',
     actual: () => String(countFiles('e2e', (f) => /\.spec\.ts$/.test(f))),
   },
   {
@@ -247,9 +247,12 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
   {
     doc: 'docs/testing-strategy.md',
     // Wrong until 2026-08-29: the doc said 18. Counting `it(` rather than running the
-    // suite keeps this in the fast gate; the two agreed when checked by hand.
-    context: 'every premise, 29 tests',
-    claimed: '29',
+    // suite keeps this in the fast gate. The two agreed when checked by hand until the
+    // 2026-09-26 premise rewrite, after which 18 declarations expand to 22 vitest cases — so
+    // the document now names the unit this counts ("test declarations") instead of claiming a
+    // figure a reader would check against the runner and find wrong.
+    context: 'every premise, 18 test declarations',
+    claimed: '18',
     actual: () =>
       String((read('src/tests/unit/premise-checks.test.ts').match(/^\s*it(\.each)?\(/gm) ?? []).length),
   },

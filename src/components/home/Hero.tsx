@@ -1,10 +1,24 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export function Hero() {
+interface HeroProps {
+  /**
+   * The headline, one entry per line, resolved by the server component that renders this.
+   *
+   * It is the positioning line — "Metal that works with your body" — and that line is a
+   * biocompatibility claim, pending in the claims registry. Resolving it here would mean
+   * importing the registry into a client component and shipping Zod with it, so the page
+   * resolves it and passes the result down. The lines come from the registry's own
+   * line-break hints, which keeps the three-line setting the card's width was designed
+   * around (ADR 013) without this component knowing which wording it received.
+   */
+  headlineLines: readonly string[]
+}
+
+export function Hero({ headlineLines }: HeroProps) {
   const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -102,8 +116,10 @@ export function Hero() {
             alignItems: 'flex-start',
           }}
         >
+          {/* "Implant-Grade Titanium" until 2026-09-26: a regulatory claim in the first words
+              a visitor reads. The eyebrow now names the three metals by specification. */}
           <span className="label-eyebrow" style={{ marginBottom: '24px' }}>
-            Implant-Grade Titanium · Niobium · 316L Steel
+            Grade 23 Titanium · Niobium · 316L Steel
           </span>
 
           <h1
@@ -118,11 +134,14 @@ export function Hero() {
               margin: '0 0 28px',
             }}
           >
-            Metal that
-            <br />
-            works with
-            <br />
-            your body.
+            {/* Fragments, not spans: the DOM is the one the legibility spec has always
+                measured — text nodes separated by <br> — whichever wording arrives. */}
+            {headlineLines.map((line, i) => (
+              <Fragment key={i}>
+                {i > 0 && <br />}
+                {line}
+              </Fragment>
+            ))}
           </h1>
 
           <p

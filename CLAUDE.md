@@ -6,6 +6,15 @@ Healthy Jewelry is a premium titanium and non-corrosion metal jewelry brand. Imp
 **Positioning**: *Metal that works with your body.*
 No stones. No gemstones. No healing crystals. No chakras. Pure material science.
 
+**These lines are the brand's intent, not publishable copy.** "Implant-grade", "biocompatible",
+"for people with metal sensitivities" and the positioning line itself are *claims*, and since
+2026-09-25 (the owner's "enforce now" decision) a claim renders only when a named reviewer has
+approved it against a document that covers the piece. Each is a pending record in
+`src/content/claims/`; until it is approved the site renders the record's neutral fallback, and
+`src/tests/unit/claim-lexicon.test.tsx` fails on the wording anywhere else in rendered copy. Write
+the specification ("Grade 23 titanium, Ti-6Al-4V ELI") and route anything more through
+`claimText()` in `src/lib/catalog/claims.ts`.
+
 Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 
 ## Tech Stack
@@ -192,12 +201,13 @@ ways, clipping, spread across ratios, buy-control position) and
   `docs/commerce-elimination-masterplan.md` for the nine workstreams that burn the register
   down. A new file carrying a commerce identifier is a defect until somebody classifies it —
   `executable` is the default class.
-- **What is deliberately still standing**: `src/lib/shopify/cacheTags.ts` and
-  `api-version.ts`, because `/api/webhooks/shopify`, `/api/revalidate` and `/api/version`
-  still import them. The webhook subscriptions must be deleted in the platform console
-  *before* the endpoint is removed, or it retries against a failing route for its full
-  backoff schedule. That is the masterplan's **WS-F** ordering (the browse-only plan called
-  it WS-7), and the connector is currently `needs_reconnect`.
+- **What is deliberately still standing**: `src/lib/shopify/cacheTags.ts`, because
+  `/api/webhooks/shopify` still imports it. `/api/revalidate`, `src/config/shopify*.ts` and
+  `src/lib/shopify/api-version.ts` were deleted by WS-A on 2026-09-25, and `/api/version`
+  now reports the build fingerprint with no vendor block. The webhook subscriptions must be
+  deleted in the platform console *before* the endpoint is removed, or it retries against a
+  failing route for its full backoff schedule. That is the masterplan's **WS-F** ordering
+  (the browse-only plan called it WS-7), and the connector is currently `needs_reconnect`.
 - Hooks: `src/lib/hooks/useReveal.ts` — IntersectionObserver scroll-reveal hook, returns `[ref, visible]` tuple, triggers once then disconnects
 
 ### No prices, anywhere

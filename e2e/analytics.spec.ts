@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './support/test'
 
 /**
  * **Nothing is measured until someone says yes.**

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
-import { SITE_URL } from '@/config/site'
+import { SITE_DEFAULT_TITLE, SITE_DESCRIPTION, SITE_URL } from '@/config/site'
 import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
@@ -19,24 +19,36 @@ const dmSans = DM_Sans({
   variable: '--font-dm',
 })
 
+/**
+ * Site-wide metadata: what a search result, a browser tab and a shared link say first.
+ *
+ * Until 2026-09-26 this published "Implant-grade … Hypoallergenic, corrosion-proof, and
+ * designed to last a lifetime" as the default description, and asked search engines to rank
+ * the brand for "hypoallergenic jewelry", "nickel-free jewelry", "biocompatible jewelry" and
+ * "MRI safe jewelry". A keyword is a claim addressed to a search engine: it asks to be shown
+ * to people looking for exactly that property. Every one of those is now a pending claim in
+ * the registry, so every one leaves here; the keywords that remain name materials and
+ * pieces, which is what the brand can say without a document.
+ *
+ * Plain strings, and the default description and title come from `@/config/site` so there
+ * is one statement of each (see the note there on why they are not registry claims).
+ */
 export const metadata: Metadata = {
   title: {
-    default: 'Healthy Jewelry — Implant-Grade Titanium',
+    default: SITE_DEFAULT_TITLE,
     template: '%s — Healthy Jewelry',
   },
-  description:
-    'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic, corrosion-proof, and designed to last a lifetime. No stones. No fillers. Pure material integrity.',
+  description: SITE_DESCRIPTION,
   keywords: [
-    'implant grade titanium jewelry',
-    'hypoallergenic jewelry',
+    'grade 23 titanium jewelry',
+    'titanium jewelry',
     'niobium jewelry',
+    'anodized niobium jewelry',
     'surgical steel jewelry',
+    '316L steel jewelry',
     'titanium rings',
     'titanium necklaces',
-    'nickel-free jewelry',
-    'biocompatible jewelry',
     'grade 23 titanium',
-    'MRI safe jewelry',
   ],
   authors: [{ name: 'Healthy Jewelry' }],
   creator: 'Healthy Jewelry',
@@ -47,15 +59,13 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: SITE_URL,
     siteName: 'Healthy Jewelry',
-    title: 'Healthy Jewelry — Implant-Grade Titanium',
-    description:
-      'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic. Corrosion-proof. Built to last.',
+    title: SITE_DEFAULT_TITLE,
+    description: SITE_DESCRIPTION,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Healthy Jewelry — Implant-Grade Titanium',
-    description:
-      'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic. Corrosion-proof.',
+    title: SITE_DEFAULT_TITLE,
+    description: SITE_DESCRIPTION,
   },
   robots: {
     index: true,

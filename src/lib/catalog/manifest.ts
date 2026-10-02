@@ -55,6 +55,15 @@ import collectionEarrings from '../../content/catalog/collections/earrings.json'
 import collectionNecklaces from '../../content/catalog/collections/necklaces.json'
 import collectionRings from '../../content/catalog/collections/rings.json'
 
+// ── Claims ─────────────────────────────────────────────────────────────────
+//
+// One file, not one per claim. A claim is reviewed against its neighbours — the three MRI
+// answers contradict each other, which is only visible when they sit side by side — and
+// the reviewer approving one is reading the whole registry anyway. Relative for the same
+// reason as the records above: `next.config.ts` loads this graph without path mappings.
+
+import claimsRegistry from '../../content/claims/claims.json'
+
 /** Raw, unvalidated product records. Read them through `@/lib/catalog`, never from here. */
 export const rawProducts: readonly unknown[] = [
   arcBandTitanium,
@@ -84,3 +93,6 @@ export const rawCollections: readonly unknown[] = [
   collectionNecklaces,
   collectionRings,
 ]
+
+/** The raw, unvalidated claims registry. Read claims through `@/lib/catalog`, never from here. */
+export const rawClaims: unknown = claimsRegistry

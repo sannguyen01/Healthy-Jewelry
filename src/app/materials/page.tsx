@@ -4,39 +4,112 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { hjMaterials } from '@/lib/data/hj-data'
+import {
+  claimText,
+  materialChips,
+  materialContext,
+  materialDesignation,
+  materialStandard,
+  toMaterialHandle,
+} from '@/lib/catalog'
 
 export const metadata: Metadata = {
   title: 'Materials',
+  // "The science of biocompatible jewelry metals — hypoallergenic, corrosion-proof,
+  // MRI-safe" until 2026-09-26: three claims and an implication in one search snippet.
   description:
-    'Grade 23 Titanium, Niobium, 316L Surgical Steel. The science of biocompatible jewelry metals — hypoallergenic, corrosion-proof, MRI-safe.',
+    'Grade 23 titanium (Ti-6Al-4V ELI), anodized niobium and 316L surgical steel: the three metals Healthy Jewelry works in, each named by its exact specification.',
+}
+
+/**
+ * The comparison table: specification rows only.
+ *
+ * It carried Hypoallergenic, Corrosion resistance, MRI-safe and Skin-safe rows answered
+ * "Yes"/"Excellent" in every cell until 2026-09-26 — twelve claims in a grid, none with a
+ * source. Those claims are pending in the registry and appear as chips on each material
+ * above once approved. What stays in the grid is what the metals are: the designation, the
+ * relative weight the page already stated, and the standard — `null` until a document
+ * supports it, because naming a standard is a certification claim about the stock. The
+ * table *cell* says "Under review"; the data never does, so no copy edit can turn a missing
+ * standard into a documented one.
+ *
+ * Module scope is safe here and only here: a documented standard depends on the registry,
+ * not on the clock. Anything that resolves a claim is computed per render, below.
+ */
+const TABLE_MATERIALS = hjMaterials.map((m) => {
+  const context = materialContext(m.handle)
+  const material = toMaterialHandle(m.handle)
+  return {
+    handle: m.handle,
+    designation: materialDesignation(material),
+    standard: materialStandard(material, context),
+  }
+})
+
+const UNDOCUMENTED_STANDARD = 'Under review'
+
+const WEIGHT: Record<string, string> = {
+  titanium: 'Lightweight',
+  niobium: 'Medium',
+  'surgical-steel': 'Medium',
 }
 
 const COMPARISON_ROWS = [
-  { property: 'Hypoallergenic', titanium: 'Yes', niobium: 'Yes', steel: 'Yes' },
-  { property: 'Corrosion resistance', titanium: 'Excellent', niobium: 'Excellent', steel: 'High' },
-  { property: 'Weight', titanium: 'Lightweight', niobium: 'Medium', steel: 'Medium' },
-  { property: 'MRI-safe', titanium: 'Yes', niobium: 'Yes', steel: 'Yes' },
-  { property: 'Skin-safe', titanium: 'Yes', niobium: 'Yes', steel: 'Yes' },
+  { property: 'Designation', cells: TABLE_MATERIALS.map((m) => m.designation) },
+  { property: 'Weight', cells: TABLE_MATERIALS.map((m) => WEIGHT[m.handle] ?? '—') },
+  { property: 'Standard', cells: TABLE_MATERIALS.map((m) => m.standard ?? UNDOCUMENTED_STANDARD) },
 ] as const
 
-const FAQ = [
+/**
+ * The standards answer is built from the material specifications, never written by hand:
+ * a standard renders only where its provenance is documented. Today none is, so the answer
+ * names the designations and says why no standard appears.
+ */
+function standardsAnswer(): string {
+  const documented = TABLE_MATERIALS.filter((m) => m.standard !== null)
+  const designations = TABLE_MATERIALS.map((m) => m.designation).join(', ')
+  if (documented.length === 0) {
+    return (
+      `Each metal is named here by its exact designation — ${designations}. Naming a ` +
+      `standard is a certification claim about the actual stock a piece is made from, so we ` +
+      `name one only once the documentation for it has been reviewed. None has been yet.`
+    )
+  }
+  return documented.map((m) => `${m.designation}: ${m.standard}.`).join(' ')
+}
+
+const SITE = { kind: 'site' } as const
+
+/**
+ * A function, not a constant: two answers resolve claims, and a claim is resolved at render
+ * time — an approval that lapses, or one whose date arrives, changes the page on the next
+ * render rather than on the next process start.
+ *
+ * Questions are kept, never silently dropped; three were rewritten because the question
+ * itself asserted the claim ("Are these metals safe for sensitive skin?", "Is this jewelry
+ * MRI-safe?", "What does implant-grade mean?"). Answers whose whole content was a claim come
+ * from the registry and render their fallback until approved.
+ */
+const faq = () => [
   {
-    q: 'Are these metals safe for sensitive skin?',
-    a: 'Yes. All three metals — Grade 23 titanium, niobium, and 316L surgical steel — are used in medical implants and body-contact devices. They have negligible nickel content and do not leach ions that trigger contact dermatitis.',
+    q: 'How do these metals behave against skin?',
+    a: claimText('materials-faq-skin', SITE),
   },
   {
-    q: 'How do I care for implant-grade jewelry?',
-    a: 'Rinse with mild soap and warm water. Pat dry. Avoid prolonged exposure to harsh chemicals such as bleach or strong solvents. Titanium and niobium are saltwater-safe; 316L steel handles occasional exposure well.',
+    q: 'How do I care for these metals?',
+    // The retired answer ended "Titanium and niobium are saltwater-safe; 316L steel handles
+    // occasional exposure well" — a corrosion claim, pending as `saltwater-resistant`.
+    a: 'Rinse with mild soap and warm water. Pat dry. Avoid prolonged exposure to harsh chemicals such as bleach or strong solvents.',
   },
   {
-    q: 'Is this jewelry MRI-safe?',
-    a: 'Grade 23 titanium and niobium are non-ferromagnetic and MRI-safe. 316L surgical steel has very low magnetic susceptibility and is generally considered safe, but consult your radiologist for specific procedures.',
+    q: 'What about MRI scans?',
+    a: claimText('materials-faq-mri', SITE),
   },
   {
-    q: 'What does "implant-grade" mean?',
-    a: '"Implant-grade" refers to alloy specifications approved for surgical use: ASTM F136 for Grade 23 titanium, ASTM F2814 for niobium, and ASTM F138 for 316L surgical steel. These standards mandate purity levels and biocompatibility testing.',
+    q: 'Which standards do these metals meet?',
+    a: standardsAnswer(),
   },
-] as const
+]
 
 const MATERIAL_NUMBERS = ['01', '02', '03'] as const
 
@@ -69,8 +142,7 @@ export default function MaterialsPage() {
               maxWidth: '580px',
             }}
           >
-            Biocompatibility is not a marketing claim — it is a material property. We use only
-            metals that have been validated for long-term contact with human tissue.
+            {claimText('materials-intro', SITE)}
           </p>
         </section>
 
@@ -154,7 +226,7 @@ export default function MaterialsPage() {
                 </p>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '0 0 32px' }}>
-                  {material.properties.map((prop) => (
+                  {materialChips(material).map((prop) => (
                     <span
                       key={prop}
                       className="material-tag"
@@ -257,36 +329,19 @@ export default function MaterialsPage() {
                     >
                       {row.property}
                     </td>
-                    <td
-                      style={{
-                        padding: '14px 20px',
-                        color: 'var(--ink)',
-                        borderBottom: '1px solid var(--ash)',
-                        fontWeight: 300,
-                      }}
-                    >
-                      {row.titanium}
-                    </td>
-                    <td
-                      style={{
-                        padding: '14px 20px',
-                        color: 'var(--ink)',
-                        borderBottom: '1px solid var(--ash)',
-                        fontWeight: 300,
-                      }}
-                    >
-                      {row.niobium}
-                    </td>
-                    <td
-                      style={{
-                        padding: '14px 20px',
-                        color: 'var(--ink)',
-                        borderBottom: '1px solid var(--ash)',
-                        fontWeight: 300,
-                      }}
-                    >
-                      {row.steel}
-                    </td>
+                    {row.cells.map((cell, c) => (
+                      <td
+                        key={c}
+                        style={{
+                          padding: '14px 20px',
+                          color: 'var(--ink)',
+                          borderBottom: '1px solid var(--ash)',
+                          fontWeight: 300,
+                        }}
+                      >
+                        {cell}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -312,7 +367,7 @@ export default function MaterialsPage() {
               maxWidth: '760px',
             }}
           >
-            {FAQ.map((item, i) => (
+            {faq().map((item, i) => (
               <div
                 key={i}
                 style={{

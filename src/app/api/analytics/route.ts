@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isAnalyticsEventName, sanitiseQuery, MAX_QUERY_LENGTH } from '@/lib/analytics/events'
+import {
+  isAnalyticsEventName,
+  sanitiseQuery,
+  MAX_QUERY_LENGTH,
+  type AnalyticsEvent,
+} from '@/lib/analytics/events'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
@@ -13,12 +18,13 @@ import { readBoundedBody } from '@/lib/http/readBoundedBody'
  * customer is already talking to. It also means the storefront never has to change
  * when the destination does — the client posts here, and here decides.
  *
- * Today "decides" means a structured log line. On Vercel those are queryable and
- * retained, which is enough to answer the questions this store cannot currently
- * answer at all: how many people reach a product page, how many add to the bag,
- * and — the one that started this — how often checkout refuses and for which
- * typed reason. Piping the same events onward to a warehouse later is a change to
- * this file only.
+ * Today "decides" means a structured log line in Vercel's function logs — the
+ * only place these events are kept. That is enough to answer the questions this
+ * site actually has: which pieces and collections people look at, and what they
+ * search for and fail to find. There is no conversion to measure; nothing here
+ * can be bought (`docs/analytics.md`). Piping the same events onward to a
+ * warehouse later is a change to this file only, and a change to the privacy page
+ * and `docs/data-flow-record.md` in the same commit.
  *
  * ## What is deliberately not recorded
  *
@@ -36,8 +42,8 @@ import { readBoundedBody } from '@/lib/http/readBoundedBody'
 export const dynamic = 'force-dynamic'
 
 // Generous. A browsing session legitimately fires an event every few seconds, and
-// this bucket exists to stop abuse rather than to budget real use — the same
-// posture as /api/shopify, which is unauthenticated for the same reason.
+// this bucket exists to stop abuse rather than to budget real use. The route is
+// unauthenticated by necessity — a beacon cannot carry a credential worth having.
 // `onError: 'allow'`. This is measurement. Dropping a beacon because Redis is
 // unreachable would lose the data *and* spend a 500 telling a customer's browser
 // about it — and this route already answers 204 to everything by design.
@@ -51,38 +57,62 @@ const limiter = createRateLimiter({
 /** Small by design. A legitimate event is a few hundred bytes. */
 const MAX_BODY_BYTES = 2_048
 
+const str = (value: unknown, max: number): string | undefined =>
+  typeof value === 'string' && value.length > 0 ? value.slice(0, max) : undefined
+const num = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined
+
+/** Every field any event in the union carries, other than its name. */
+type KeysOfUnion<T> = T extends unknown ? keyof T : never
+type EventField = Exclude<KeysOfUnion<AnalyticsEvent>, 'name'>
+
+/**
+ * One coercion per field the event union defines — **exactly** those fields.
+ *
+ * `satisfies Record<EventField, …>` makes the set a compile-time equality with
+ * `AnalyticsEvent`: a field added to the union without a line here is a type error,
+ * and so is a line here for a field no event defines. That second direction is the
+ * one that had failed. Until 2026-09-25 this allowlist still copied `value`,
+ * `currency`, `quantity`, `itemCount` and `reason` into the log — the price and
+ * cart fields of four events deleted with the commerce UI — so anything posting
+ * `{ value: '89.00', currency: 'USD' }` directly to this route had it written to a
+ * log on a site that publishes no prices. No client sent them; the sink simply
+ * outlived the vocabulary it was written for.
+ */
+const FIELD_SANITISERS = {
+  handle: (value: unknown) => str(value, 128),
+  collection: (value: unknown) => str(value, 64),
+  material: (value: unknown) => str(value, 64),
+  productCount: num,
+  resultCount: num,
+  // Sanitised again server-side. The client already truncates, but a route that
+  // trusts its client for the one free-text field is not validating anything.
+  query: (value: unknown) =>
+    typeof value === 'string' ? sanitiseQuery(value.slice(0, MAX_QUERY_LENGTH)) : undefined,
+} satisfies Record<EventField, (value: unknown) => string | number | undefined>
+
 /**
  * Copy across only the fields the event union defines, coercing each.
  *
  * An allowlist, never a spread: spreading the request body would let anything a
  * caller invents reach the logs, which is precisely how a field carrying an email
  * address ends up in a log retention policy nobody wrote it into.
+ *
+ * The allowlist is the union's field set, not each event's own: a direct POST of
+ * `product_viewed` carrying a `query` is logged with it, sanitised. Every field is
+ * bounded, and the one free-text field is lower-cased and truncated whichever
+ * event carries it, so per-event narrowing would tidy the record without changing
+ * what it can hold. Recorded as a known limit rather than implied away.
  */
 function sanitiseEvent(body: Record<string, unknown>): Record<string, unknown> | null {
   const name = typeof body.name === 'string' ? body.name : ''
   if (!isAnalyticsEventName(name)) return null
 
-  const str = (value: unknown, max = 128): string | undefined =>
-    typeof value === 'string' && value.length > 0 ? value.slice(0, max) : undefined
-  const num = (value: unknown): number | undefined =>
-    typeof value === 'number' && Number.isFinite(value) ? value : undefined
-
-  return {
-    name,
-    handle: str(body.handle),
-    collection: str(body.collection, 64),
-    material: str(body.material, 64),
-    value: str(body.value, 32),
-    currency: str(body.currency, 8),
-    quantity: num(body.quantity),
-    itemCount: num(body.itemCount),
-    productCount: num(body.productCount),
-    resultCount: num(body.resultCount),
-    reason: str(body.reason, 32),
-    // Sanitised again server-side. The client already truncates, but a route that
-    // trusts its client for the one free-text field is not validating anything.
-    query: typeof body.query === 'string' ? sanitiseQuery(body.query.slice(0, MAX_QUERY_LENGTH)) : undefined,
+  const event: Record<string, unknown> = { name }
+  for (const [field, clean] of Object.entries(FIELD_SANITISERS)) {
+    event[field] = clean(body[field])
   }
+  return event
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -93,8 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 })
   }
 
-  // Same shared reader as /api/shopify and /api/contact — real bytes, bounded
-  // before allocation. Every refusal here stays 204: this route answers a
+  // Same shared reader as /api/contact — real bytes, bounded before allocation. Every refusal here stays 204: this route answers a
   // fire-and-forget beacon, and an oversize payload is not something a
   // customer's browser should hear about or retry.
   const body = await readBoundedBody(request, MAX_BODY_BYTES)

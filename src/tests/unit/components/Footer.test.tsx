@@ -1,6 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Footer } from '@/components/layout/Footer'
+import { claimText } from '@/lib/catalog'
+
+/**
+ * The tagline is the positioning line, and the positioning line is a pending claim — "Metal
+ * that works with your body" implies biocompatibility. These assertions used to pin that
+ * wording; they now pin whatever the registry resolves, so approving the claim changes the
+ * footer without editing this file, and assert separately that the pending wording does
+ * not render today.
+ */
+const TAGLINE = claimText('brand-positioning', { kind: 'site' })
 
 vi.mock('next/link', () => ({
   default: ({
@@ -32,7 +42,12 @@ describe('Footer', () => {
 
     it('renders brand tagline copy', () => {
       render(<Footer />)
-      expect(screen.getByText(/metal that works with your body/i, { selector: 'p' })).toBeTruthy()
+      expect(screen.getByText(new RegExp(`^${TAGLINE}`), { selector: 'p' })).toBeTruthy()
+    })
+
+    it('does not render the positioning claim while it is pending', () => {
+      render(<Footer />)
+      expect(screen.queryAllByText(/works with your body/i)).toHaveLength(0)
     })
   })
 
@@ -102,7 +117,7 @@ describe('Footer', () => {
 
     it('shows tagline in bottom bar', () => {
       render(<Footer />)
-      const taglines = screen.getAllByText(/metal that works with your body/i)
+      const taglines = screen.getAllByText(new RegExp(TAGLINE))
       expect(taglines.length).toBeGreaterThanOrEqual(2)
     })
   })

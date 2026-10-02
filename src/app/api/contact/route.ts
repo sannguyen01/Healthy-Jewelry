@@ -11,9 +11,9 @@ import { CONTACT_EMAIL, SENDER_EMAIL } from '@/config/site'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
-// Rate limiting now lives in `@/lib/utils/rateLimit`, shared with
-// `/api/shopify`. It used to be two hand-rolled copies; the Shopify proxy had
-// none at all, which made the un-audited route the softer target.
+// Rate limiting lives in `@/lib/utils/rateLimit`, shared with every public
+// route. It used to be two hand-rolled copies; the cart proxy had none at all,
+// which made the un-audited route the softer target.
 /** See the note at the parse site for how this number was chosen. */
 const MAX_BODY_BYTES = 8_192
 
@@ -109,19 +109,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     )
   }
 
+  // 4. Believe the provider's answer, not the absence of an exception.
+  //
+  // **`emails.send()` does not throw when Resend refuses a message.** resend@6
+  // catches every non-2xx and *returns* `{ data: null, error }` — an unverified
+  // sending domain, a revoked key, a 429, a validation failure. This route
+  // awaited the call, ignored what it returned, and answered `{ success: true }`
+  // to every one of them: the customer was told their message had arrived while
+  // it went nowhere, which is the exact lie PR #32 removed for a *missing* key,
+  // surviving one layer down for a *rejected* one. The `try` below only ever
+  // caught the rare case the SDK does throw on, so the test that mocked a
+  // rejection was testing a path production almost never takes, and the mock
+  // that stood in for success (`{ id }` at the top level) is not the shape
+  // resend@6 returns — so the defect could not have shown up in this suite.
+  //
+  // 502, not 500: the failure is upstream, and a gateway status says so. The
+  // body is the same honest error ContactForm already renders beside a mailto
+  // fallback, so nothing on the client changes.
+  //
+  // Logged as `{ name, statusCode }` and nothing else. Resend's `message` can
+  // echo the addresses it was given — `to`, `replyTo`, which is the customer's
+  // email — and Vercel function logs are readable by every project member. The
+  // name is an enumerated code (`validation_error`, `rate_limit_exceeded`, …),
+  // which is what an operator needs and all an operator needs.
   try {
     const cleanSubject = sanitizeSubject(subject)
     const resend = new Resend(apiKey)
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: `Healthy Jewelry Contact <${SENDER_EMAIL}>`,
       to: [CONTACT_EMAIL],
       replyTo: email,
       subject: `[Contact] ${cleanSubject} — ${name}`,
       text: `Name: ${name}\nEmail: ${email}\nSubject: ${cleanSubject}\n\nMessage:\n${message}`,
     })
+
+    if (error) {
+      console.error('[contact] Resend refused the message', {
+        name: error.name,
+        statusCode: error.statusCode,
+      })
+      return NextResponse.json(
+        { error: 'Failed to send message. Please email us directly.' },
+        { status: 502 }
+      )
+    }
+
+    // Neither an error nor a message id is not a success. The SDK's types allow
+    // `{ data: null, error: null }`, and "we could not tell" has to mean the
+    // customer is told to email us — the same failure direction the consent gate
+    // takes. An accepted send always carries the id Resend will report it under.
+    if (!data?.id) {
+      console.error('[contact] Resend returned no message id and no error', {
+        name: 'missing_message_id',
+        statusCode: null,
+      })
+      return NextResponse.json(
+        { error: 'Failed to send message. Please email us directly.' },
+        { status: 502 }
+      )
+    }
+
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[contact] Resend error:', err)
+    // The error's class name only. A thrown error's message and stack are free
+    // text from code we do not own, and this is the one route whose inputs are a
+    // person's name, address and words.
+    console.error('[contact] Resend threw', {
+      name: err instanceof Error ? err.name : typeof err,
+    })
     return NextResponse.json(
       { error: 'Failed to send message. Please email us directly.' },
       { status: 500 }

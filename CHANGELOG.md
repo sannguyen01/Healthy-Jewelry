@@ -4,6 +4,43 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-09-27 — PR #90: Masterplan v2 — the boundary compared at the right grain, and five live defects
+
+A proposed revision of the decommission plan was measured against the repository before it
+was executed. It carried 25 defects and false premises; v2 adopts it where it was right and
+executes every part a repository can.
+
+- **Exact-set reconciliation** ([ADR 037](docs/adr/037-a-reconciliation-at-the-wrong-grain.md)).
+  Register rows and whole-file exemptions (§4 `Carries`) declare exactly the identifiers they
+  excuse; the scanner compares sets both ways. The lexer is string-, template-, regex- and
+  JSX-aware and checked against the TypeScript compiler on every tracked script. A stated
+  phase and an equality-pinned row count replace a floor that would have failed on completion.
+- **What the build emits is scanned**, inside the existing `verify` context; `main` builds cold.
+  **Egress is enforced**: an automatic Playwright fixture fails any spec on an unapproved origin
+  or a CSP violation, a server harness watches the route handlers, and a Content-Security-Policy
+  with `connect-src 'self'` exists for the first time. Retired routes are tested by method,
+  slash, encoding and query; a fresh session leaves no storage.
+- **Live defects fixed:** a refused contact send reported as success; raw IPs as rate-limit keys
+  while the privacy page said "hashed"; a consent banner naming a deleted event; price-shaped
+  fields in the analytics log; unevidenced skin and medical claims — now a claims registry,
+  rendered only with approved evidence (the owner's "enforce now").
+- **Governance:** the protection probe reads rulesets; a read-only merge-denial proof replaces
+  "press merge on a known-bad PR" on a repository that auto-deploys; CODEOWNERS; a live-surface
+  evidence probe; `CHECKOUT-HOST-CNAME` replaces a premise whose subject was deleted; four
+  runbooks for the console-only work.
+- **WS-A deletions:** `/api/revalidate`, the vendor config modules, the API-version pin,
+  diagnose-deployment; the mock commerce environment shrinks to what the webhook route reads.
+- Register 53 → 34 rows. 45 controls, 33 sentinels, all 31 vitest sentinels alive.
+- **Review pass on the integrated diff.** Two CI failures fixed at the cause: the lexer
+  differential parsed every tracked script twice and passed 5s under coverage; the claim
+  detector's two unreachable branches put it under the per-file branch floor. `/simplify`
+  gave the §13 host matcher, §7 route reading and claim liveness rule one home each, and made
+  the scanner 3× faster with byte-identical output. `/code-review` found the live-surface
+  probe calling a retired route that correctly redirects "commerce" (it judged where the
+  redirect landed), the WS-D runbook removing the variable the webhook's shop-domain check
+  needs, and claims resolved once at import rather than at render — all fixed.
+  `/security-review` found nothing at the reporting bar.
+
 ## 2026-09-25 — PR #88: The commerce boundary becomes something the build checks
 
 `docs/browse-only-masterplan.md` was a careful plan that nothing enforced. Nothing in

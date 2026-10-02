@@ -22,8 +22,18 @@ import path from 'node:path'
 
 const SRC = path.resolve(__dirname, '../..')
 
-/** A secret is any Shopify/Upstash/Resend env var without the public prefix. */
-const SECRET_ENV = /process\.env\.((?!NEXT_PUBLIC_)(?:SHOPIFY|UPSTASH|RESEND)_[A-Z0-9_]+)/g
+/**
+ * A secret is any Shopify/Upstash/Resend/rate-limit env var without the public prefix.
+ *
+ * `RATE_LIMIT_` joined on 2026-09-25 with `RATE_LIMIT_KEY_SECRET`, the HMAC key that
+ * pseudonymises client IPs before they become rate-limit bucket keys. It is the one secret
+ * whose leak would undo a privacy property rather than an access control: with the key, a
+ * stored bucket key can be reversed by enumerating the IPv4 space. A pattern that did not
+ * name it would protect it only by coincidence, which is the failure the
+ * customer-account block below was written about.
+ */
+const SECRET_ENV =
+  /process\.env\.((?!NEXT_PUBLIC_)(?:SHOPIFY|UPSTASH|RESEND|RATE_LIMIT)_[A-Z0-9_]+)/g
 
 function sourceFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -143,18 +153,45 @@ describe('server-only secrets never reach a client module', () => {
     )
   })
 
-  it('the public store domain is still allowed — the rule is about secrets', () => {
-    // `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` is inlined on purpose. A rule that banned every
-    // Shopify env var would be wrong and would get switched off.
+  it('a public value is still allowed — the rule is about secrets', () => {
+    // `NEXT_PUBLIC_*` is inlined on purpose. A rule that banned every vendor-prefixed env
+    // var would be wrong and would get switched off.
     //
-    // This used to read the cart store too, as the one client module that needed the public
-    // domain. The cart is gone, and with it the last *client* consumer of this file — the
-    // split ADR 003 describes now has only server-side callers. The public config is still
-    // asserted to carry no secret, because that is the property, not the caller.
-    const publicConfig = readFileSync(path.join(SRC, 'config/shopify-public.ts'), 'utf8')
-    expect(publicConfig).toContain('NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN')
-    expect([...publicConfig.matchAll(SECRET_ENV)]).toEqual([])
+    // This read `config/shopify-public.ts`, the browser-safe half of the split ADR 003
+    // describes. WS-A deleted it on 2026-09-25 with nothing left to import it, so the
+    // property is asserted against the pattern directly: the negative lookahead is what
+    // lets a public value through, and it is worth pinning because a pattern that caught
+    // `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` would flag `build-info.ts`'s legitimate reads the
+    // day one is added there.
+    expect(new RegExp(SECRET_ENV.source).test('process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN')).toBe(
+      false
+    )
+    expect(new RegExp(SECRET_ENV.source).test('process.env.SHOPIFY_WEBHOOK_SECRET')).toBe(true)
   })
+
+  /**
+   * **The rate-limit key is a secret, and its only reader is server-side.**
+   *
+   * Asserted by name rather than left to the graph walk, for the same reason as the
+   * customer-account block below: the walk protects only what `SECRET_ENV` recognises, and
+   * a secret added after the pattern was written is protected by coincidence or not at all.
+   * Both halves are pinned — the pattern recognises it, and the module that reads it is
+   * outside the client graph — so the test cannot pass by pointing at nothing.
+   */
+  it('RATE_LIMIT_KEY_SECRET is inside the pattern, and its reader is not client-reachable', () => {
+    expect(new RegExp(SECRET_ENV.source).test('process.env.RATE_LIMIT_KEY_SECRET')).toBe(true)
+
+    const reader = path.join(SRC, 'lib/utils/rateLimit.ts')
+    expect(
+      [...readFileSync(reader, 'utf8').matchAll(SECRET_ENV)].map((m) => m[1]),
+      'rateLimit.ts no longer reads the key, so this test is pointed at nothing'
+    ).toContain('RATE_LIMIT_KEY_SECRET')
+    expect(
+      [...reachable].map((f) => path.relative(SRC, f)),
+      'rateLimit.ts is reachable from a client module, so its HMAC key could be inlined into a bundle'
+    ).not.toContain('lib/utils/rateLimit.ts')
+  })
+
 
   /*
    * 'the client store does not import the server config module' was here.

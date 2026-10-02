@@ -57,9 +57,9 @@ export function ConsentBanner() {
           contrast, because the pixels behind "Shop Collection" were the banner's
           own `--bg`. A consent notice covering the two primary calls to action on
           the landing page is a conversion bug caused by a compliance control, and
-          it is the exact failure `analytics.spec.ts` already guards for the
-          Checkout button. Guarding one and not the other is how a class of bug
-          survives being fixed.
+          it is the failure `analytics.spec.ts` now guards across four widths.
+          Guarding one control and not the others is how a class of bug survives
+          being fixed.
 
           Right-hand side because the hero is a split at ≥901px: copy and CTAs
           left, photograph right. Overlapping part of a photograph is a cost worth
@@ -94,8 +94,17 @@ export function ConsentBanner() {
           margin: 0,
         }}
       >
-        We count anonymous page views and add-to-bag events to understand what people
-        look for. No cookies, no tracking across sites, nothing that identifies you.{' '}
+        {/*
+          Says what is counted, because it is three specific things: which piece
+          page opens, which collection, and what is typed into search (shortened).
+          It said "page views and add-to-bag events" until 2026-09-25 — the second
+          no longer exists, and the first was never true: other pages send nothing.
+          The list is `ANALYTICS_EVENT_NAMES` in `src/lib/analytics/events.ts`; a new
+          event is a change to this sentence in the same commit.
+        */}
+        If you allow it, we count which pieces and collections are viewed and what is
+        searched for here — the item, never you. No cookies, no identifiers, no tracking
+        across sites; your answer is kept in this browser.{' '}
         <Link
           href="/privacy"
           style={{ color: 'var(--titanium-text)', textDecoration: 'underline' }}

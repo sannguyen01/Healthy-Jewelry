@@ -5,8 +5,10 @@
 // schema that stops the build — see docs/adr/034-the-catalogue-is-the-source.md, which
 // supersedes ADR 004.
 //
-// What remains is the materials-science copy: three metals, their properties, and the
-// claims the brand makes about them. It is deliberately *not* in the catalogue. That schema
+// What remains is the materials-science copy: three metals and their specifications. The
+// claims the brand proposes about them are not here — they are records in
+// `src/content/claims/claims.json`, each with evidence and a decision, and this file names
+// them by id. It is deliberately *not* in the catalogue. That schema
 // describes things a visitor can look at and ask an ambassador about — a piece has a handle,
 // a URL, sizes, a photograph. A metal has none of those; it is prose rendered by
 // `/materials` and the homepage section, and forcing it into a product shape would mean
@@ -36,30 +38,60 @@ export interface HJMaterial {
   title: string
   subtitle: string
   body: string
+  /** Specification facts about the metal — always rendered. Never a claim. */
   properties: string[]
+  /**
+   * Claims proposed for this metal, by registry id. Rendered as chips **only** once approved
+   * against evidence that covers this material; until then they render nothing, and the
+   * specification properties above are the whole list.
+   *
+   * Ids rather than wording because the wording lives in `src/content/claims/claims.json`
+   * with its evidence and decision, and a second copy here would be a claim that bypasses
+   * both. Plain strings for the same reason `handle` is: this module does not import the
+   * catalogue. `claims-surfaces.test.ts` reconciles every id against the registry.
+   */
+  claims: string[]
 }
 
-
+/**
+ * The three metals, as specifications.
+ *
+ * Until 2026-09-26 this carried twelve claims as plain copy — "Implant-grade",
+ * "Hypoallergenic", "corrosion-proof in saltwater", "MRI-safe", "Lifetime color stability",
+ * "naturally biocompatible", "Zero nickel", "Biocompatible", "Medical grade", "prevents
+ * sensitization", "FDA-recognized" — rendered on `/materials` and the homepage with nothing
+ * behind any of them. They are claims now, in the registry, pending review; what stays
+ * here is what the metal *is*.
+ *
+ * One was not a claim so much as a conflation: "Low carbon content prevents sensitization
+ * over extended wear" used the metallurgical sense of sensitization — carbide precipitation
+ * at grain boundaries, which is what the L in 316L guards against — in a sentence a reader
+ * takes to be about skin. It is not carried into the registry, because no document could
+ * support the reading it invited.
+ */
 export const hjMaterials: HJMaterial[] = [
   {
     handle: 'titanium',
     title: 'Grade 23 Titanium',
-    subtitle: 'Implant-grade',
-    body: 'The same alloy used in surgical implants and aerospace structures. Hypoallergenic, 45% lighter than steel, corrosion-proof in saltwater.',
-    properties: ['Hypoallergenic', 'Saltwater-resistant', 'Lifetime color stability', 'MRI-safe'],
+    subtitle: 'Titanium alloy',
+    body: 'Titanium alloyed with aluminum and vanadium, in its Extra Low Interstitial grade — the alloy family used in aerospace structures. About 45% lighter than steel.',
+    properties: ['Ti-6Al-4V ELI', '45% lighter than steel'],
+    claims: ['implant-grade', 'hypoallergenic', 'saltwater-resistant', 'colour-stability', 'mri-safe'],
   },
   {
     handle: 'niobium',
     title: 'Niobium',
     subtitle: 'Anodized',
-    body: 'A rare refractory metal, naturally biocompatible. Anodized in oxygen-free environments to achieve stable, pigment-free color.',
-    properties: ['Pigment-free color', 'Zero nickel', 'Biocompatible', 'Anodized permanently'],
+    body: 'A refractory metal, colored by anodizing: the process grows a thin oxide layer on the surface, and that layer is the color — no pigment, no dye, no coating.',
+    properties: ['Pigment-free color', 'Anodized finish'],
+    claims: ['nickel-free', 'biocompatible', 'anodized-permanence'],
   },
   {
     handle: 'surgical-steel',
     title: '316L Surgical Steel',
-    subtitle: 'Medical grade',
-    body: '316L is the same steel specification used in medical instruments. Low carbon content prevents sensitization over extended wear.',
-    properties: ['Low-carbon spec', 'High corrosion resistance', 'Polishable', 'FDA-recognized'],
+    subtitle: 'Low-carbon stainless',
+    body: 'The low-carbon grade of 316 stainless steel — the L in 316L stands for low carbon. It takes a mirror polish.',
+    properties: ['Low-carbon spec', 'Polishable'],
+    claims: ['corrosion-resistance', 'fda-recognised'],
   },
 ]

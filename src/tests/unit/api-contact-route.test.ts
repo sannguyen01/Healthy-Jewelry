@@ -1,13 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-// Mock Resend before importing the route
+/**
+ * Resend, mocked at the module boundary — in the shape resend@6 actually returns.
+ *
+ * This mock resolved `{ id: 'mock-email-id' }` until 2026-09-25. resend@6 never returns
+ * that: `emails.send()` resolves `{ data, error, headers }`, with `data: null` and an
+ * `error` object for **every** non-2xx — it does not throw. A fixture shaped like the
+ * author's memory of the API rather than like the API
+ * ([ADR 028](../../../docs/adr/028-a-fixture-is-the-input-you-thought-of.md)) is why the
+ * route could ignore the return value, answer `{ success: true }` to a rejected send, and
+ * pass this file for as long as both existed.
+ *
+ * One `send` spy shared by every instance, so a test can both script the answer and read
+ * back what the route asked Resend to deliver.
+ */
+const send = vi.hoisted(() => vi.fn())
+const SENT = { data: { id: 'mock-email-id' }, error: null, headers: null }
+
 vi.mock('resend', () => ({
-  Resend: vi.fn().mockImplementation(() => ({
-    emails: {
-      send: vi.fn().mockResolvedValue({ id: 'mock-email-id' }),
-    },
-  })),
+  Resend: vi.fn().mockImplementation(() => ({ emails: { send } })),
 }))
 
 // Mock @upstash/ratelimit and @upstash/redis so tests run without real Redis.
@@ -23,6 +35,7 @@ vi.mock('@upstash/redis', () => ({
 }))
 
 const { POST } = await import('@/app/api/contact/route')
+const { CONTACT_EMAIL, SENDER_EMAIL } = await import('@/config/site')
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -50,6 +63,8 @@ function makeReq(body: unknown): NextRequest {
 describe('POST /api/contact', () => {
   beforeEach(() => {
     vi.unstubAllEnvs()
+    send.mockReset()
+    send.mockResolvedValue(SENT)
   })
 
   afterEach(() => {
@@ -198,17 +213,33 @@ describe('POST /api/contact', () => {
       expect(json.success).toBe(true)
     })
 
+    it('asks Resend to deliver exactly the message, to the Company inbox, replying to the sender', async () => {
+      // What "success" is a claim about. Without this the 200 above would pass for a
+      // route that sent an empty email to the wrong address.
+      vi.stubEnv('RESEND_API_KEY', 'test_resend_key')
+      const res = await POST(makeReq(VALID_BODY))
+      expect(res.status).toBe(200)
+
+      expect(send).toHaveBeenCalledOnce()
+      const payload = send.mock.calls[0][0] as {
+        from: string
+        to: string[]
+        replyTo: string
+        subject: string
+        text: string
+      }
+      expect(payload.to).toEqual([CONTACT_EMAIL])
+      expect(payload.from).toContain(SENDER_EMAIL)
+      expect(payload.replyTo).toBe(VALID_BODY.email)
+      expect(payload.subject).toContain(VALID_BODY.subject)
+      expect(payload.subject).toContain(VALID_BODY.name)
+      expect(payload.text).toContain(VALID_BODY.message)
+      expect(payload.text).toContain(VALID_BODY.email)
+    })
+
     it('returns 500 when Resend throws', async () => {
       vi.stubEnv('RESEND_API_KEY', 'test_resend_key')
-      const { Resend } = await import('resend')
-      vi.mocked(Resend).mockImplementationOnce(
-        () =>
-          ({
-            emails: {
-              send: vi.fn().mockRejectedValueOnce(new Error('Resend API down')),
-            },
-          }) as unknown as InstanceType<typeof Resend>
-      )
+      send.mockRejectedValueOnce(new Error('Resend API down'))
       const req = new NextRequest('http://localhost/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '192.0.2.52' },
@@ -218,6 +249,100 @@ describe('POST /api/contact', () => {
       expect(res.status).toBe(500)
       const json = (await res.json()) as { error: string }
       expect(json.error).toMatch(/failed to send/i)
+    })
+  })
+
+  /**
+   * **A rejected send is a failure, and the customer is told so.**
+   *
+   * resend@6 answers every refusal — unverified domain, bad key, 429, validation — with a
+   * resolved `{ data: null, error }`. The route used to discard that value and return
+   * `{ success: true }`, so a message that went nowhere was reported as delivered. These
+   * cases script the SDK's real failure shapes and require the honest answer.
+   */
+  describe('Resend refuses the message — the return value is the answer', () => {
+    // Shaped like resend@6's ErrorResponse. The message deliberately echoes an address,
+    // because Resend's messages can: it is the reason only name and statusCode are logged.
+    const REFUSED = {
+      data: null,
+      error: {
+        name: 'validation_error',
+        statusCode: 403,
+        message: `The ${VALID_BODY.email} address could not be used: domain is not verified.`,
+      },
+      headers: {},
+    }
+
+    async function refusedWith(result: unknown) {
+      vi.stubEnv('RESEND_API_KEY', 'test_resend_key')
+      send.mockResolvedValueOnce(result)
+      return POST(makeReq(VALID_BODY))
+    }
+
+    it('answers 502 with the honest error, never success, when Resend returns { error }', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const res = await refusedWith(REFUSED)
+      const json = (await res.json()) as { error?: string; success?: boolean }
+
+      expect(res.status).toBe(502)
+      expect(json.success).toBeUndefined()
+      expect(json.error).toMatch(/failed to send/i)
+      spy.mockRestore()
+    })
+
+    it('logs the refusal by name and status code — the branch that saw the error, not a fallback', async () => {
+      // Asserting the specific fields is what separates this branch from the no-id guard
+      // below, which would also answer 502 if this one were skipped.
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      await refusedWith(REFUSED)
+
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('[contact]'), {
+        name: 'validation_error',
+        statusCode: 403,
+      })
+      spy.mockRestore()
+    })
+
+    it.each([
+      ['{ data: null, error: null }', { data: null, error: null, headers: null }],
+      ['data without an id', { data: {}, error: null, headers: null }],
+    ])('treats %s as a failure — no id is not a delivery', async (_label, result) => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const res = await refusedWith(result)
+      expect(res.status).toBe(502)
+      expect(((await res.json()) as { success?: boolean }).success).toBeUndefined()
+      spy.mockRestore()
+    })
+
+    it('never writes the customer, their words, or the provider message into the logs', async () => {
+      // Vercel function logs are readable by every project member. Every failure path is
+      // driven here, and every console.error argument is serialised — objects included,
+      // which is where a raw error would have carried `replyTo` back out.
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      await refusedWith(REFUSED)
+      await refusedWith({ data: null, error: null, headers: null })
+      vi.stubEnv('RESEND_API_KEY', 'test_resend_key')
+      send.mockRejectedValueOnce(new Error(`connect failed for ${VALID_BODY.email}`))
+      await POST(makeReq(VALID_BODY))
+      vi.stubEnv('RESEND_API_KEY', '')
+      await POST(makeReq(VALID_BODY))
+
+      expect(spy.mock.calls.length, 'no failure path logged anything').toBeGreaterThanOrEqual(4)
+      const logged = spy.mock.calls
+        .flat()
+        .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
+        .join(' ')
+      for (const pii of [
+        VALID_BODY.email,
+        VALID_BODY.name,
+        VALID_BODY.message,
+        VALID_BODY.subject,
+        'domain is not verified',
+      ]) {
+        expect(logged, `a log line carried "${pii}"`).not.toContain(pii)
+      }
+      spy.mockRestore()
     })
   })
 })

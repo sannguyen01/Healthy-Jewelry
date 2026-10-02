@@ -5,6 +5,14 @@ on:
     branches: [main, develop]
   push:
     branches: [main, develop]
+  # Harmless while no merge queue exists: nothing emits the event, so nothing runs. It is
+  # here so that enabling a queue cannot stall it. A queue waits for the required contexts
+  # to report on the queue's own temporary branch, and without this trigger they never do —
+  # every queued pull request sits until it times out, and the queue reads as broken rather
+  # than as missing a trigger. See the `dependency-scope` job for the one check that behaves
+  # differently here, and docs/runbooks/main-ruleset.md for why strict mode, not a queue, is
+  # the recommendation until that is revisited.
+  merge_group:
 
 # A push supersedes the run already in flight for the same ref. PR #8 spent
 # roughly 108 billable minutes across four pushes because every superseded run
@@ -31,24 +39,17 @@ env:
   # production site constant (src/tests/unit/config.test.ts), while the build and
   # the E2E server need localhost — the same name legitimately means different
   # things per step, so each one sets it explicitly.
+  #
+  # Three values, down from five on 2026-09-26. The storefront token and the revalidation
+  # secret went when WS-A deleted their last readers (src/config/shopify.ts and
+  # /api/revalidate): a mock nothing reads keeps a branch alive in nobody's code and makes the
+  # decommission look further from done than it is. What stays is read by code that survives
+  # until WS-F deletes the webhook subscriptions: /api/webhooks/shopify and its verify script
+  # read the signing secret and the store domain under both of its names. They are mocks. A
+  # credential that works has no business being reachable from a merge gate.
   SHOPIFY_STORE_DOMAIN: mock.myshopify.com
-  SHOPIFY_STOREFRONT_ACCESS_TOKEN: mock_token
   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN: mock.myshopify.com
   SHOPIFY_WEBHOOK_SECRET: mock_webhook_secret
-  # Set for /api/revalidate, which reads it to authenticate a manual purge.
-  #
-  # The reason used to be different and is worth correcting rather than leaving: it was set
-  # so `src/lib/shopify/env-check.ts`'s build-time warning stayed silent, because a CI log
-  # that always prints "Shopify is not fully configured" trains everyone to ignore the one
-  # place that would catch a genuinely unconfigured deploy. That file is gone — the static
-  # catalogue is the source now, so there is no degraded mode to warn about, and
-  # `next.config.ts` throws on a malformed record instead of warning about a missing one.
-  #
-  # All five values above are still read by code that survives: /api/version, /api/revalidate
-  # and /api/webhooks/shopify, which stay until WS-7 deletes the Shopify webhook
-  # subscriptions from Admin. They are mocks. A credential that works has no business being
-  # reachable from a merge gate.
-  SHOPIFY_REVALIDATION_SECRET: mock_revalidation_secret
 
 jobs:
   # The merge gate. Everything here is cheap and deterministic; if this is green
@@ -186,7 +187,18 @@ jobs:
       # changing a byte of what E2E tests. The key falls back to any cache built
       # from the same lockfile, so a source-only change still gets a warm start
       # rather than a cold rebuild.
+      #
+      # **Pull requests only.** The build that becomes `main` — and so becomes what
+      # Vercel deploys — starts cold. `.next/cache` is written by whatever built last
+      # under a matching key, including a pull request's own earlier push, and the
+      # artifact scan below judges what `next build` emits: a warm cache is an input
+      # to that output which nothing reviewed. A minute of build time on `main` is
+      # the price of the scan reading a build made only from the merged tree.
+      #
+      # Configuration, not execution (ADR 027): this reads the event, not another
+      # step's result, so the implicit `success()` GitHub adds is not load-bearing.
       - name: Cache Next.js build cache
+        if: github.event_name == 'pull_request'
         uses: actions/cache@v4
         with:
           path: .next/cache
@@ -205,6 +217,23 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+      # The Commerce Elimination Contract, enforced against what the build emitted.
+      #
+      # The contract step above reads tracked files, and a bundle is not one: a
+      # NEXT_PUBLIC_ value inlined at build time, a transitive package compiled into a
+      # chunk, and whatever the tree-shaker kept are invisible to it. This reads
+      # `.next/` and `public/` — client chunks and prerendered pages with zero
+      # tolerance, server output with the staged allowance a WS-F register row earns —
+      # and never prints what it matched.
+      #
+      # A step inside this job rather than a job of its own, on purpose: a new check
+      # name blocks nothing until somebody registers it in branch protection (ADR 015),
+      # while this job's context is already the one that is required. Before the
+      # upload, so a build that fails the scan is never handed to E2E as approved.
+      # Invoked by path for the reason the contract step is.
+      - name: Build artifact scan
+        run: node scripts/scan-build-artifacts.mjs
 
       # Handed to the E2E job so it exercises the exact artifact this gate
       # approved, and so the build is paid for once rather than twice.
@@ -234,6 +263,20 @@ jobs:
   dependency-scope:
     name: Dependency scope
     runs-on: ubuntu-latest
+    # **Skipped on `merge_group`, deliberately, and a skipped required check reports success.**
+    #
+    # This job reads the pull request's description and diffs its head against its base. A
+    # merge-queue run has neither: the event carries a temporary `gh-readonly-queue/…` ref, no
+    # pull request number, and no description. So in a queue this job skips, and GitHub counts
+    # a skipped required context as passing — which is the right outcome only because the
+    # same pull request's own `pull_request` run already evaluated the identical dependency
+    # diff against the identical description before it could be queued. The queue changes the
+    # *base* the head is merged onto, and a dependency-scope question is about the head's own
+    # manifest change, which the queue does not alter.
+    #
+    # The hole that leaves, stated rather than implied: a description edited after that
+    # pull_request run is not re-read in the queue. Strict mode (branch up to date) is the
+    # recommendation over a merge queue until this is revisited — docs/runbooks/main-ruleset.md.
     if: github.event_name == 'pull_request'
     # Declared at job scope, and only here. This is the one job in the workflow that
     # spends the token, and `permissions:` at workflow scope would have silently narrowed

@@ -4,11 +4,14 @@
   "collection": "earrings",
   "material": "titanium",
   "materialLabel": "Grade 23 Titanium",
-  "description": "Flat disc studs on implant-grade titanium posts.",
+  "description": "Flat disc studs on Grade 23 titanium posts.",
   "specification": "Disc 8 mm · post 6 mm",
   "sizes": [],
   "availability": "ask-an-ambassador",
   "badge": "bestseller",
+  "form": {
+    "state": "unassigned"
+  },
   "media": {
     "kind": "illustration",
     "svgType": "earring-stud"

@@ -228,10 +228,10 @@ export function composeDiagnosis(logs) {
     : 'No step produced output — the run failed before the checks started.'
 }
 
-/** The standing caveat, identical on the issue body and on every report comment. */
+/** The standing caveat, stated once, on the issue body. */
 const CAVEAT = [
   'This checks the **live** store and deployment, so it can fail for reasons',
-  'unrelated to any commit — a Shopify incident, an expired credential, or a',
+  'unrelated to any commit — a hosting or DNS incident, an expired credential, or a',
   'configuration change. It is deliberately not part of branch protection.',
   '',
   'See `docs/go-live-runbook.md` and `docs/credential-inventory.md`.',

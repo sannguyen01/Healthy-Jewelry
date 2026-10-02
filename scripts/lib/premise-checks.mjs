@@ -6,320 +6,235 @@
  * Every other guardrail here asserts **"the code still does X."** None asserted **"the
  * premise behind X still holds."** That gap is invisible while the premises hold, which is
  * exactly how it survived six rounds of audit: a decision made on good evidence quietly
- * becomes a decision made on stale evidence, and nothing goes red.
+ * becomes a decision made on stale evidence, and nothing goes red. See ADR 008.
  *
- * Five instances were found at once — the English-only decision, the payments blocker, the
- * Open Graph runtime tradeoff, the empty spec metafield, and a collection-set assumption
- * introduced by the very change that fixed the soft-404. See ADR 008.
+ * ## What this module held, and why it now holds one different premise
+ *
+ * Six premises lived here. Five took the commerce store's own data as input — its locales,
+ * its collection set, a spec metafield, order and payment counts, app-owned webhook
+ * subscriptions — and lost their subject when the read path went (WS-6). They were no longer
+ * collected, but their evaluators stayed in this file for a further week, which is ADR 035's
+ * outcome 2 in slow motion: code that reads as a detector and is called by nothing.
+ *
+ * The sixth was the pinned vendor API version against its published retirement date. It was
+ * pure, so it survived WS-6 — and it lost its subject with `scripts/lib/api-version.mjs` in
+ * WS-C, because a version pin with no vendor behind it is a clock measuring nothing.
+ *
+ * **Deleting all six and stopping there would have left a vacuous detector**: a
+ * `premise-drift` channel that reads `premise-drift.json`, finds an empty array, and closes
+ * every issue as "all premises hold" — about a list with nothing in it. A control whose
+ * input set is empty passes by construction, and it would have looked healthier than ever.
+ * The six are recorded by id in `scripts/verify-premises.mjs` (`RETIRED_PREMISES`), so their
+ * removal is a record rather than an absence.
+ *
+ * What replaces them is a premise this site actually rests on *now*:
+ * {@link checkoutHostPremise}, below.
  *
  * ## Pure on purpose
  *
  * Every evaluator takes already-fetched data and returns a verdict. The caller does the
  * network. That makes the **drifted** branch testable, and the drifted branch is the one
  * that never runs locally — so it is the one most likely to be wrong the day it finally
- * fires. This project has paid for that before: the completed-order branch of the cart
- * could not be exercised in development, and was the half that broke.
+ * fires.
  *
  * ## Drift is not failure
  *
- * A `vi` locale appearing is an *opportunity*, not an outage. These report separately from
- * the pass/fail checks and never turn the run red. Failing on opportunity is how the
- * 24-minute E2E suite became noise nobody read.
+ * A drifted premise means a recorded decision has gone stale, not that the site is broken.
+ * These report separately from the pass/fail checks and never turn the run red. Failing on
+ * drift is how the 24-minute E2E suite became noise nobody read.
+ *
+ * ## Three states, not two
+ *
+ * `holds: true`, `holds: false`, and `evaluable: false`. The third was missing from every
+ * premise this module ever held, because every one of them evaluated a value the caller had
+ * already fetched successfully. A DNS lookup does not have that luxury: SERVFAIL, a timeout,
+ * or a runner with no resolver at all are "could not ask", and reporting any of them as
+ * drift would open a `premise-drift` issue claiming somebody changed DNS when nobody did.
+ * ADR 010's separation of "this check failed" from "this check could not run", applied to a
+ * premise.
  */
 
-import { apiVersionStatus } from './api-version.mjs'
-
-/**
- * Shopify creates this automatically; it is not one of ours and never will be.
- *
- * **This exemption is itself an assumption, and it was wrong once.** Exempting `frontpage`
- * is correct for the question `collectionSetPremise` asks — *has the collection set
- * drifted* — because a built-in collection appearing is not drift. It is not correct as a
- * general statement that `frontpage` is harmless: `mapShopifyProduct` used to read a
- * product's first collection unvalidated, so a product sitting in `frontpage` was mapped
- * *into* it and rendered a breadcrumb linking to a hard 404. The one detector that ever
- * looked at `frontpage` had concluded it did not matter.
- *
- * `parseCollection` in `src/lib/shopify/tags.ts` now skips built-ins on the way in, so the
- * exemption here and the parser there agree by construction rather than by luck.
- */
-const SHOPIFY_BUILTIN_COLLECTIONS = new Set(['frontpage'])
+import { isVendorHost } from './browse-only.mjs'
 
 /**
  * @typedef {object} Premise
  * @property {string} id          Stable identifier, matching the decision it guards.
  * @property {string} decision    Where the decision is written down.
- * @property {boolean} holds      True when reality still matches the assumption.
+ * @property {boolean} holds      True when reality still matches the assumption. False on
+ *                                drift *and* when unevaluable — read `evaluable` first.
+ * @property {boolean} evaluable  False when the premise could not be asked at all.
  * @property {string} detail      One line, actionable, naming what changed.
  * @property {'blocking' | 'opportunity'} kind
- *   `blocking` — drift means something is broken right now.
+ *   `blocking` — drift means something is broken or unsafe right now.
  *   `opportunity` — drift means a deferred decision is now worth revisiting.
  */
 
 /**
- * ADR 005 chose an English-only storefront because the store has no Vietnamese content to
- * surface. The ADR names its own prerequisite — publish a `vi` locale and translate the
- * products *first* — and nothing was watching for it to be met.
+ * The decision the checkout-hostname premise guards.
  *
- * @param {{ locale: string, published?: boolean }[]} shopLocales
+ * The masterplan records it and the runbook carries its steps. Both are named, because a
+ * reader of a `premise-drift` issue needs the reasoning and the procedure, and they live in
+ * different places for good reason.
+ */
+export const CHECKOUT_HOST_DECISION =
+  'docs/commerce-elimination-masterplan.md — WS-E step 3; procedure in docs/runbooks/ws-e-dns.md'
+
+/**
+ * Resolver outcomes that mean *the name does not exist* or *has no CNAME*, as opposed to
+ * *the resolver could not answer*.
+ *
+ * Node's `dns.promises` reports c-ares status codes. `ENOTFOUND` is NXDOMAIN; `ENODATA` is
+ * "the name exists and has no record of the type asked for" — for `resolveCname`, that the
+ * hostname is now an A/AAAA record rather than an alias. Both are **answers**. Everything
+ * else — `ESERVFAIL`, `ETIMEOUT`, `ECONNREFUSED`, `EREFUSED`, `ENOTINITIALIZED`, and codes
+ * nobody anticipated — is treated as an inability to ask, because the unsafe direction for a
+ * premise is inventing drift out of a broken resolver.
+ */
+export const DNS_ANSWER_CODES = /** @type {const} */ (['ENOTFOUND', 'ENODATA'])
+
+/**
+ * `checkout.<apex>` still CNAMEs to the vendor.
+ *
+ * ## The decision this guards
+ *
+ * WS-E retires the checkout hostname on a clock rather than on a whim: ship browse-only,
+ * confirm nothing links to it, wait 30 days, then attach it to Vercel and serve the same 410
+ * that `/checkouts/*` serves. Every step of that plan — the observation window, the order of
+ * the CAA change, the decision to attach rather than delete — rests on one fact that nobody
+ * in this repository controls: **the hostname still points at the vendor's shops host.**
+ *
+ * If that stops being true outside the plan, the clock is measuring the wrong thing. Either
+ * somebody changed DNS without the runbook (and the "nothing links to it" confirmation may
+ * never have happened), or the vendor side released the name, or the record now aims at
+ * something else entirely — which, for a hostname old emails still link to, is the shape of
+ * a subdomain nobody is watching.
+ *
+ * ## Why a DNS lookup, and why it needs no credential
+ *
+ * The five retired premises all needed the store's Admin API, and the connector reads
+ * `needs_reconnect`. This needs a public resolver and nothing else, so it runs on a smoke
+ * tier whose secrets were emptied — the property that kept the browse-only check alive
+ * through the same outage.
+ *
+ * ## The control lookup
+ *
+ * `control` is the resolution of something that must exist — the apex's own NS records.
+ * A resolver that answers NXDOMAIN for *everything* (some sandboxes and captive middleboxes
+ * do) would otherwise read as "the checkout hostname was deleted". If the control could not
+ * be answered, nothing below it can be trusted, and the verdict is `evaluable: false`. Same
+ * reasoning as `isAttributable` in `browse-only.mjs`: attribution before judgement.
+ *
+ * @param {object} input
+ * @param {string} input.host  e.g. `checkout.healthyjewellery.com`
+ * @param {{ ok: true, records: string[] } | { ok: false, code: string }} input.cname
+ * @param {{ ok: true, records: string[] } | { ok: false, code: string }} input.control
  * @returns {Premise}
  */
-export function i18nPremise(shopLocales) {
-  const nonEnglish = shopLocales.filter((l) => !l.locale.startsWith('en'))
-
-  return {
-    id: 'ADR-005-english-only',
-    decision: 'docs/adr/005-english-only-storefront.md',
-    kind: 'opportunity',
-    holds: nonEnglish.length === 0,
-    detail:
-      nonEnglish.length === 0
-        ? 'Store is still English-only; the decision stands on current evidence.'
-        : `Store now has ${nonEnglish.map((l) => l.locale).join(', ')}. ADR 005's stated ` +
-          'prerequisite is met — translated content exists to surface, so the ' +
-          'English-only decision is due for revisit.',
+export function checkoutHostPremise({ host, cname, control }) {
+  const base = {
+    id: 'CHECKOUT-HOST-CNAME',
+    decision: CHECKOUT_HOST_DECISION,
+    // Blocking, not opportunity: a hostname carried in old emails and bookmarks that now
+    // resolves somewhere unplanned is a safety question today, not a decision to revisit
+    // at leisure. It still never fails the run — premise drift reports, it does not block.
+    kind: /** @type {const} */ ('blocking'),
   }
-}
 
-/**
- * `/shop/[collection]` sets `dynamicParams = false`, so **only** the handles in
- * `hjCollections` are served — anything else is a hard 404 before rendering.
- *
- * That is correct only while Shopify's collections are a subset of ours. Add a sixth
- * collection in Shopify Admin and it 404s: worse than the soft-404 that setting was
- * introduced to fix, and silent. The risk was written in a code comment and given no
- * detector, which is the omission this whole module exists to correct.
- *
- * @param {{ handle: string }[]} shopifyCollections
- * @param {{ handle: string }[]} knownCollections
- * @returns {Premise}
- */
-export function collectionSetPremise(shopifyCollections, knownCollections) {
-  const known = new Set(knownCollections.map((c) => c.handle))
-  const missing = shopifyCollections
-    .map((c) => c.handle)
-    .filter((handle) => !SHOPIFY_BUILTIN_COLLECTIONS.has(handle) && !known.has(handle))
-
-  return {
-    id: 'COLLECTION-SET-DRIFT',
-    decision: "src/app/shop/[collection]/page.tsx — dynamicParams = false",
-    // Blocking, not opportunity: these URLs are 404ing for customers right now.
-    kind: 'blocking',
-    holds: missing.length === 0,
-    detail:
-      missing.length === 0
-        ? `All ${shopifyCollections.length} Shopify collections are known to hjCollections.`
-        : `${missing.length} Shopify collection(s) are NOT in hjCollections and therefore ` +
-          `HARD-404 on the site: ${missing.join(', ')}. Add them to src/lib/data/hj-data.ts ` +
-          'and deploy, or remove them in Shopify.',
-  }
-}
-
-/**
- * `custom.spec` is deliberately unpopulated — specs are physical measurements and inventing
- * them would put fabricated claims on a store. The detail page hides the line when empty,
- * so nothing surfaces the moment real measurements arrive.
- *
- * @param {number} productsWithSpec
- * @param {number} totalProducts
- * @returns {Premise}
- */
-export function specMetafieldPremise(productsWithSpec, totalProducts) {
-  return {
-    id: 'SHOPIFY-SPEC-METAFIELD',
-    decision: 'STATE.md — SHOPIFY-SPEC-METAFIELD',
-    kind: 'opportunity',
-    holds: productsWithSpec === 0,
-    detail:
-      productsWithSpec === 0
-        ? 'No product has custom.spec set; the detail-page line stays hidden as intended.'
-        : `${productsWithSpec}/${totalProducts} products now have custom.spec set. The spec ` +
-          'line is rendering — the item can close.',
-  }
-}
-
-/**
- * `productPhotographyPremise` lived here until 2026-08-25 and was promoted to a failing
- * check — `productPhotographyCoverage` in `scripts/verify-production.mjs`.
- *
- * ADR 008 names that path itself: *"if premise-drift issues start accumulating unread, the
- * right response is to promote the specific premise to a failing check, not to make all of
- * them fail."* Zero coverage had been the reported state for weeks with nothing acting on
- * it, which is the condition that clause describes.
- *
- * It is removed rather than kept alongside, because its polarity was the inverse of the
- * check's: `holds: photoCount === 0` treated zero as the premise *holding*, so the two
- * would have printed `✗ coverage is zero` and `✓ premise holds` about the same number in
- * the same run output.
- */
-
-
-/**
- * The payments blocker, and the one premise that **expires by itself**.
- *
- * Admin GraphQL exposes no field for "which providers are enabled" — `PaymentSettings`
- * carries only `supportedDigitalWallets` — so this cannot be verified while the store has
- * no orders. But `Order.paymentGatewayNames` *is* readable, so the moment a single order
- * exists the premise "not machine-verifiable" stops being true and the check upgrades
- * itself from a reminder into a real assertion.
- *
- * Human once, then automatic. That is the honest alternative to a deadline nobody agreed
- * to.
- *
- * @param {number} ordersCount
- * @param {string[]} paymentGatewayNames Gateways seen on recent orders; empty until one exists.
- * @returns {Premise}
- */
-export function paymentsPremise(ordersCount, paymentGatewayNames) {
-  if (ordersCount === 0) {
+  if (!control || control.ok !== true || control.records.length === 0) {
+    const why = control && control.ok === false ? control.code : 'no records'
     return {
-      id: 'SHOPIFY-PAYMENTS',
-      decision: 'docs/go-live-runbook.md step 1',
-      kind: 'blocking',
-      // Holds in the sense that the premise is still accurate: it genuinely cannot be
-      // checked yet. The blocker itself is tracked in STATE.md, not manufactured here.
-      holds: true,
+      ...base,
+      holds: false,
+      evaluable: false,
       detail:
-        'No orders yet, so provider state remains unverifiable by API — PaymentSettings ' +
-        'exposes only supportedDigitalWallets. This check upgrades itself automatically ' +
-        'once the first order exists.',
+        `Could not evaluate: the control lookup (the apex's NS records) failed with ${why}. ` +
+        `A resolver that cannot find the apex cannot be believed about ${host}, so nothing ` +
+        `was concluded. This is not drift.`,
     }
   }
 
-  const gateways = paymentGatewayNames.filter(Boolean)
-  return {
-    id: 'SHOPIFY-PAYMENTS',
-    decision: 'docs/go-live-runbook.md step 1',
-    kind: 'blocking',
-    holds: gateways.length > 0,
-    detail:
-      gateways.length > 0
-        ? `Verifiable now: ${ordersCount} order(s) processed via ${[...new Set(gateways)].join(', ')}. ` +
-          'The human-only premise has expired — this is asserted automatically from here.'
-        : `${ordersCount} order(s) exist but none names a payment gateway. Either they were ` +
-          'created without payment, or the provider was removed after they were placed.',
-  }
-}
-
-/**
- * The pinned Shopify API version is still accessible.
- *
- * The one premise in this module with a **published expiry date**, which makes it the
- * clearest case for the whole idea. Shopify's schedule states exactly when
- * {@link SHOPIFY_API_VERSION} stops being served, and on that date every request silently
- * falls forward to a different API. Nothing breaks visibly; the version just quietly stops
- * being the one in the code.
- *
- * That already happened once here, undetected for roughly seven months. See ADR 009.
- *
- * `opportunity`, not `blocking`, and deliberately so: while the version is still accessible
- * nothing is wrong, and there is a scheduled window in which to migrate calmly. The moment
- * it stops being accessible is not this premise's job — `served version === pinned version`
- * is a hard check in `verify-production.mjs`, because by then it is breakage rather than
- * a decision worth revisiting.
- *
- * @param {Date} [now]
- * @returns {Premise}
- */
-export function apiVersionPremise(now = new Date()) {
-  const { version, accessibleUntil, daysRemaining, state } = apiVersionStatus(now)
-  const deadline = accessibleUntil.slice(0, 10)
-
-  const detail = {
-    ok: `Shopify API ${version} is accessible until ${deadline} (${daysRemaining} days). No action.`,
-    expiring:
-      `Shopify API ${version} stops being served on ${deadline} — ${daysRemaining} days away. ` +
-      'After that every request falls forward to the oldest accessible version, silently. ' +
-      'Migrate deliberately now: bump SHOPIFY_API_VERSION in scripts/lib/api-version.mjs and ' +
-      'apiVersion in src/config/shopify-public.ts, then audit the queries.',
-    expired:
-      `Shopify API ${version} stopped being served on ${deadline}, ${Math.abs(daysRemaining)} ` +
-      'days ago. Every request is now being answered by a different API version than the one ' +
-      'this code targets. This is the exact condition ADR 009 exists to prevent recurring.',
-  }[state]
-
-  return {
-    id: 'SHOPIFY-API-VERSION',
-    decision: 'docs/adr/009-api-version-must-be-asserted-not-declared.md',
-    kind: 'opportunity',
-    holds: state === 'ok',
-    detail,
-  }
-}
-
-/**
- * Shopify is actually *sending* webhooks — which nothing here can currently prove.
- *
- * ## The false confidence this replaces
- *
- * `verify-webhook-secret.mjs` reports "SECRET CORRECT" and the runbook reads as
- * though that means webhooks work. It does not. That check POSTs a request this
- * project signed itself and confirms the **route accepts it**. It says nothing
- * about whether Shopify has a webhook subscription pointing at the site at all.
- *
- * And the obvious way to check — `webhookSubscriptions` on the Admin API — cannot
- * help: it returns only the subscriptions owned by the *querying app*. Webhooks
- * created in Settings → Notifications are invisible to it by design, so an empty
- * list is indistinguishable from a correctly configured store. Confirmed against
- * the live store: `[]`, with no way to tell which case it is.
- *
- * So the Shopify → Vercel direction can be entirely green while Shopify sends
- * nothing. That is not a check that needs fixing; it is a **gap that needs
- * naming**, which is what ADR 008 is for.
- *
- * ## Why it expires by itself
- *
- * Like `paymentsPremise`. The premise is "delivery is unverifiable", and it stops
- * being true the moment a real order exists: an order means Shopify had something
- * to deliver, so the question becomes answerable by looking at whether anything
- * arrived. Human once, then automatic.
- *
- * @param {number} ordersCount
- * @param {number} appOwnedWebhooks Subscriptions visible to the querying app.
- * @returns {Premise}
- */
-export function webhookDeliveryPremise(ordersCount, appOwnedWebhooks) {
-  if (ordersCount === 0) {
+  if (cname.ok === false && !DNS_ANSWER_CODES.includes(/** @type {any} */ (cname.code))) {
     return {
-      id: 'SHOPIFY-WEBHOOK-DELIVERY',
-      decision: 'docs/go-live-runbook.md step 4',
-      kind: 'blocking',
-      // Holds in the sense the premise is accurate: delivery genuinely cannot be
-      // verified yet. The blocker itself lives in the launch inventory.
-      holds: true,
+      ...base,
+      holds: false,
+      evaluable: false,
       detail:
-        'No orders yet, so webhook DELIVERY is unproven. `verify:webhook` confirms the ' +
-        'route accepts a correctly-signed request — it does not confirm Shopify sends ' +
-        'one. Admin-UI webhooks are invisible to webhookSubscriptions (it returns only ' +
-        'the querying app\'s own), so an empty list proves nothing either way. This ' +
-        'upgrades itself into a real assertion once the first order exists.',
+        `Could not evaluate: resolving ${host} returned ${cname.code}, which is the resolver ` +
+        `failing rather than answering. The control lookup succeeded, so this is specific to ` +
+        `this name — worth a second look if it persists, and not evidence that DNS changed.`,
     }
   }
 
-  if (appOwnedWebhooks > 0) {
+  if (cname.ok === false) {
+    const meaning =
+      cname.code === 'ENOTFOUND'
+        ? `${host} no longer exists (NXDOMAIN)`
+        : `${host} exists but is no longer a CNAME (ENODATA) — it is now an address record`
     return {
-      id: 'SHOPIFY-WEBHOOK-DELIVERY',
-      decision: 'docs/go-live-runbook.md step 4',
-      kind: 'blocking',
-      holds: true,
+      ...base,
+      holds: false,
+      evaluable: true,
       detail:
-        `${appOwnedWebhooks} app-owned webhook subscription(s) are visible and ${ordersCount} ` +
-        'order(s) exist, so delivery is now directly checkable rather than inferred.',
+        `${meaning}. The WS-E plan retires this hostname only after confirming nothing links ` +
+        `to it and waiting 30 days; a change outside that plan means the clock is measuring ` +
+        `a premise that is gone. Find out who changed it, and whether the "nothing links to ` +
+        `it" confirmation was ever made, before resuming the runbook.`,
+    }
+  }
+
+  const targets = cname.records.map((r) => String(r).toLowerCase().replace(/\.$/, ''))
+  const vendor = targets.filter(isVendorHost)
+  if (vendor.length > 0) {
+    return {
+      ...base,
+      holds: true,
+      evaluable: true,
+      detail:
+        `${host} still CNAMEs to ${vendor.join(', ')}, the vendor's shops host. The WS-E ` +
+        `30-day clock rests on current evidence.`,
     }
   }
 
   return {
-    id: 'SHOPIFY-WEBHOOK-DELIVERY',
-    decision: 'docs/go-live-runbook.md step 4',
-    kind: 'blocking',
+    ...base,
     holds: false,
+    evaluable: true,
     detail:
-      `${ordersCount} order(s) exist, so the "unverifiable" premise has expired — there ` +
-      'was something to deliver. No app-owned subscription is visible, which means the ' +
-      'webhooks are either configured in Settings → Notifications (fine, but still ' +
-      'invisible here) or not configured at all. Check Shopify Admin → Settings → ' +
-      'Notifications → Webhooks, and confirm a recent delivery succeeded.',
+      `${host} now CNAMEs to ${targets.join(', ') || '(an empty answer)'}, which is not the ` +
+      `vendor. Nobody ran the WS-E runbook's last step, or this repository would have ` +
+      `recorded it: somebody changed DNS outside the plan. Confirm the new target is ours ` +
+      `and intended — a hostname old checkout links still point at, aimed somewhere ` +
+      `unreviewed, is how a subdomain gets taken over.`,
   }
+}
+
+/** Asked, answered, and not holding. An unevaluable premise has not drifted; it is unknown. */
+const isDrifted = (p) => p.evaluable !== false && !p.holds
+
+/**
+ * What `premise-drift.json` should contain, or `null` when it must not be written.
+ *
+ * The reporting step in `production-smoke.yml` reads that file with a three-way contract:
+ *
+ *   · a **non-empty array** opens or updates the `premise-drift` issue;
+ *   · an **empty array** closes it — "all premises hold again";
+ *   · a **missing file** returns early — "premises could not be evaluated".
+ *
+ * Every premise this module used to hold was always evaluable, so the old writer produced
+ * only the first two. A DNS premise can produce the third, and writing `[]` for it would
+ * announce "all premises hold again" about a resolver that never answered — closing a real
+ * drift issue on the strength of a timeout. So: drifted premises are always written (an
+ * unevaluable neighbour does not hide them); an empty drift list is written only when every
+ * premise was actually asked.
+ *
+ * @param {Premise[]} premises
+ * @returns {Premise[] | null}
+ */
+export function driftFileContent(premises) {
+  const drifted = premises.filter(isDrifted)
+  if (drifted.length > 0) return drifted
+  if (premises.some((p) => p.evaluable === false)) return null
+  return []
 }
 
 /**
@@ -328,16 +243,29 @@ export function webhookDeliveryPremise(ordersCount, appOwnedWebhooks) {
  * @param {Premise[]} premises
  */
 export function formatPremises(premises) {
-  const drifted = premises.filter((p) => !p.holds)
-  const lines = premises.map((p) => `${p.holds ? '·' : '!'} ${p.id} — ${p.detail}`)
+  const drifted = premises.filter(isDrifted)
+  const unevaluable = premises.filter((p) => p.evaluable === false)
+  const mark = (p) => (p.evaluable === false ? '?' : p.holds ? '·' : '!')
+  const lines = premises.map((p) => `${mark(p)} ${p.id} — ${p.detail}`)
+
+  const parts = []
+  if (drifted.length > 0) {
+    parts.push(
+      `${drifted.length} of ${premises.length} premises have drifted: ` +
+        drifted.map((p) => p.id).join(', ')
+    )
+  }
+  if (unevaluable.length > 0) {
+    parts.push(
+      `${unevaluable.length} of ${premises.length} could not be evaluated: ` +
+        unevaluable.map((p) => p.id).join(', ')
+    )
+  }
 
   return {
     drifted,
+    unevaluable,
     lines,
-    summary:
-      drifted.length === 0
-        ? `All ${premises.length} premises hold.`
-        : `${drifted.length} of ${premises.length} premises have drifted: ` +
-          drifted.map((p) => p.id).join(', '),
+    summary: parts.length === 0 ? `All ${premises.length} premises hold.` : `${parts.join('. ')}.`,
   }
 }

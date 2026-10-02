@@ -30,15 +30,12 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { assessBrowseOnly, sameSite } from './lib/browse-only.mjs'
+import { UNKNOWN_HANDLE, assessBrowseOnly, sameSite } from './lib/browse-only.mjs'
 import { apexHostFromSiteConfig } from './lib/canonical-domain.mjs'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const PRODUCT_DIR = path.join(ROOT, 'src/content/catalog/products')
 const COLLECTION_DIR = path.join(ROOT, 'src/content/catalog/collections')
-
-/** A handle no catalogue will ever hold, used to prove that unknown handles 404. */
-const UNKNOWN_HANDLE = 'this-product-does-not-exist-hj-probe'
 
 /**
  * Where the sitemap lives, read out of `public/robots.txt` rather than guessed.

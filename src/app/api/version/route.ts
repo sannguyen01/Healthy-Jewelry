@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import { BUILD_INFO, fingerprint } from '@/config/build-info'
-import { shopifyConfig } from '@/config/shopify'
-import { PINNED_API_VERSION } from '@/lib/shopify/api-version'
+import { BUILD_INFO, FINGERPRINTED_KEYS, fingerprint } from '@/config/build-info'
 
 /**
  * What this deployment is, so nobody has to guess again.
@@ -16,8 +14,8 @@ import { PINNED_API_VERSION } from '@/lib/shopify/api-version'
  * `NEXT_PUBLIC_*` variables are inlined into JavaScript at build time. Change one
  * in Vercel and redeploy, and if the build cache is reused the served bundle
  * keeps the old value — no error, no warning, byte-identical behaviour to a
- * correct deployment. `docs/go-live-runbook.md` and several STATE.md entries all
- * warn about this trap, and none of them made it *observable*.
+ * correct deployment. Several STATE.md entries warn about this trap, and none of
+ * them made it *observable*.
  *
  * So it is measured twice:
  *
@@ -32,14 +30,27 @@ import { PINNED_API_VERSION } from '@/lib/shopify/api-version'
  * existing Build Cache" unchecked. That comparison is the entire point of this
  * route.
  *
+ * ## What it no longer reports, and why that is a removal rather than a gap
+ *
+ * It carried a `shopify` block — whether a store domain and a Storefront token
+ * were both set, and the pinned vendor API version — plus `build.storeDomainInlined`
+ * and `runtime.storeDomainSet`. Each answered "can this deployment sell anything",
+ * which was the first question anyone debugging a fallback catalogue needed. The
+ * answer is now "no, by construction" on every deployment
+ * (`COMMERCE-ELIMINATION-CONTRACT.md` §2), and a field whose value cannot vary is
+ * not a measurement. Every script that reads this payload —
+ * `scripts/lib/canonical-domain.mjs` is the one that outlives the decommission —
+ * reads `build.commit`, the two `vercelEnv`s and the two fingerprints, all of
+ * which remain.
+ *
  * ## What it deliberately does not return
  *
- * No secret values, no tokens, no URLs beyond the deployment's own host — only
- * booleans, a commit SHA, and two short fingerprints. Same rule as `/api/health`:
- * say whether the mechanism is right, never how it is wired. The fingerprint
- * inputs are public by construction (`NEXT_PUBLIC_*` is shipped to browsers in
- * plain text), so this is not protecting a secret — it is keeping the endpoint's
- * surface to exactly what the question needs.
+ * No secret values, no tokens, no URLs beyond the deployment's own host — only a
+ * commit SHA, environment names and two short fingerprints. Same rule as
+ * `/api/health`: say whether the mechanism is right, never how it is wired. The
+ * fingerprint inputs are public by construction (`NEXT_PUBLIC_*` is shipped to
+ * browsers in plain text), so this is not protecting a secret — it is keeping the
+ * endpoint's surface to exactly what the question needs.
  */
 
 // Never prerendered. A build-time answer would describe the build machine and
@@ -64,20 +75,15 @@ function readRuntimeEnv(name: string): string {
   return env[name] ?? ''
 }
 
-const FINGERPRINTED_KEYS = ['NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN', 'NEXT_PUBLIC_SITE_URL'] as const
-
 export async function GET(): Promise<NextResponse> {
+  // The key set comes from `build-info.ts`, not a second list typed here. Two copies of
+  // "which keys are fingerprinted" is how one side gains a key the other lacks — and
+  // then every deployment reports stale, or none can.
   const runtimeValues = Object.fromEntries(
     FINGERPRINTED_KEYS.map((key) => [key, readRuntimeEnv(key)])
   )
   const runtimeFingerprint = fingerprint(runtimeValues)
   const bundleIsStale = runtimeFingerprint !== BUILD_INFO.configFingerprint
-
-  // The gate every product fetcher is behind. Reported as a boolean because
-  // "is checkout possible at all on this deployment" is the first thing anyone
-  // debugging a fallback catalogue needs, and it is currently only knowable by
-  // inference from what the page rendered.
-  const shopifyConfigured = !!(shopifyConfig.storeDomain && shopifyConfig.storefrontAccessToken)
 
   return NextResponse.json(
     {
@@ -85,11 +91,6 @@ export async function GET(): Promise<NextResponse> {
       runtime: {
         vercelEnv: readRuntimeEnv('VERCEL_ENV') || null,
         configFingerprint: runtimeFingerprint,
-        storeDomainSet: runtimeValues.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN.length > 0,
-      },
-      shopify: {
-        configured: shopifyConfigured,
-        pinnedApiVersion: PINNED_API_VERSION,
       },
       // Pre-computed rather than left for the caller to derive, so a human
       // reading raw JSON reaches the same verdict as the script does.

@@ -4,11 +4,14 @@
   "collection": "earrings",
   "material": "niobium",
   "materialLabel": "Niobium",
-  "description": "Anodized niobium cone studs. Permanent color finish.",
+  "description": "Anodized niobium cone studs. Pigment-free anodized color.",
   "specification": "Cone 7 mm · post 5 mm",
   "sizes": [],
   "availability": "ask-an-ambassador",
   "badge": null,
+  "form": {
+    "state": "unassigned"
+  },
   "media": {
     "kind": "illustration",
     "svgType": "earring-cone"

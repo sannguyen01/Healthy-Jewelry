@@ -10,17 +10,32 @@ autonomous run escalates instead of editing them on its own.
 
 ## Path denylist
 
-```
-.env / .env.*
-**/secrets/** / **/credentials/**
-**/*_key* / **/*_secret*
+```denylist-paths
+.env
+.env.*
+**/secrets/**
+**/credentials/**
+**/*_key*
+**/*_secret*
 .vercel/**
 **/migrations/**
 .github/workflows/**
-COMMERCE-ELIMINATION-CONTRACT.md      (the commerce boundary, parsed on every PR)
-docs/commerce-dependency-register.md  (its inventory — a row is closed by deleting it)
+COMMERCE-ELIMINATION-CONTRACT.md
+docs/commerce-dependency-register.md
 next.config.ts
+vercel.json
 ```
+
+`COMMERCE-ELIMINATION-CONTRACT.md` is the commerce boundary, parsed on every pull request, and
+`docs/commerce-dependency-register.md` is its inventory — a row is closed by deleting it.
+`vercel.json` holds `buildCommand` and is where any future deploy gate would live.
+
+This list is one path per line, in a `denylist-paths` fence, so that
+`src/tests/unit/safety-denylist-parity.test.ts` can compare it with `gate.yaml` in both
+directions. Until 2026-09-26 it was a prose block that packed two globs per line and carried
+annotations in parentheses — readable, and uncheckable — and it had silently lost
+`vercel.json`, which ADR 015 added to `gate.yaml` a month earlier. A mirror nobody compares
+to anything drifts; this one had.
 
 ## Auto-merge policy
 
@@ -42,7 +57,8 @@ control that announces protection it is not providing.
 So the accurate statement is narrower. A human decides to open the PR, and a
 human decides to merge it. CI runs and its result is the thing to read, but
 nothing enforces it. Enabling enforcement is a console action — the exact
-contexts are in `docs/testing-strategy.md`.
+ruleset, its three contexts and the read-only proof that it refuses a bad pull request are
+in `docs/runbooks/main-ruleset.md`.
 
 ## Human gates (always required)
 

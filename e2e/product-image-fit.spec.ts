@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './support/test'
 import { intersection, settle, OVERHANG_TOLERANCE_PX } from './support/viewportFit'
 
 /**
@@ -41,9 +41,8 @@ import { intersection, settle, OVERHANG_TOLERANCE_PX } from './support/viewportF
  * One product per distinct viewBox ratio, covering all five that shipped. Fewer than
  * five and the spread assertion below is measuring a subset of the problem.
  *
- * Every handle resolves through the static fallback catalogue (`src/lib/data/hj-data.ts`),
- * which is what the suite serves: `placeholder.myshopify.com` cannot be fetched, so
- * `isShopifyConfigured()` is false and every product renders the illustration branch.
+ * Every handle resolves through the reviewed catalogue (`src/content/catalog/`), the only
+ * product source there is; a product with no photograph renders the illustration branch.
  */
 const REPRESENTATIVES = [
   { handle: 'arc-band-titanium', svgType: 'ring-arc', ratio: '1:1' },
@@ -308,16 +307,20 @@ test.describe('the detail column stays reachable', () => {
    * button, and it is still live: nothing else in this suite would notice the tile
    * growing again and shoving the rest of the column below the fold.
    *
-   * So the probe moves to whatever is now last in the column — the trust signals. Deleting
+   * So the probe moves to whatever is now last in the column — the material notes. Deleting
    * it along with its old subject would have retired a working detector because the thing
    * it happened to point at went away, which is the ADR 020 failure in reverse.
+   *
+   * It anchored on the text '·IMPLANT GRADE·' until 2026-09-26, when that chip — an
+   * unevidenced claim — left the row. It anchors on the row itself now, by test id, so what
+   * the row says (the registry's decision) cannot move the anchor a second time.
    */
   test('the tile does not push the column down the page', async ({ page }) => {
     for (const { handle, svgType } of REPRESENTATIVES) {
       await visit(page, handle, 390)
-      const anchor = page.getByText('·IMPLANT GRADE·')
+      const anchor = page.getByTestId('material-notes')
       const box = await anchor.first().boundingBox()
-      if (box === null) throw new Error(`/products/${handle}: no trust signals found to measure`)
+      if (box === null) throw new Error(`/products/${handle}: no material notes found to measure`)
       const y = box.y + (await page.evaluate(() => window.scrollY))
       expect(
         y,

@@ -2,7 +2,7 @@
 // dangerouslySetInnerHTML is safe here: data is server-generated structured data, never user input.
 
 import type { CatalogProduct } from '@/lib/catalog'
-import { SITE_NAME, SITE_URL, CONTACT_EMAIL, SOCIAL_LINKS } from '@/config/site'
+import { SITE_NAME, SITE_URL, CONTACT_EMAIL, SOCIAL_LINKS, SITE_DESCRIPTION } from '@/config/site'
 import { productSeo } from '@/lib/seo/productSeo'
 import type { BreadcrumbItem } from './Breadcrumbs'
 
@@ -74,8 +74,10 @@ export function organizationJsonLd(): Record<string, unknown> {
     name: SITE_NAME,
     url: SITE_URL,
     logo: `${SITE_URL}/favicon.svg`,
-    description:
-      'Implant-grade titanium, niobium, and 316L surgical steel jewelry. Hypoallergenic, corrosion-proof, and designed to last a lifetime.',
+    // The site description, not a copy of it. This carried its own "Hypoallergenic,
+    // corrosion-proof" sentence until 2026-09-26 — structured data is read by machines that
+    // quote it, so a claim here is a claim in every rich result.
+    description: SITE_DESCRIPTION,
     contactPoint: {
       '@type': 'ContactPoint',
       email: CONTACT_EMAIL,

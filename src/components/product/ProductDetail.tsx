@@ -1,40 +1,41 @@
-'use client'
-
-import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import type { CatalogProduct } from '@/lib/catalog'
+import { productMaterialNotes, type CatalogProduct } from '@/lib/catalog'
 import { ProductImage } from '@/components/product/ProductImage'
 import { ProductBadge } from '@/components/product/ProductBadge'
-import { SizePicker } from '@/components/product/SizePicker'
-import { track } from '@/lib/analytics'
+import {
+  ProductSizeSelection,
+  ProductViewTracker,
+} from '@/components/product/ProductDetailInteractive'
 
 interface ProductDetailProps {
   product: CatalogProduct
 }
 
-const TRUST_SIGNALS = ['·IMPLANT GRADE·', '·HYPOALLERGENIC·', '·MRI SAFE·']
-
+/**
+ * A server component. It was `'use client'` until 2026-09-26, for two hooks — the view
+ * event and the size selection — which now live in `ProductDetailInteractive.tsx`. The
+ * reason for the move is the notes row below: it renders claims, claims resolve against a
+ * Zod-validated registry, and resolving them in the browser would ship both to every visitor.
+ */
 export function ProductDetail({ product }: ProductDetailProps) {
-  const [selectedSize, setSelectedSize] = useState<string | undefined>(undefined)
   // `activeImageIndex` was here, driving the thumbnail gallery. The media union holds at
   // most one photograph, so there was never a second thumbnail to switch to — see the note
   // where the gallery used to render. State nothing can change is state that misleads a
   // reader about what the component does.
 
-  // One view per mount. The ref guards React's development double-invoke, which
-  // would otherwise double every page-view number and teach everyone to halve it.
-  const viewReported = useRef(false)
-  useEffect(() => {
-    if (viewReported.current) return
-    viewReported.current = true
-    track({
-      name: 'product_viewed',
-      handle: product.handle,
-      collection: product.collection,
-      material: product.material,
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product.handle])
+  /**
+   * The notes under the piece: its exact designation, a standard only where documentation
+   * covers this piece, and any claim approved for it.
+   *
+   * This row was `TRUST_SIGNALS = ['·IMPLANT GRADE·', '·HYPOALLERGENIC·', '·MRI SAFE·']`,
+   * rendered identically on all seventeen product pages until 2026-09-26 — a regulatory, an
+   * allergen and a medical-imaging claim, with no evidence behind any, on niobium and 316L
+   * pieces as well as titanium ones. The retired `/faq` itself called 316L only
+   * "MRI-conditional". The three are pending in the claims registry and render here the
+   * moment one is approved for this piece; until then the designation is the whole row,
+   * because it is the one thing on it that needs no document.
+   */
+  const notes = productMaterialNotes(product)
 
   /**
    * The photograph, when the catalogue record carries one.
@@ -84,6 +85,9 @@ export function ProductDetail({ product }: ProductDetailProps) {
       {/* Columns and gap live in globals.css. They were inline here with a
           `<style>` tag overriding them at 768px — the `!important` existed only
           because an inline value cannot otherwise lose to a media query. */}
+      <ProductViewTracker
+        product={{ handle: product.handle, collection: product.collection, material: product.material }}
+      />
       <div className="hj-detail-grid">
         {/* Left — photograph, gallery, or illustration */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -205,14 +209,14 @@ export function ProductDetail({ product }: ProductDetailProps) {
           */}
 
           {/* Size picker — only for rings and bracelets */}
-          <SizePicker
-            collection={product.collection}
-            onSelect={setSelectedSize}
-            selected={selectedSize}
-          />
+          <ProductSizeSelection collection={product.collection} />
 
-          {/* Trust signals */}
-          <div
+          {/* Material notes — see `notes` above. `data-testid` because the E2E suite uses
+              this row as the foot of the detail column, and its text now depends on what
+              has been approved. */}
+          <ul
+            data-testid="material-notes"
+            aria-label="Material notes"
             style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -220,27 +224,33 @@ export function ProductDetail({ product }: ProductDetailProps) {
               alignItems: 'center',
               justifyContent: 'center',
               paddingTop: '8px',
+              listStyle: 'none',
+              margin: 0,
+              paddingLeft: 0,
             }}
           >
-            {TRUST_SIGNALS.map((signal) => (
-              <span
-                key={signal}
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--titanium-text)',
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {signal}
-              </span>
+            {/* A designation is case-sensitive — Ti-6Al-4V is not TI-6AL-4V — so it is the
+                one note not set in capitals. */}
+            <li style={{ ...NOTE_STYLE, textTransform: 'none' }}>{notes.designation}</li>
+            {notes.standard !== null && <li style={NOTE_STYLE}>{notes.standard}</li>}
+            {notes.claims.map((claim) => (
+              <li key={claim} style={NOTE_STYLE}>
+                ·{claim}·
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </div>
     </div>
   )
+}
+
+const NOTE_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)',
+  fontSize: 'var(--text-xs)',
+  color: 'var(--titanium-text)',
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
 }
 
 export default ProductDetail

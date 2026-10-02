@@ -76,12 +76,13 @@ matters: adding the www redirect while the apex still redirects to www produces 
 
 Do **not** touch DNS for either of these. This is a project setting, not a record.
 
-## Decision already made: Vercel stays the root, Shopify stays headless
+## Decision already made: Vercel stays the root, and nothing points it at the store
 
-This project keeps its bespoke Next.js frontend at the root domain. Shopify
-is used **only** as a headless commerce backend via the Storefront API
-(`NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` = `<store>.myshopify.com`, unrelated to
-the custom domain). This means:
+This project keeps its bespoke Next.js frontend at the root domain, and nothing
+on it can be bought (`COMMERCE-ELIMINATION-CONTRACT.md`). The Shopify account
+that remains is being closed (WS-F), and it never needed the custom domain: the
+store was only ever reached through its own vendor-issued hostname, never
+through `healthyjewellery.com`. This means:
 
 ### Do NOT complete Shopify's "Connect existing domain" flow
 
@@ -95,8 +96,9 @@ connection with instructions like:
 **do not follow these.** Completing them would point the root domain at
 Shopify's hosted storefront instead of this Next.js app. Go to **Shopify
 Admin → Settings → Domains** and remove/cancel the pending
-`healthyjewellery.com` connection request instead. Headless Storefront API
-usage does not require (and is actively harmed by) a domain connection.
+`healthyjewellery.com` connection request instead. A store that sells nothing
+through this domain has no use for a domain connection, and completing one would
+take the root away from this app.
 
 ## What to actually do, in order
 
@@ -113,11 +115,10 @@ usage does not require (and is actively harmed by) a domain connection.
    values can shift as Vercel migrates infrastructure, so copy the value
    Vercel shows *at the time you look*, not the ones tabulated above.
 4. **`account.healthyjewellery.com`** — optional cleanup, not urgent (nothing
-   in the app links to it). Either:
-   - Point it at Shopify's IP (`23.227.38.65`) in Vercel's DNS panel, if you
-     want Shopify's classic hosted customer-accounts pages to work at that
-     subdomain, or
-   - Delete the stray record and ignore it.
+   in the app links to it): delete the stray record. Pointing it at the vendor's
+   hosted customer-accounts pages is not an option any more — customer identity
+   is an absolute prohibition in `COMMERCE-ELIMINATION-CONTRACT.md` §3, and a
+   login page on the brand's own subdomain would be exactly that.
 5. **Mat Bao** — no action needed on the DNS/zone-editor tab; it's inert for
    this domain. If you want to reduce future confusion, you can leave it as
    is (harmless) or clear it out, but do not expect edits there to take

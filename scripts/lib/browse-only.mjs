@@ -35,6 +35,12 @@
 export const BROWSE_ONLY_VERDICTS = ['clean', 'findings', 'unevaluable']
 
 /**
+ * A handle no catalogue will ever hold, used to prove that unknown handles 404. One value
+ * for every probe that asks, so two probes cannot disagree about which product is fictional.
+ */
+export const UNKNOWN_HANDLE = 'this-product-does-not-exist-hj-probe'
+
+/**
  * A response this probe could not attribute to the site.
  *
  * Same guard `probe-canonical-domain.mjs` needed, for the same reason: a sandbox or a
@@ -78,6 +84,44 @@ export function isAttributable(observation) {
 export const FORBIDDEN_HOST_PATTERN = /\b[\w.-]*\.?(?:myshopify\.com|shopify\.com|shopifycdn\.(?:com|net))\b/gi
 
 /**
+ * The vendor's registrable domains, as a list rather than as a pattern.
+ *
+ * {@link FORBIDDEN_HOST_PATTERN} scans a *body* for a host embedded in text; this answers
+ * the narrower question "is this hostname the vendor's?" about a value that is already a
+ * hostname — a CNAME target, a redirect `Location`, a deployment alias. The two must not
+ * disagree, and `browse-only-smoke.test.ts` holds them together: every domain here is one
+ * the body pattern matches.
+ *
+ * Kept in this file for the reason the file is classified `negative-control` in the
+ * contract: a detector has to name what it detects. The premise detector for the checkout
+ * hostname and the live-surface probe import this rather than carrying a second copy of the
+ * vendor's name in running code — one definition of "the vendor's hosts", read by three
+ * checks, is the property ADR 032 asks of the site's own hostname.
+ */
+export const VENDOR_DOMAINS = /** @type {const} */ ([
+  'myshopify.com',
+  'shopify.com',
+  'shopifycdn.com',
+  'shopifycdn.net',
+])
+
+/**
+ * Is this hostname one of the vendor's, or a subdomain of one?
+ *
+ * Anchored at a label boundary, so `notmyshopify.com.example` and `myshopify.com.evil` are
+ * not the vendor, and a trailing root dot — which a resolver may return on a CNAME — is
+ * tolerated rather than read as a different name.
+ *
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+export function isVendorHost(hostname) {
+  const host = String(hostname ?? '').trim().toLowerCase().replace(/\.$/, '')
+  if (host === '') return false
+  return VENDOR_DOMAINS.some((domain) => host === domain || host.endsWith(`.${domain}`))
+}
+
+/**
  * Commerce markers that must not survive in a served page.
  *
  * Deliberately narrow and structural. Matching the word "cart" anywhere would fire on the
@@ -96,6 +140,78 @@ export const COMMERCE_MARKERS = [
   { id: 'add-to-bag', pattern: /data-testid="add-to-bag"/i, what: 'an Add to Bag control' },
   { id: 'checkout-control', pattern: /data-testid="checkout-button"/i, what: 'a checkout control' },
 ]
+
+/**
+ * The text a visitor would read, out of an HTML body.
+ *
+ * Scripts and styles go first — a Next.js page carries its whole render payload again inside
+ * `<script>` tags, and JSON-LD lives there too; both are judged by {@link COMMERCE_MARKERS},
+ * not here. Then tags, then the handful of entities a price is likely to be written with.
+ * Not an HTML parser, and it does not need to be one: the question is "does a price-shaped
+ * string reach the reader", and a regex that strips too little errs toward reporting.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+export function visibleText(html) {
+  return String(html ?? '')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;|&#160;|&#xa0;/gi, ' ')
+    .replace(/&#8363;|&#x20ab;/gi, '₫')
+    .replace(/&#36;|&dollar;/gi, '$')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+}
+
+/**
+ * Price shapes, in the forms this site has actually shown and the ones it could.
+ *
+ * **Why this exists: the probe could not see the defect it was built after.** Every marker in
+ * {@link COMMERCE_MARKERS} is structural — JSON-LD keys, test ids — so a page rendering
+ * `1.450.000₫` in a paragraph, or the historical `Dome Ring · 112.00` (STATE.md, 2026-08-05:
+ * a fallback product with no currency at all), passed as clean. A rendered price is the most
+ * visible commerce residue there is and it was the one kind this check was blind to.
+ *
+ * Each pattern needs a digit beside the currency, because the site legitimately says "VND"
+ * nowhere and "đ" inside Vietnamese words everywhere a localised page ever exists. The bare
+ * decimal is the loosest and is fenced accordingly: two decimals exactly, not part of a longer
+ * number or a ratio, and not followed by a unit — `1.60 mm` is a measurement, `112.00` is not.
+ */
+export const PRICE_PATTERNS = /** @type {const} */ ([
+  { id: 'dong-symbol', pattern: /\d(?:[\d.,\s]*\d)?\s?₫|₫\s?\d/u },
+  { id: 'dong-letter', pattern: /\d(?:[\d.,]*\d)?\s?đ(?![\p{L}\p{N}])/u },
+  { id: 'currency-code', pattern: /\b(?:VND|USD|EUR|GBP)\s?\d|\d(?:[\d.,]*\d)?\s?(?:VND|USD|EUR|GBP)\b/ },
+  { id: 'us-dollar', pattern: /\bUS\$\s?\d/ },
+  { id: 'dollar', pattern: /\$\s?\d/ },
+  { id: 'grouped-amount', pattern: /(?<![\d.,])\d{1,3}(?:\.\d{3}){2,}(?![\d.,]*\d)/ },
+  {
+    id: 'decimal-amount',
+    // At least two integer digits, or a thousands separator. The first version accepted one,
+    // and the first run over a real production build flagged the FAQ's ring-size advice —
+    // "divide by 3.14" — as a price. A one-digit bare decimal is a constant or a measurement
+    // far more often than an amount, and a one-digit amount almost always carries a currency.
+    pattern: /(?<![\d.,:])(?:\d{2,3}|\d{1,3}(?:,\d{3})+)\.\d{2}(?![\d.,:]|\s?(?:%|(?:mm|cm|m|g|mg|kg|µm|x|in|ct)\b))/,
+  },
+])
+
+/**
+ * Every price shape visible in a body, at most one per pattern, with the text that matched.
+ *
+ * @param {string} html
+ * @returns {Array<{ id: string, match: string }>}
+ */
+export function detectVisiblePrice(html) {
+  const text = visibleText(html)
+  const found = []
+  for (const { id, pattern } of PRICE_PATTERNS) {
+    const m = text.match(pattern)
+    if (m) found.push({ id, match: m[0].trim() })
+  }
+  return found
+}
 
 /**
  * Every finding code this module can emit.
@@ -128,6 +244,8 @@ export const BROWSE_ONLY_FINDINGS = /** @type {const} */ ([
   'sitemap-omits-product',
   'sitemap-lists-unknown-product',
   ...COMMERCE_MARKERS.map((m) => `commerce-${m.id}`),
+  // Not a marker: a price is judged on visible text, not matched as a structural key.
+  'commerce-visible-price',
 ])
 
 /**
@@ -389,6 +507,18 @@ export function assessBrowseOnly({ expectedHandles, observations, sitemapHandles
           `${observation.path} references ${hosts.join(', ')}. A browse-only site must not ` +
           `reach a Shopify host — an allowlisted CDN outlives the code that needed it, and ` +
           `an image still loading from it is a live dependency on an account being closed.`,
+      })
+    }
+
+    // Blocking, like every commerce marker. A price a visitor can read is the most visible
+    // commerce residue there is, and until 2026-09-26 the one kind this probe could not see.
+    const prices = observation.body ? detectVisiblePrice(observation.body) : []
+    if (prices.length > 0) {
+      findings.push({
+        code: 'commerce-visible-price',
+        detail:
+          `${observation.path} renders a price: ${prices.map((p) => `"${p.match}"`).join(', ')}. ` +
+          `Nothing on this site can be bought, so no surface may show an amount.`,
       })
     }
 

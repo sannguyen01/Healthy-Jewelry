@@ -1,0 +1,35 @@
+# The files that define what this repository will and will not allow.
+#
+# Every path below either states a boundary (the commerce contract, its register, the control
+# registry, the loop denylist), enforces one (the scanner, its tests, the workflows), or ships
+# to production with no application code in between (vercel.json, next.config.ts). A change to
+# any of them weakens or strengthens a rule, and a weakening edit looks like tidying in a diff.
+#
+# What this does today, stated rather than implied: it auto-requests a review from the owner
+# on any pull request touching these paths. It does NOT block a merge. Requiring code-owner
+# review in a repository with one human maintainer deadlocks every merge — GitHub blocks
+# self-approval, and agents here act through the owner's identity. The ruleset turns
+# `require_code_owner_review` on the day a second human reviewer exists; until then the
+# enforceable set is required checks, strict mode, a pull request, and no bypass actors.
+# See docs/runbooks/main-ruleset.md.
+#
+# Every pattern is root-anchored and must match a tracked file, or be listed as pending in
+# src/tests/unit/codeowners.test.ts — a rule that matches nothing is either a typo or a rule
+# that outlived its subject (ADR 035).
+
+/COMMERCE-ELIMINATION-CONTRACT.md @sannguyen01
+/docs/commerce-dependency-register.md @sannguyen01
+/docs/controls.json @sannguyen01
+/scripts/lib/commerce-contract.mjs @sannguyen01
+/scripts/verify-commerce-contract.mjs @sannguyen01
+/src/tests/unit/commerce-contract.test.ts @sannguyen01
+/gate.yaml @sannguyen01
+/vercel.json @sannguyen01
+/next.config.ts @sannguyen01
+/.github/ @sannguyen01
+
+# Created by the claims-registry workstream (WS-B) on a sibling branch; pending until it lands.
+/src/content/claims/ @sannguyen01
+
+# Last, so nothing above can shadow it: whoever may change the owners may change every rule.
+/.github/CODEOWNERS @sannguyen01

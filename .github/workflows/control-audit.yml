@@ -44,6 +44,12 @@ permissions:
   # visible rather than silently absent: an unevaluable probe says so, and never
   # reports `absent` on a permission problem. See ADR 010's separation of "failed" from
   # "could not run".
+  #
+  # Rulesets are the other half, and the half the owner is likely to configure. The effective
+  # rules for main are readable with this token; a ruleset's bypass list is not — GitHub shows
+  # `bypass_actors` only to a reader with write access to the ruleset. So without
+  # CONTROL_AUDIT_TOKEN a ruleset-governed main reads as protected-but-`unevaluable`, never as
+  # `absent` and never as `enforced`: "not shown" is not "empty".
   checks: read
   actions: read
 
@@ -68,9 +74,14 @@ jobs:
         with:
           node-version-file: package.json
 
-      # No `pnpm install`. Every probe here is dependency-free and uses Node 22's global
-      # fetch, so this job cannot be broken by a dependency change the merge gate has
-      # not seen yet — the same property that keeps production-smoke.yml independent.
+      # No job-wide `pnpm install`, and one step-level exception. Every probe here is
+      # dependency-free and uses Node 22's global fetch, so none of them can be broken by a
+      # dependency change the merge gate has not seen yet — the property that keeps
+      # production-smoke.yml independent. The exception is `Assertion liveness`, which runs
+      # the unit suite and so installs dependencies inside its own step. This comment said
+      # "no pnpm install" for the whole job while that step ran one; the property it
+      # described holds for every *other* step, which is why each of them keeps its own
+      # `continue-on-error` and none of them waits on the install.
 
       - name: Merge gate — is main actually protected?
         id: merge-gate
@@ -357,17 +368,18 @@ jobs:
               })
             }
 
-      # Twelve invariants broken on purpose, one at a time, to check that the tests
+      # Every vitest invariant in scripts/lib/sentinels.mjs broken on purpose, one at a time, to check that the tests
       # protecting them still go red. See docs/adr/020.
       #
       # `continue-on-error` for the same reason the merge-gate probe has it: a dead
       # assertion is a health finding, not a reason to fail a scheduled audit that also
       # carries other results. The summary below reports it either way.
       #
-      # Vitest sentinels only. The two Playwright ones each need a production build, and
-      # this job installs no dependencies on purpose — adding them would make the audit
-      # breakable by a dependency change the merge gate has not seen yet, which is the
-      # property that keeps this tier independent. Run them by hand with
+      # Vitest sentinels only. This step installs dependencies for itself — the unit suite
+      # needs them — and that install is the one place a dependency change can break this
+      # audit, confined to this step's own outcome. The two Playwright sentinels would each
+      # add a production build on top, which is minutes per mutation and a second way for a
+      # build change the merge gate has not seen to darken the audit. Run them by hand with
       # `--with-e2e` when the sentinel set changes.
       - name: Assertion liveness — can these tests still fail?
         id: liveness
@@ -771,16 +783,16 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────────
       # Reports into the job summary and files no issue, deliberately.
       #
-      # Run against production today this returns `findings` with 52 entries, every one of
-      # them true: 17 products x 3 surviving commerce markers, plus /products/<unknown>
-      # answering 200 rather than 404. Those belong to WS-5 and WS-4 of
-      # docs/browse-only-masterplan.md, not to this audit.
+      # This probe's registered home is production-smoke.yml, whose failure channel already
+      # carries its findings (`browse-only-smoke`, configured 2026-09-20). A second issue from
+      # a second workflow about the same finding is two channels saying one thing, which
+      # ADR 011 records being muted. Here it is a row in the audit table, beside the
+      # live-surface evidence below, so the two can be read together.
       #
-      # A six-hourly issue that cannot be closed for weeks is the shape ADR 011 records
-      # costing this repository a month of unread escalations, so this reports a number and
-      # nothing else until the replacement can pass. `continue-on-error` keeps its exit 1
-      # from failing the audit; the issue-filing step and `status: configured` arrive
-      # together, once a manual `pnpm verify:browse-only` comes back clean.
+      # This comment used to say production returned `findings` with 52 entries — 17 products
+      # x 3 commerce markers, plus a soft 404. True on 2026-09-20, false since PR #83 removed
+      # both. It is not replaced by today's number: a count in a comment is exactly the thing
+      # that went stale, and the step's own output, printed below, is the current answer.
       #
       # No PRODUCTION_SITE_URL here: the probe reads the apex out of src/config/site.ts,
       # the same join probe-canonical-domain.mjs uses, so it cannot hold production to a
@@ -789,6 +801,38 @@ jobs:
         id: browse-only
         continue-on-error: true
         run: node scripts/verify-browse-only.mjs 2>&1 | tee browse-only.log
+
+      # Where does any commerce on the live site come from? Evidence, not a verdict to act on.
+      #
+      # A retrieval of the live site reportedly showed prices the repository cannot produce.
+      # This asks every host answering for the site — apex, www, the deployment URL the apex
+      # names, twice each so the cache can speak — and classifies what it finds by the four
+      # rules in scripts/lib/live-surface.mjs: source, alias, retrieval, or clean.
+      #
+      # Report-only, like the step above and for a stronger reason: the purchase-era copy it
+      # records (free shipping, returns, warranty) is in source today pending legal review,
+      # so an issue filed on it would ask CI for something only an adviser can give. It files
+      # nothing and its exit 1 on a non-clean classification is kept from failing the audit by
+      # `continue-on-error`, as every probe here is. The JSON is uploaded as an artifact
+      # because the summary is a digest and the per-request record is the evidence.
+      - name: Live surface — where does any commerce on the live site come from?
+        id: live-surface
+        continue-on-error: true
+        run: |
+          node scripts/probe-live-surface.mjs --out live-surface.json --summary live-surface.md \
+            2>&1 | tee live-surface.log
+
+      # `always()` for the reason every reporter here gives (ADR 027): evidence from a run
+      # that classified something as wrong is the evidence most worth keeping.
+      - name: Upload the live-surface evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-surface-evidence
+          path: live-surface.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Audit summary
         if: always()
@@ -799,13 +843,18 @@ jobs:
             echo "| Control | Result |"
             echo "|---|---|"
             echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
-            echo "| Assertion liveness (12 vitest sentinels) | ${{ steps.liveness.outcome }} |"
+            echo "| Assertion liveness (31 vitest sentinels) | ${{ steps.liveness.outcome }} |"
             echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
             echo "| Merge gate liveness (is CI evaluating?) | ${{ steps.ci-liveness.outcome }} |"
             echo "| Canonical domain bound to production | ${{ steps.canonical-domain.outcome }} |"
             echo "| Browse-only catalogue (reports only) | ${{ steps.browse-only.outcome }} |"
+            echo "| Live surface — where commerce comes from (reports only) | ${{ steps.live-surface.outcome }} |"
             echo ""
-            for log in merge-gate liveness smoke-liveness ci-liveness canonical-domain browse-only; do
+            if [ -s live-surface.md ]; then
+              cat live-surface.md
+              echo ""
+            fi
+            for log in merge-gate liveness smoke-liveness ci-liveness canonical-domain browse-only live-surface; do
               if [ -s "$log.log" ]; then
                 echo "<details><summary>$log</summary>"
                 echo ""

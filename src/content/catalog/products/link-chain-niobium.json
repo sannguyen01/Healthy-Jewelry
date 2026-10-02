@@ -4,11 +4,14 @@
   "collection": "necklaces",
   "material": "niobium",
   "materialLabel": "Niobium",
-  "description": "Anodized niobium belcher chain. No clasp allergens.",
+  "description": "Anodized niobium belcher chain.",
   "specification": "2.4 mm links · 18\"",
   "sizes": [],
   "availability": "ask-an-ambassador",
   "badge": null,
+  "form": {
+    "state": "unassigned"
+  },
   "media": {
     "kind": "illustration",
     "svgType": "necklace-chain"

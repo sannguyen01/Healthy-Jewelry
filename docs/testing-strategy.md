@@ -24,7 +24,7 @@
 > | `homepage-fetch-budget.test.ts` — Shopify round trips per render | `homepage-composition-contract.test.ts` — three strips, one catalogue read |
 > | `opengraph-vnd-font.test.tsx` — the ₫ glyph rasterises | `opengraph-bundled-font.test.tsx` — every character the card can carry |
 > | coverage scoped to `src/lib`, `src/store`, `src/config` | `src/store` is gone with the cart; `src/lib` and `src/config` |
-> | six premise detectors, five of them reading Shopify | one, `SHOPIFY-API-VERSION`, and it is pure |
+> | six premise detectors, five of them reading Shopify | one, `CHECKOUT-HOST-CNAME`: a DNS lookup with no credential. `SHOPIFY-API-VERSION` was retired with its subject on 2026-09-26 |
 > | the prohibition lived in prose, in this file and four others | `COMMERCE-ELIMINATION-CONTRACT.md`, **parsed** on every pull request, with a 53-row register reconciled in both directions ([ADR 036](adr/036-a-prohibition-in-prose-is-not-a-boundary.md)) |
 >
 > [ADR 035](adr/035-a-control-outlives-its-subject.md) is the rule that governed every one of those
@@ -123,8 +123,12 @@ choice, the payments blocker, the Open Graph runtime tradeoff, the empty spec me
 collection-set assumption introduced by the change that fixed the soft-404. Full reasoning in
 [ADR 008](adr/008-decisions-need-premise-detectors.md).
 
-`scripts/lib/premise-checks.mjs` holds the evaluators; `scripts/verify-production.mjs` fetches the live
-data and reports them in a section of their own.
+`scripts/lib/premise-checks.mjs` holds the evaluators; `scripts/verify-premises.mjs` performs the
+lookups and reports them in a section of their own. Since 2026-09-26 there is one premise,
+`CHECKOUT-HOST-CNAME` — the checkout hostname still aliases the vendor, which is what WS-E's
+thirty-day retirement clock rests on. The six it replaced all lost their subject with the store's read
+path, and a detector with nothing to detect would have reported "all premises hold" forever
+([ADR 035](adr/035-a-control-outlives-its-subject.md)).
 
 **They never turn the run red.** A `vi` locale appearing is an opportunity, not an outage, and failing
 on opportunity is how a suite becomes noise nobody reads. Drift writes `premise-drift.json`, and the
@@ -137,8 +141,9 @@ Two properties are worth copying into any premise check added later:
 
 - **Pure evaluator, network at the caller.** The drifted branch never runs locally, so it is the branch
   most likely to be wrong the day it fires — the same lesson as the completed-order cart path.
-  `src/tests/unit/premise-checks.test.ts` exercises **both** states of every premise, 29 tests, with
-  the false-positive cases (`frontpage`, `en-GB`) pinned explicitly.
+  `src/tests/unit/premise-checks.test.ts` exercises **both** states of every premise, 18 test declarations, with
+  the false-positive cases (a lookalike host, a trailing root dot, a resolver that cannot answer)
+  pinned explicitly.
 - **A check may expire itself.** `SHOPIFY-PAYMENTS` is unverifiable only while `ordersCount` is 0;
   the first order makes `paymentGatewayNames` readable and the reminder becomes a real assertion.
   Human once, then automatic — better than a deadline nobody agreed to.

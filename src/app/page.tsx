@@ -10,20 +10,45 @@ import {
   MaterialsSection,
 } from '@/components/home'
 import type { CollectionTile } from '@/components/home/CollectionGrid'
-import { getBestsellers, getNewArrivals, getAllProducts, getAllCollections } from '@/lib/catalog'
+import {
+  claimLines,
+  claimText,
+  getBestsellers,
+  getNewArrivals,
+  getAllProducts,
+  getAllCollections,
+} from '@/lib/catalog'
+import { SITE_DEFAULT_TITLE } from '@/config/site'
 import { dedupeInOrder, stripByMaterial } from '@/lib/utils/homepageStrips'
 
-export const metadata: Metadata = {
-  title: 'Healthy Jewelry — Implant-Grade Titanium',
-  description:
-    'Premium jewelry in Grade 23 titanium, niobium, and 316L surgical steel. Hypoallergenic, biocompatible, built for people with metal sensitivities.',
-  openGraph: {
-    title: 'Healthy Jewelry — Implant-Grade Titanium',
-    description: 'Metal that works with your body. No stones. No fillers. Pure material integrity.',
-    siteName: 'Healthy Jewelry',
-    locale: 'en_US',
-    type: 'website',
-  },
+/**
+ * The positioning line is a claim, and it is resolved here, on the server.
+ *
+ * "Metal that works with your body" implies biocompatibility, so it is a pending record in
+ * the claims registry and renders its brand-voice fallback until a named reviewer approves
+ * it against a document. Resolved in this server component and handed to `Hero` as lines,
+ * because `Hero` is a client component: importing the registry there would ship Zod and the
+ * whole registry to every visitor's browser for the sake of one headline.
+ */
+const SITE = { kind: 'site' } as const
+
+/**
+ * A function rather than a constant because the share description resolves a claim, and a
+ * claim is resolved at render time: an exported `metadata` object is built once, at import.
+ */
+export function generateMetadata(): Metadata {
+  return {
+    title: SITE_DEFAULT_TITLE,
+    description:
+      'Jewelry in Grade 23 titanium, anodized niobium and 316L surgical steel — rings, necklaces, earrings, bracelets and charms, each named by its exact specification.',
+    openGraph: {
+      title: SITE_DEFAULT_TITLE,
+      description: `${claimText('brand-positioning', SITE)} No stones. No fillers. Pure material integrity.`,
+      siteName: 'Healthy Jewelry',
+      locale: 'en_US',
+      type: 'website',
+    },
+  }
 }
 
 /**
@@ -102,7 +127,7 @@ export default function HomePage() {
     <>
       <Nav />
       <main>
-        <Hero />
+        <Hero headlineLines={claimLines('brand-positioning', SITE)} />
         <HorizontalScroll label="BESTSELLING" products={bestsellers} />
         <CampaignBand />
         <HorizontalScroll label="NEW ARRIVALS" products={newArrivals} />

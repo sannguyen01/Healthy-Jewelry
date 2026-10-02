@@ -46,8 +46,13 @@ Five things, and it is measured against them:
 
 1. **Explain the materials accurately.** Grade 23 titanium, anodized niobium, 316L surgical
    steel — and only where the claim has supporting documentation behind it.
-2. **Present the geometric collection language.** Arc, Halo, Orbit, Facet, Disc, Bar, Cuff,
-   Split, Hoop.
+2. **Classify pieces by a geometric design taxonomy.** Nine forms — Arc, Halo, Orbit, Facet,
+   Disc, Bar, Cuff, Split, Hoop — classify pieces; they do not name them. A form is assigned to a
+   piece by a person and recorded on its catalogue record as `{ state: 'assigned', value }`; it is
+   never inferred from a title, and until it is assigned the record says `unassigned`. No product
+   is renamed to fit the taxonomy (owner's decision, 2026-09-25). Held by `FORMS` in
+   `src/lib/catalog/schema.ts` and by `unassignedFormCount()`, pinned with equality in
+   `catalog-content.test.ts`.
 3. **Carry the travel-memory story** and show where an ambassador encounter continues.
 4. **Offer low-pressure, non-commerce contact paths.** Social profiles, the approved inquiry
    route, ambassador follow-up, location and event information where it exists.
@@ -118,7 +123,11 @@ the word. A guardrail that fails on its own guardrails gets exemptions added unt
 quiet, which is the ADR 011 muting pattern pointed at a linter.
 
 So: `code` is a token outside comments in a file that executes; `prose` is a comment or
-Markdown. A comment inside a code file is **free**, deliberately. The comment above
+Markdown. A string, a template literal, a regular expression and JSX text are all `code`: a
+`//` or a `/*` inside one opens nothing, and the lexer that decides this is checked line by
+line against the TypeScript compiler (`src/tests/unit/commerce-lexer-differential.test.ts`),
+because a misread comment is a silent exemption. A comment inside a code file is **free**,
+deliberately. The comment above
 `src/app/api/webhooks/shopify/route.ts` explaining why that route is still standing is the
 most useful sentence in it, and a rule that deletes it makes the decommission harder to
 finish rather than closer to done.
@@ -134,43 +143,44 @@ rather than the reverse.
 
 <!-- contract:positions -->
 
-| Glob | Class | Why |
-|---|---|---|
-| `pnpm-lock.yaml` | excluded | Machine-generated, 212 KB, and audited by `auditPackages` against a parsed package set rather than by line scanning. |
-| `public/**` | excluded | Binary assets. Fonts and photographs have no comment syntax and no commerce semantics. |
-| `.gitignore` | excluded | No extension, no comment grammar worth declaring for one file. |
-| `.prettierrc` | excluded | JSON without an extension; formatting configuration carries no commerce surface. |
-| `docs/adr/**` | historical | An ADR is a dated decision and is never edited to match the present. Seventeen of them mention Shopify correctly. |
-| `CHANGELOG.md` | historical | A log of what happened. Rewriting it to match today falsifies the account. |
-| `STATE.md` | historical | The engineering record, explicitly historical by construction. |
-| `dependency-sweeper-state.md` | historical | A dated sweep record. |
-| `docs/browse-only-masterplan.md` | historical | The predecessor plan, self-classified historical in its own header. |
-| `docs/headless-launch-inventory.md` | historical | Evidence: what the store contained on 2026-08-12. Banner already present. |
-| `docs/shopify-decommission-inventory.md` | historical | The credential ledger. Names credentials, never values, and says so. |
-| `docs/credential-inventory.md` | historical | What exists and what it reaches, as measured. |
-| `docs/catalog-conventions.md` | superseded | Rules for editing products in Shopify Admin. |
-| `docs/go-live-runbook.md` | superseded | Leads to a working checkout that will not exist. |
-| `docs/webhooks.md` | superseded | Every subscription in it is scheduled for deletion. |
-| `docs/shopify-policies/**` | superseded | Policy drafts to be pasted into Shopify Admin. |
-| `SHOPIFY_SETUP.md` | superseded | Describes switching Shopify on. |
-| `COMMERCE-ELIMINATION-CONTRACT.md` | specification | This file names every identifier it forbids, and is the input the scanner parses. |
-| `docs/commerce-dependency-register.md` | specification | The register names the paths it tracks, and is the scanner's second input. |
-| `scripts/lib/commerce-contract.mjs` | negative-control | The scanner. |
-| `scripts/verify-commerce-contract.mjs` | negative-control | Its driver. |
-| `src/tests/unit/commerce-contract.test.ts` | negative-control | Its tests, including the mutations that prove it can fail. |
-| `src/tests/unit/commerce-route-inventory.test.ts` | negative-control | Reconciles §6 and §7 against the filesystem, `next.config.ts` and the E2E spec. It has to name the one handler excluded from the public inventory in order to justify the exclusion. |
-| `src/tests/unit/browse-only-copy.test.tsx` | negative-control | Forbids payment-method copy by naming the methods. |
-| `src/tests/unit/catalog-content.test.ts` | negative-control | Forbids commerce fields in catalogue JSON by naming them. |
-| `src/tests/unit/price-absence-contract.test.tsx` | negative-control | Forbids currency symbols by listing them. |
-| `scripts/lib/browse-only.mjs` | negative-control | The live probe that reports `shopify-host-referenced`. It must name the host it looks for. |
-| `src/tests/unit/browse-only-smoke.test.ts` | negative-control | Drives that probe against fixtures where the host is present and absent. |
-| `scripts/lib/canonical-domain.mjs` | negative-control | Detects the apex resolving into Shopify's redirect chain. |
-| `src/tests/unit/canonical-domain-decision.test.ts` | negative-control | Drives it against a chain that ends at `shops.myshopify.com`. |
-| `e2e/retired-routes.spec.ts` | negative-control | Asserts, over real HTTP, that the commerce URL space is gone. |
-| `src/tests/unit/soft-404-premise.test.ts` | negative-control | Watches a decision whose premise the decommission expires. |
-| `src/tests/unit/secret-exposure.test.ts` | negative-control | Walks the client import graph and fails if a secret becomes reachable. |
-| `src/tests/unit/decommission-inventory.test.ts` | negative-control | Reconciles the credential ledger against the inventory, in both directions. |
-| `src/tests/unit/dependency-scope.test.ts` | negative-control | Rejects dependency scope creep; names `@shopify` as the case it rejects. |
+| Glob | Class | Why | Carries |
+|---|---|---|---|
+| `pnpm-lock.yaml` | excluded | Machine-generated, 212 KB, and audited by `auditPackages` against a parsed package set rather than by line scanning. |  |
+| `public/**` | excluded | Binary assets. Fonts and photographs have no comment syntax and no commerce semantics. |  |
+| `.gitignore` | excluded | No extension, no comment grammar worth declaring for one file. |  |
+| `.prettierrc` | excluded | JSON without an extension; formatting configuration carries no commerce surface. |  |
+| `.github/CODEOWNERS` | excluded | Ownership rules only, with no extension and no comment grammar worth declaring for one file. Excluded from position analysis, not from the credential-value rule, which reads every tracked text file. |  |
+| `docs/adr/**` | historical | An ADR is a dated decision and is never edited to match the present. Seventeen of them mention Shopify correctly. |  |
+| `CHANGELOG.md` | historical | A log of what happened. Rewriting it to match today falsifies the account. |  |
+| `STATE.md` | historical | The engineering record, explicitly historical by construction. |  |
+| `dependency-sweeper-state.md` | historical | A dated sweep record. |  |
+| `docs/browse-only-masterplan.md` | historical | The predecessor plan, self-classified historical in its own header. |  |
+| `docs/headless-launch-inventory.md` | historical | Evidence: what the store contained on 2026-08-12. Banner already present. |  |
+| `docs/shopify-decommission-inventory.md` | historical | The credential ledger. Names credentials, never values, and says so. |  |
+| `docs/credential-inventory.md` | historical | What exists and what it reaches, as measured. |  |
+| `docs/catalog-conventions.md` | superseded | Rules for editing products in Shopify Admin. |  |
+| `docs/go-live-runbook.md` | superseded | Leads to a working checkout that will not exist. |  |
+| `docs/webhooks.md` | superseded | Every subscription in it is scheduled for deletion. |  |
+| `docs/shopify-policies/**` | superseded | Policy drafts to be pasted into Shopify Admin. |  |
+| `SHOPIFY_SETUP.md` | superseded | Describes switching Shopify on. |  |
+| `COMMERCE-ELIMINATION-CONTRACT.md` | specification | This file names every identifier it forbids, and is the input the scanner parses. | admin-api-path checkout-handoff customer-identity inventory-check payment-provider shopify-env shopify-host shopify-name storefront-token-header |
+| `docs/commerce-dependency-register.md` | specification | The register names the paths it tracks, and is the scanner's second input. | shopify-env shopify-name |
+| `scripts/lib/commerce-contract.mjs` | negative-control | The scanner. | — |
+| `scripts/verify-commerce-contract.mjs` | negative-control | Its driver. | — |
+| `src/tests/unit/commerce-contract.test.ts` | negative-control | Its tests, including the mutations that prove it can fail. | admin-api-path cart-mutation checkout-handoff customer-identity discount-machinery draft-order graphql-endpoint inventory-check payment-provider shopify-env shopify-host shopify-name storefront-token-header |
+| `src/tests/unit/commerce-route-inventory.test.ts` | negative-control | Reconciles §6 and §7 against the filesystem, `next.config.ts` and the E2E spec. It has to name the one handler excluded from the public inventory in order to justify the exclusion. | shopify-name |
+| `src/tests/unit/browse-only-copy.test.tsx` | negative-control | Forbids payment-method copy by naming the methods. | payment-provider |
+| `src/tests/unit/catalog-content.test.ts` | negative-control | Forbids commerce fields in catalogue JSON. Since 2026-09-26 it reads that list from §8 rather than restating it, so it names only the vendor. | shopify-name |
+| `src/tests/unit/price-absence-contract.test.tsx` | negative-control | Forbids currency symbols by listing them. | — |
+| `scripts/lib/browse-only.mjs` | negative-control | The live probe that reports `shopify-host-referenced`. It must name the host it looks for, and since 2026-09-26 it is also the one list of vendor domains (`VENDOR_DOMAINS`) the checkout-host premise and the live-surface probe import rather than restate. | shopify-host shopify-name |
+| `src/tests/unit/browse-only-smoke.test.ts` | negative-control | Drives that probe against fixtures where the host is present and absent. | shopify-host shopify-name |
+| `scripts/lib/canonical-domain.mjs` | negative-control | Detects the apex resolving into Shopify's redirect chain. | shopify-name |
+| `src/tests/unit/canonical-domain-decision.test.ts` | negative-control | Drives it against a chain that ends at `shops.myshopify.com`. | shopify-host shopify-name |
+| `e2e/retired-routes.spec.ts` | negative-control | Asserts, over real HTTP, that the commerce URL space is gone. | shopify-name |
+| `src/tests/unit/soft-404-premise.test.ts` | negative-control | Watches a decision whose premise the decommission expires. | shopify-name |
+| `src/tests/unit/secret-exposure.test.ts` | negative-control | Walks the client import graph and fails if a secret becomes reachable. | shopify-env shopify-name |
+| `src/tests/unit/decommission-inventory.test.ts` | negative-control | Reconciles the credential ledger against the inventory, in both directions. | shopify-name |
+| `src/tests/unit/dependency-scope.test.ts` | negative-control | Rejects dependency scope creep; names `@shopify` as the case it rejects. | — |
 
 <!-- /contract:positions -->
 
@@ -178,8 +188,19 @@ A `superseded` document must carry a **dated supersession banner in its first 15
 class is what exempts the file; the banner is what earns the class. Without it the exemption
 is silent, and a silent exemption is how an obsolete runbook reads as current.
 
-A `negative-control` file must contain an assertion. The strongest exemption in this contract
-cannot be granted to a file that checks nothing.
+A `negative-control` file must contain an assertion **in its code** — the word "expect" in a
+comment earns nothing. The strongest exemption in this contract cannot be granted to a file
+that checks nothing.
+
+`negative-control` and `specification` are whole-file exemptions, so each of those rows
+declares in **Carries** exactly which identifiers the exemption is doing work for: the ones
+in code position (anywhere, for a Markdown specification) that would otherwise be a finding.
+The scan holds the declaration to what it observes as an exact set, in both directions —
+a negative control that grows a new identifier fails until the row says so, and one that
+stops needing an entry fails until the row stops claiming it. `—` declares none; an empty
+cell on one of those rows is a finding. A glob row is reconciled against the union over the
+files it decides. Every other class leaves the column empty. Value-scope matches (§3) are
+never exempt, in any class, `excluded` included.
 
 A `specification` file must be **named in the code of some other tracked file**. The class
 exists because a document that lists every forbidden identifier cannot also assert — it is the
@@ -245,7 +266,6 @@ absent here fails, and a route here and absent on disk fails.
 | `/api/analytics` | route | 200 |
 | `/api/contact` | route | 200 |
 | `/api/health` | route | 200 |
-| `/api/revalidate` | route | 200 |
 | `/api/sitemap` | route | 200 |
 | `/api/version` | route | 200 |
 
@@ -254,11 +274,6 @@ absent here fails, and a route here and absent on disk fails.
 **`/api/webhooks/shopify` is deliberately absent from this table.** It answers only to an
 HMAC-signed delivery, so it is not a public route; it is in the register instead, retained
 under WS-F's ordering and scheduled for deletion rather than for approval.
-
-`/api/revalidate` **is** listed, and that is not an endorsement. It is a route this deployment
-currently serves, and the table's job is to be exhaustive about what the site answers — an
-inventory that quietly omitted a live endpoint would be worth less than no inventory. It
-carries a register row saying it goes.
 
 ## 7. Forbidden route inventory
 
@@ -370,6 +385,36 @@ true of a deletion.
 
 ---
 
+## Phase
+
+The decommission is in one of two states, and the contract says which. The scanner holds
+the declaration against the register in both directions, so neither state can be chosen to
+make a check pass:
+
+- **`active`** — work is outstanding. The register must have at least one row, and every row
+  must declare exactly the identifiers its file carries. An `active` contract with an empty
+  register **fails** (`phase-active-register-empty`): that is the completion condition, and
+  completion is declared here, in a reviewed edit, rather than inferred from a green run.
+- **`complete`** — the register is empty and the scanner reports nothing. A `complete`
+  contract with any register row **fails** (`phase-complete-register-nonempty`).
+
+This replaces a floor — "the register has at least twenty rows" — that encoded the opposite
+of §10 condition 5 and would have failed, and been lowered, on the day the work finished
+([ADR 035](docs/adr/035-a-control-outlives-its-subject.md)). The row count itself is pinned
+by equality in `src/tests/unit/commerce-contract.test.ts` (`EXPECTED_REGISTER_ROWS`,
+[ADR 021](docs/adr/021-a-metric-with-only-one-direction.md)): lowering it means
+deleting rows, and raising it means an edit somebody has to explain.
+
+<!-- contract:state -->
+
+| Key | Value | Why |
+|---|---|---|
+| `decommission` | `active` | 2026-09-25: the register still carries WS-A, WS-C, WS-D, WS-E, WS-F, WS-G and WS-I rows. |
+
+<!-- /contract:state -->
+
+---
+
 ## 10. Completion conditions
 
 The decommission is complete when every one of these is true and each is demonstrated by the
@@ -384,7 +429,7 @@ check beside it — not inferred from a successful deploy.
 | 5 | The scanner reports zero blocking findings with an empty register | `pnpm verify:commerce-contract` |
 | 6 | No commerce package is declared or locked | `auditPackages` |
 | 7 | No commerce environment variable or CI secret remains | `pnpm audit:secrets`; `vercel env ls` |
-| 8 | Material claims render only against referenced evidence | content-schema validation |
+| 8 | Material claims render only against referenced evidence | `claims-registry.test.ts` (a claim resolves to its wording only when approved, current and evidenced) and `claim-lexicon.test.tsx` (nothing renders outside approved wording) |
 | 9 | Every form and analytics event reaches only an approved Company-controlled system | privacy owner's sign-off, recorded |
 | 10 | Historical record retention, retrieval ownership and account closure are documented and approved | `docs/shopify-decommission-inventory.md`, every row dated with evidence |
 
@@ -403,3 +448,91 @@ re-permits and who approved it. A change that adds a register row must name the 
 will remove it. A change that adds a `superseded` or `negative-control` classification must
 carry the banner or the assertion that earns it — the checks will refuse it otherwise, which is
 the point.
+
+---
+
+## 12. Approved egress
+
+Where this deployment may send bytes, per side. Everything not listed here is refused —
+this is an allowlist, because the failure it exists for is a request nobody decided to
+make: a theme snippet, an SDK's telemetry beacon, a font or image pulled from a vendor CDN
+by a component that was copied rather than written.
+
+Two sides, because they are two different questions asked by two different harnesses:
+
+- **`browser`** — every request any page makes, recorded by the automatic Playwright
+  fixture in `e2e/support/test.ts` on every E2E test, and enforced in production by the
+  `Content-Security-Policy` in `next.config.ts` (`connect-src 'self'`, pinned by
+  `src/tests/unit/csp-contract.test.ts`). The browser talks to the site and to nothing
+  else. `self` means the origin being served in that run, which is why it is a keyword: the
+  E2E server is `http://localhost:3000` and production is not.
+- **`server`** — every outbound call a route handler makes, recorded by stubbing `fetch` in
+  `src/tests/unit/server-egress.test.ts`. Two processors, each named in the privacy page.
+
+Pattern shapes, and no others: `self`; a non-network scheme (`data:`, `blob:`, `about:`);
+`https://host` (exactly that host, default port); `https://*.host` (any host *beneath*
+`host`, not `host` itself). Parsed by `scripts/lib/egress.mjs`, which throws on anything
+else rather than matching nothing.
+
+<!-- contract:egress-allowed -->
+
+| Origin pattern | Side | Why |
+|---|---|---|
+| `self` | browser | The site's own origin: pages, `/_next/static`, self-hosted fonts, the Open Graph image routes, `/api/analytics` and `/api/contact`. |
+| `data:` | browser | Inline SVG and image bytes the page already holds. Not a network request. |
+| `blob:` | browser | Object URLs a page creates from its own data. Not a network request. |
+| `about:` | browser | `about:blank`, the document every frame starts as. Not a network request. |
+| `https://api.resend.com` | server | Contact delivery from `/api/contact`, and the key check in `/api/health`. |
+| `https://*.upstash.io` | server | Rate limiting. The REST endpoint is a per-database subdomain, so the apex itself is not approved. |
+
+<!-- /contract:egress-allowed -->
+
+## 13. Forbidden egress
+
+Hosts this deployment must never contact, from either side, in any build. A row matches its
+host **and every host beneath it**, on a label boundary: `cdn.` in front of a forbidden host
+is the same vendor, while letters glued to the front of one are somebody else's domain —
+which §12 already refuses without this table's help.
+
+**§13 outranks §12.** A host that falls under both is forbidden, so an approval written
+wider than intended cannot reopen a closed vendor by being wide.
+
+Read by the browser fixture and the server harness through `scripts/lib/egress.mjs`, by
+`src/tests/unit/csp-contract.test.ts` against every CSP directive, and by
+`scripts/scan-build-artifacts.mjs` against every file the build emits — client chunks,
+prerendered HTML and RSC payloads, server chunks and source maps.
+
+Several rows are subsumed by a broader one and are listed anyway. They are the hosts a
+storefront theme, a checkout or a payment button actually calls, and a reviewer searching
+this table for the hostname in a failing request should find it by name.
+
+<!-- contract:egress-forbidden -->
+
+| Host pattern | Why |
+|---|---|
+| `myshopify.com` | The storefront and Storefront API host family. No runtime read path exists. |
+| `shopify.com` | The platform itself: Admin API, accounts, and the hosted checkout's asset hosts. |
+| `cdn.shopify.com` | Product photographs and theme assets. The catalogue ships its own imagery. |
+| `shopifycdn.com` | The platform's secondary asset CDN. |
+| `shopifysvc.com` | Platform services behind storefront scripts. |
+| `monorail-edge.shopifysvc.com` | Storefront analytics beacons — conversion tracking, which §2 forbids. |
+| `shop.app` | The accelerated-checkout wallet and its buyer-identity service. |
+| `stripe.com` | Payment processing. No payment is taken on this domain. |
+| `js.stripe.com` | The payment element script. A payment path begins by loading it. |
+| `paypal.com` | Payment processing and its checkout buttons. |
+| `paypalobjects.com` | Payment button assets. |
+| `braintreegateway.com` | Payment processing. |
+| `adyen.com` | Payment processing. |
+| `klarna.com` | Deferred payment. |
+| `afterpay.com` | Deferred payment. |
+| `vnpay.vn` | Domestic payment gateway. |
+| `zalopay.vn` | Domestic wallet payments. |
+| `momo.vn` | Domestic wallet payments. |
+| `easypost.com` | Shipping rates and labels. Fulfilment is arranged by a person. |
+| `goshippo.com` | Shipping rates and labels. |
+| `taxjar.com` | Sales-tax calculation. Tax applies to a transaction, and there is none. |
+| `avalara.com` | Tax calculation. |
+| `avalara.net` | Tax calculation API hosts. |
+| `checkout.healthyjewellery.com` | The retired checkout hostname. It resolves into the platform until WS-E retires it, so a link to it is a link into a checkout. |
+
+<!-- /contract:egress-forbidden -->

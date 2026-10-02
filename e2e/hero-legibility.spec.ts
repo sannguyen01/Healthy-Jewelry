@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from './support/test'
 import { PNG } from 'pngjs'
 import {
   contrastRatioFromLuminance,
@@ -72,7 +72,8 @@ const SAMPLE_INSET_PX = 4
 async function heroTextNodes(page: Page): Promise<Array<{ label: string; locator: Locator }>> {
   const hero = page.locator('section').first()
   return [
-    { label: 'eyebrow', locator: hero.getByText(/implant-grade titanium/i) },
+    // "Implant-Grade Titanium" until 2026-09-26; the eyebrow now names the metals by specification.
+    { label: 'eyebrow', locator: hero.getByText(/grade 23 titanium · niobium · 316l steel/i) },
     { label: 'headline', locator: hero.getByRole('heading', { level: 1 }) },
     { label: 'body copy', locator: hero.getByText(/no stones\. no fillers/i) },
     { label: 'Shop Collection CTA', locator: hero.getByRole('link', { name: /shop collection/i }) },

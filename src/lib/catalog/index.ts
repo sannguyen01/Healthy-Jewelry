@@ -33,11 +33,24 @@ import {
   collectionSchema,
   productSchema,
   pendingFieldCount,
+  MATERIAL_HANDLES,
   type CatalogCollection,
   type CatalogProduct,
   type CollectionHandle,
+  type MaterialHandle,
 } from './schema'
-import { rawCollections, rawProducts } from './manifest'
+import { rawClaims, rawCollections, rawProducts } from './manifest'
+import { CLAIM_IDS, loadClaimsRegistry, type ClaimId, type ClaimsRegistry } from './claims-schema'
+import {
+  approvedWordings,
+  documentedStandard,
+  findMaterialSpec,
+  inline,
+  lines,
+  resolveClaim,
+  type ClaimContext,
+  type ClaimResolution,
+} from './claims'
 
 /**
  * Parse and cross-check a whole catalogue, or throw naming everything wrong with it.
@@ -120,6 +133,20 @@ function parseAll<T>(
 }
 
 const { products, collections } = loadCatalog(rawProducts, rawCollections)
+
+/**
+ * The claims registry, validated here rather than in its own module for one reason: the
+ * build-time check.
+ *
+ * `next.config.ts` imports this file and nothing else from `src/lib/catalog`, so anything
+ * validated here is validated once per build before a page is generated. A registry loaded
+ * in a sibling module would need its own import in `next.config.ts` — which belongs to
+ * another workstream — or a circular import back into this file for the product handles
+ * its cross-check needs. Loading it after the products makes both unnecessary.
+ */
+const claimsRegistry: ClaimsRegistry = loadClaimsRegistry(rawClaims, {
+  productHandles: products.map((p) => p.handle),
+})
 
 // ── Accessors ──────────────────────────────────────────────────────────────
 
@@ -215,4 +242,136 @@ export function totalPendingFields(): number {
   return products.reduce((sum, product) => sum + pendingFieldCount(product), 0)
 }
 
-export type { CatalogProduct, CatalogCollection, CollectionHandle }
+/**
+ * How many products have not yet been assigned one of the nine forms.
+ *
+ * Every one of them, today, and deliberately: Arc, Halo, Orbit, Facet, Disc, Bar, Cuff,
+ * Split and Hoop are a design taxonomy, not a naming rule, and assigning a form is a design
+ * decision a person makes. Counted so that the assignment is a burn-down with a number on
+ * it rather than a field that is quietly filled in by whoever edits a record next.
+ */
+export function unassignedFormCount(): number {
+  return products.filter((product) => product.form.state === 'unassigned').length
+}
+
+// ── Claims ─────────────────────────────────────────────────────────────────
+//
+// Server-side only, and that is a bundle decision as much as an architectural one: these
+// read a Zod-validated registry, and a client component importing them would ship Zod to
+// the browser for the sake of three words. Client components receive resolved text as
+// props from the server component that renders them — see `Hero` and `ProductDetail`.
+
+/** The validated registry, for tests and for the scheduled expiry probe. */
+export function getClaimsRegistry(): ClaimsRegistry {
+  return claimsRegistry
+}
+
+/** The render-time clock. A function, so a test can see exactly where time enters. */
+function renderTime(): Date {
+  return new Date()
+}
+
+/** The full resolution — wording or fallback, and why — for surfaces and tests that need the reason. */
+export function resolveClaimFor(id: ClaimId, context: ClaimContext): ClaimResolution {
+  return resolveClaim(claimsRegistry, id, context, renderTime())
+}
+
+/**
+ * What a sentence surface renders for this claim: its wording when approved and
+ * applicable, its neutral fallback otherwise. Line-break hints collapse to spaces.
+ */
+export function claimText(id: ClaimId, context: ClaimContext): string {
+  return inline(resolveClaimFor(id, context).text)
+}
+
+/** As `claimText`, split on the registry's line-break hints — for a heading set on several lines. */
+export function claimLines(id: ClaimId, context: ClaimContext): string[] {
+  return lines(resolveClaimFor(id, context).text)
+}
+
+/** Only the approved wordings among `ids`, for list surfaces. See `approvedWordings`. */
+export function approvedClaimTexts(ids: readonly ClaimId[], context: ClaimContext): string[] {
+  return approvedWordings(claimsRegistry, ids, context, renderTime())
+}
+
+/**
+ * Narrow claim ids held as plain strings — `hj-data.ts` keeps them that way so the
+ * materials copy does not import the catalogue — or throw naming the one that is not real.
+ * A throw rather than a cast: an unknown id silently rendering nothing would look exactly
+ * like a claim nobody has approved yet.
+ */
+export function asClaimIds(ids: readonly string[]): ClaimId[] {
+  return ids.map((id) => {
+    const known = CLAIM_IDS.find((c) => c === id)
+    if (!known) throw new Error(`"${id}" is not a claim id in src/lib/catalog/claims-schema.ts.`)
+    return known
+  })
+}
+
+/** The exact designation of a metal — a specification, so it always renders. */
+export function materialDesignation(material: MaterialHandle): string {
+  return findMaterialSpec(claimsRegistry, material).designation
+}
+
+/** The standard a metal is documented to meet in this context, or `null`. See `documentedStandard`. */
+export function materialStandard(material: MaterialHandle, context: ClaimContext): string | null {
+  return documentedStandard(claimsRegistry, material, context)
+}
+
+/**
+ * Narrow a materials-copy handle to the catalogue vocabulary, or throw.
+ *
+ * `hj-data.ts` keeps its handles as plain strings on purpose (see its header), so the
+ * narrowing happens once, here, at the edge where a material becomes a claim context.
+ */
+export function toMaterialHandle(handle: string): MaterialHandle {
+  const material = MATERIAL_HANDLES.find((m) => m === handle)
+  if (!material) throw new Error(`"${handle}" is not one of the catalogue's materials.`)
+  return material
+}
+
+/** The claim context for one metal, from a materials-copy handle. */
+export function materialContext(handle: string): ClaimContext {
+  return { kind: 'material', material: toMaterialHandle(handle) }
+}
+
+/** The claim context for one product page. */
+export function productContext(product: CatalogProduct): ClaimContext {
+  return { kind: 'product', handle: product.handle, material: product.material }
+}
+
+/**
+ * The notes under a product: its material designation, a standard only where documentation
+ * covers this piece, and any approved claim about it. Today that is the designation alone —
+ * the three chips this row carried until 2026-09-26 were claims with no evidence.
+ */
+export const PRODUCT_NOTE_CLAIMS: readonly ClaimId[] = ['implant-grade', 'hypoallergenic', 'mri-safe']
+
+export function productMaterialNotes(product: CatalogProduct): {
+  designation: string
+  standard: string | null
+  claims: string[]
+} {
+  const context = productContext(product)
+  return {
+    designation: materialDesignation(product.material),
+    standard: materialStandard(product.material, context),
+    claims: approvedClaimTexts(PRODUCT_NOTE_CLAIMS, context),
+  }
+}
+
+/**
+ * The chips a metal shows: its specification properties, then each of its claims that is
+ * approved for that metal at render time. One rule for the two surfaces that render
+ * `hjMaterials` — the homepage section and `/materials` — so they cannot disagree about
+ * the same metal.
+ */
+export function materialChips(material: {
+  handle: string
+  properties: readonly string[]
+  claims: readonly string[]
+}): string[] {
+  return [...material.properties, ...approvedClaimTexts(asClaimIds(material.claims), materialContext(material.handle))]
+}
+
+export type { CatalogProduct, CatalogCollection, CollectionHandle, ClaimId, ClaimContext }
