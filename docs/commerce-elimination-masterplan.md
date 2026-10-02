@@ -202,7 +202,7 @@ canary blocked because it is a draft or conflicted has not proved the required-c
 mail provider returning a message id has accepted a message, not delivered it.
 
 ```
-UNPROTECTED                 main deploys with nothing required                ← today (2026-10-02)
+UNPROTECTED                 main deploys with nothing required                ← today (2026-10-02; canary #94: NOT-DENIED)
   │ ruleset active, read back `enforced`, bypass list empty   (owner; runbooks/main-ruleset.md 1–2)
 GATE_UNPROVEN
   │ ready-for-review canary fails `verify`; probe-merge-denial reads `denied` with draft:false,

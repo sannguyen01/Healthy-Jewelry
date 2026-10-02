@@ -73,8 +73,16 @@ follows #90 (#93). ADR 038 is the pattern.
 
 ### Still blocked, and on what
 
-- **No ruleset on `main`** — the canary is not run until the owner creates it and reads it back
-  (`docs/runbooks/main-ruleset.md`). Permission for the canary itself is already given.
+- **The merge gate does not hold yet.** The owner reported the `main` ruleset created and read
+  back, and the canary ran on 2026-10-02 as PR #94: one failing unit test, ready for review.
+  - `verify` failed, yet GitHub read `mergeable_state: unstable` twice. The merge button works on a
+    red pull request, so the verdict is **NOT-DENIED**.
+  - A wrong context name would read `blocked`, so the likelier causes are in the ruleset itself:
+    enforcement set to *Evaluate*, a target that misses `main`, or a missing required-checks rule.
+  - The agent session could not read the rules (its token was refused), so the owner checks them
+    in Settings → Rules, or by running `probe-branch-protection.mjs` with an admin-read token.
+  - #94 stays open and unmerged. Once corrected it should read `blocked` with no new push; then it
+    is closed and its branch deleted.
 - The owner's 2026-09-27 platform observations (apex 307 → www; commerce variables still set;
   no `RATE_LIMIT_KEY_SECRET` in the project inventory) are recorded in masterplan §7 as theirs:
   this session's Vercel connector answered 403 for the team scope.

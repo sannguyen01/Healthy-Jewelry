@@ -1,6 +1,6 @@
 # Runbook — the `main` ruleset, and the read-only proof that it holds
 
-**Owner:** the repository owner (`sannguyen01`). **Workstream:** WS-C. **Status:** not yet run.
+**Owner:** the repository owner (`sannguyen01`). **Workstream:** WS-C. **Status:** canary run 2026-10-02 (#94): **NOT-DENIED**, so the ruleset as created does not enforce. See Evidence.
 
 `main` auto-deploys to production. Until this runbook is carried out, the merge button is the
 deploy button with no required check between them (`docs/controls.json`, `merge-gate`:
@@ -193,10 +193,10 @@ empty cell is the honest state.
 | Step | Observed (what, in words) | Date | By | Evidence (verdict, run, PR) |
 |---|---|---|---|---|
 | Contexts confirmed by `required-checks-contract` | | | | |
-| Ruleset created (id) | | | | |
-| `probe-branch-protection.mjs` read back `enforced` | | | | |
+| Ruleset created (id) | the owner reported it created and read back; the id could not be read from the agent session | 2026-10-02 | owner (reported) | none readable: the session's token answered 401, and anonymous reads were rate-limited |
+| `probe-branch-protection.mjs` read back `enforced` | **not observed.** From the agent session it read `unevaluable`: 401 "Bad credentials" with the environment token, and an anonymous-rate-limit 403 without it. That is an inability to ask, not evidence either way | 2026-10-02 | agent session | `verdict: unevaluable` |
 | `docs/controls.json` `merge-gate` set to `configured` | | | | |
-| Canary PR opened, ready for review, `verify` failed (PR number) | | | | |
-| `probe-merge-denial.mjs` verdict `denied` — head SHA, merge commit SHA, ruleset ID | | | | |
-| Required-context states (head and merge commit), `draft`, `mergeable`, `behind_by` | | | | |
+| Canary PR opened, ready for review, `verify` failed (PR number) | opened ready for review from `main` at `726dfc3`. `verify` failed, `Dependency scope` passed, E2E was skipped (`needs: verify`) | 2026-10-02 | agent session | #94, head `81099f6` |
+| `probe-merge-denial.mjs` verdict `denied` — head SHA, merge commit SHA, ruleset ID | **NOT denied.** GitHub read `mergeable_state: unstable` twice: the merge button worked on a failing PR. `judgeDenial()` on those readings gave `NOT-DENIED / mergeable-with-unmet-required-context` against the runbook's contexts, and `unevaluable / rules-unreadable` against what the session could read. The readings came through the GitHub connector, because the probe's own token was refused. Merge commit SHA and ruleset ID were not readable | 2026-10-02 | agent session | #94 comment with the readings; canary left open |
+| Required-context states (head and merge commit), `draft`, `mergeable`, `behind_by` | head: verify failing, Dependency scope passing, E2E skipped. `draft: false`. No conflicts: `unstable` is not `dirty`. `behind_by: 0` | 2026-10-02 | agent session | #94 |
 | Canary closed unmerged, branch deleted | | | | |
