@@ -3,13 +3,20 @@
  * Does an expired claim approval leave the page a visitor is actually served?
  *
  * Builds a production artifact in which one claim (`brand-positioning`) is approved from
- * yesterday and expires at the end of today, serves it twice, and reads what comes back:
+ * yesterday and expires at the end of today, and serves it once — a server that is running
+ * when the approval lapses, which is the case that matters in production:
  *
- *   1. with the real clock — the approved wording must appear (anti-vacuity: a fixture that
- *      never rendered would make its later absence meaningless, ADR 020);
- *   2. with the server's clock shifted two days past expiry — each page is requested up to
- *      `--attempts` times, and the verdict says whether the wording left every surface that
- *      carried it (visible text, `<meta>` content, JSON-LD), and on which attempt.
+ *   1. before the server's clock moves, the approved wording must appear (anti-vacuity: a
+ *      fixture that never rendered would make its later absence meaningless, ADR 020);
+ *   2. then both of the server's clocks jump two days past expiry
+ *      (`scripts/experiments/shift-clock.mjs` — `Date` for the claim resolver, `performance`
+ *      for Next's cache), each page is requested up to `--attempts` times, and the verdict says
+ *      whether the wording left every surface that carried it (visible text, `<meta>` content,
+ *      JSON-LD), and on which attempt.
+ *
+ * One server rather than two on purpose. A server *started* after the move dates every
+ * prerendered entry at load, sees it as fresh, and serves a HIT whatever the revalidation
+ * window — which is how this experiment's first version reported FAIL for a correct build.
  *
  * The decision is `judgeExpiry()` in `scripts/lib/claim-expiry.mjs`; this file only builds,
  * serves and fetches. The fixture is written into a scratch copy exported with `git archive
@@ -38,6 +45,8 @@ import { EXPERIMENT_CLAIM_ID, inlineText, judgeExpiry, withExpiringApproval, wor
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const SHIFT_MS = 2 * 86_400_000
+/** Real time between the server starting and its clocks jumping: enough to read the baseline. */
+const JUMP_DELAY_MS = 20_000
 const PAGES = ['/', '/about', '/materials']
 
 function flag(argv, name, fallback) {
@@ -105,33 +114,38 @@ async function main() {
   console.error('[experiment] building…')
   run('pnpm', ['build'], dir, { NEXT_TELEMETRY_DISABLED: '1' })
 
+  // The jump is scheduled before the server starts (the preload reads it once), far enough
+  // ahead that the baseline below is read on the real clock, with time to spare.
+  const jumpAt = Date.now() + JUMP_DELAY_MS
+  const preload = pathToFileURL(path.join(ROOT, 'scripts/experiments/shift-clock.mjs')).href
+  const stop = await serve(dir, port, {
+    NODE_OPTIONS: `--import ${preload}`,
+    HJ_CLOCK_SHIFT_MS: String(SHIFT_MS),
+    HJ_CLOCK_JUMP_AT_MS: String(jumpAt),
+  })
   const baseline = {}
+  const shifted = {}
   let ogBefore = null
-  let stop = await serve(dir, port, {})
+  let ogAfter = null
   try {
     for (const p of PAGES) baseline[p] = wordingOn((await get(port, p)).body.toString('utf8'), wording)
     ogBefore = createHash('sha256').update((await get(port, '/opengraph-image')).body).digest('hex')
-  } finally {
-    stop()
-  }
-  await new Promise((r) => setTimeout(r, 1500))
+    if (Date.now() >= jumpAt) throw new Error('the baseline was still being read when the clock jumped; raise JUMP_DELAY_MS')
+    await new Promise((res) => setTimeout(res, jumpAt - Date.now() + 1000))
 
-  const shifted = {}
-  let ogAfter = null
-  const preload = pathToFileURL(path.join(ROOT, 'scripts/experiments/shift-clock.mjs')).href
-  stop = await serve(dir, port, { NODE_OPTIONS: `--import ${preload}`, HJ_CLOCK_SHIFT_MS: String(SHIFT_MS) })
-  try {
     for (const p of PAGES) {
       shifted[p] = []
       for (let i = 0; i < attempts; i += 1) {
         const r = await get(port, p)
-        shifted[p].push({ ...wordingOn(r.body.toString('utf8'), wording), cache: r.cache, status: r.status })
-        if (!Object.values(wordingOn(r.body.toString('utf8'), wording)).some(Boolean)) break
+        const where = wordingOn(r.body.toString('utf8'), wording)
+        shifted[p].push({ ...where, cache: r.cache, status: r.status })
+        if (!Object.values(where).some(Boolean)) break
         await new Promise((res) => setTimeout(res, 1500))
       }
     }
+    // The share card: one request to notice staleness, one after regeneration.
     await get(port, '/opengraph-image')
-    await new Promise((res) => setTimeout(res, 1500))
+    await new Promise((res) => setTimeout(res, 2500))
     ogAfter = createHash('sha256').update((await get(port, '/opengraph-image')).body).digest('hex')
   } finally {
     stop()
@@ -146,6 +160,7 @@ async function main() {
     wording,
     buildClock: buildClock.toISOString(),
     serverClockShiftMs: SHIFT_MS,
+    serverClockJumpedAt: new Date(jumpAt).toISOString(),
     baseline,
     shifted,
     openGraphImage: {

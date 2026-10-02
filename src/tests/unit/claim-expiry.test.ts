@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import ts from 'typescript'
 import { parseSource, walk } from '@/lib/analysis/tsAstScan'
@@ -158,3 +160,42 @@ describe('judgeExpiry — every verdict from a fixture', () => {
     expect(result.verdict).toBe('PASS')
   })
 })
+
+/**
+ * **The experiment's clock moves both clocks, and only after the jump.**
+ *
+ * Its first version moved `Date` alone, on the reasoning that `performance` measures durations.
+ * Next's cache judges age with `performance.timeOrigin + performance.now()`, so no time passed
+ * for the cache and the experiment reported FAIL for a build whose bound was correct. Run in a
+ * real child process, because a preload is a process-level fact and an in-process stub of it
+ * would test the stub.
+ */
+describe('scripts/experiments/shift-clock.mjs', () => {
+  const preload = pathToFileURL(join(ROOT, 'scripts/experiments/shift-clock.mjs')).href
+  const DAY = 86_400_000
+  const read = (env: Record<string, string>) => {
+    const out = spawnSync(
+      process.execPath,
+      ['--import', preload, '-e', 'console.log(JSON.stringify({ date: Date.now(), ctor: new Date().getTime(), perf: performance.timeOrigin + performance.now() }))'],
+      { env: { ...process.env, ...env }, encoding: 'utf8' }
+    )
+    expect(out.status, out.stderr).toBe(0)
+    return JSON.parse(out.stdout) as { date: number; ctor: number; perf: number }
+  }
+
+  it('moves Date and the performance clock together once the jump has passed', () => {
+    const before = Date.now()
+    const t = read({ HJ_CLOCK_SHIFT_MS: String(DAY), HJ_CLOCK_JUMP_AT_MS: '0' })
+    for (const value of [t.date, t.ctor, t.perf]) {
+      expect(value - before).toBeGreaterThan(DAY - 60_000)
+      expect(value - before).toBeLessThan(DAY + 60_000)
+    }
+  })
+
+  it('leaves both clocks alone before the jump', () => {
+    const before = Date.now()
+    const t = read({ HJ_CLOCK_SHIFT_MS: String(DAY), HJ_CLOCK_JUMP_AT_MS: String(before + 10 * 60_000) })
+    for (const value of [t.date, t.ctor, t.perf]) expect(Math.abs(value - before)).toBeLessThan(60_000)
+  })
+})
+
