@@ -23,7 +23,8 @@ user-visible or architecturally significant changes.
   found it.
 - **The hero card's 60% cap can no longer be raised silently.** Its sentinel had been dead since
   it was written: the cap never binds and the spec read its ceiling from the cap. The number is
-  now pinned to CLAUDE.md, and a separate browser sentinel proves the measurement fires.
+  now pinned to CLAUDE.md, wherever in `src` it is declared, and a separate browser sentinel
+  proves the measurement fires. All 41 sentinels are alive: 39 by the full probe, 2 by hand.
 - **The claim-expiry experiment says what it did not prove.** Every verdict names the surfaces no
   page carried before expiry. Today that is JSON-LD, because no claim reaches structured data.
 - [ADR 038](docs/adr/038-what-a-control-observes-is-not-what-it-claims.md); `AGENTS.md` lists the

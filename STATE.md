@@ -35,7 +35,15 @@ follows #90 (#93). ADR 038 is the pattern.
 - **Gate evidence.** GitHub reported PR #90 `mergeable_state: clean` while it was a draft, so
   `denied` now also requires draft/conflict/behind readings and head–merge agreement.
 - **Review.** `/code-review` (high) found ten defects in this work — the worst a `/policies` 308
-  turned into a 404 — all fixed; `/security-review` found nothing reportable.
+  turned into a 404 — all fixed; `/security-review` found nothing reportable. A second
+  `/code-review` over the close-out (`c9a035c..20fbd26`) found nine. Six were fixed in `f8389b5`,
+  and the seventh in part:
+  - expired wording that *appears* after expiry is now FAIL;
+  - the hero-cap pin reads every declaration in `src`;
+  - every `LIVE` doc-number row must state its own value.
+
+  The spec's token-read ceiling, browser sentinels outside the audit, and commit-type history
+  stay as they are, with reasons in the commit.
 - **Assertion liveness.** The full probe over the finished branch found 37 of 38 vitest
   sentinels alive. `merge-denial-attribution` was dead: its mutation ORed in `mergeable`, the old
   name of judgeDenial's "merge button works" local, and the gate-evidence commit had renamed that
@@ -53,7 +61,8 @@ follows #90 (#93). ADR 038 is the pattern.
   - `hero-card-measured` is a browser sentinel. It forces the card past its cap, which proves
     the measurement fires.
 
-  That makes 41 sentinels, 39 vitest.
+  That makes 41 sentinels, 39 vitest. After the second review below, the full probe on `f8389b5`
+  found all 39 vitest sentinels alive; the two browser ones are alive by hand.
 - **Claim expiry, JSON-LD.** The question named JSON-LD and the experiment reads it, but no
   builder routes a claim into structured data, so it was `false` in every baseline and silently
   outside the verdict. Every verdict now names its `unexercised` surfaces. Re-run on `09fafad`:
