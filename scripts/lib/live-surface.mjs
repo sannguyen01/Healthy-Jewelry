@@ -221,38 +221,131 @@ export function requestShowsCommerce(request) {
  * @property {boolean} [protected] a Vercel deployment-protection 401
  * @property {string | null} commit build.commit from that host's /api/version
  * @property {boolean} commerce    any request on this host showed commerce
- * @property {Record<string, string>} digests  first-pass sha256 of each 200 body, by path
+ * @property {Record<string, string>} digests       first-pass (cold) sha256 of each 200 body, by path
+ * @property {Record<string, string>} [warmDigests] second-pass (warm) sha256 of each 200 body, by path
+ * @property {string[]} [truncatedPaths]   paths whose body was longer than the probe read
+ * @property {{ status: number, location: string | null } | null} [firstHop] what `/` answered first
  */
 
+const isEdge = (h) => (h.role === 'apex' || h.role === 'www') && h.reachable
+
 /**
- * **The owner's four diagnostic rules, as a function.**
+ * **What the hosts are, before anything is said about why.**
  *
- * Precedence is part of the rule set and is deliberate:
+ * The first version of {@link classifyDiscrepancy} went straight from "the edge and the
+ * deployment both show commerce" to "the source or the build carries it" — without asking
+ * whether the edge and the deployment were serving the *same* thing. If they serve two
+ * different builds that both carry commerce, there are two problems (an alias pointing at the
+ * wrong build, and a build that is wrong), and naming one of them sends somebody to fix half.
+ * So identity is observed first, as data, and attribution reads it:
  *
- *   1. `source-build-deploy-chain` — the edge (apex or `www`) *and* the deployment URL both serve
- *      commerce. The build itself carries it, so no alias or cache explains it away.
- *   2. `alias-dns-cdn` — the edge differs from the deployment it claims to be serving: another
- *      commit, another body for the same path, or commerce on one side only.
- *   3. `retrieval-or-indexing` — no host serves commerce over HTTP, but an external retrieval
- *      did. The site is not the source of what was seen.
- *   4. `clean` — no host serves commerce and nothing external says otherwise.
+ * - `identityMismatch` — the edge hosts report different build commits from one another.
+ * - `cacheVariance` — one host answered the same path with different bytes cold and warm.
+ * - `agreement` — the edge against the deployment: `agree` only when established positively
+ *   (the same non-null commit, or at least one path with identical bytes and nothing that
+ *   differs), `disagree` on any measured difference, `unknown` when nothing could be compared,
+ *   `deployment-unobserved` when the deployment URL never answered.
+ * - `truncated` — paths whose body was longer than the probe read. An absence of commerce in a
+ *   prefix is not an absence of commerce.
+ * - `firstHops` — what `/` answered first on each host, so a redirect the wrong way round
+ *   (apex → www on a site whose canonical host is the apex) is in the evidence, not lost in a
+ *   followed chain. Whether that direction is *correct* is `probe-canonical-domain.mjs`'s
+ *   question and its issue; here it is identity, recorded.
  *
- * `unevaluable` when no edge host could be observed, or when the edge serves commerce and the
- * deployment URL could not be seen (protected or unreachable) — rules 1 and 2 cannot be told
- * apart without it, and guessing between "fix the source" and "fix the alias" sends somebody to
- * the wrong console.
+ * @param {HostObservation[]} hosts
+ */
+export function observeHosts(hosts) {
+  const edge = hosts.filter(isEdge)
+  const deployment = hosts.find((h) => h.role === 'deployment' && h.reachable) ?? null
+
+  const commits = Object.fromEntries(edge.filter((h) => h.commit).map((h) => [h.host, h.commit]))
+  const identityMismatch = new Set(Object.values(commits)).size > 1 ? Object.entries(commits).map(([host, commit]) => ({ host, commit })) : []
+
+  const cacheVariance = []
+  for (const h of hosts.filter((x) => x.reachable)) {
+    for (const [path, cold] of Object.entries(h.digests ?? {})) {
+      const warm = h.warmDigests?.[path]
+      if (warm && warm !== cold) cacheVariance.push({ host: h.host, path })
+    }
+  }
+
+  const differences = []
+  let compared = 0
+  if (deployment) {
+    for (const h of edge) {
+      if (h.commit && deployment.commit) {
+        compared += 1
+        if (h.commit !== deployment.commit) differences.push({ host: h.host, kind: 'commit', edge: h.commit, deployment: deployment.commit })
+      }
+      for (const [path, digest] of Object.entries(h.digests ?? {})) {
+        const other = deployment.digests?.[path]
+        if (!other) continue
+        compared += 1
+        if (other !== digest) differences.push({ host: h.host, kind: 'digest', path })
+      }
+      if (h.commerce !== deployment.commerce) {
+        differences.push({ host: h.host, kind: 'commerce', edge: h.commerce, deployment: deployment.commerce })
+      }
+    }
+  }
+  const agreement =
+    edge.length === 0 ? 'no-edge'
+      : !deployment ? 'deployment-unobserved'
+        : differences.length > 0 ? 'disagree'
+          : compared > 0 ? 'agree'
+            : 'unknown'
+
+  const truncated = hosts
+    .filter((h) => h.reachable)
+    .flatMap((h) => (h.truncatedPaths ?? []).map((path) => ({ host: h.host, path })))
+
+  const firstHops = Object.fromEntries(hosts.filter((h) => h.firstHop).map((h) => [h.host, h.firstHop]))
+
+  return {
+    edgeObserved: edge.map((h) => h.host),
+    deploymentObserved: deployment?.host ?? null,
+    identityMismatch,
+    cacheVariance,
+    agreement,
+    differences,
+    truncated,
+    firstHops,
+  }
+}
+
+/**
+ * **Where commerce on the live site comes from — attributed only after identity is settled.**
+ *
+ * Precedence, and every step is a rule rather than a heuristic:
+ *
+ *   1. `unevaluable/no-edge-host-observed` — neither the apex nor www answered as the site.
+ *   2. `host-identity-mismatch` — the apex and www report different builds. Any attribution
+ *      after this would be about one of two artifacts without saying which.
+ *   3. `alias-dns-cdn/cold-warm-variance` — one host served one path two different ways.
+ *   4. The edge differs from the deployment it names: `multiple-causes` when **both** serve
+ *      commerce (a wrong alias *and* a wrong build — fix both, attribute neither alone), else
+ *      `alias-dns-cdn/edge-differs-from-deployment`.
+ *   5. Commerce on the edge: `source-build-deploy-chain` only when edge and deployment are
+ *      positively established to `agree`; `unevaluable` when the deployment could not be seen
+ *      or agreement could not be established.
+ *   6. `unevaluable/truncated-response` — nothing was found, but some bytes were never read.
+ *   7. `retrieval-or-indexing` — the site is clean over HTTP and an external retrieval was not.
+ *   8. `clean`.
+ *
+ * The result keeps every field the summary and the issue read, and adds `observation`.
  *
  * @param {{ externalRetrievalShowsCommerce?: boolean, hosts: HostObservation[] }} input
  */
 export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, hosts }) {
-  const edge = hosts.filter((h) => (h.role === 'apex' || h.role === 'www') && h.reachable)
+  const observation = observeHosts(hosts)
+  const edge = hosts.filter(isEdge)
   const deployment = hosts.find((h) => h.role === 'deployment' && h.reachable) ?? null
   const edgeCommerce = edge.filter((h) => h.commerce).map((h) => h.host)
   const note =
     'HTTP only. Browser-only residue — localStorage, a service worker, Cache Storage — is not ' +
     'visible to a request and is asserted by the E2E fresh-session and egress checks.'
 
-  const result = (classification, reason, detail, differences = []) => ({
+  const result = (classification, reason, detail, differences = observation.differences) => ({
     classification,
     reason,
     detail,
@@ -260,6 +353,7 @@ export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, ho
     edgeCommerce,
     deploymentCommerce: deployment?.commerce ?? null,
     externalRetrievalShowsCommerce,
+    observation,
     note,
   })
 
@@ -272,53 +366,84 @@ export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, ho
     )
   }
 
-  if (edgeCommerce.length > 0 && deployment?.commerce) {
+  if (observation.identityMismatch.length > 0) {
     return result(
-      'source-build-deploy-chain',
-      'edge-and-deployment-serve-commerce',
-      `${edgeCommerce.join(' and ')} and the deployment URL ${deployment.host} all serve commerce. ` +
-        `The deployment is the build's direct output, so no alias or cache explains this: the ` +
-        `deployed commit (${deployment.commit ?? 'unknown'}) carries it, or the build that ` +
-        `produced it did. Check that commit's source, then whether the build reused a cache.`
+      'host-identity-mismatch',
+      'edge-hosts-serve-different-builds',
+      `The edge hosts do not serve one build: ${observation.identityMismatch.map((i) => `${i.host} reports ${i.commit}`).join(', ')}. ` +
+        `A visitor's answer depends on which name they typed, and nothing else here can be attributed ` +
+        `until both names point at one deployment — check Vercel → Domains for each hostname.`
     )
   }
 
-  const differences = []
-  if (deployment) {
-    for (const h of edge) {
-      if (h.commit && deployment.commit && h.commit !== deployment.commit) {
-        differences.push({ host: h.host, kind: 'commit', edge: h.commit, deployment: deployment.commit })
-      }
-      for (const [path, digest] of Object.entries(h.digests ?? {})) {
-        const other = deployment.digests?.[path]
-        if (other && other !== digest) differences.push({ host: h.host, kind: 'digest', path })
-      }
-      if (h.commerce !== deployment.commerce) {
-        differences.push({ host: h.host, kind: 'commerce', edge: h.commerce, deployment: deployment.commerce })
-      }
-    }
+  if (observation.cacheVariance.length > 0) {
+    return result(
+      'alias-dns-cdn',
+      'cold-warm-variance',
+      `The same host served the same path two different ways a few seconds apart: ` +
+        `${observation.cacheVariance.map((v) => `${v.host}${v.path}`).join(', ')}. A cache holding ` +
+        `two variants, or a regeneration between the passes — compare x-vercel-cache and age.`
+    )
   }
 
-  if (differences.length > 0) {
+  if (observation.agreement === 'disagree') {
+    const kinds = observation.differences
+      .map((d) => (d.kind === 'digest' ? `${d.host} ${d.path} (body)` : `${d.host} (${d.kind})`))
+      .join(', ')
+    if (edgeCommerce.length > 0 && deployment?.commerce) {
+      return result(
+        'multiple-causes',
+        'edge-and-deployment-diverge-both-serve-commerce',
+        `The edge and the deployment serve different builds (${kinds}), and both carry commerce. ` +
+          `That is two problems: the edge points at the wrong build, and the deployment it should ` +
+          `point at is wrong too. Fix the alias and the build; attributing this to either alone ` +
+          `would leave the other in place.`
+      )
+    }
     return result(
       'alias-dns-cdn',
       'edge-differs-from-deployment',
-      `The edge does not serve what the deployment it names serves: ` +
-        differences
-          .map((d) => (d.kind === 'digest' ? `${d.host} ${d.path} (body)` : `${d.host} (${d.kind})`))
-          .join(', ') +
-        `. An alias pointing at another deployment, DNS pointing somewhere else, or a CDN ` +
-        `serving a stale variant — check Vercel → Domains and the x-vercel-cache headers.`,
-      differences
+      `The edge does not serve what the deployment it names serves: ${kinds}. An alias pointing ` +
+        `at another deployment, DNS pointing somewhere else, or a CDN serving a stale variant — ` +
+        `check Vercel → Domains and the x-vercel-cache headers.`
     )
   }
 
   if (edgeCommerce.length > 0) {
+    if (!deployment) {
+      return result(
+        'unevaluable',
+        'edge-commerce-deployment-unobserved',
+        `${edgeCommerce.join(' and ')} serve commerce, and the deployment URL could not be ` +
+          `observed (protected or unreachable), so a bad build and a bad alias cannot be told apart.`
+      )
+    }
+    if (observation.agreement !== 'agree') {
+      return result(
+        'unevaluable',
+        'agreement-unestablished',
+        `${edgeCommerce.join(' and ')} and the deployment URL ${deployment.host} serve commerce, but ` +
+          `no commit or body could be compared between them, so whether they are one build is ` +
+          `unknown. The deployment's own commerce is recorded in the observation.`
+      )
+    }
+    return result(
+      'source-build-deploy-chain',
+      'edge-and-deployment-serve-commerce',
+      `${edgeCommerce.join(' and ')} and the deployment URL ${deployment.host} serve the same build ` +
+        `(${deployment.commit ?? 'matching bodies'}), and it carries commerce. No alias or cache explains ` +
+        `this: the deployed commit carries it, or the build that produced it did. Check that ` +
+        `commit's source, then whether the build reused a cache.`
+    )
+  }
+
+  if (observation.truncated.length > 0) {
     return result(
       'unevaluable',
-      'edge-commerce-deployment-unobserved',
-      `${edgeCommerce.join(' and ')} serve commerce, and the deployment URL could not be ` +
-        `observed (protected or unreachable), so a bad build and a bad alias cannot be told apart.`
+      'truncated-response',
+      `No commerce was found, but ${observation.truncated.map((t) => `${t.host}${t.path}`).join(', ')} ` +
+        `answered with more than the probe reads, so part of each was never inspected. An absence ` +
+        `found in a prefix is not an absence.`
     )
   }
 
@@ -343,7 +468,7 @@ export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, ho
 export function renderSummary(evidence) {
   const c = evidence.classification
   const lines = [
-    '### Live surface (report only)',
+    '### Live surface',
     '',
     `**${c.classification}** — ${c.detail}`,
     '',
@@ -356,6 +481,20 @@ export function renderSummary(evidence) {
     ),
     '',
   ]
+  const o = c.observation
+  if (o) {
+    lines.push(
+      `Edge vs deployment: **${o.agreement}**` +
+        (o.identityMismatch.length ? ` · edge hosts disagree: ${o.identityMismatch.map((i) => `${i.host} ${i.commit.slice(0, 7)}`).join(', ')}` : '') +
+        (o.cacheVariance.length ? ` · cold/warm variance: ${o.cacheVariance.map((v) => `${v.host}${v.path}`).join(', ')}` : '') +
+        (o.truncated.length ? ` · truncated: ${o.truncated.map((t) => `${t.host}${t.path}`).join(', ')}` : ''),
+      ''
+    )
+    const hops = Object.entries(o.firstHops ?? {})
+    if (hops.length > 0) {
+      lines.push(`First answer for \`/\`: ${hops.map(([h, f]) => `\`${h}\` ${f.status}${f.location ? ` → ${f.location}` : ''}`).join(' · ')}`, '')
+    }
+  }
   const commerceRequests = evidence.requests.filter((r) => requestShowsCommerce(r))
   if (commerceRequests.length > 0) {
     lines.push('Requests showing commerce:', '')

@@ -4,6 +4,7 @@ import path from 'node:path'
 
 const {
   classifyDiscrepancy,
+  observeHosts,
   detectBody,
   nextHop,
   pickHeaders,
@@ -145,6 +146,9 @@ type Host = {
   commit: string | null
   commerce: boolean
   digests: Record<string, string>
+  warmDigests?: Record<string, string>
+  truncatedPaths?: string[]
+  firstHop?: { status: number; location: string | null } | null
 }
 const host = (role: Role, name: string, overrides: Partial<Host> = {}): Host => ({
   role,
@@ -168,8 +172,22 @@ describe("classifyDiscrepancy — the owner's four rules", () => {
     expect(result.classification).toBe('retrieval-or-indexing')
   })
 
-  it('apex differs from the deployment by commit → alias-dns-cdn', () => {
+  it('apex and www on different builds → host-identity-mismatch, before anything is attributed', () => {
+    // This fixture read `alias-dns-cdn` until 2026-09-27. Its apex and www report different
+    // commits from each other, so a visitor's answer depends on which name they typed — and
+    // any attribution after that is about one of two artifacts without saying which.
     const result = classifyDiscrepancy({ hosts: [apex({ commit: 'old1234' }), www(), deployment()] })
+    expect(result.classification).toBe('host-identity-mismatch')
+    expect(result.observation.identityMismatch).toEqual([
+      { host: APEX, commit: 'old1234' },
+      { host: `www.${APEX}`, commit: 'c0ffee' },
+    ])
+  })
+
+  it('both edge hosts on one build that is not the deployment → alias-dns-cdn', () => {
+    const result = classifyDiscrepancy({
+      hosts: [apex({ commit: 'old1234' }), www({ commit: 'old1234' }), deployment()],
+    })
     expect(result.classification).toBe('alias-dns-cdn')
     expect(result.differences).toContainEqual({ host: APEX, kind: 'commit', edge: 'old1234', deployment: 'c0ffee' })
   })
@@ -234,6 +252,78 @@ describe("classifyDiscrepancy — the owner's four rules", () => {
   })
 })
 
+/**
+ * **Observation before attribution.** The cases the first classifier got too definite: it read
+ * "edge and deployment both show commerce" as "the build carries it" without first asking
+ * whether they were the same build.
+ */
+describe('classifyDiscrepancy — identity is settled before cause', () => {
+  it('both serve commerce on DIFFERENT builds → multiple-causes, never source-build-deploy-chain', () => {
+    const result = classifyDiscrepancy({
+      hosts: [
+        apex({ commerce: true, commit: 'old1234' }),
+        www({ commerce: true, commit: 'old1234' }),
+        deployment({ commerce: true, commit: 'new5678', digests: { '/': 'ddd', '/shop': 'eee' } }),
+      ],
+    })
+    expect(result.classification).toBe('multiple-causes')
+    expect(result.reason).toBe('edge-and-deployment-diverge-both-serve-commerce')
+    expect(result.observation.agreement).toBe('disagree')
+  })
+
+  it('both serve commerce and nothing could be compared → unevaluable, with the deployment commerce kept', () => {
+    const result = classifyDiscrepancy({
+      hosts: [
+        apex({ commerce: true, commit: null, digests: {} }),
+        deployment({ commerce: true, commit: null, digests: {} }),
+      ],
+    })
+    expect(result).toMatchObject({ classification: 'unevaluable', reason: 'agreement-unestablished', deploymentCommerce: true })
+    expect(result.observation.agreement).toBe('unknown')
+  })
+
+  it('agreement by identical bodies alone is enough when no commit is reported', () => {
+    const result = classifyDiscrepancy({
+      hosts: [apex({ commerce: true, commit: null }), deployment({ commerce: true, commit: null })],
+    })
+    expect(result.observation.agreement).toBe('agree')
+    expect(result.classification).toBe('source-build-deploy-chain')
+  })
+
+  it('one host serving one path two ways cold and warm → alias-dns-cdn/cold-warm-variance', () => {
+    const result = classifyDiscrepancy({
+      hosts: [apex({ warmDigests: { '/': 'aaa', '/shop': 'zzz' } }), www(), deployment()],
+    })
+    expect(result).toMatchObject({ classification: 'alias-dns-cdn', reason: 'cold-warm-variance' })
+    expect(result.observation.cacheVariance).toEqual([{ host: APEX, path: '/shop' }])
+  })
+
+  it('a truncated body with nothing found is never clean — and outranks an external retrieval', () => {
+    const hosts = [apex({ truncatedPaths: ['/shop'] }), www(), deployment()]
+    expect(classifyDiscrepancy({ hosts })).toMatchObject({ classification: 'unevaluable', reason: 'truncated-response' })
+    expect(classifyDiscrepancy({ hosts, externalRetrievalShowsCommerce: true }).classification).toBe('unevaluable')
+  })
+
+  it('commerce found in a truncated prefix is still commerce', () => {
+    const result = classifyDiscrepancy({
+      hosts: [apex({ commerce: true, truncatedPaths: ['/'] }), deployment({ commerce: true })],
+    })
+    expect(result.classification).toBe('source-build-deploy-chain')
+  })
+
+  it("records each host's first answer for /, so a redirect the wrong way round is evidence", () => {
+    const observation = observeHosts([
+      apex({ firstHop: { status: 307, location: `https://www.${APEX}/` } }),
+      www({ firstHop: { status: 200, location: null } }),
+    ])
+    expect(observation.firstHops).toEqual({
+      [APEX]: { status: 307, location: `https://www.${APEX}/` },
+      [`www.${APEX}`]: { status: 200, location: null },
+    })
+    expect(observation.agreement).toBe('deployment-unobserved')
+  })
+})
+
 describe('what is asked, and how far a redirect is followed', () => {
   it('probes the public pages, one real product, the unknown product and one path per §7 row', () => {
     const paths = probePaths('arc-band-titanium', ROUTES_FORBIDDEN).map((p: { path: string }) => p.path)
@@ -280,23 +370,52 @@ describe('what is asked, and how far a redirect is followed', () => {
     expect(picked).toEqual({ server: 'Vercel', 'x-vercel-cache': 'HIT', 'content-security-policy-present': true })
   })
 
-  it('walks a redirect chain by hand and stops at the edge of the site', async () => {
-    const answers: Record<string, { status: number; location?: string; body?: string }> = {
-      [`https://${APEX}/shop`]: { status: 307, location: `https://www.${APEX}/shop` },
-      [`https://www.${APEX}/shop`]: { status: 200, body: html('<h1>Shop</h1>') },
+  /**
+   * A real `Response` whose body records whether anybody cancelled it. Pull-based, 512 bytes at a
+   * time, the way a socket delivers — a stream that enqueues everything up front is already
+   * closed by the time a reader stops, and cancelling a closed stream calls nothing.
+   */
+  function trackedResponse(status: number, body: string, headers: Record<string, string> = {}) {
+    const state = { cancelled: false }
+    const bytes = new TextEncoder().encode(body)
+    let offset = 0
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (offset >= bytes.byteLength) return controller.close()
+        controller.enqueue(bytes.subarray(offset, offset + 512))
+        offset += 512
+      },
+      cancel() {
+        state.cancelled = true
+      },
+    })
+    return { response: new Response(stream, { status, headers: { server: 'Vercel', ...headers } }), state }
+  }
+
+  it('walks a redirect chain by hand, discards the hop, and reads the page it lands on', async () => {
+    // These doubles had no body stream until 2026-09-27, so the probe's reader saw empty text
+    // and the test checked statuses alone. Real Responses now: the body is read, and the
+    // redirect hop's body is released unread.
+    const hop = trackedResponse(307, 'moved', { location: `https://www.${APEX}/shop` })
+    const page = trackedResponse(200, html('<h1>Shop</h1>'))
+    const answers: Record<string, Response> = {
+      [`https://${APEX}/shop`]: hop.response,
+      [`https://www.${APEX}/shop`]: page.response,
     }
-    const fetchImpl = async (url: string) => {
-      const a = answers[url]
-      return {
-        status: a.status,
-        headers: { get: (n: string) => (n === 'location' ? a.location ?? null : n === 'server' ? 'Vercel' : null) },
-        text: async () => a.body ?? '',
-      }
-    }
-    const result = await fetchChain(`https://${APEX}/shop`, fetchImpl)
+    const result = await fetchChain(`https://${APEX}/shop`, async (url: string) => answers[url])
     expect(result.chain.map((c: { status: number }) => c.status)).toEqual([307, 200])
     expect(result.status).toBe(200)
     expect(result.finalUrl).toBe(`https://www.${APEX}/shop`)
+    expect(result.body).toContain('<h1>Shop</h1>')
+    expect(result.truncated).toBe(false)
+    expect(hop.state.cancelled, 'the redirect hop body was left open').toBe(true)
+  })
+
+  it('records a body longer than the cap as truncated, with only the cap read', async () => {
+    const page = trackedResponse(200, html('x'.repeat(5000)))
+    const result = await fetchChain(`https://${APEX}/`, async () => page.response, 1024)
+    expect(result).toMatchObject({ truncated: true, truncationReason: 'byte-cap', bytesRead: 1024 })
+    expect(page.state.cancelled).toBe(true)
   })
 
   it('returns a transport failure as data', async () => {
@@ -320,5 +439,6 @@ describe('renderSummary', () => {
     expect(markdown).toContain('**clean**')
     expect(markdown).toMatch(/not a finding/)
     expect(markdown).toContain(`${APEX}/shipping`)
+    expect(markdown).toContain('Edge vs deployment: **deployment-unobserved**')
   })
 })

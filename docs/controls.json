@@ -237,7 +237,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 35 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 39 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -381,14 +381,24 @@
     },
     {
       "id": "live-surface-evidence",
-      "claims": "any commerce the live site serves is classified by where in the chain it appears — source/build, alias/DNS/CDN, external retrieval, or clean — from dated, hashed, build-identified responses across apex, www and the deployment URL",
+      "claims": "any commerce the live site serves is attributed only after identity is observed — whether apex and www serve one build, whether a host answers one path the same way cold and warm, whether the edge agrees with the deployment it names — from dated, hashed, build-identified responses read under a streaming byte cap that reports truncation",
       "status": "configured",
       "probe": "scripts/probe-live-surface.mjs",
       "probeLibrary": "scripts/lib/live-surface.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
       "selfMonitoring": false,
-      "knownLimit": "Report-only: it files no issue and its exit 1 is absorbed by continue-on-error, because the purchase-era copy it observes (shipping and returns terms) is in source pending WS-H legal review, and a red that nobody in CI can clear is the ADR 011 muting pattern. HTTP only — cookies, storage and service workers are e2e/fresh-session.spec.ts's question. A Vercel-protected deployment URL (401) cannot be compared, so commerce on the edge with the deployment unobserved is `unevaluable` rather than guessed. The visible-price detector is a regex over stripped HTML, pinned both ways by fixtures and by a clean run over 35 prerendered pages; its coverage beyond those is unknown (ADR 007). The external-retrieval input is a flag a human sets; nothing measures it.",
+      "knownLimit": "HTTP only — cookies, storage and service workers are e2e/fresh-session.spec.ts's question. A Vercel-protected deployment URL (401) cannot be compared, so commerce on the edge with the deployment unobserved, or with no comparable commit or body, is `unevaluable` rather than guessed; a body longer than the 2 MB read cap is `unevaluable` unless commerce was found in what was read. The visible-price detector is a regex over stripped HTML, pinned both ways by fixtures and by a clean run over 35 prerendered pages; its coverage beyond those is unknown (ADR 007). Cold/warm variance can also be an ISR regeneration landing between the two passes, now that pages revalidate hourly. The external-retrieval input is a flag a human sets; nothing measures it. The purchase-era copy it records is never part of the classification.",
       "backstop": "human:weekly"
+    },
+    {
+      "id": "live-surface-acknowledgement",
+      "claims": "every non-clean or unevaluable live-surface classification opens or updates one issue with a deadline; an /ack from an owner, member or collaborator is required within 72h, the CODEOWNERS humans are mentioned exactly once when it is missed, a changed finding restarts the clock, and a clean report closes the issue",
+      "probe": "scripts/lib/live-surface-issue.mjs",
+      "probeRunsIn": ".github/workflows/control-audit.yml",
+      "status": "configured",
+      "selfMonitoring": false,
+      "backstop": "human:weekly",
+      "knownLimit": "Runs only where control-audit.yml runs — the default branch, on its schedule — so it does nothing until this lands on main. An acknowledgement records that a person has seen the finding, not that it is fixed; the issue stays open until the report is clean. Only the first 100 comments are read for an /ack. A probe that produced no JSON says nothing here; the step's own outcome reports that."
     },
     {
       "id": "merge-denial-proof",
@@ -502,12 +512,12 @@
     },
     {
       "id": "retired-route-matrix",
-      "claims": "every retired commerce URL answers its contract §7 status and location for GET, HEAD and a stale POST, with and without a trailing slash, an encoded segment or a query string, asserted by status code without following redirects",
+      "claims": "every retired commerce URL answers its contract §7 status and location for GET and HEAD, with and without a trailing slash, an encoded segment or a query string, asserted by status code without following redirects — and a stale action (POST in five encodings) on a 308 path, followed hop by hop, ends on that family's 410 page, never on a framework 404/405 or a page that implies it worked",
       "status": "configured",
       "probe": "e2e/retired-routes.spec.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "The variants are generated from §7, so a route family missing from the contract is missing from the matrix too — commerce-route-inventory.test.ts reconciles §7 against the filesystem and next.config.ts to close that. Concrete examples stand in for each `:path*` family; an exotic path shape no example resembles is not exercised.",
+      "knownLimit": "The variants are generated from §7, so a route family missing from the contract is missing from the matrix too — commerce-route-inventory.test.ts reconciles §7 against the filesystem and calls each retiredRoute() handler to close that. Concrete examples stand in for each `:path*` family; an exotic path shape no example resembles is not exercised. Since 2026-09-27 the 308 families are route handlers rather than next.config.ts redirects (a config redirect answers every method with the 308), so a legacy GET invokes a function where it used to match an edge rule — a cost accepted for low and falling legacy traffic.",
       "backstop": "control:merge-gate"
     },
     {
