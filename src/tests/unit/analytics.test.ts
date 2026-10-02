@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement } from 'react'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
 import { parseSource, importsFrom } from '@/lib/analysis/tsAstScan'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
 import {
@@ -10,15 +10,17 @@ import {
   setAnalyticsSink,
   ANALYTICS_EVENT_NAMES,
   isAnalyticsEventName,
-  sanitiseQuery,
   readConsent,
   writeConsent,
   analyticsAllowed,
   shouldAskForConsent,
   CONSENT_STORAGE_KEY,
+  CONSENT_OPEN_EVENT,
+  openConsentPreferences,
   type AnalyticsEvent,
 } from '@/lib/analytics'
-import { MAX_QUERY_LENGTH } from '@/lib/analytics/events'
+import { COLLECTION_HANDLES, MATERIAL_HANDLES } from '@/lib/catalog/schema'
+import { searchFacets } from '@/lib/catalog'
 
 /**
  * **The default is off, and that is the assertion that matters most.**
@@ -186,19 +188,53 @@ describe('event names', () => {
   })
 })
 
-describe('search queries are the one free-text field', () => {
-  it('lower-cases and trims, so the same search counts once', () => {
-    expect(sanitiseQuery('  Titanium Ring  ')).toBe('titanium ring')
+/**
+ * **A search is reported by what it named, never by what was typed.**
+ *
+ * `search_performed` carried the query — lower-cased and cut to 64 characters — until
+ * 2026-09-27, and these tests pinned the cutting. Truncation bounded how much of a pasted email
+ * address or order number reached the log, not whether it did. The event now carries the
+ * collections and materials the query named, as handles the catalogue already publishes, so
+ * the property worth pinning is the output's range: whatever goes in, only handles come out.
+ */
+describe('a search is reported by what it named', () => {
+  const HANDLES: readonly string[] = [...COLLECTION_HANDLES, ...MATERIAL_HANDLES]
+
+  it('names the collections and metals a query mentions, singular or plural, sorted', () => {
+    expect(searchFacets('Titanium Ring')).toEqual(['rings', 'titanium'])
+    expect(searchFacets('316L earring')).toEqual(['earrings', 'surgical-steel'])
+    expect(searchFacets('niobium   NECKLACES')).toEqual(['necklaces', 'niobium'])
+    expect(searchFacets('grade 23')).toEqual(['titanium'])
   })
 
-  /** People paste order numbers and email addresses into search boxes. */
-  it('truncates a long query rather than storing it whole', () => {
-    expect(sanitiseQuery('x'.repeat(500))).toHaveLength(MAX_QUERY_LENGTH)
+  it('reports nothing of a query that names nothing — an email address is not a facet', () => {
+    expect(searchFacets('customer@example.com')).toEqual([])
+    expect(searchFacets('+84 90 123 4567')).toEqual([])
+    expect(searchFacets('order #1001')).toEqual([])
+    expect(searchFacets('')).toEqual([])
   })
 
-  it('sanitises at the boundary, not at each call site', () => {
-    track({ name: 'search_performed', query: '  TITANIUM  ', resultCount: 3 }, 'granted')
-    expect(sent[0]).toMatchObject({ query: 'titanium' })
+  it('keeps the shelf and drops the person when a query carries both', () => {
+    expect(searchFacets('jane.doe@example.com ring order 10001')).toEqual(['rings'])
+  })
+
+  it('can only ever return catalogue handles, once each, whatever it is given', () => {
+    // Generative: every pair of words from a mixed vocabulary of real terms and personal-data
+    // shapes. The range of the function is the privacy boundary, so the range is what is asserted.
+    const WORDS = ['ring', 'rings', 'steel', 'TITANIUM', 'me@x.io', '0901234567', '#99', 'charm', 'https://a.b', 'ço']
+    for (const a of WORDS) {
+      for (const b of WORDS) {
+        const facets = searchFacets(`${a} ${b}`)
+        expect(new Set(facets).size, `${a} ${b}`).toBe(facets.length)
+        for (const f of facets) expect(HANDLES, `${a} ${b} → ${f}`).toContain(f)
+      }
+    }
+  })
+
+  it('hands a search event to the sink exactly as given — there is no text to clean any more', () => {
+    const event: AnalyticsEvent = { name: 'search_performed', resultCount: 3, facets: ['rings'] }
+    track(event, 'granted')
+    expect(sent[0]).toEqual(event)
   })
 })
 
@@ -218,7 +254,8 @@ describe('track never becomes load-bearing', () => {
   it('passes non-search events through untouched', () => {
     // Was driven with `checkout_failed`, which no longer exists. `collection_viewed` is
     // the same shape of assertion — an event with fields that must survive the boundary
-    // unmodified, unlike `search_performed`, which is deliberately sanitised.
+    // unmodified. (`search_performed` was the exception, sanitised here, until it stopped
+    // carrying text on 2026-09-27; it now passes through untouched too.)
     const event: AnalyticsEvent = {
       name: 'collection_viewed',
       collection: 'rings',
@@ -252,21 +289,33 @@ describe('the consent copy matches the measurement', () => {
     expect(text).toMatch(/pieces/i) // product_viewed
     expect(text).toMatch(/collections/i) // collection_viewed
     expect(text).toMatch(/search/i) // search_performed
+    // …and says the words themselves are not kept, because they are not.
+    expect(text).toMatch(/never what you type/i)
     // And none of the vocabulary of events or mechanisms that do not exist.
     for (const absent of [/bag/i, /cart/i, /checkout/i, /page views/i, /set(s)? (a )?cookie/i]) {
       expect(text, `the banner claims ${absent}`).not.toMatch(absent)
     }
   })
 
-  it('the privacy page reads the storage key and query length from the code that uses them', () => {
-    // Imported, not typed: a renamed key or a new length changes the sentence with it.
+  it('the privacy page reads the storage key from the code that uses it, and offers the control', () => {
+    // Imported, not typed: a renamed key changes the sentence with it. The query length it also
+    // imported went with the query (2026-09-27); the withdrawal control arrived in its place.
     const sf = parseSource(PRIVACY, readFileSync(join(ROOT, PRIVACY), 'utf8'))
     expect(importsFrom(sf, '@/lib/analytics/consent').map((b) => b.imported)).toContain(
       'CONSENT_STORAGE_KEY'
     )
-    expect(importsFrom(sf, '@/lib/analytics/events').map((b) => b.imported)).toContain(
-      'MAX_QUERY_LENGTH'
-    )
+    expect(
+      importsFrom(sf, '@/components/analytics/MeasurementPreferences').map((b) => b.imported)
+    ).toContain('MeasurementPreferences')
+  })
+
+  it('the privacy page says search text is never recorded, and that withdrawal is not deletion', () => {
+    const prose = readFileSync(join(ROOT, PRIVACY), 'utf8').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    expect(prose).toMatch(/What you type into search is\s+never recorded/)
+    expect(prose).not.toMatch(/what is typed into site search/i)
+    // The honest limit of withdrawal: it stops future records; it does not reach back.
+    expect(prose).toMatch(/does not delete records\s+already made/i)
+    expect(prose).not.toMatch(/clear this site&apos;s data in your\s+browser settings, which is also how to change/i)
   })
 
   it('the privacy page does not describe cookies the site does not set', () => {
@@ -282,3 +331,63 @@ describe('the consent copy matches the measurement', () => {
   })
 })
 
+/**
+ * **Withdrawing consent is as easy as giving it.**
+ *
+ * Until 2026-09-27 the banner appeared once and the only way back was clearing this site's data
+ * in the browser. "Measurement preferences" — in the footer of every page and on `/privacy` —
+ * now reopens the same prompt, showing the current answer, and Decline stops the very next
+ * event because `track()` reads the stored answer on every call.
+ */
+describe('consent can be withdrawn from the site', () => {
+  beforeEach(() => {
+    localStorage.removeItem(CONSENT_STORAGE_KEY)
+    cleanup()
+  })
+
+  it('reopens the answered prompt on request, showing the current answer', () => {
+    writeConsent(localStorage, 'granted')
+    render(createElement(ConsentBanner))
+    expect(screen.queryByRole('dialog', { name: /analytics consent/i })).toBeNull()
+
+    act(() => openConsentPreferences())
+
+    const dialog = screen.getByRole('dialog', { name: /analytics consent/i })
+    expect(dialog.textContent).toMatch(/currently allowed/i)
+    expect(screen.getByRole('button', { name: 'Allow' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Decline' }).getAttribute('aria-pressed')).toBe('false')
+    // Focus goes to the dialog the visitor asked for, not left on a footer far away.
+    expect(dialog.contains(document.activeElement)).toBe(true)
+  })
+
+  it('Decline after Allow stops the next event, and closes the prompt', () => {
+    writeConsent(localStorage, 'granted')
+    render(createElement(ConsentBanner))
+    expect(track(productEvent)).toBe(true)
+
+    act(() => openConsentPreferences())
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
+
+    expect(readConsent(localStorage)).toBe('denied')
+    expect(screen.queryByRole('dialog', { name: /analytics consent/i })).toBeNull()
+    const before = sent.length
+    expect(track(productEvent)).toBe(false)
+    expect(sent.length).toBe(before)
+  })
+
+  it('dispatches the one event the banner listens for, and never throws without a window', () => {
+    const target = new EventTarget()
+    let heard = 0
+    target.addEventListener(CONSENT_OPEN_EVENT, () => (heard += 1))
+    openConsentPreferences(target)
+    expect(heard).toBe(1)
+    expect(() => openConsentPreferences(undefined)).not.toThrow()
+    expect(() =>
+      openConsentPreferences({
+        dispatchEvent: () => {
+          throw new Error('refused')
+        },
+      })
+    ).not.toThrow()
+  })
+})

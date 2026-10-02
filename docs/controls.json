@@ -237,7 +237,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 33 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 34 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -361,13 +361,23 @@
     },
     {
       "id": "analytics-sink-allowlist",
-      "claims": "the /api/analytics log line carries exactly the fields the AnalyticsEvent union defines, so a price or any other undeclared field posted to it is dropped rather than logged",
+      "claims": "the /api/analytics log line carries only an event that passes that event's own strict schema \u2014 a product, collection or material handle the catalogue publishes and counts no larger than the catalogue \u2014 and no free text at all: a search is recorded as the collections and metals it named, never the query",
       "status": "configured",
       "probe": "src/tests/unit/api-analytics-route.test.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Equality with the union is enforced at compile time by `satisfies Record<EventField, …>`, so it depends on tsc running in the gate; the test pins the runtime side. The allowlist is the union's field set, not per event: a direct POST can attach one event's field to another, bounded and sanitised.",
+      "knownLimit": "Schema and event type are held equal in both directions by tsc (`EVENT_SCHEMAS` and `exact` in the route), so that half depends on the type-check running in the gate; the tests pin the runtime half with forged payloads in every field of every event. It governs this pipeline only: /search?q= is a URL, and the hosting platform's request logs record URLs (docs/data-flow-record.md). A count bounded by the catalogue size is still a number a forger chooses \u2014 it cannot carry an identifier, but it can carry noise.",
       "backstop": "control:merge-gate"
+    },
+    {
+      "id": "consent-withdrawal",
+      "claims": "a visitor who allowed measurement can withdraw from any page — 'Measurement preferences' in the footer, and on /privacy, reopens the consent prompt showing the current answer — and after Decline the next page sends nothing to /api/analytics",
+      "probe": "e2e/analytics.spec.ts",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "status": "configured",
+      "selfMonitoring": true,
+      "backstop": "control:merge-gate",
+      "knownLimit": "Withdrawal stops future records; it does not delete log lines already written while consent was granted, and the privacy page says so rather than implying otherwise. The browser test covers the footer path on the configured projects; the reopen logic is also pinned in src/tests/unit/analytics.test.ts. Whether the retention and lawful-basis cells in docs/data-flow-record.md are satisfied is the privacy owner's question, not this control's."
     },
     {
       "id": "live-surface-evidence",

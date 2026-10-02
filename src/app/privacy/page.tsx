@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { CONTACT_EMAIL, PRIVACY_EMAIL } from '@/config/site'
 import { CONSENT_STORAGE_KEY } from '@/lib/analytics/consent'
-import { MAX_QUERY_LENGTH } from '@/lib/analytics/events'
+import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
@@ -111,8 +111,13 @@ export default function PrivacyPage() {
               while both rate-limiter implementations keyed on the raw address; it is now
               pseudonymised in src/lib/utils/rateLimit.ts, and the sentence below describes
               both modes because which one is live is a deployment setting, reported by
-              /api/health as ipKeying. The storage key and the query length are imported,
-              not typed, so this page cannot drift from the code that sets them.
+              /api/health as ipKeying. The storage key is imported, not typed, so this page
+              cannot drift from the code that sets it.
+
+              Corrected on 2026-09-27: this bullet said search text was recorded, lower-cased
+              and shortened to 64 characters. It no longer is — a search is reported as the
+              collections and metals it named (searchFacets in src/lib/catalog), because an
+              email address or an order number fits in 64 characters too.
             */}
             <ul style={listStyle}>
               <li>
@@ -123,10 +128,10 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>Measurement data, only if you allow it:</strong> which piece and
-                collection pages are opened, and what is typed into site search — lower-cased,
-                shortened to {MAX_QUERY_LENGTH} characters — with the number of results. No
-                cookie, identifier or IP address is attached to these records, and nothing is
-                sent until you choose Allow.
+                collection pages are opened, and for a site search, how many results it found
+                and which of our collections or metals it named. What you type into search is
+                never recorded. No cookie, identifier or IP address is attached to these
+                records, and nothing is sent until you choose Allow.
               </li>
               <li>
                 <strong>Request data:</strong> when your browser asks for a page, our hosting
@@ -244,9 +249,22 @@ export default function PrivacyPage() {
               It stores one thing in your browser: your answer to the measurement prompt,
               under the local-storage key &lsquo;{CONSENT_STORAGE_KEY}&rsquo;, with the value
               &ldquo;granted&rdquo; or &ldquo;denied&rdquo;. It is read only by your browser
-              and is never sent to us. It stays until you clear this site&apos;s data in your
-              browser settings, which is also how to change your answer: the prompt appears
-              again, and nothing is measured until you choose.
+              and is never sent to us.
+            </p>
+            {/*
+              Until 2026-09-27 the only way to change the answer was to clear this site's data
+              in the browser. Withdrawing consent has to be as easy as giving it, so the same
+              prompt now reopens from "Measurement preferences" at the foot of every page and
+              from the button below. `track()` reads the stored answer on every call, so a
+              Decline stops the very next event. What it cannot do is reach back: records
+              already written are not deleted by changing the answer, and the sentence says so
+              rather than implying otherwise.
+            */}
+            <p style={bodyStyle}>
+              You can change your answer at any time from &ldquo;Measurement preferences&rdquo;
+              at the foot of every page, or here: <MeasurementPreferences />. Choosing Decline
+              stops measurement from the next page you open. It does not delete records
+              already made while measurement was allowed.
             </p>
           </div>
 

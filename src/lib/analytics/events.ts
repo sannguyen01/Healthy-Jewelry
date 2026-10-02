@@ -16,6 +16,9 @@
 // every source of traffic are invisible to it. Conversion rate is currently
 // uncomputable — the numerator lives in Shopify and the denominator lives nowhere.
 
+import type { SearchFacet } from '@/lib/catalog'
+import type { CollectionHandle, MaterialHandle } from '@/lib/catalog/schema'
+
 /*
  * `Priced` was here — `{ value, currency }`, the money an event carried.
  *
@@ -27,9 +30,23 @@
 
 interface ProductRef {
   handle: string
-  collection: string
-  material: string
+  collection: CollectionHandle
+  material: MaterialHandle
 }
+
+/**
+ * What a search was *about*, never what was typed: each collection or material the query
+ * named, as the catalogue spells it (`searchFacets()` in `src/lib/catalog`).
+ *
+ * Until 2026-09-27 `search_performed` carried the query itself, lower-cased and cut to 64
+ * characters, on the reasoning that "what are people searching for" is the most actionable
+ * question a small catalogue can ask. It is — and an email address, a phone number and an
+ * order reference all fit in 64 characters, and people paste all three into search boxes.
+ * Truncation bounded the length of what could leak, not whether it could. Facets keep the
+ * useful half (which shelves people look for, and which searches find nothing) and cannot
+ * hold a word the catalogue did not already contain.
+ */
+export type { SearchFacet }
 
 /**
  * Every event, with the payload it must carry.
@@ -40,8 +57,8 @@ interface ProductRef {
  */
 export type AnalyticsEvent =
   | ({ name: 'product_viewed' } & ProductRef)
-  | { name: 'collection_viewed'; collection: string; productCount: number }
-  | { name: 'search_performed'; query: string; resultCount: number }
+  | { name: 'collection_viewed'; collection: CollectionHandle; productCount: number }
+  | { name: 'search_performed'; resultCount: number; facets: SearchFacet[] }
 /*
  * `add_to_bag`, `remove_from_bag`, `checkout_started` and `checkout_failed` were here.
  *
@@ -72,19 +89,4 @@ export const ANALYTICS_EVENT_NAMES = [
 
 export function isAnalyticsEventName(value: string): value is AnalyticsEventName {
   return (ANALYTICS_EVENT_NAMES as readonly string[]).includes(value)
-}
-
-/**
- * Search queries are free text a customer typed, so they are the one field here
- * that could carry something personal — people paste email addresses and order
- * numbers into search boxes.
- *
- * Truncated and lower-cased rather than dropped: "what are people searching for"
- * is the single most actionable question a small store can ask of its own
- * analytics, and 64 characters is far more than any real jewellery query.
- */
-export const MAX_QUERY_LENGTH = 64
-
-export function sanitiseQuery(query: string): string {
-  return query.trim().toLowerCase().slice(0, MAX_QUERY_LENGTH)
 }

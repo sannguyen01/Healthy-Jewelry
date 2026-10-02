@@ -5,7 +5,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ProductCard } from '@/components/product/ProductCard'
 import { headers } from 'next/headers'
-import { searchProducts } from '@/lib/catalog'
+import { searchFacets, searchProducts } from '@/lib/catalog'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { TrackView } from '@/components/analytics/TrackView'
 
@@ -79,14 +79,21 @@ async function SearchResults({ query }: { query: string }) {
   return (
     <>
       {/*
-        What people search for, and whether they find anything, is the most
-        actionable question a small catalogue can ask of itself — a query with
-        zero results is either a product to stock or a word to add to a
-        description. Only reported for a real query; the empty state is not a
-        search.
+        Which shelves people look for, and whether a search finds anything, is the
+        most actionable question a small catalogue can ask of itself — a search
+        with zero results is a product to stock or a word to add to a description.
+        Only reported for a real query; the empty state is not a search.
+
+        The query itself is never reported. `searchFacets` reduces it to the
+        collections and materials it named, handles the catalogue already
+        publishes, so the words stay on the page they were typed into and never
+        reach the beacon, the route or the log (`SearchFacet` in
+        src/lib/analytics/events.ts says why).
       */}
       {isRealQuery && !throttled && (
-        <TrackView event={{ name: 'search_performed', query, resultCount: results.length }} />
+        <TrackView
+          event={{ name: 'search_performed', resultCount: results.length, facets: searchFacets(query) }}
+        />
       )}
       <main
         style={{
