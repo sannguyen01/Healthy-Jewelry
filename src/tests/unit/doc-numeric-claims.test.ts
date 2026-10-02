@@ -193,6 +193,17 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     actual: () => cssValue('hj-product-tile-max'),
   },
   {
+    // The only check on this number. The card measures at most 0.514 of the photograph, so
+    // 0.60 never binds, and the hero spec reads its ceiling from this same token: raised to
+    // 0.98, nothing rendered moves and the spec's ceiling moves with it — 48 passed, measured
+    // 2026-10-02. NUMERIC skips it too (no unit). Pinned here, a wider card is an edit to
+    // CLAUDE.md as well, which is the reviewed change ADR 013 asks for.
+    doc: 'CLAUDE.md',
+    context: '`--hj-hero-card-max-ratio` (0.60)',
+    claimed: '0.60',
+    actual: () => cssValue('hj-hero-card-max-ratio'),
+  },
+  {
     doc: 'CLAUDE.md',
     context: 'breakpoint at 768px',
     claimed: '768px',

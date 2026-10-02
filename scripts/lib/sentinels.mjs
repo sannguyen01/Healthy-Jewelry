@@ -488,16 +488,32 @@ export const SENTINELS = [
     scar: 'The site shipped with no Content-Security-Policy at all, so the plan to strip former commerce origins from connect-src had nothing to act on.',
   },
 
-  // ── Playwright: need a production build, so opt-in via --with-e2e ──
   {
+    // A vitest sentinel since 2026-10-02, and dead for the five weeks it was a Playwright one.
+    // The card measures at most 0.514 of the photograph, so a 0.60 cap never binds, and the hero
+    // spec reads its ceiling from this token: raised to 0.98, nothing rendered moved and the
+    // spec's ceiling moved with it (48 passed). No rendered measurement can see a raise, so the
+    // number is pinned to CLAUDE.md's stated 0.60, and `hero-card-measured` below proves the
+    // measurement itself fires.
     id: 'hero-card-bound',
-    runner: 'playwright',
+    runner: 'vitest',
     file: 'src/app/globals.css',
     find: '--hj-hero-card-max-ratio: 0.60;',
     replace: '--hj-hero-card-max-ratio: 0.98;',
-    specs: ['e2e/hero-legibility.spec.ts'],
+    specs: ['src/tests/unit/doc-numeric-claims.test.ts'],
     invariant: 'the hero copy card never covers more than 60% of the photograph',
     scar: 'Every guardrail on the hero was satisfied better the larger the card grew, so the codified pressure pointed one way and the end state is a photograph behind a floating memo — ADR 013.',
+  },
+  // ── Playwright: need a production build, so opt-in via --with-e2e ──
+  {
+    id: 'hero-card-measured',
+    runner: 'playwright',
+    file: 'src/components/home/Hero.tsx',
+    find: "          maxWidth: 'calc(var(--hj-hero-card-max-ratio) * 100%)',",
+    replace: "          minWidth: '75%', maxWidth: 'none',",
+    specs: ['e2e/hero-legibility.spec.ts'],
+    invariant: 'the hero card is measured against its cap in a real browser, not trusted to obey it',
+    scar: 'The cap shipped as a max-width the spec could have taken on faith; a card that outgrows it — a replaced rule, an inline override — has to be seen by measuring the box.',
   },
   {
     id: 'product-tile-bound',
