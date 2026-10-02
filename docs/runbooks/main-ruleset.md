@@ -142,27 +142,48 @@ merging it deploys a known-bad commit to production — the failure this whole r
 to prevent, performed as its test. GitHub already computes whether the merge would be allowed;
 the proof is reading that.
 
-An agent may carry out steps 3a–3c only with the owner's explicit permission to push the canary
-branch.
+An agent may carry out steps 3a–3d only with the owner's explicit permission to push the canary
+branch, and only **after** steps 1 and 2 have recorded an active ruleset read back as
+`enforced`. A canary pushed before that reads `NOT-DENIED` by definition and proves nothing.
 
 1. **3a.** From an up-to-date `main`, create `canary/merge-gate-<yyyy-mm-dd>` with one commit
-   that fails a required check and changes nothing else — for example a unit test asserting
-   `expect(1).toBe(2)` in `src/tests/unit/zz-merge-gate-canary.test.ts`.
-2. **3b.** Push it and open a pull request titled `CANARY — do not merge`, **ready for review,
-   not draft** (a draft is blocked for being a draft, which proves nothing about the checks).
-   Wait until `Lint · Type-check · Unit tests · Build` has concluded `failure`.
-3. **3c.** Read the verdict:
+   that fails a required check and changes nothing else — a unit test asserting
+   `expect(1).toBe(2)` in `src/tests/unit/zz-merge-gate-canary.test.ts`. No credential, no
+   customer data, no other file.
+2. **3b.** Push it and open a pull request titled `CANARY — DO NOT MERGE`, **ready for review,
+   not draft**. Wait until `Lint · Type-check · Unit tests · Build` has concluded `failure`.
+   Expect the other two contexts to read: `Dependency scope` — success (it fails only on an
+   unjustified major dependency bump, and the canary bumps nothing); `E2E tests (Playwright)` —
+   **skipped**, because it `needs: verify`. GitHub counts a skipped required check as
+   satisfied, so the denial rests on `verify` alone, and the evidence record says so.
+3. **3c.** Read the verdict — from a checkout that has the probe (it is not on `main` until the
+   decommission PRs merge):
 
    ```sh
-   GITHUB_TOKEN=<token> node scripts/probe-merge-denial.mjs --pr <number> --out canary-evidence.json
+   GITHUB_TOKEN=<token> node scripts/probe-merge-denial.mjs --pr <number> --observer <your name> --out canary-evidence.json
    ```
 
-   Exit 0 and `"verdict": "denied"` is the proof: `mergeable_state` is `blocked` and a required
-   context has not passed. Exit 1, `NOT-DENIED`, means the merge button works on a failing pull
-   request — stop, do not merge, and read `probe-branch-protection.mjs`'s findings. Exit 2 is
-   `unevaluable`: re-run after a minute (GitHub computes mergeability lazily), or read `reason`.
+   Exit 0 and `"verdict": "denied"` is the proof. Since 2026-09-27 it is only produced when all
+   of these hold, each read separately:
+
+   - `mergeable_state` is `blocked` and a required context has not passed on the head commit;
+   - the pull request is **not a draft** (`draft: false`) — GitHub reported a draft PR as
+     `clean`, so the state alone cannot rule this out;
+   - it has **no conflicts** (`mergeable: true`);
+   - it is **not behind** `main` (`behind_by: 0` from comparing the two) — strict mode blocks
+     that on its own;
+   - the **test merge commit** does not disagree with the head about any required context.
+     GitHub may evaluate either; if they disagree the answer is `unevaluable /
+     head-merge-attribution-disagrees`, and the pull request's checks tab and merge box are
+     compared by hand before anything is recorded.
+
+   Exit 1, `NOT-DENIED`, means the merge button works on a failing pull request — stop, do not
+   merge, and read `probe-branch-protection.mjs`'s findings. Exit 2 is `unevaluable`: read
+   `reason`. `precondition-unknown:*` and `mergeability-not-computed` usually mean "re-run in a
+   minute"; `draft`, `conflicts` and `behind-base` mean the canary is not testing what it should
+   — fix the canary, never the verdict.
 4. **3d.** Close the pull request **without merging** and delete the branch. Record the
-   evidence below.
+   evidence below — every field comes from `canary-evidence.json`.
 
 ## Evidence
 
@@ -175,6 +196,7 @@ empty cell is the honest state.
 | Ruleset created (id) | | | | |
 | `probe-branch-protection.mjs` read back `enforced` | | | | |
 | `docs/controls.json` `merge-gate` set to `configured` | | | | |
-| Canary PR opened, required check failed | | | | |
-| `probe-merge-denial.mjs` verdict `denied` (head SHA) | | | | |
+| Canary PR opened, ready for review, `verify` failed (PR number) | | | | |
+| `probe-merge-denial.mjs` verdict `denied` — head SHA, merge commit SHA, ruleset ID | | | | |
+| Required-context states (head and merge commit), `draft`, `mergeable`, `behind_by` | | | | |
 | Canary closed unmerged, branch deleted | | | | |

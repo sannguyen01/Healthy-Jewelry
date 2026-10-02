@@ -314,6 +314,16 @@ export const SENTINELS = [
     scar: 'Until 2026-09-27 a non-clean live-surface classification became a job summary and a 30-day artifact and was read by nobody; the acknowledgement that replaces that is only a control if not just anyone can give it.',
   },
   {
+    id: 'denial-preconditions',
+    runner: 'vitest',
+    file: 'scripts/lib/merge-denial.mjs',
+    find: 'export function blockingPrecondition({ draft = null, mergeable = null, behindBy = null }) {',
+    replace: 'export function blockingPrecondition({ draft = null, mergeable = null, behindBy = null }) {\n  return null',
+    specs: ['src/tests/unit/probe-merge-denial.test.ts'],
+    invariant: 'a canary is judged denied only when it is read as not a draft, free of conflicts and not behind its base — otherwise the block is not attributable to the failing check',
+    scar: 'GitHub reported PR #90 mergeable_state "clean" while it was a draft, so the state does not encode draft-ness; the judgement read "blocked" as "blocked by the check" with nothing ruling the other causes out.',
+  },
+  {
     id: 'commerce-register-exact-set',
     runner: 'vitest',
     file: 'scripts/lib/commerce-contract.mjs',

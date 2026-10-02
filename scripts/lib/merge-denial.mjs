@@ -31,6 +31,18 @@
  *                     reason that is not the checks (conflicts, draft, out of date, reviews).
  *                     None of those proves anything in either direction, and ADR 010 is the rule
  *                     against reading any of them as a result.
+ *
+ * **`denied` is a claim about *why* the merge is refused, so the other reasons are ruled out
+ * explicitly** (2026-09-27). `mergeable_state` alone cannot do it: GitHub reported PR #90
+ * `"clean"` while it was a draft, so the state does not encode draft-ness, and a pull request
+ * that is both behind its base and failing a check can read `"blocked"` for either. So `denied`
+ * now also requires the pull request to be read as not a draft, free of conflicts
+ * (`mergeable: true`) and zero commits behind its base — each a separate reading, and an
+ * unknown one is `unevaluable`, never assumed. And when GitHub reports checks on the test
+ * merge commit as well as the head, the two must not disagree about a required context:
+ * GitHub can evaluate either, and a verdict built on the one it did not use is attribution to
+ * the wrong commit. `NOT-DENIED` is never held back by any of this — a gate that let a failing
+ * pull request through is reportable however partial the attribution.
  */
 export const DENIAL_VERDICTS = /** @type {const} */ (['denied', 'NOT-DENIED', 'unevaluable'])
 
@@ -83,25 +95,80 @@ export function contextState(context, checkRuns = [], statuses = []) {
 }
 
 /**
+ * What stops a `blocked` reading from being attributed to the checks, or `null` when nothing
+ * does. Each precondition is a reading of its own; an unknown one is reported as unknown.
+ *
+ * @param {{ draft?: boolean | null, mergeable?: boolean | null, behindBy?: number | null }} readings
+ * @returns {{ reason: string, detail: string } | null}
+ */
+export function blockingPrecondition({ draft = null, mergeable = null, behindBy = null }) {
+  if (draft === true) return { reason: 'draft', detail: 'the pull request is a draft, which blocks it regardless of any check.' }
+  if (draft !== false) return { reason: 'precondition-unknown:draft', detail: 'whether the pull request is a draft was not read.' }
+  if (mergeable === false) return { reason: 'conflicts', detail: 'the pull request has merge conflicts, which block it regardless of any check.' }
+  if (mergeable !== true) return { reason: 'precondition-unknown:mergeable', detail: 'whether the pull request is free of conflicts was not read.' }
+  if (typeof behindBy === 'number' && behindBy > 0) {
+    return { reason: 'behind-base', detail: `the head is ${behindBy} commit(s) behind its base, which strict mode blocks on its own.` }
+  }
+  if (behindBy !== 0) return { reason: 'precondition-unknown:behindBy', detail: 'how far the head is behind its base was not read.' }
+  return null
+}
+
+/**
+ * Required contexts whose verdict on the test merge commit disagrees with the head's — passing on
+ * one and not on the other. A context with nothing reported on the merge commit is not a
+ * disagreement: for GitHub Actions the check runs attach to the head, and silence there means
+ * the head is the commit GitHub evaluated.
+ *
+ * @param {Record<string, string>} headContexts
+ * @param {Record<string, string> | null} mergeContexts `null` when the merge commit was not read
+ */
+export function headMergeDisagreements(headContexts, mergeContexts) {
+  if (!mergeContexts) return []
+  return Object.keys(headContexts)
+    .filter((c) => mergeContexts[c] && mergeContexts[c] !== 'missing')
+    .filter((c) => (headContexts[c] === 'passing') !== (mergeContexts[c] === 'passing'))
+    .sort()
+}
+
+/**
  * Judge the canary.
  *
  * @param {object} input
  * @param {string | null | undefined} input.mergeableState GitHub's `mergeable_state`.
  * @param {string[] | null} input.requiredContexts `null` when the rules could not be read.
- * @param {Array<object>} [input.checkRuns]
- * @param {Array<object>} [input.statuses]
- * @returns {{ verdict: 'denied' | 'NOT-DENIED' | 'unevaluable', reason: string, contexts: Record<string, string>, unmet: string[], detail: string }}
+ * @param {Array<object>} [input.checkRuns]   on the head commit
+ * @param {Array<object>} [input.statuses]    on the head commit
+ * @param {boolean | null} [input.draft]      the pull request's own `draft` field
+ * @param {boolean | null} [input.mergeable]  the pull request's own `mergeable` field (false = conflicts)
+ * @param {number | null} [input.behindBy]    `behind_by` from comparing the base with the head
+ * @param {Array<object> | null} [input.mergeCommitRuns]      on `merge_commit_sha`, or null when not read
+ * @param {Array<object> | null} [input.mergeCommitStatuses]  on `merge_commit_sha`, or null when not read
+ * @returns {{ verdict: 'denied' | 'NOT-DENIED' | 'unevaluable', reason: string, contexts: Record<string, string>, mergeContexts: Record<string, string> | null, unmet: string[], detail: string }}
  */
-export function judgeDenial({ mergeableState, requiredContexts, checkRuns = [], statuses = [] }) {
+export function judgeDenial({
+  mergeableState,
+  requiredContexts,
+  checkRuns = [],
+  statuses = [],
+  draft = null,
+  mergeable = null,
+  behindBy = null,
+  mergeCommitRuns = null,
+  mergeCommitStatuses = null,
+}) {
   const contexts = Object.fromEntries(
     (requiredContexts ?? []).map((c) => [c, contextState(c, checkRuns, statuses)])
   )
+  const mergeContexts =
+    mergeCommitRuns === null && mergeCommitStatuses === null
+      ? null
+      : Object.fromEntries((requiredContexts ?? []).map((c) => [c, contextState(c, mergeCommitRuns ?? [], mergeCommitStatuses ?? [])]))
   const unmet = Object.entries(contexts)
     .filter(([, state]) => state !== 'passing')
     .map(([c]) => c)
     .sort()
   const unmetList = unmet.map((c) => `"${c}" (${contexts[c]})`).join(', ')
-  const result = (verdict, reason, detail) => ({ verdict, reason, contexts, unmet, detail })
+  const result = (verdict, reason, detail) => ({ verdict, reason, contexts, mergeContexts, unmet, detail })
 
   if (requiredContexts === null || requiredContexts === undefined) {
     return result(
@@ -121,10 +188,12 @@ export function judgeDenial({ mergeableState, requiredContexts, checkRuns = [], 
     )
   }
 
-  const mergeable = MERGEABLE_STATES.includes(/** @type {any} */ (mergeableState))
+  // Whether the merge button works, by GitHub's state — distinct from the `mergeable` reading
+  // (false = conflicts) that `blockingPrecondition` uses.
+  const buttonWorks = MERGEABLE_STATES.includes(/** @type {any} */ (mergeableState))
 
   if (requiredContexts.length === 0) {
-    return mergeable
+    return buttonWorks
       ? result(
           'NOT-DENIED',
           'no-required-contexts',
@@ -140,13 +209,35 @@ export function judgeDenial({ mergeableState, requiredContexts, checkRuns = [], 
   }
 
   if (mergeableState === 'blocked') {
+    if (unmet.length > 0) {
+      const precondition = blockingPrecondition({ draft, mergeable, behindBy })
+      if (precondition) {
+        return result(
+          'unevaluable',
+          precondition.reason,
+          `GitHub reports "blocked" and ${unmetList} has not passed, but ${precondition.detail} ` +
+            `The block cannot be attributed to the required check until that is ruled out.`
+        )
+      }
+      const disagree = headMergeDisagreements(contexts, mergeContexts)
+      if (disagree.length > 0) {
+        return result(
+          'unevaluable',
+          'head-merge-attribution-disagrees',
+          `The head commit and GitHub's test merge commit disagree about ${disagree
+            .map((c) => `"${c}" (head ${contexts[c]}, merge ${mergeContexts?.[c]})`)
+            .join(', ')}. GitHub may be evaluating either; a denial built on the other would be ` +
+            `attributed to the wrong commit. Compare the pull request's checks tab before recording anything.`
+        )
+      }
+    }
     return unmet.length > 0
       ? result(
           'denied',
           'required-context-unmet',
           `GitHub reports "blocked", and the required context(s) ${unmetList} have not passed ` +
-            `on the head commit. The gate refused a known-bad ` +
-            `pull request without anyone pressing merge.`
+            `on the head commit — a non-draft, conflict-free pull request that is not behind its ` +
+            `base. The gate refused a known-bad pull request without anyone pressing merge.`
         )
       : result(
           'unevaluable',
@@ -157,7 +248,7 @@ export function judgeDenial({ mergeableState, requiredContexts, checkRuns = [], 
         )
   }
 
-  if (mergeable) {
+  if (buttonWorks) {
     return unmet.length > 0
       ? result(
           'NOT-DENIED',
@@ -219,22 +310,60 @@ export async function pollMergeable(
  * table and must be re-checkable by the next person without the API — which is the standard
  * `docs/shopify-decommission-inventory.md` sets for evidence ("what was observed, in words,
  * with a date").
+ *
+ * @param {{
+ *   now: Date, repo: string, prNumber: number, headSha: string | null, baseRef: string,
+ *   attempts: number, mergeableState: string | null | undefined, protection: object,
+ *   judgement: ReturnType<typeof judgeDenial>, mergeCommitSha?: string | null,
+ *   draft?: boolean | null, mergeable?: boolean | null, behindBy?: number | null,
+ *   rulesetIds?: string[], observer?: string | null,
+ * }} input
  */
-export function evidenceRecord({ now, repo, prNumber, headSha, baseRef, attempts, mergeableState, protection, judgement }) {
+export function evidenceRecord({
+  now,
+  repo,
+  prNumber,
+  headSha,
+  baseRef,
+  attempts,
+  mergeableState,
+  protection,
+  judgement,
+  mergeCommitSha = null,
+  draft = null,
+  mergeable = null,
+  behindBy = null,
+  rulesetIds = [],
+  observer = null,
+}) {
   return {
     recordedAt: now.toISOString(),
+    // Who ran it, as they gave it with --observer. Never inferred: an unattributed record says so.
+    observer,
     repo,
     pullRequest: prNumber,
     baseRef,
     headSha,
+    mergeCommitSha,
+    rulesetIds,
     mergeableState: mergeableState ?? null,
     mergeabilityReadAttempts: attempts,
+    draft,
+    mergeable,
+    behindBy,
     rules: protection,
     requiredContexts: Object.keys(judgement.contexts),
     contextStates: judgement.contexts,
+    mergeCommitContextStates: judgement.mergeContexts ?? null,
     verdict: judgement.verdict,
     reason: judgement.reason,
     detail: judgement.detail,
-    method: 'read-only: GET pull request, GET check runs and statuses, GET rules and rulesets. No merge was attempted.',
+    // `E2E tests (Playwright)` needs `verify`, so on a canary whose verify fails it reports
+    // skipped — and GitHub counts a skipped required check as satisfied. The denial is proven
+    // through `Lint · Type-check · Unit tests · Build`, never through E2E; recorded so nobody
+    // reads the skip as a pass the canary earned.
+    note: 'E2E is skipped when verify fails (needs: verify) and GitHub counts that skip as satisfied; the denial rests on the verify context.',
+    method:
+      'read-only: GET pull request, GET compare, GET check runs and statuses on the head and the test merge commit, GET rules and rulesets. No merge was attempted.',
   }
 }
