@@ -148,6 +148,7 @@ type Host = {
   digests: Record<string, string>
   warmDigests?: Record<string, string>
   truncatedPaths?: string[]
+  coldCache?: Record<string, string>
   firstHop?: { status: number; location: string | null } | null
 }
 const host = (role: Role, name: string, overrides: Partial<Host> = {}): Host => ({
@@ -296,6 +297,26 @@ describe('classifyDiscrepancy — identity is settled before cause', () => {
     })
     expect(result).toMatchObject({ classification: 'alias-dns-cdn', reason: 'cold-warm-variance' })
     expect(result.observation.cacheVariance).toEqual([{ host: APEX, path: '/shop' }])
+  })
+
+  it('a first pass answered STALE is a scheduled regeneration, not cache variance', () => {
+    // Every page revalidates hourly since 2026-09-27, so the probe's first request can be the one
+    // that triggers a regeneration and its second the fresh page. That is the site working.
+    const result = classifyDiscrepancy({
+      hosts: [apex({ warmDigests: { '/': 'aaa', '/shop': 'zzz' }, coldCache: { '/shop': 'STALE' } }), www(), deployment()],
+    })
+    expect(result.classification).toBe('clean')
+    expect(result.observation.cacheVariance).toEqual([])
+    expect(result.observation.regenerated).toEqual([{ host: APEX, path: '/shop' }])
+  })
+
+  it('an identity verdict still says commerce was seen — it is never dropped from the sentence', () => {
+    const result = classifyDiscrepancy({
+      hosts: [apex({ commit: 'old1234', commerce: true }), www(), deployment()],
+    })
+    expect(result.classification).toBe('host-identity-mismatch')
+    expect(result.detail).toContain(`Commerce was also observed on ${APEX}`)
+    expect(result.edgeCommerce).toEqual([APEX])
   })
 
   it('a truncated body with nothing found is never clean — and outranks an external retrieval', () => {

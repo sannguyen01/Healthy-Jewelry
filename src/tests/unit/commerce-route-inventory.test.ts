@@ -260,6 +260,9 @@ describe('§7 — the forbidden route inventory matches what answers', () => {
         expect(response.headers.get('location'), `${method} ${concrete} redirects somewhere else`).toBe(
           `${row.location}?utm_source=x`
         )
+        // A handler is a function where a config redirect was an edge rule; the edge may only
+        // answer repeats itself if the response says it can.
+        expect(response.headers.get('cache-control'), `${method} ${concrete} is not edge-cacheable`).toMatch(/s-maxage=\d+/)
       }
       const post = handler.POST(new Request(`http://origin${concrete}`, { method: 'POST' }))
       expect(post.status, `a stale POST to ${concrete} is not the 410 page`).toBe(410)

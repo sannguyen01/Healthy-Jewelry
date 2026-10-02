@@ -517,7 +517,7 @@
       "probe": "e2e/retired-routes.spec.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "The variants are generated from §7, so a route family missing from the contract is missing from the matrix too — commerce-route-inventory.test.ts reconciles §7 against the filesystem and calls each retiredRoute() handler to close that. Concrete examples stand in for each `:path*` family; an exotic path shape no example resembles is not exercised. Since 2026-09-27 the 308 families are route handlers rather than next.config.ts redirects (a config redirect answers every method with the 308), so a legacy GET invokes a function where it used to match an edge rule — a cost accepted for low and falling legacy traffic.",
+      "knownLimit": "The variants are generated from §7, so a route family missing from the contract is missing from the matrix too — commerce-route-inventory.test.ts reconciles §7 against the filesystem and calls each retiredRoute() handler to close that. Concrete examples stand in for each `:path*` family; an exotic path shape no example resembles is not exercised. Since 2026-09-27 the 308 families are route handlers rather than next.config.ts redirects (a config redirect answers every method with the 308), so a legacy GET invokes a function where it used to match an edge rule. The 308 carries s-maxage=86400, so the edge answers repeats; the residual cost is about one invocation per legacy path per day.",
       "backstop": "control:merge-gate"
     },
     {

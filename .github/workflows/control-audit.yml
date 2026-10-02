@@ -858,7 +858,7 @@ jobs:
             try { owners = ownersFromCodeowners(fs.readFileSync('.github/CODEOWNERS', 'utf-8')) } catch { core.info('No CODEOWNERS.') }
             const { data: openIssues } = await github.rest.issues.listForRepo({ ...repo, state: 'open', labels: LIVE_SURFACE_LABEL })
             const comments = openIssues.length
-              ? (await github.rest.issues.listComments({ ...repo, issue_number: openIssues[0].number, per_page: 100 })).data
+              ? await github.paginate(github.rest.issues.listComments, { ...repo, issue_number: openIssues[0].number, per_page: 100 })
               : []
             const plan = liveSurfaceIssuePlan({ evidence, openIssues, comments, now: new Date(), runUrl, owners })
             for (const issue_number of plan.close) {

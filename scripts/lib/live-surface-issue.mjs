@@ -53,22 +53,27 @@ export function ownersFromCodeowners(text) {
 }
 
 /**
- * What makes two reports "the same finding": the classification, its reason, and the sorted
- * facts behind it. Timestamps, run URLs and digests of unchanged pages are not in it, so a
+ * What makes two reports "the same finding": the classification, its reason, and which hosts are
+ * involved in which way. Timestamps, run URLs, paths, commits and digests are not in it, so a
  * finding that persists keeps its fingerprint across runs and its acknowledgement with it.
  *
  * @param {{ classification: string, reason: string, edgeCommerce?: string[], differences?: object[], observation?: object }} c
  */
 export function fingerprintOf(c) {
+  // Hosts and kinds, never paths, commits or digests. A persisting problem whose details
+  // fluctuate between six-hourly runs — a different path varying, a new deploy on the wrong
+  // alias — is the same finding; fingerprinting the details would restart its clock every run
+  // and it would never reach the escalation this plan exists to make.
   const o = c.observation ?? {}
+  const hostsOf = (xs) => [...new Set((xs ?? []).map((x) => x.host))].sort()
   const facts = {
     classification: c.classification,
     reason: c.reason,
-    edgeCommerce: [...(c.edgeCommerce ?? [])].sort(),
-    differences: (c.differences ?? []).map((d) => `${d.host}|${d.kind}|${d.path ?? ''}`).sort(),
-    identity: (o.identityMismatch ?? []).map((i) => `${i.host}|${i.commit}`).sort(),
-    variance: (o.cacheVariance ?? []).map((v) => `${v.host}${v.path}`).sort(),
-    truncated: (o.truncated ?? []).map((t) => `${t.host}${t.path}`).sort(),
+    edgeCommerce: [...new Set(c.edgeCommerce ?? [])].sort(),
+    differences: [...new Set((c.differences ?? []).map((d) => `${d.host}|${d.kind}`))].sort(),
+    identity: hostsOf(o.identityMismatch),
+    variance: hostsOf(o.cacheVariance),
+    truncated: hostsOf(o.truncated),
   }
   return createHash('sha256').update(JSON.stringify(facts)).digest('hex').slice(0, 16)
 }
@@ -170,6 +175,8 @@ export function liveSurfaceIssuePlan({ evidence, openIssues = [], comments = [],
           `Comment \`/ack <note>\` once someone owns it.\n\n${escalatedMarker(fp)}`
         : null,
     addLabels: overdue && existing !== null ? [LIVE_SURFACE_OVERDUE_LABEL] : [],
-    removeLabels: acknowledged ? [LIVE_SURFACE_OVERDUE_LABEL] : [],
+    // Whenever the current finding is not overdue — acknowledged, or a new finding whose clock has
+    // just restarted — the label from an earlier one comes off. Removing an absent label is a no-op.
+    removeLabels: !overdue && existing !== null ? [LIVE_SURFACE_OVERDUE_LABEL] : [],
   }
 }

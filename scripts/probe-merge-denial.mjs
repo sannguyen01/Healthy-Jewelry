@@ -111,18 +111,19 @@ async function main() {
 
   const runsAt = async (sha) => (await get(`/repos/${REPO}/commits/${sha}/check-runs?per_page=100`, token)).body?.check_runs ?? []
   const statusesAt = async (sha) => (await get(`/repos/${REPO}/commits/${sha}/status`, token)).body?.statuses ?? []
-  const checkRuns = headSha ? await runsAt(headSha) : []
-  const statuses = headSha ? await statusesAt(headSha) : []
-
   // The test merge commit GitHub may evaluate instead of the head, read the same way. Absent
   // until GitHub has computed mergeability, and then honestly `null` rather than empty.
   const mergeCommitSha = prBody?.merge_commit_sha ?? null
-  const mergeCommitRuns = mergeCommitSha ? await runsAt(mergeCommitSha) : null
-  const mergeCommitStatuses = mergeCommitSha ? await statusesAt(mergeCommitSha) : null
 
-  // How far the head is behind its base: strict mode blocks that on its own, so a denial must
-  // rule it out. `null` when the comparison could not be read — never assumed to be zero.
-  const compared = headSha ? await get(`/repos/${REPO}/compare/${encodeURIComponent(baseRef)}...${headSha}`, token) : null
+  // Five independent reads, concurrently. How far the head is behind its base matters because
+  // strict mode blocks that on its own; `null` when it could not be read — never assumed zero.
+  const [checkRuns, statuses, mergeCommitRuns, mergeCommitStatuses, compared] = await Promise.all([
+    headSha ? runsAt(headSha) : [],
+    headSha ? statusesAt(headSha) : [],
+    mergeCommitSha ? runsAt(mergeCommitSha) : null,
+    mergeCommitSha ? statusesAt(mergeCommitSha) : null,
+    headSha ? get(`/repos/${REPO}/compare/${encodeURIComponent(baseRef)}...${headSha}`, token) : null,
+  ])
   const behindBy = compared?.status === 200 && Number.isInteger(compared.body?.behind_by) ? compared.body.behind_by : null
 
   const draft = typeof prBody?.draft === 'boolean' ? prBody.draft : null
@@ -136,6 +137,7 @@ async function main() {
     draft,
     mergeable,
     behindBy,
+    requireUpToDate: typeof protection.strict === 'boolean' ? protection.strict : null,
     mergeCommitRuns,
     mergeCommitStatuses,
   })

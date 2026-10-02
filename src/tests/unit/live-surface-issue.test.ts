@@ -137,10 +137,53 @@ describe('liveSurfaceIssuePlan', () => {
 })
 
 describe('fingerprintOf', () => {
-  it('is stable for the same facts and moves when a fact moves', () => {
+  it('is stable when only the details of a persisting problem fluctuate', () => {
+    // A new deploy on the wrong alias, or a different path varying on the next run, is the same
+    // finding: restarting its clock every six hours would mean it never escalates.
     const a = fingerprintOf(mismatch.classification)
-    expect(fingerprintOf(evidenceOf([host('apex', APEX, { commit: 'old1234' }), host('www', `www.${APEX}`)]).classification)).toBe(a)
-    expect(fingerprintOf(evidenceOf([host('apex', APEX, { commit: 'old9999' }), host('www', `www.${APEX}`)]).classification)).not.toBe(a)
+    const newCommit = evidenceOf([host('apex', APEX, { commit: 'old9999' }), host('www', `www.${APEX}`)])
+    expect(fingerprintOf(newCommit.classification)).toBe(a)
+    const variance = (path: string) =>
+      evidenceOf([host('apex', APEX, { digests: { [path]: 'a' }, warmDigests: { [path]: 'b' } }), host('www', `www.${APEX}`)])
+    expect(fingerprintOf(variance('/shop').classification)).toBe(fingerprintOf(variance('/materials').classification))
+  })
+
+  it('moves when the kind of problem moves, and ignores hosts that are not edge', () => {
+    const a = fingerprintOf(mismatch.classification)
+    expect(fingerprintOf(unevaluable.classification)).not.toBe(a)
+    const onWwwToo = evidenceOf([
+      host('apex', APEX, { commit: 'old1234' }),
+      host('www', `www.${APEX}`),
+      host('preview', 'preview.example', { commit: 'zzz' }),
+    ])
+    // A preview host is not edge, so it does not change who is involved: same finding.
+    expect(fingerprintOf(onWwwToo.classification)).toBe(a)
+  })
+})
+
+describe('the overdue label follows the current finding', () => {
+  it('comes off when the finding changes and its clock restarts', () => {
+    const first = plan({ evidence: mismatch })
+    const changed = plan({ evidence: unevaluable, now: hours(ACK_WINDOW_HOURS + 5), openIssues: opened(first.body) })
+    expect(changed.escalationComment).toBeNull()
+    expect(changed.addLabels).toEqual([])
+    expect(changed.removeLabels).toEqual([LIVE_SURFACE_OVERDUE_LABEL])
+  })
+
+  it('stays on while the same finding is overdue and unacknowledged', () => {
+    const first = plan({ evidence: mismatch })
+    const late = plan({ evidence: mismatch, now: hours(ACK_WINDOW_HOURS + 5), openIssues: opened(first.body) })
+    expect(late.addLabels).toEqual([LIVE_SURFACE_OVERDUE_LABEL])
+    expect(late.removeLabels).toEqual([])
+  })
+})
+
+describe('the workflow reads every comment', () => {
+  it('paginates the comments an /ack or an escalation marker may be in', async () => {
+    const { readFileSync } = await import('node:fs')
+    const workflow = readFileSync('.github/workflows/control-audit.yml', 'utf8')
+    const step = workflow.slice(workflow.indexOf('Report a live surface that needs a person'))
+    expect(step).toContain('github.paginate(github.rest.issues.listComments')
   })
 })
 

@@ -54,7 +54,7 @@ import {
  * - `/cart/[[...path]]`
  * - `/account/[[...path]]`
  * - `/collections/[[...path]]`
- * - `/policies/[...path]`
+ * - `/policies/[[...path]]`
  * - `/stones/[[...path]]`
  * - `/crystals/[[...path]]`
  */
@@ -251,6 +251,15 @@ test.describe('Retired commerce routes', () => {
     const body = await response.text()
     expect(body).not.toMatch(/SUMMER25/)
     expect(body).not.toMatch(/discount applied/i)
+  })
+
+  test('the bare /policies still reaches the policies — as the config redirect it replaced did', async ({ request }) => {
+    // `/policies/:path*` matched the bare path too (`:path*` is zero or more segments), and §7's
+    // matrix only generates paths beneath a family. The handler briefly used a required
+    // catch-all and turned this 308 into a 404; caught in review, pinned here.
+    const response = await request.get('/policies', { maxRedirects: 0 })
+    expect(response.status()).toBe(308)
+    expect(response.headers()['location']).toBe('/legal')
   })
 
   test('the routes that stay, stay', async ({ request }) => {

@@ -123,6 +123,14 @@ describe('judgeDenial — a block is pinned on the check only when nothing else 
     expect(judgeDenial({ ...blocked, ...readings })).toMatchObject({ verdict: 'unevaluable', reason })
   })
 
+  it('behind its base is no reason to withhold a denial when the rules do not require up to date', () => {
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: 1, requireUpToDate: false }).verdict).toBe('denied')
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: null, requireUpToDate: false }).verdict).toBe('denied')
+    // Strict, or strictness unknown: behind may be the reason, so it is ruled out first.
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: 1, requireUpToDate: true }).reason).toBe('behind-base')
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: 1 }).reason).toBe('behind-base')
+  })
+
   it('NOT-DENIED is never held back by an unknown precondition — a gate that did not hold is reportable', () => {
     expect(judgeDenial({ mergeableState: 'clean', requiredContexts: REQUIRED, checkRuns: verifyFails })).toMatchObject({
       verdict: 'NOT-DENIED',

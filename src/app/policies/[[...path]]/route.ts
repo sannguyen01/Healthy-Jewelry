@@ -10,10 +10,12 @@ import { AMBASSADOR_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
  * own pages do not correspond one-to-one with the old ones — there is no refund policy here,
  * because there is nothing to refund.
  *
- * A required catch-all (`[...path]`), not an optional one: contract §7 retires `/policies/*`
- * and says nothing about the bare `/policies`, which stays a 404 rather than acquiring an
- * answer nobody declared. Nothing submits to a policy page, so a POST here is the same stray
- * the other families get, and the same explanation. See `retiredRoute()`.
+ * Optional catch-all, like the other families. This was briefly a required one (`[...path]`)
+ * on the reasoning that §7 names only `/policies/*` — but the config redirect it replaced,
+ * `/policies/:path*`, matched the bare `/policies` too (`:path*` is zero or more segments), so
+ * that change would have turned a working 308 into a 404. Caught in review on 2026-09-27; the
+ * bare path is now asserted in `e2e/retired-routes.spec.ts`. Nothing submits to a policy page,
+ * so a POST here is the same stray the other families get, and the same explanation.
  */
 const COPY = {
   title: 'This page has moved — Healthy Jewellery',

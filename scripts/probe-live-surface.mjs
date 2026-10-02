@@ -206,6 +206,7 @@ async function main() {
       digests: {},
       warmDigests: {},
       truncatedPaths: [],
+      coldCache: {},
       firstHop: null,
       skipped: 0,
     }
@@ -260,6 +261,10 @@ async function main() {
         summary.reachable = true
         if (requestShowsCommerce(record)) summary.commerce = true
         if (status === 200 && record.sha256) (pass === 1 ? summary.digests : summary.warmDigests)[p] = record.sha256
+        if (pass === 1) {
+          const cache = record.headers?.['x-vercel-cache'] ?? record.headers?.['x-nextjs-cache']
+          if (cache) summary.coldCache[p] = cache
+        }
         if (record.truncated && !summary.truncatedPaths.includes(p)) summary.truncatedPaths.push(p)
         if (pass === 1 && p === '/' && answer.chain?.[0]) {
           summary.firstHop = { status: answer.chain[0].status, location: answer.chain[0].location ?? null }

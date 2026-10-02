@@ -375,6 +375,28 @@ describe('consent can be withdrawn from the site', () => {
     expect(sent.length).toBe(before)
   })
 
+  it('returns focus to the control that opened it, and refocuses on every request', () => {
+    writeConsent(localStorage, 'granted')
+    const trigger = document.createElement('button')
+    trigger.textContent = 'Measurement preferences'
+    document.body.appendChild(trigger)
+    render(createElement(ConsentBanner))
+
+    trigger.focus()
+    act(() => openConsentPreferences())
+    const dialog = screen.getByRole('dialog', { name: /analytics consent/i })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+
+    // Tab away while it is open and ask again: focus must come back to the dialog.
+    trigger.focus()
+    act(() => openConsentPreferences())
+    expect(dialog.contains(document.activeElement), 'a second request did not refocus').toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
+    expect(document.activeElement, 'focus was dropped instead of returned').toBe(trigger)
+    trigger.remove()
+  })
+
   it('dispatches the one event the banner listens for, and never throws without a window', () => {
     const target = new EventTarget()
     let heard = 0

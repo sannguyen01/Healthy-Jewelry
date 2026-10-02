@@ -74,6 +74,7 @@ export const HEADER_SUBSET = /** @type {const} */ ([
   'server',
   'x-vercel-id',
   'x-vercel-cache',
+  'x-nextjs-cache',
   'age',
   'cache-control',
   'etag',
@@ -224,6 +225,7 @@ export function requestShowsCommerce(request) {
  * @property {Record<string, string>} digests       first-pass (cold) sha256 of each 200 body, by path
  * @property {Record<string, string>} [warmDigests] second-pass (warm) sha256 of each 200 body, by path
  * @property {string[]} [truncatedPaths]   paths whose body was longer than the probe read
+ * @property {Record<string, string>} [coldCache] pass-1 cache state per path (`x-vercel-cache`, else `x-nextjs-cache`)
  * @property {{ status: number, location: string | null } | null} [firstHop] what `/` answered first
  */
 
@@ -261,11 +263,19 @@ export function observeHosts(hosts) {
   const commits = Object.fromEntries(edge.filter((h) => h.commit).map((h) => [h.host, h.commit]))
   const identityMismatch = new Set(Object.values(commits)).size > 1 ? Object.entries(commits).map(([host, commit]) => ({ host, commit })) : []
 
+  // A path whose bytes changed between the passes is a cache serving two variants — unless the
+  // first pass was answered STALE, which is a regeneration the first request triggered: since
+  // 2026-09-27 every page revalidates hourly (CLAIM_WITHDRAWAL_BOUND_SECONDS), so that is the
+  // site working, and reporting it as an alias/CDN fault would be a false alarm on schedule.
+  const REGENERATING = new Set(['STALE', 'REVALIDATED', 'UPDATING'])
   const cacheVariance = []
+  const regenerated = []
   for (const h of hosts.filter((x) => x.reachable)) {
     for (const [path, cold] of Object.entries(h.digests ?? {})) {
       const warm = h.warmDigests?.[path]
-      if (warm && warm !== cold) cacheVariance.push({ host: h.host, path })
+      if (!warm || warm === cold) continue
+      const state = String(h.coldCache?.[path] ?? '').toUpperCase()
+      ;(REGENERATING.has(state) ? regenerated : cacheVariance).push({ host: h.host, path })
     }
   }
 
@@ -304,8 +314,11 @@ export function observeHosts(hosts) {
   return {
     edgeObserved: edge.map((h) => h.host),
     deploymentObserved: deployment?.host ?? null,
+    edgeCommerce: edge.filter((h) => h.commerce).map((h) => h.host),
+    deploymentCommerce: deployment?.commerce ?? null,
     identityMismatch,
     cacheVariance,
+    regenerated,
     agreement,
     differences,
     truncated,
@@ -338,9 +351,15 @@ export function observeHosts(hosts) {
  */
 export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, hosts }) {
   const observation = observeHosts(hosts)
-  const edge = hosts.filter(isEdge)
-  const deployment = hosts.find((h) => h.role === 'deployment' && h.reachable) ?? null
-  const edgeCommerce = edge.filter((h) => h.commerce).map((h) => h.host)
+  const deployment = hosts.find((h) => h.host === observation.deploymentObserved) ?? null
+  const { edgeCommerce } = observation
+  // Identity is settled first, but commerce seen on the way is never dropped from the sentence a
+  // person reads: an identity verdict that silently held a commerce finding would hide the one
+  // fact this probe exists to surface.
+  const commerceSeen = [...edgeCommerce, ...(deployment?.commerce ? [deployment.host] : [])]
+  const alsoCommerce = commerceSeen.length
+    ? ` Commerce was also observed on ${commerceSeen.join(' and ')}; attributing it waits on this.`
+    : ''
   const note =
     'HTTP only. Browser-only residue — localStorage, a service worker, Cache Storage — is not ' +
     'visible to a request and is asserted by the E2E fresh-session and egress checks.'
@@ -357,7 +376,7 @@ export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, ho
     note,
   })
 
-  if (edge.length === 0) {
+  if (observation.edgeObserved.length === 0) {
     return result(
       'unevaluable',
       'no-edge-host-observed',
@@ -372,7 +391,8 @@ export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, ho
       'edge-hosts-serve-different-builds',
       `The edge hosts do not serve one build: ${observation.identityMismatch.map((i) => `${i.host} reports ${i.commit}`).join(', ')}. ` +
         `A visitor's answer depends on which name they typed, and nothing else here can be attributed ` +
-        `until both names point at one deployment — check Vercel → Domains for each hostname.`
+        `until both names point at one deployment — check Vercel → Domains for each hostname.` +
+        alsoCommerce
     )
   }
 
@@ -382,7 +402,9 @@ export function classifyDiscrepancy({ externalRetrievalShowsCommerce = false, ho
       'cold-warm-variance',
       `The same host served the same path two different ways a few seconds apart: ` +
         `${observation.cacheVariance.map((v) => `${v.host}${v.path}`).join(', ')}. A cache holding ` +
-        `two variants, or a regeneration between the passes — compare x-vercel-cache and age.`
+        `two variants — compare x-vercel-cache and age in the artifact. (A first pass answered STALE ` +
+        `is a scheduled regeneration and is not counted here.)` +
+        alsoCommerce
     )
   }
 

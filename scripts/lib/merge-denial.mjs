@@ -98,14 +98,21 @@ export function contextState(context, checkRuns = [], statuses = []) {
  * What stops a `blocked` reading from being attributed to the checks, or `null` when nothing
  * does. Each precondition is a reading of its own; an unknown one is reported as unknown.
  *
- * @param {{ draft?: boolean | null, mergeable?: boolean | null, behindBy?: number | null }} readings
+ * Being behind the base blocks a merge only when the rules require branches to be up to date
+ * (`requireUpToDate`, the ruleset's strict policy). Under a non-strict ruleset a canary one
+ * commit behind `main` is still a clean test of the check, and calling it `behind-base` would
+ * withhold a valid denial until somebody rebased for nothing. Unknown strictness is treated as
+ * strict: the conservative reading, since "behind" then might be the reason.
+ *
+ * @param {{ draft?: boolean | null, mergeable?: boolean | null, behindBy?: number | null, requireUpToDate?: boolean | null }} readings
  * @returns {{ reason: string, detail: string } | null}
  */
-export function blockingPrecondition({ draft = null, mergeable = null, behindBy = null }) {
+export function blockingPrecondition({ draft = null, mergeable = null, behindBy = null, requireUpToDate = null }) {
   if (draft === true) return { reason: 'draft', detail: 'the pull request is a draft, which blocks it regardless of any check.' }
   if (draft !== false) return { reason: 'precondition-unknown:draft', detail: 'whether the pull request is a draft was not read.' }
   if (mergeable === false) return { reason: 'conflicts', detail: 'the pull request has merge conflicts, which block it regardless of any check.' }
   if (mergeable !== true) return { reason: 'precondition-unknown:mergeable', detail: 'whether the pull request is free of conflicts was not read.' }
+  if (requireUpToDate === false) return null
   if (typeof behindBy === 'number' && behindBy > 0) {
     return { reason: 'behind-base', detail: `the head is ${behindBy} commit(s) behind its base, which strict mode blocks on its own.` }
   }
@@ -141,6 +148,7 @@ export function headMergeDisagreements(headContexts, mergeContexts) {
  * @param {boolean | null} [input.draft]      the pull request's own `draft` field
  * @param {boolean | null} [input.mergeable]  the pull request's own `mergeable` field (false = conflicts)
  * @param {number | null} [input.behindBy]    `behind_by` from comparing the base with the head
+ * @param {boolean | null} [input.requireUpToDate] whether the rules require an up-to-date branch (strict)
  * @param {Array<object> | null} [input.mergeCommitRuns]      on `merge_commit_sha`, or null when not read
  * @param {Array<object> | null} [input.mergeCommitStatuses]  on `merge_commit_sha`, or null when not read
  * @returns {{ verdict: 'denied' | 'NOT-DENIED' | 'unevaluable', reason: string, contexts: Record<string, string>, mergeContexts: Record<string, string> | null, unmet: string[], detail: string }}
@@ -153,6 +161,7 @@ export function judgeDenial({
   draft = null,
   mergeable = null,
   behindBy = null,
+  requireUpToDate = null,
   mergeCommitRuns = null,
   mergeCommitStatuses = null,
 }) {
@@ -210,7 +219,7 @@ export function judgeDenial({
 
   if (mergeableState === 'blocked') {
     if (unmet.length > 0) {
-      const precondition = blockingPrecondition({ draft, mergeable, behindBy })
+      const precondition = blockingPrecondition({ draft, mergeable, behindBy, requireUpToDate })
       if (precondition) {
         return result(
           'unevaluable',

@@ -159,21 +159,24 @@ export function retiredRoute({ successor, copy }: { successor: string; copy: Gon
   const redirect = (request: Request): Response =>
     new Response(null, {
       status: 308,
-      // Relative, as Next's own redirect emits it; the query survives so a campaign link keeps
-      // its attribution through the hop.
-      headers: { Location: `${successor}${new URL(request.url).search}` },
+      headers: {
+        // Relative, as Next's own redirect emits it; the query survives so a campaign link keeps
+        // its attribution through the hop.
+        Location: `${successor}${new URL(request.url).search}`,
+        // A config redirect was an edge rule and cost nothing per request; a handler is a
+        // function. `s-maxage` lets the edge answer repeats itself, so a legacy URL costs one
+        // invocation per path per day rather than one per crawl.
+        'Cache-Control': RETIRED_REDIRECT_CACHE_CONTROL,
+      },
     })
-  const gone = (): Response => goneResponse(copy)
-  return {
-    GET: redirect,
-    HEAD: redirect,
-    POST: gone,
-    PUT: gone,
-    PATCH: gone,
-    DELETE: gone,
-    OPTIONS: gone,
-  }
+  // Every method `goneRoute` answers, with browsing redirected: one method map, so a method
+  // added there is answered here too — the reason `goneRoute` returns a map at all.
+  return { ...goneRoute(copy), GET: redirect, HEAD: redirect }
 }
+
+/** How long a retired path's 308 may be reused: an hour in a browser, a day at the edge. */
+export const RETIRED_REDIRECT_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400'
+
 
 /**
  * The sentence every one of these pages ends on.
@@ -190,3 +193,20 @@ export const AMBASSADOR_NEXT_STEP =
 
 /** The other half: there is still a catalogue, and it is still worth looking at. */
 export const BROWSE_NEXT_STEP = '<a href="/shop">Browse the catalogue</a>'
+
+/**
+ * What `/stones` and `/crystals` say to an action — one copy for the two pre-repositioning
+ * families, which retired the same category for the same reason. It names what the range is
+ * now and never the retired category: the brand's PROHIBITED list forbids that copy outright,
+ * and a 410 page is still a page.
+ */
+export const RETIRED_CATEGORY_COPY: GoneCopy = {
+  title: 'This page no longer exists — Healthy Jewellery',
+  heading: 'This page no longer exists.',
+  paragraphs: [
+    'Healthy Jewellery now makes pieces in Grade 23 titanium, niobium and 316L surgical steel ' +
+      'only. Nothing you submitted was sent or saved.',
+    BROWSE_NEXT_STEP,
+    AMBASSADOR_NEXT_STEP,
+  ],
+}

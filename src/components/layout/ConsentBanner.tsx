@@ -33,16 +33,25 @@ import {
  */
 export function ConsentBanner() {
   const [consent, setConsent] = useState<ConsentState | null>(null)
-  // Reopened from "Measurement preferences" after an answer was already given. Withdrawal has
-  // to be as easy as consent was, so the prompt that asked is the prompt that changes it.
-  const [reopened, setReopened] = useState(false)
+  // How many times "Measurement preferences" has asked for the prompt since it last closed:
+  // 0 = not reopened. A counter rather than a flag so a second request while the prompt is
+  // already open still moves focus to it. Withdrawal has to be as easy as consent was, so the
+  // prompt that asked is the prompt that changes it.
+  const [openRequests, setOpenRequests] = useState(0)
+  const reopened = openRequests > 0
   const dialog = useRef<HTMLDivElement>(null)
+  // Where focus was when the prompt was asked for, so a keyboard user is returned there after
+  // choosing instead of being dropped at the top of the document.
+  const returnFocus = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     setConsent(readConsent(window.localStorage))
     const reopen = () => {
+      if (document.activeElement instanceof HTMLElement && !dialog.current?.contains(document.activeElement)) {
+        returnFocus.current = document.activeElement
+      }
       setConsent(readConsent(window.localStorage))
-      setReopened(true)
+      setOpenRequests((n) => n + 1)
     }
     window.addEventListener(CONSENT_OPEN_EVENT, reopen)
     return () => window.removeEventListener(CONSENT_OPEN_EVENT, reopen)
@@ -51,15 +60,19 @@ export function ConsentBanner() {
   // Focus follows the visitor's request: the button they pressed is in the footer, and the
   // dialog it opened is pinned to the viewport corner — a keyboard user must not have to hunt.
   useEffect(() => {
-    if (reopened) dialog.current?.querySelector('button')?.focus()
-  }, [reopened])
+    if (openRequests > 0) dialog.current?.querySelector('button')?.focus()
+  }, [openRequests])
 
   if (consent === null || (!shouldAskForConsent(consent) && !reopened)) return null
 
   const choose = (next: 'granted' | 'denied') => {
     writeConsent(window.localStorage, next)
     setConsent(next)
-    setReopened(false)
+    setOpenRequests(0)
+    if (reopened) {
+      returnFocus.current?.focus()
+      returnFocus.current = null
+    }
   }
 
   return (

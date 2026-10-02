@@ -163,8 +163,9 @@ const nextConfig: NextConfig = {
    * method with the 410 page at the URL the visitor used.
    *
    * The cost is recorded rather than hidden: a legacy GET now invokes a function instead of
-   * matching an edge rule. Legacy traffic is small and falling; `retired-route-matrix` in
-   * `docs/controls.json` carries it as a known limit. A new redirect belongs in contract §7
+   * matching an edge rule. The 308 carries `s-maxage=86400`, so the edge answers repeats and a
+   * legacy path costs about one invocation per day; `retired-route-matrix` in
+   * `docs/controls.json` carries the rest as a known limit. A new redirect belongs in contract §7
    * first, and `commerce-route-inventory.test.ts` reconciles whichever mechanism serves it.
    */
 }

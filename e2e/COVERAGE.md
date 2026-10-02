@@ -31,7 +31,7 @@ check too: a stale exception is an assertion nobody re-examined.
 /cart/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: the §7 matrix asserts the 308 to /shop for GET and HEAD in every variant, and the stale-action block follows a POST in five encodings to the 410 page it must end on. A browser test submits the old theme's multipart product form from a page and reads what a person sees. `page.goto` alone would follow the 308 and assert /shop.
 /account/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to /contact for GET and HEAD, and a stale sign-in POST followed to the 410 page, which says nothing entered was sent or saved.
 /collections/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to /shop for GET and HEAD across the matrix, and a stale POST followed to the 410 page.
-/policies/[...path] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to /legal for GET and HEAD, and a stale POST followed to the 410 page. The bare /policies is deliberately not served.
+/policies/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to /legal for GET and HEAD, the bare /policies included (the config redirect it replaced matched it too), and a stale POST followed to the 410 page.
 /stones/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: 308 to / for GET and HEAD, and a stale POST followed to the 410 page.
 /crystals/[[...path]] — Verified by e2e/retired-routes.spec.ts, by status code: as /stones/[[...path]].
 /api/contact — e2e/contact.spec.ts intercepts it to drive the form's success, failure and 503 states, and src/tests/unit/api-contact-route.test.ts exercises the handler. Between them both sides of the contract are covered.
