@@ -368,7 +368,11 @@ export const SENTINELS = [
     runner: 'vitest',
     file: 'scripts/lib/merge-denial.mjs',
     find: '  if (mergeableState === \'blocked\') {',
-    replace: '  if (mergeableState === \'blocked\' || mergeable) {',
+    // `buttonWorks`, not `mergeable`: this read `|| mergeable` when that was the name of the
+    // "merge button works" local. 7cdb6ea renamed it and added a `mergeable` *parameter* (GitHub's
+    // conflict reading), so the anchor still matched and the mutation silently ORed in a value
+    // every NOT-DENIED fixture left null — dead, and only the liveness probe could tell.
+    replace: '  if (mergeableState === \'blocked\' || buttonWorks) {',
     specs: ['src/tests/unit/probe-merge-denial.test.ts'],
     invariant: 'a pull request GitHub would merge while a required check failed is NOT-DENIED, never denied',
     scar: 'The proposed exit test was to press merge on a known-bad pull request; a misconfigured rule would have deployed it to production.',

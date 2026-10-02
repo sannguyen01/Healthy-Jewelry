@@ -52,10 +52,21 @@ describe('judgeDenial — each verdict from a known answer', () => {
     }
   })
 
-  it.each(['clean', 'unstable', 'has_hooks'])(
-    'NOT-DENIED: "%s" while a required check has failed — the gate did not hold',
-    (mergeableState) => {
-      const result = judgeDenial({ mergeableState, requiredContexts: REQUIRED, checkRuns: verifyFails })
+  // Under READY too, because that is how a canary the gate let through actually reads — not a
+  // draft, no conflicts, up to date. Without it the preconditions arrived null here, and a
+  // mutation that misread a working merge button as a block stayed green: it fell through to
+  // `precondition-unknown` on a fixture no real canary would produce.
+  it.each([
+    ['clean', 'unread', {}],
+    ['unstable', 'unread', {}],
+    ['has_hooks', 'unread', {}],
+    ['clean', 'ready', READY],
+    ['unstable', 'ready', READY],
+    ['has_hooks', 'ready', READY],
+  ] as const)(
+    'NOT-DENIED: "%s" (preconditions %s) while a required check has failed — the gate did not hold',
+    (mergeableState, _label, preconditions) => {
+      const result = judgeDenial({ mergeableState, requiredContexts: REQUIRED, checkRuns: verifyFails, ...preconditions })
       expect(result.verdict).toBe('NOT-DENIED')
       expect(result.detail).toContain(REQUIRED[0])
     }
