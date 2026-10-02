@@ -159,6 +159,31 @@ describe('judgeExpiry — every verdict from a fixture', () => {
     expect(result.carried).toEqual([{ path: '/about', surface: 'visible' }])
     expect(result.verdict).toBe('PASS')
   })
+
+  // The owner's question named JSON-LD, and the extractor reads it — but no builder routes a
+  // claim into structured data, so it is `false` in every baseline and dropped out of the
+  // verdict. A PASS that did not say so read as covering it. Every verdict names what it did
+  // not exercise; a surface carried on any page counts as exercised.
+  it.each<[string, Array<typeof on & { cache: string }>]>([
+    ['PASS', [{ ...off, cache: 'HIT' }]],
+    ['FAIL', [{ ...on, cache: 'HIT' }]],
+  ])('%s names the surfaces no page carried in the baseline', (verdict, series) => {
+    const result = judgeExpiry({ baseline: { '/': on, '/about': { ...off, visible: true } }, attempts: { '/': series, '/about': [off] } })
+    expect(result.verdict).toBe(verdict)
+    expect(result.unexercised).toEqual(['jsonLd'])
+  })
+
+  it('nothing is unexercised when every surface carried the wording somewhere', () => {
+    const result = judgeExpiry({
+      baseline: { '/': on, '/products/x': { ...off, jsonLd: true } },
+      attempts: { '/': [off], '/products/x': [off] },
+    })
+    expect(result).toMatchObject({ verdict: 'PASS', unexercised: [] })
+  })
+
+  it('unevaluable names every surface, because none was exercised', () => {
+    expect(judgeExpiry({ baseline: { '/': off }, attempts: { '/': [off] } }).unexercised).toEqual(['jsonLd', 'metadata', 'visible'])
+  })
 })
 
 /**

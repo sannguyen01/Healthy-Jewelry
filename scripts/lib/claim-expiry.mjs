@@ -115,16 +115,26 @@ export function wordingOn(html, wording) {
  *   baseline still carries it on the last attempt.
  * - `PASS` when every such surface lost it — and the record says on which attempt, because "the
  *   first request after expiry was stale" is part of the measured bound, not a detail.
+ * - Every verdict lists `unexercised`: surfaces inspected on every page that carried the wording
+ *   on none in the baseline, so their absence afterwards proves nothing either way.
  *
  * @param {{ baseline: Record<string, { visible: boolean, metadata: boolean, jsonLd: boolean }>, attempts: Record<string, Array<{ visible: boolean, metadata: boolean, jsonLd: boolean, cache?: string | null }>> }} observed
  */
 export function judgeExpiry({ baseline, attempts }) {
   const carried = []
+  const inspected = new Set()
   for (const [path, where] of Object.entries(baseline)) {
-    for (const [surface, present] of Object.entries(where)) if (present) carried.push({ path, surface })
+    for (const [surface, present] of Object.entries(where)) {
+      inspected.add(surface)
+      if (present) carried.push({ path, surface })
+    }
   }
+  // Inspected on every page and carried on none: the verdict says nothing about these. JSON-LD
+  // is the standing case — no builder routes a claim into structured data — and a PASS that did
+  // not name it would read as if it covered the surface the brief asked about.
+  const unexercised = [...inspected].filter((s) => !carried.some((c) => c.surface === s)).sort()
   if (carried.length === 0) {
-    return { verdict: 'unevaluable', reason: 'fixture-never-rendered', carried, lingering: [], withdrawnAt: {} }
+    return { verdict: 'unevaluable', reason: 'fixture-never-rendered', carried, unexercised, lingering: [], withdrawnAt: {} }
   }
   const lingering = []
   const withdrawnAt = {}
@@ -139,6 +149,6 @@ export function judgeExpiry({ baseline, attempts }) {
     withdrawnAt[`${path} ${surface}`] = first + 1
   }
   return lingering.length > 0
-    ? { verdict: 'FAIL', reason: 'expired-wording-still-served', carried, lingering, withdrawnAt }
-    : { verdict: 'PASS', reason: 'expired-wording-withdrawn', carried, lingering, withdrawnAt }
+    ? { verdict: 'FAIL', reason: 'expired-wording-still-served', carried, unexercised, lingering, withdrawnAt }
+    : { verdict: 'PASS', reason: 'expired-wording-withdrawn', carried, unexercised, lingering, withdrawnAt }
 }
