@@ -10,6 +10,14 @@ import { claimText } from '@/lib/catalog'
 // A literal rather than SITE_DEFAULT_TITLE: Next reads `alt` from this module's exports, and
 // a literal is the form it is guaranteed to resolve. Said "Implant-Grade Titanium" until
 // 2026-09-26 — the share card is the brand's most-copied sentence.
+/**
+ * The share card renders the positioning claim, so it re-renders on the same bound as the pages
+ * (`CLAIM_WITHDRAWAL_BOUND_SECONDS`, `src/lib/catalog/claims-schema.ts`). A metadata image route
+ * does not inherit the root layout's segment config, so it states its own — the same literal,
+ * held equal by `claim-expiry.test.ts`.
+ */
+export const revalidate = 3600
+
 export const alt = 'Healthy Jewelry — Grade 23 Titanium, Niobium, 316L Steel'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'

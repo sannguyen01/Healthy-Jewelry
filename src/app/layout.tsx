@@ -86,6 +86,16 @@ export const viewport: Viewport = {
   themeColor: '#F7F5F1',
 }
 
+/**
+ * **Every page re-renders at most an hour after it was built** — because every page renders a
+ * claim (the Footer's positioning line), and a claim's approval can expire with no commit.
+ * Without this, all 37 prerendered routes had no revalidation at all and an expired approval
+ * stayed served until somebody redeployed (`CLAIM_WITHDRAWAL_BOUND_SECONDS` in
+ * `src/lib/catalog/claims-schema.ts` has the measurement). A literal because Next reads segment
+ * config statically; `claim-expiry.test.ts` holds it equal to that constant.
+ */
+export const revalidate = 3600
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html

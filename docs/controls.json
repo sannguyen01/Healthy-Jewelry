@@ -237,7 +237,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 34 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 35 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -433,7 +433,7 @@
       "probeLibrary": "src/lib/catalog/claims.ts",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": false,
-      "knownLimit": "It governs claims that arrive as registry records; a claim written straight into copy never reaches the resolver, which is claim-lexicon's job. Expiry changes what renders and never fails a build (ADR 029), so a lapsed approval reverts silently until a scheduled claimsNearingExpiry() probe exists. Evidence is a document reference and a reviewer's name; nothing verifies the document says what the reviewer recorded. Under the owner's 'enforce now' decision (2026-09-25) every record is pending, so today it proves the fallback path and, by fixture, the approved path.",
+      "knownLimit": "It governs claims that arrive as registry records; a claim written straight into copy never reaches the resolver, which is claim-lexicon's job. Expiry changes what renders and never fails a build (ADR 029). What renders reaches visitors within CLAIM_WITHDRAWAL_BOUND_SECONDS (3600) plus the one stale request that triggers regeneration: until 2026-09-27 every page was prerendered with no revalidation, and scripts/experiment-claim-expiry.mjs measured an approval two days past expiry still served on 8 cache HITs out of 8 at 228fdaf. That experiment is manual and re-run when the rendering mode or Next's major version changes; claim-expiry.test.ts holds the revalidate literals to the bound on every PR. No reviewer is reminded before an approval lapses (claimsNearingExpiry() has no scheduled caller) — a precondition of the first approval, since none exists. Evidence is a document reference and a reviewer's name; nothing verifies the document says what the reviewer recorded. Under the owner's 'enforce now' decision (2026-09-25) every record is pending, so today it proves the fallback path and, by fixture, the approved path.",
       "backstop": "control:merge-gate"
     },
     {

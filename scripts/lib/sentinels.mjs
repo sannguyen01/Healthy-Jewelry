@@ -264,6 +264,16 @@ export const SENTINELS = [
     scar: 'Until 2026-09-27 the banner appeared once and the only way to take an Allow back was clearing this site\'s data in the browser settings — the privacy page said so, and called it the way to change the answer.',
   },
   {
+    id: 'claim-withdrawal-bound',
+    runner: 'vitest',
+    file: 'src/app/layout.tsx',
+    find: 'export const revalidate = 3600',
+    replace: 'export const revalidate = 86400',
+    specs: ['src/tests/unit/claim-expiry.test.ts'],
+    invariant: 'every claim-bearing segment re-renders within CLAIM_WITHDRAWAL_BOUND_SECONDS, so an expired approval leaves served pages without a redeploy',
+    scar: 'Built at 228fdaf with an approval expiring that day and served two days later, the expired positioning claim was still in the homepage hero, its meta description and every Footer on 8 cache HITs out of 8 — all 37 prerendered routes had no revalidation at all.',
+  },
+  {
     id: 'commerce-register-exact-set',
     runner: 'vitest',
     file: 'scripts/lib/commerce-contract.mjs',
