@@ -277,6 +277,19 @@ and an agent still never merges.
      changed files, the checks and the reviewer. If another commit lands after review, the
      exception is evaluated again against the new head.
 
+**Owner override, 2026-10-03 (not exception 2).**
+- **The decision.** After the ruleset update at 03:48 UTC, the owner chose to merge #97 at its
+  reviewed head before the read-back was conclusive.
+- **Why exception 2 does not cover it.** The 03:49 read found the target narrowed to `main`, the
+  bypass list empty, and force-push and deletion blocked. It found no pull-request rule and no
+  required status checks, so `main` still required no check, and exception 2's condition was not
+  met.
+- **What it is instead.** The merge is the owner's override, recorded as one:
+  - `githubGate` stays **`failed`**;
+  - the ruleset's pull-request rule, its three required checks, the classic-layer inspection and
+    the identity of Integration 1236702 are still owed before any canary;
+  - it is precedent for no other pull request.
+
 **The release is already live.** #93 (this review) was merged at 16:16:44 UTC on 2026-10-02 and
 auto-deployed to production while `main` was `UNPROTECTED`, so `PREVIEW_VERIFIED` was skipped, not
 reached. Production now serves the release (routes, analytics, claims). The production checks
@@ -498,6 +511,9 @@ Four rules came out of keeping these apart:
 | 02:29:29 | 09:29:29 | Vercel's status on `81fd782`: "Deployment has completed", **6 min 23 s before CI on the same commit finished**. Production admission still does not wait for tests. This time they passed | commit status |
 | 02:35:52 | 09:35:52 | `main`'s push run 37089958244 on `81fd782`: `verify` success, E2E success, `Dependency scope` skipped (push) | GitHub |
 | 02:45:20 | 09:45:20 | #97's pull-request run 37090486106 at `af9d447`: `Production admission` logs `ADMITTED (pull_request): verify success, e2e success, dependencyScope success`. This is the check's first real run, and it shows **the passing path only**. It is not a `main` push, not a failing path, and not evidence that Vercel waits for it | job log |
+| 03:48:12 | 10:48:12 | The owner updates ruleset 24077858: target `~DEFAULT_BRANCH` and `refs/heads/main` (`~ALL` removed), rules `deletion` and `non_fast_forward`, bypass list empty | ruleset `updated_at` |
+| 03:49:22 | 10:49:22 | Full read-back: one ruleset reaches `main`; the bypass list is readable and empty; **no pull-request rule, no required status checks**; classic summary `enabled: false`, full endpoint 403. `evaluateProtection`: `unevaluable` (`contexts-mismatch`, `not-strict`, `no-pull-request-required`) | `gh api`; judge |
+| ~03:55 | ~10:55 | **The owner chooses to merge #97 as an override** (§6), not under exception 2. `githubGate` stays `failed` | owner, in session |
 
 ### What it proves, and what it does not
 

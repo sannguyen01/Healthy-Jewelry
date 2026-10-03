@@ -50,6 +50,13 @@ Four independent flags in §6 replace any single state that could hide them:
   `proven` only by an owner-approved test on the real promotion path ([ADR 039](docs/adr/039-a-ready-build-is-not-a-passing-build.md)).
   43 sentinels, 41 vitest.
 
+- **Ruleset updated, read back, not conclusive; #97 to be merged by owner override.** At 03:48 UTC the owner
+  narrowed 24077858 to `main`, emptied its bypass list, and added `non_fast_forward`. The 03:49
+  read found no pull-request rule and no required checks, so `main` still requires no check
+  (judge: `unevaluable`). The owner chose to merge #97 as a recorded override, not under the
+  bounded exception. `githubGate` stays `failed`; the rest of the ruleset is still owed before
+  any canary.
+
 ### Still blocked, and on what
 
 - **Owner:**

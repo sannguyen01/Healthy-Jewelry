@@ -308,6 +308,52 @@ The read-back (Step 2):
 }
 ```
 
+Filled, 2026-10-03 03:49 UTC, after the owner's ruleset update:
+
+```json
+{
+  "control": "githubGate",
+  "verdict": "unevaluable",
+  "observedAt": "2026-10-03T03:49:22Z",
+  "observer": "agent session (read-only, GitHub proxy)",
+  "rulesets": [
+    {
+      "id": 24077858,
+      "updatedAt": "2026-10-03T10:48:12.661+07:00",
+      "enforcement": "active",
+      "include": [
+        "~DEFAULT_BRANCH",
+        "refs/heads/main"
+      ],
+      "exclude": []
+    }
+  ],
+  "effectiveRuleSources": {
+    "deletion": 24077858,
+    "non_fast_forward": 24077858
+  },
+  "effectiveContexts": [],
+  "contextIntegrationIds": [],
+  "contextSourceVerified": false,
+  "strict": false,
+  "pullRequestRequired": false,
+  "nonFastForward": true,
+  "deletion": true,
+  "bypassListReadable": true,
+  "bypassActors": [],
+  "classicSummaryEnabled": false,
+  "classicFullReadable": false,
+  "classicOwnerInspection": null,
+  "judgeOutput": [
+    "contexts-mismatch:unevaluable",
+    "not-strict:unevaluable",
+    "no-pull-request-required:unevaluable",
+    "code-owner-review-off:informational"
+  ],
+  "canaryVerdict": "not-run"
+}
+```
+
 The canary (Step 3):
 
 ```json
@@ -337,6 +383,7 @@ The canary (Step 3):
 | Contexts confirmed by `required-checks-contract` | | | | |
 | Ruleset created (id) | the owner reported it created and read back; the id could not be read from the agent session | 2026-10-02 | owner (reported) | none readable: the session's token answered 401, and anonymous reads were rate-limited |
 | `probe-branch-protection.mjs` read back `enforced` | **Not enforced.** On 2026-10-02 the read was `unevaluable` (401, then an anonymous rate limit). On 2026-10-03 the session's GitHub proxy read the rules, and the probe's own `evaluateProtection()` judged them `mismatched`. Ruleset `Main` (24077858) is `active`, targeting `~ALL`, `~DEFAULT_BRANCH` and `refs/heads/main`. Its only rule is `deletion`, with no required checks, no pull-request rule and no force-push block. Its bypass list holds Integration 1236702 (`always`). Classic protection and the ruleset's history answered 403 | 2026-10-02, 2026-10-03 | agent session | `verdict: mismatched`: contexts missing, not strict, no PR required, bypass actor present |
+| Ruleset updated by the owner, read back in full | **Not conclusive.** At 03:48:12 UTC the owner narrowed the target to `~DEFAULT_BRANCH` and `refs/heads/main` (`~ALL` removed), emptied the bypass list (Integration 1236702 gone; what it was is still to be recorded), and added `non_fast_forward` beside `deletion`. The 03:49 read found only that one ruleset reaching `main`, and **no `pull_request` and no `required_status_checks` rule**. Classic summary `enabled: false`; full endpoint 403, so the owner's inspection is still owed. The owner then chose to merge #97 as a recorded override (masterplan §6), not under exception 2. The record follows the table | 2026-10-03 | owner (update); agent session (read) | `evaluateProtection`: `unevaluable`, with `contexts-mismatch`, `not-strict` and `no-pull-request-required` |
 | `docs/controls.json` `merge-gate` set to `configured` | | | | |
 | Canary PR opened, ready for review, `verify` failed (PR number) | opened ready for review from `main` at `726dfc3`. `verify` failed, `Dependency scope` passed, E2E was skipped (`needs: verify`) | 2026-10-02 | agent session | #94, head `81099f6` |
 | `probe-merge-denial.mjs` verdict `denied` — head SHA, merge commit SHA, ruleset ID | **NOT denied.** GitHub read `mergeable_state: unstable` twice: the merge button worked on a failing PR. `judgeDenial()` on those readings gave `NOT-DENIED / mergeable-with-unmet-required-context` against the runbook's contexts, and `unevaluable / rules-unreadable` against what the session could read. The readings came through the GitHub connector, because the probe's own token was refused. Merge commit SHA and ruleset ID were not readable | 2026-10-02 | agent session | #94 comment with the readings; canary left open for diagnosis, then merged (next row) |
