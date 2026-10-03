@@ -249,17 +249,23 @@ What may happen in each state:
 
 | State | Allowed | Forbidden |
 |---|---|---|
-| `UNPROTECTED` | draft work, previews, read-only diagnostics | merging, revoking, deleting subscriptions, DNS changes |
-| `GATE_UNPROVEN` | the canary procedure only | merging anything, the canary included |
+| `UNPROTECTED` | draft work, previews, read-only diagnostics; the owner merging a *recovery* pull request (below) | merging anything else, revoking, deleting subscriptions, DNS changes |
+| `GATE_UNPROVEN` | the canary procedure, and the owner merging the pull requests it depends on (the `Production admission` check, R-C1; the v2 canary's permanent test, R-B2) once their head checks are green under the read-back ruleset | merging anything else; merging the canary itself |
 | `GATE_PROVEN` | ready-for-review PRs, review, small targeted fixes | external removals |
 | `PREVIEW_VERIFIED` | taking PRs out of draft, a human merge | external removals before production is verified |
 | `PRODUCTION_VERIFIED` | the external sequence above, in order, by people | skipping or reordering it |
 
-**One exception, recorded because it was needed on 2026-10-02.** In `UNPROTECTED`, the owner
-may merge a *recovery* pull request: one whose only effect is to remove a defect that an admission
-failure let onto `main`, after its head checks are green. #95 is that pull request; it deletes the
-canary test #94 put on `main`. Nothing else rides on the exception, and an agent still never
-merges.
+**Two exceptions, each recorded because the recovery needs it.** Nothing else rides on either,
+and an agent still never merges.
+
+1. **In `UNPROTECTED`, a recovery pull request** (needed on 2026-10-02). The owner may merge one
+   whose only effect is to remove a defect that an admission failure let onto `main`, once its
+   head checks are green. #95 is that pull request: it deletes the canary test #94 put on `main`.
+2. **In `GATE_UNPROVEN`, the pull requests the canary depends on** (added 2026-10-03). The v2
+   canary cannot fail on a test that is not yet on `main`, and Vercel cannot select a check that
+   has never reported on `main`. So the `Production admission` pull request and the canary's
+   permanent test merge after the read-back, and before the denial is proven, under a ruleset
+   that by then requires their three checks.
 
 **The release is already live.** #93 (this review) was merged at 16:16:44 UTC on 2026-10-02 and
 auto-deployed to production while `main` was `UNPROTECTED`, so `PREVIEW_VERIFIED` was skipped, not
