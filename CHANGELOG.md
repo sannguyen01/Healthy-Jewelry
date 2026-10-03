@@ -4,6 +4,23 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-10-03 — Incident PR-94: recovery, and production admission
+
+- **The merge-gate canary was merged, and its failing test reached `main`.** #95 deletes it. The
+  incident is masterplan §13: detection worked; GitHub source admission and Vercel production
+  admission failed. Each is recorded as its own assertion, and four independent evidence flags
+  sit beside the state machine.
+- **A `Production admission` check passes only on explicit success**, so the deployment platform
+  can be told to wait for it before assigning production aliases. A skipped, cancelled or
+  missing result is a refusal. It is not configured in the platform yet, and it is never called
+  proven without an owner-approved test on the real promotion path
+  ([ADR 039](docs/adr/039-a-ready-build-is-not-a-passing-build.md)).
+- **The retained webhook receiver is proven to do nothing without its secret**: 503, no cache
+  invalidation, no order line. That is shown in a mutation-checked test and on a local
+  production build.
+- The ruleset runbook repairs the existing ruleset instead of adding one, and its read-backs take
+  their credential from a store, never from a typed token.
+
 ## 2026-10-02 — PR #93: Release review for #90 — four controls asked what they actually observe
 
 - **A stale action on a retired path ends on a page a person can read.** The 308 families are

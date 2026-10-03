@@ -1,6 +1,6 @@
 # Runbook — the `main` ruleset, and the read-only proof that it holds
 
-**Owner:** the repository owner (`sannguyen01`). **Workstream:** WS-C. **Status:** canary #94 (2026-10-02) read **NOT-DENIED** and was then merged. The ruleset reads back `mismatched`, with only a `deletion` rule. **Step 3 is on hold** until the rules read `enforced` *and* the canary is inert if merged. Details are in Evidence.
+**Owner:** the repository owner (`sannguyen01`). **Workstream:** WS-C. **Status:** canary #94 (2026-10-02) read **NOT-DENIED** and was then merged. The ruleset reads back `mismatched`, with only a `deletion` rule. **Step 3 is on hold** until the rules read `enforced` *and* the canary is inert if merged. Details are in Evidence. The repair, the read-back's conclusive conditions and the v2 canary design are in masterplan §13 (R-B).
 
 `main` auto-deploys to production. Until this runbook is carried out, the merge button is the
 deploy button with no required check between them (`docs/controls.json`, `merge-gate`:
@@ -111,6 +111,22 @@ the registry and to the probe's enforceable set):
 gh api --method POST repos/sannguyen01/healthy-jewelry/rulesets --input ruleset.json
 ```
 
+**A ruleset already exists, so repair it rather than adding a second one.** Ruleset `Main`
+(24077858) read back on 2026-10-03 with one `deletion` rule, a target of `~ALL`,
+`~DEFAULT_BRANCH` and `refs/heads/main`, and Integration 1236702 on its bypass list (Evidence).
+
+1. **Identify Integration 1236702 first** (Settings → Rules → the ruleset → Bypass list names
+   it). Record what it is. Then remove it: the bypass list must be empty.
+2. **Narrow the target to `main` before adding the pull-request rule.** On `~ALL`, a
+   pull-request rule blocks every direct push to every branch, agents' working branches
+   included.
+3. Replace its rules with the JSON above. `PUT` replaces the whole ruleset with the file, which is
+   the intent: the file is the policy.
+
+```sh
+gh api --method PUT repos/sannguyen01/healthy-jewelry/rulesets/24077858 --input ruleset.json
+```
+
 Console equivalent: **GitHub → Settings → Rules → Rulesets → New branch ruleset.** Name as
 above; enforcement *Active*; bypass list *empty*; target `main`; tick *Restrict deletions*,
 *Block force pushes*, *Require a pull request before merging* (0 approvals, code-owner review
@@ -120,14 +136,39 @@ contexts, each sourced from *GitHub Actions*.
 Do **not** also create a classic branch-protection rule. The probe reads both and judges their
 union, but two mechanisms stating one policy is two places for it to drift.
 
-## Step 2 — read it back
+## Step 2 — read it back, with a credential nobody types
 
-```sh
-GITHUB_TOKEN=<a token with administration:read> node scripts/probe-branch-protection.mjs --json
-```
+**No canary runs until this read is conclusive.** The owner reporting that the ruleset was
+edited is not a read. #94 ran on a report, and was merged.
+
+The read needs a credential that can see the bypass list, which means one with write access to
+the ruleset. It must come from a mechanism that keeps it out of the command line, the shell
+history, chat, issues and files. Either:
+
+- **in CI:** run *Actions → Control audit → Run workflow*. Its probe step uses the
+  `CONTROL_AUDIT_TOKEN` repository secret (a token with `administration:read`) and prints the
+  verdict in the job summary; or
+- **locally, from the owner's own login:** the GitHub CLI hands over its stored credential
+  without it being typed:
+
+  ```sh
+  GITHUB_TOKEN="$(gh auth token)" node scripts/probe-branch-protection.mjs --json
+  ```
+
+  An agent session reads the same rules through its own GitHub proxy (`gh api
+  repos/sannguyen01/healthy-jewelry/rulesets/24077858`). That is how the 2026-10-03 reading
+  below was taken.
 
 Expected: `"verdict": "enforced"` and `"agrees": false` — the registry still says
-`not-configured`, and the probe says so. Then set `merge-gate`'s `status` to `configured` in
+`not-configured`, and the probe says so. Conclusive means all of these, read rather than assumed:
+
+| Property | Read from | Conclusive when |
+|---|---|---|
+| Target | `rulesets/{id}` → `conditions.ref_name.include` | `refs/heads/main` only |
+| Contexts | `rules/branches/main` → `required_status_checks` | exactly the three, each with `integration_id` 15368 (GitHub Actions). The probe checks the names, and a person checks the source |
+| Strict | the same rule's `strict_required_status_checks_policy` | `true` |
+| Pull request | a `pull_request` rule | present, zero approvals |
+| Bypass list | `rulesets/{id}` → `bypass_actors` | **returned, and empty**. Not returned is `unevaluable`, never "empty" | Then set `merge-gate`'s `status` to `configured` in
 `docs/controls.json` in a pull request; the next audit reads `agrees: true` and closes the
 `merge-gate-unenforced` issue.
 
@@ -164,7 +205,7 @@ branch, and only **after** steps 1 and 2 have recorded an active ruleset read ba
 3. **3c.** Read the verdict — from any checkout of `main`; the probe is there since `be34099`:
 
    ```sh
-   GITHUB_TOKEN=<token> node scripts/probe-merge-denial.mjs --pr <number> --observer <your name> --out canary-evidence.json
+   GITHUB_TOKEN="$(gh auth token)" node scripts/probe-merge-denial.mjs --pr <number> --observer <your name> --out canary-evidence.json
    ```
 
    Exit 0 and `"verdict": "denied"` is the proof. Since 2026-09-27 it is only produced when all
