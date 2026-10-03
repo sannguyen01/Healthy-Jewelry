@@ -413,8 +413,8 @@
       "humanAction": "After creating the ruleset from docs/runbooks/main-ruleset.md: grant permission to push a canary branch whose required check fails on purpose, then run step 3 of that runbook and record the `denied` evidence it prints. Never press merge on the canary: main auto-deploys to production.",
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
-      "acceptedSince": "2026-09-26",
-      "acceptedWhy": "Not configured because the thing it proves does not exist yet: main has no ruleset, so a canary would read NOT-DENIED by definition. It becomes runnable the day the owner creates the ruleset from the runbook, and it is a one-off proof by design rather than a schedule."
+      "acceptedSince": "2026-10-03",
+      "acceptedWhy": "Restated 2026-10-03. The ruleset that exists reads back mismatched (only a deletion rule; see docs/runbooks/main-ruleset.md, Evidence). Canary #94 read NOT-DENIED on 2026-10-02 and was then merged, turning main red. So nothing proves the gate yet, and this canary design breaks main if merged. The proof becomes runnable when the rules read back enforced and the canary fails only in its own pull-request context."
     },
     {
       "id": "codeowners-coverage",
