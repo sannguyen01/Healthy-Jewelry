@@ -20,10 +20,14 @@ Four independent flags in §6 replace any single state that could hide them:
 `githubGate: failed`, `productionPromotion: failed`, `contactOperations: unknown` and
 `storeDisconnection: unknown`.
 
-- **R-A, recovery.** #95 deletes the canary test. Its head `8c93505` is green on all four checks
-  (run 37088040887), and it was marked ready at 02:05 UTC. A head check is not a post-merge
-  check: once the owner merges it, the merge SHA's tree, `main`'s push run and the deployment are
-  checked separately.
+- **R-A, recovery: on `main`.** #95 was green on its head and was merged by the owner at 02:29 UTC
+  as `81fd782`. The post-merge checks ran on that merge SHA, not the head:
+  - the canary path is absent from the tree;
+  - `main`'s push run 37089958244 has `verify` and E2E at `success`;
+  - the deployment's serving is unobserved, because the hosts are refused here.
+
+  Vercel reported the deployment complete 6 min 23 s before that CI run finished: production
+  still does not wait for tests.
 - **The cause, read.** Ruleset 24077858 has one `deletion` rule, targets `~ALL`, and has
   Integration 1236702 on its bypass list. It is judged `mismatched`. Its state at merge time is
   unknown, because its history answers 403.
@@ -46,14 +50,13 @@ Four independent flags in §6 replace any single state that could hide them:
 ### Still blocked, and on what
 
 - **Owner:**
-  - merge #95;
+  - read the deployment for `81fd782`, or allow the hosts in this environment's network settings;
   - repair the ruleset (narrow the target to `main`, add the three contexts with strict mode and
     the pull-request rule, empty the bypass list after identifying 1236702);
   - add the platform deployment check and restrict Force Promote;
   - confirm contact delivery and the limiter's keying (R-D);
   - reconnect for the read-only store-side inventory (R-E).
 - **Agent, after the owner:**
-  - the post-merge checks for #95;
   - the authorised read-back, which must be conclusive before any canary;
   - the v2 canary, inert if merged (§13, R-B2), which is also the first real run of the
     admission check's failing path.

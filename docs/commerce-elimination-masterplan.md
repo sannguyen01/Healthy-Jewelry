@@ -237,7 +237,7 @@ configuration alone never makes a flag `proven`.
 | Flag | 2026-10-03 | The observation behind it | `proven` only when |
 |---|---|---|---|
 | `githubGate` | **`failed`** | #94 merged into `main` with a failed required check (`ebdebc0`, 2026-10-02). Ruleset 24077858 read back on 2026-10-03: a `deletion` rule only, an Integration bypass actor, judged `mismatched` | the read above is conclusive, then a v2 canary reads `denied` and is closed unmerged (§13, R-B) |
-| `productionPromotion` | **`failed`** | READY Production deployments from `ebdebc0` and `be34099`, aliased to the apex and `www` (the owner's 2026-10-02 read of the project) | an owner-approved negative test on the real promotion path keeps a failing commit off the aliases (§13, R-C). Adding the platform check makes it `configured-unproven`, no more |
+| `productionPromotion` | **`failed`** | READY Production deployments from `ebdebc0` and `be34099`, aliased to the apex and `www` (the owner's 2026-10-02 read of the project). On 2026-10-03 the platform reported `81fd782` deployed 6 min 23 s before its CI finished | an owner-approved negative test on the real promotion path keeps a failing commit off the aliases (§13, R-C). Adding the platform check makes it `configured-unproven`, no more |
 | `contactOperations` | `unknown` | the owner's 2026-10-02 inventory: `RESEND_*`, `UPSTASH_*` and `RATE_LIMIT_KEY_SECRET` absent from the project's returned variables; shared bindings unread | provider acceptance plus a human-confirmed inbox delivery, and the limiter's keying mode read from `/api/health` (§13, R-D) |
 | `storeDisconnection` | `unknown` | the project holds no commerce-named variable (owner's read); the retained receiver answers 503 with no effect on a local production build (agent, 2026-10-03); the store side is unread (connector needs re-authentication) | a read-only store-side inventory shows no subscription, app or feed expects this site, and only then is the receiver removed (§13, R-E) |
 
@@ -284,7 +284,7 @@ empty. **An empty cell is the honest state.**
 |---|---|---|---|
 | 1 | **Repair** the `main` ruleset (24077858) to the runbook's JSON: target `main` only (drop `~ALL`, which with a pull-request rule would block every direct push), add the pull-request, required-checks (the three contexts from GitHub Actions, strict) and force-push rules, keep `deletion`, and **empty the bypass list** after identifying Integration 1236702 | `docs/runbooks/main-ruleset.md` | a ruleset existed; read back 2026-10-03 as `mismatched` (§13) |
 | 2 | Grant permission to push a v2 canary branch, only after the read-back is conclusive; the read-only denial proof is then run and recorded | same, step 3 | #94 ran before that read and was merged (§13) |
-| 2a | Merge the recovery pull request #95; then the tree, push-run and deployment checks are recorded | §13, R-A | |
+| 2a | Merge the recovery pull request #95; then the tree, push-run and deployment checks are recorded | §13, R-A | merged 2026-10-03 02:29 UTC (`81fd782`); tree and push run checked by the agent; the deployment's serving is still the owner's read |
 | 2b | Add a Vercel deployment check on `Production admission` that blocks production alias assignment; restrict and record Force Promote | `docs/runbooks/production-admission.md` | |
 | 3 | Clear the apex redirect, then set `www` → apex (in that order — the reverse loops) | `docs/runbooks/ws-e-dns.md` | |
 | 4 | Re-authenticate the commerce connector; run the read-only inventory; reconcile 22 vs 17 | `docs/runbooks/ws-f-read-only-inventory.md` | |
@@ -461,7 +461,7 @@ The failing check worked; the two boundaries that should have consumed its resul
 | Detection | **worked** | `verify` failed on #94's head (`81099f6`) and on every run that included the test | n/a |
 | GitHub source admission | **failed** | #94 merged with that check red (`ebdebc0`). The ruleset read on 2026-10-03 holds a `deletion` rule only | a conclusive authorised read, then a v2 canary read `denied` (R-B) |
 | Vercel production admission | **failed** | READY Production deployments from `ebdebc0` and `be34099` took the apex and `www` (the owner's 2026-10-02 read) | an approved negative test on the real promotion path (R-C) |
-| Recovery | **prepared, not on `main`** | #95's *head* checks on `8c93505` are green (run 37088040887, 2026-10-03 01:57–02:03 UTC), and it was marked ready at 02:05 UTC. `main` is still `be34099` | the owner merges; then the tree, `main`'s push run and the deployment are checked on the *merge* SHA (R-A) |
+| Recovery | **on `main`**, two of three post-merge checks observed | Head checks on `8c93505` were green (run 37088040887). The owner merged #95 at 02:29:00 UTC as `81fd782`. On that *merge* SHA the canary path is absent from the tree, and `main`'s push run 37089958244 has `verify` and E2E at `success` (agent, 2026-10-03). The deployment's serving is unobserved: the platform's status says only "Deployment has completed" | the owner's read of the deployment for `81fd782` |
 | External operations | **partly observed** | the owner's 2026-10-02 project inventory; no contact, limiter or store-side observation | R-D and R-E evidence |
 
 Four rules came out of keeping these apart:
@@ -484,6 +484,9 @@ Four rules came out of keeping these apart:
 | 16:17:57 | 23:17:57 | The removal was pushed to the merged branch, 73 seconds too late for #93. It continues in #95 | git history |
 | 10-03 | | Ruleset read through the session's GitHub proxy: `Main`, `active`, targeting `~ALL`, `~DEFAULT_BRANCH` and `refs/heads/main`. One `deletion` rule. Bypass: Integration 1236702 (`always`). `evaluateProtection` judges it `mismatched` | `gh api` |
 | 10-03 02:05 | 09:05 | #95 ready for review with green head checks. The merge is the owner's | GitHub |
+| 02:29:00 | 09:29:00 | **#95 merged** by the owner → `81fd782`. The canary path is absent from its tree | GitHub; `git ls-tree` |
+| 02:29:29 | 09:29:29 | Vercel's status on `81fd782`: "Deployment has completed", **6 min 23 s before CI on the same commit finished**. Production admission still does not wait for tests. This time they passed | commit status |
+| 02:35:52 | 09:35:52 | `main`'s push run 37089958244 on `81fd782`: `verify` success, E2E success, `Dependency scope` skipped (push) | GitHub |
 
 ### What it proves, and what it does not
 
@@ -539,10 +542,13 @@ changed nothing.
   "recovery": {
     "removalPullRequest": "#95",
     "removalHeadChecks": "success",
-    "removalOnMain": false,
+    "removalOnMain": true,
+    "removalMergeCommit": "81fd782ccf35f8e82ad7e7ee1a686aafceaa1ac3",
+    "postMergePushRun": { "id": 37089958244, "verify": "success", "e2e": "success" },
+    "postMergeDeployment": "platform-status-only",
     "githubGate": "failed",
     "productionPromotion": "failed",
-    "nextAction": "owner-merges-95-then-repairs-and-reads-back-the-ruleset"
+    "nextAction": "owner-repairs-and-reads-back-the-ruleset"
   }
 }
 ```

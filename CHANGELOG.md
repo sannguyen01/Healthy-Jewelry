@@ -6,7 +6,7 @@ user-visible or architecturally significant changes.
 
 ## 2026-10-03 — Incident PR-94: recovery, and production admission
 
-- **The merge-gate canary was merged, and its failing test reached `main`.** #95 deletes it. The
+- **The merge-gate canary was merged, and its failing test reached `main`.** #95 deleted it (`81fd782`). `main`'s push run is green on `verify` and E2E. The
   incident is masterplan §13: detection worked; GitHub source admission and Vercel production
   admission failed. Each is recorded as its own assertion, and four independent evidence flags
   sit beside the state machine.
