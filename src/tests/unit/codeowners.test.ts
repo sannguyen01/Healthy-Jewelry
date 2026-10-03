@@ -38,6 +38,10 @@ const REQUIRED = [
   '/.github/',
   '/scripts/lib/commerce-contract.mjs',
   '/scripts/verify-commerce-contract.mjs',
+  // The production-admission verdict runs from the tree it judges, so a change to it is a change
+  // to what may reach production, and needs the same named owner as the deploy configuration.
+  '/scripts/lib/production-admission.mjs',
+  '/scripts/check-production-admission.mjs',
   '/src/tests/unit/commerce-contract.test.ts',
   '/gate.yaml',
   '/vercel.json',

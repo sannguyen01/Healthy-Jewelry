@@ -22,6 +22,8 @@
 /docs/controls.json @sannguyen01
 /scripts/lib/commerce-contract.mjs @sannguyen01
 /scripts/verify-commerce-contract.mjs @sannguyen01
+/scripts/lib/production-admission.mjs @sannguyen01
+/scripts/check-production-admission.mjs @sannguyen01
 /src/tests/unit/commerce-contract.test.ts @sannguyen01
 /gate.yaml @sannguyen01
 /vercel.json @sannguyen01

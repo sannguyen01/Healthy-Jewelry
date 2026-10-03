@@ -14,11 +14,8 @@ evidence moves the control's status, and what never does. The reasoning is in
 
 `Production admission` is the `production-admission` job in `.github/workflows/ci.yml`. It runs
 after `verify`, `e2e` and `dependency-scope` under `always()`, which makes it eligible to run, and
-fail, when they fail or are skipped. That is all `always()` guarantees. A cancelled run, a
-workflow that never triggers, a runner failure, or a missing or colliding check name can each
-leave no verdict, and each is a separate observation. Vercel also builds a production deployment
-before its deployment check decides whether that deployment gets the custom domains, so a READY
-build is never evidence either way.
+fail, when they fail or are skipped. What that does not guarantee, and why a READY build is never
+evidence either way, is [ADR 039](../adr/039-a-ready-build-is-not-a-passing-build.md), decision 2.
 
 | Event | Admitted only when |
 |---|---|

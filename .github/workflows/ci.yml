@@ -428,13 +428,9 @@ jobs:
   # explicitly what this event requires, and the policy lives in
   # scripts/lib/production-admission.mjs, where it is exhaustively tested.
   #
-  # `always()`, not the default `success()`. Without a status function a job whose needs failed
-  # is skipped, and a skipped check is the exact reading this job exists to refuse: it has to
-  # *run* when `verify` fails, so that it can fail. It names its status function, as ADR 027
-  # requires. What `always()` buys is eligibility to run after failed or skipped prerequisites,
-  # and no more: a cancelled run, a workflow that never triggers, a runner failure, and a missing
-  # or colliding check name can each leave no verdict at all. Those are separate observations,
-  # never readings of this job.
+  # `always()`, not the default `success()`: a skipped check is the reading this job exists to
+  # refuse, so it must be eligible to run, and fail, when `verify` fails (ADR 027 names the
+  # status function). What `always()` does not guarantee is ADR 039, decision 2.
   #
   # Not a required context in the ruleset, which keeps its three. A pull request's own three
   # results are already required there; this context is for the platform, and is selected in
