@@ -59,6 +59,30 @@ export const MERGEABLE_STATES = /** @type {const} */ (['clean', 'unstable', 'has
 export const PASSING_CONCLUSIONS = /** @type {const} */ (['success', 'neutral', 'skipped'])
 
 /**
+ * The branch names a merge-gate canary may use: `canary/merge-gate-YYYY-MM-DD`, with an optional
+ * lower-case suffix for a second run on the same day.
+ *
+ * #94's canary was an `expect(1).toBe(2)` that failed everywhere, so merging it turned `main`
+ * red. The v2 canary changes one dated line in `docs/runbooks/merge-gate-canary-log.md`, and the
+ * failure lives in a permanent test that fails only when `GITHUB_HEAD_REF` (a pull request's
+ * source branch, empty on a push) matches this. Merged by mistake, that test does not fail on
+ * `main`'s push; other checks still can, and a canary is still never merged.
+ *
+ * Format only, on purpose: it is not a date validator. Its job is to keep the canary test inert
+ * on every other ref, and a canary-prefixed branch with an impossible date failing `verify` is
+ * harmless. The runbook names the branch with `date -u +%F`.
+ */
+const MERGE_GATE_CANARY_REF = /^canary\/merge-gate-\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?$/
+
+/**
+ * @param {unknown} ref A bare branch name, as `GITHUB_HEAD_REF` carries it.
+ * @returns {boolean}
+ */
+export function isMergeGateCanaryRef(ref) {
+  return typeof ref === 'string' && MERGE_GATE_CANARY_REF.test(ref)
+}
+
+/**
  * The state of one required context on the canary's head commit.
  *
  * A context can be satisfied by a check run (named after the job) or by a commit status (named

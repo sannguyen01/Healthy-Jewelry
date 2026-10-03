@@ -529,6 +529,18 @@ export const SENTINELS = [
     invariant: 'production admission passes only on explicit success; skipped, cancelled or missing is a refusal',
     scar: 'On 2026-10-02 two READY production deployments were built from a main whose verify had failed: a build that finished was read as a build that passed (incident PR-94).',
   },
+  {
+    // A predicate that never matches makes every canary pass silently and read NOT-DENIED for the
+    // wrong reason. The accepted fixtures in the canary test are what notice.
+    id: 'merge-gate-canary-ref',
+    runner: 'vitest',
+    file: 'scripts/lib/merge-denial.mjs',
+    find: "  return typeof ref === 'string' && MERGE_GATE_CANARY_REF.test(ref)",
+    replace: '  return false',
+    specs: ['src/tests/unit/merge-gate-canary.test.ts'],
+    invariant: 'a correctly named merge-gate canary branch is recognised, so its pull request fails verify',
+    scar: "#94's canary failed everywhere, so its merge turned main red. v2 fails only in its own pull request, which makes the branch-name predicate the one thing standing between a canary and a silent pass.",
+  },
   // ── Playwright: need a production build, so opt-in via --with-e2e ──
   {
     id: 'hero-card-measured',
