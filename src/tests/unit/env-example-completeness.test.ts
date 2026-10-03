@@ -46,6 +46,11 @@ const EXEMPT = new Set([
   'VERCEL_URL', // injected by Vercel
   'PLAYWRIGHT_SKIP_BUILD', // test harness plumbing
   'PLAYWRIGHT_CHROMIUM_PATH',
+  // Read only by scripts/experiments/shift-clock.mjs, which scripts/experiment-claim-expiry.mjs
+  // preloads into a scratch server to ask what it serves after a claim approval has lapsed.
+  // Never a deployment setting: a deployment with a shifted clock would be a defect.
+  'HJ_CLOCK_SHIFT_MS',
+  'HJ_CLOCK_JUMP_AT_MS', // same preload: the real instant the moved clock takes effect
   'PRODUCTION_SITE_URL', // CI-only; documented in docs/credential-inventory.md
   'SMOKE_SECRETS_SOURCE', // CI-only environment marker
   'UPSTASH_REDIS_REST_URL', // optional; documented in the runbook + inventory

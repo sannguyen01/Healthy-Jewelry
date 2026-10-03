@@ -23,10 +23,13 @@
  *
  * ## What it does not do
  *
- * It files no issue and fails no gate. It is report-only by design, in `control-audit.yml`
- * beside the other scheduled probes: the purchase-era copy it observes is present in source
- * pending legal review, and a scheduled check that goes red on text nobody in CI may change is
- * one people mute (ADR 011). It never sends a credential anywhere — no request carries one.
+ * It fails no gate: the live site changes with no commit, and a scheduled clock that turns
+ * pull requests red reaches the person who cannot act (ADR 029). It does not go unread either —
+ * since 2026-09-27 the step after it in `control-audit.yml` turns any non-clean or unevaluable
+ * classification into one issue with an acknowledgement deadline
+ * (`scripts/lib/live-surface-issue.mjs`). The purchase-era copy it observes is present in
+ * source pending legal review and is never part of that finding. It never sends a credential
+ * anywhere — no request carries one.
  *
  * ## Usage
  *
@@ -47,6 +50,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { discardBody, readBoundedText } from './lib/bounded-read.mjs'
 import { isAttributable } from './lib/browse-only.mjs'
 import { apexHostFromSiteConfig } from './lib/canonical-domain.mjs'
 import { parseContract } from './lib/commerce-contract.mjs'
@@ -64,7 +68,10 @@ import {
 const ROOT = path.resolve(import.meta.dirname, '..')
 const PRODUCT_DIR = path.join(ROOT, 'src/content/catalog/products')
 const TIMEOUT_MS = 15_000
-const MAX_BODY_BYTES = 2_000_000
+/** The most of any one body the probe reads. Enforced while streaming, not after downloading. */
+export const MAX_BODY_BYTES = 2_000_000
+/** `/api/version` is a few hundred bytes; anything near this is not the endpoint being asked. */
+const MAX_VERSION_BYTES = 65_536
 const PASSES = 2
 
 /** The first catalogue handle, from filenames — the licence `verify-browse-only.mjs` documents. */
@@ -76,10 +83,16 @@ export function firstHandle(dir = PRODUCT_DIR) {
 /**
  * Fetch one URL, walking redirects by hand. Never throws.
  *
+ * The body is read through `readBoundedText`, which stops at `maxBytes` *while streaming* and
+ * says whether it did. Until 2026-09-27 this called `response.text()` and sliced the result —
+ * the whole body downloaded and decoded first, and a page longer than the cap reported as if
+ * it had been read in full. A redirect hop's body is discarded, never read.
+ *
  * @param {string} url
- * @param {(url: string, init: object) => Promise<{ status: number, headers: { get: (name: string) => string | null }, text: () => Promise<string> }>} [fetchImpl]
+ * @param {(url: string, init: object) => Promise<Response>} [fetchImpl]
+ * @param {number} [maxBytes]
  */
-export async function fetchChain(url, fetchImpl = fetch) {
+export async function fetchChain(url, fetchImpl = fetch, maxBytes = MAX_BODY_BYTES) {
   const chain = []
   let current = url
   for (let hop = 0; ; hop += 1) {
@@ -98,15 +111,11 @@ export async function fetchChain(url, fetchImpl = fetch) {
     chain.push({ url: current, status: response.status, location })
     const step = nextHop(current, response.status, location, hop)
     if (step.follow && step.to) {
+      await discardBody(response)
       current = step.to
       continue
     }
-    let body = ''
-    try {
-      body = (await response.text()).slice(0, MAX_BODY_BYTES)
-    } catch {
-      // status and headers remain the answer
-    }
+    const read = await readBoundedText(response, maxBytes)
     return {
       chain,
       transport: 'ok',
@@ -114,13 +123,16 @@ export async function fetchChain(url, fetchImpl = fetch) {
       finalUrl: current,
       stoppedBecause: step.reason,
       headers: pickHeaders((n) => response.headers.get(n)),
-      body,
+      body: read.text,
+      bytesRead: read.bytesRead,
+      truncated: read.truncated,
+      truncationReason: read.reason,
     }
   }
 }
 
 async function buildIdentity(origin) {
-  const answer = await fetchChain(`${origin}/api/version`)
+  const answer = await fetchChain(`${origin}/api/version`, fetch, MAX_VERSION_BYTES)
   if (answer.transport !== 'ok' || answer.status !== 200) return { commit: null, vercelUrl: null, status: answer.status ?? 0 }
   try {
     const json = JSON.parse(answer.body)
@@ -192,6 +204,10 @@ async function main() {
       commit: identity.commit,
       commerce: false,
       digests: {},
+      warmDigests: {},
+      truncatedPaths: [],
+      coldCache: {},
+      firstHop: null,
       skipped: 0,
     }
 
@@ -220,7 +236,9 @@ async function main() {
           stoppedBecause: answer.stoppedBecause ?? null,
           headers: answer.headers ?? null,
           sha256: answer.transport === 'ok' ? createHash('sha256').update(answer.body).digest('hex') : null,
-          bytes: answer.body?.length ?? 0,
+          bytes: answer.bytesRead ?? 0,
+          truncated: answer.truncated ?? false,
+          truncationReason: answer.truncationReason ?? null,
           commit: identity.commit,
           attributable,
           detectors: attributable ? detectBody(answer.body, forbiddenHosts) : null,
@@ -242,7 +260,15 @@ async function main() {
         }
         summary.reachable = true
         if (requestShowsCommerce(record)) summary.commerce = true
-        if (pass === 1 && status === 200 && record.sha256) summary.digests[p] = record.sha256
+        if (status === 200 && record.sha256) (pass === 1 ? summary.digests : summary.warmDigests)[p] = record.sha256
+        if (pass === 1) {
+          const cache = record.headers?.['x-vercel-cache'] ?? record.headers?.['x-nextjs-cache']
+          if (cache) summary.coldCache[p] = cache
+        }
+        if (record.truncated && !summary.truncatedPaths.includes(p)) summary.truncatedPaths.push(p)
+        if (pass === 1 && p === '/' && answer.chain?.[0]) {
+          summary.firstHop = { status: answer.chain[0].status, location: answer.chain[0].location ?? null }
+        }
         for (const term of record.detectors?.purchaseEraCopy ?? []) {
           observations[term] = [...new Set([...(observations[term] ?? []), `${target.host}${p}`])]
         }

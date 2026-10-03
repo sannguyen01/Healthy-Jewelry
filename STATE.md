@@ -1,7 +1,209 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-09-27
+Last refreshed by hand: 2026-10-03
+
+## Session note — 2026-10-03
+
+**Incident PR-94: detection worked, and both admission boundaries ignored it.** The canary's
+`verify` failed. It was merged anyway (`ebdebc0`), and the owner's 2026-10-02 read of the
+platform shows READY Production deployments from that commit and from #93's merge (`be34099`),
+aliased to the apex and `www`. Masterplan §13 records it as five separate assertions, so that
+none can be inferred from another:
+- **Detection** worked.
+- **GitHub source admission** failed.
+- **Vercel production admission** failed.
+- **Recovery** is prepared and not on `main`.
+- **External operations** are partly observed.
+
+Four independent flags in §6 replace any single state that could hide them. At the incident
+they read `githubGate: failed`, `productionPromotion: failed`, `contactOperations: unknown` and
+`storeDisconnection: unknown`. Since 07:56 UTC on 2026-10-03, `githubGate` is `proven` (below);
+the other three are unchanged.
+
+- **R-A, recovery: on `main`.** #95 was green on its head and was merged by the owner at 02:29 UTC
+  as `81fd782`. The post-merge checks ran on that merge SHA, not the head:
+  - the canary path is absent from the tree;
+  - `main`'s push run 37089958244 has `verify` and E2E at `success`;
+  - the deployment's serving is unobserved, because the hosts are refused here.
+
+  Vercel reported the deployment complete 6 min 23 s before that CI run finished: production
+  still does not wait for tests.
+- **The cause, read.** Ruleset 24077858 has one `deletion` rule, targets `~ALL`, and has
+  Integration 1236702 on its bypass list. It is judged `mismatched`. Its state at merge time is
+  unknown, because its history answers 403.
+- **The receiver fails closed, now proven rather than read.** Twelve unit cases cover the secret
+  removed or empty, every handled topic, and forged and would-be-valid signatures: 503, no
+  invalidation, no order line. They were seen red under two mutations, and the sentinel is
+  `receiver-unconfigured-no-effect`. On a local production build with no commerce variable,
+  four POSTs answered 503 and logged only "not set". The production endpoint is unobserved from
+  here. The sentinel names the route, so the register went from 34 to 35 rows (WS-F).
+- **R-C, production admission.** A `Production admission` job passes only on explicit success:
+  - on a pull request, all three jobs;
+  - on a push to `main`, verify and E2E, with dependency scope exactly `skipped`;
+  - anything else is refused, `merge_group` included.
+
+  It runs under `always()`, which makes it *eligible* to run, and fail, when `verify` fails. It
+  does not guarantee a verdict for a cancelled or never-triggered run. Both incident runs replay
+  as refusals in its tests. Its first real run, #97's pull-request run 37090486106, logged
+  `ADMITTED (pull_request)`. That is the passing path only: not a `main` push, not the failing
+  path, and not Vercel waiting. It is not a ruleset context. It is `not-configured` until Vercel waits for it, and
+  `proven` only by an owner-approved test on the real promotion path ([ADR 039](docs/adr/039-a-ready-build-is-not-a-passing-build.md)).
+  43 sentinels, 41 vitest.
+
+- **Ruleset updated, read back, not conclusive; #97 to be merged by owner override.** At 03:48 UTC the owner
+  narrowed 24077858 to `main`, emptied its bypass list, and added `non_fast_forward`. The 03:49
+  read found no pull-request rule and no required checks, so `main` still requires no check
+  (judge: `unevaluable`). The owner chose to merge #97 as a recorded override, not under the
+  bounded exception. `githubGate` stays `failed`; the rest of the ruleset is still owed before
+  any canary.
+
+- **The ruleset reads back conclusive (05:00 UTC), and the override is withdrawn.**
+  - A second update at 04:48 required one context, `Github Actions`: the source app's name typed
+    as a check name. Nothing publishes it, so #97 read `blocked`; the judge said `mismatched`.
+  - The third update, at 04:59, has the three real contexts from integration 15368, strict, and
+    a pull-request rule.
+  - With the owner's recorded inspection (no classic rule; 1236702 was the Claude GitHub App),
+    the read is conclusive. `githubGate` is `configured-unproven`, and #97 merges under
+    exception 2.
+  - Owed then: the v2 canary, and `merge-gate` flipped to `configured`. Both are below.
+
+- **#97 merged (05:14 UTC), and `Production admission` passed on `main`'s push.** The owner
+  merged it at its reviewed head, under exception 2, as `ddaac1c` (identical tree). Push run
+  37099187496 logged `ADMITTED (push-main)` with `Dependency scope` skipped: matrix row 3. Vercel
+  reported the deployment complete 6 min 49 s before that run finished, so production still does
+  not wait. The 05:25 audit's merge-gate probe read `unevaluable`: `CONTROL_AUDIT_TOKEN` is unset or
+  lacks administration read. Its live-surface step read the site clean and closed #96.
+
+- **The gate is proven: the v2 canary #98 read `denied` (07:56 UTC), and was closed unmerged.**
+  - Its only change was one dated line in the canary log. `verify` failed on exactly one test, the
+    canary case, whose message named the branch.
+  - `Production admission` logged `REFUSED (pull_request)`: its failing path, observed for the
+    first time (matrix row 2).
+  - `judgeDenial()` gave `denied` / `required-context-unmet`, on `verify` alone: not a draft, no
+    conflicts, 0 behind, strict, the test-merge commit reporting nothing, `verify` passing on the
+    base. `blocked`
+    was read twice.
+  - `githubGate` → **`proven`**, and the state machine is in **`GATE_PROVEN`**. `merge-gate` →
+    `configured` in the records pull request.
+  - `merge-denial-proof` stays `not-configured`: the registry reserves `configured` for a probe
+    that runs on its own, and a canary runs only with the owner's permission. The runbook and
+    masterplan said otherwise until this record, and are corrected.
+  - The proof holds for ruleset 24077858 as updated at 04:59:37 UTC. A change to it means
+    reading it back and running a canary again.
+  - Attribution limit: GitHub records the close under the owner's account, because the session's
+    connector acts with the owner's credential.
+
+### Still blocked, and on what
+
+- **Owner:**
+  - read the deployment for `81fd782`, or allow the hosts in this environment's network settings;
+  - add, or fix, the `CONTROL_AUDIT_TOKEN` secret (administration read), so the six-hourly probe can see a
+    ruleset regression; without it, every regression except a phantom context reads `unevaluable`;
+  - delete the spent branches `canary/merge-gate-2026-10-02`, `canary/merge-gate-2026-10-03` and
+    `claude/incident-pr94-followup`;
+  - add the platform deployment check and restrict Force Promote. Its precondition is met, because
+    the check has reported on a `main` commit;
+  - confirm contact delivery and the limiter's keying (R-D);
+  - reconnect for the read-only store-side inventory (R-E).
+- **Agent, after the owner:** read back the platform check once it is added
+  (`productionPromotion` → `configured-unproven`, never further on configuration alone). The
+  read-back and the canary are done.
+
+## Session note — 2026-10-02
+
+**A green PR was asked what a visitor, a log and the gate actually receive, and four of its
+controls answered at the wrong grain.** The owner's direction replaced a proposal for more
+workstreams and more agents with four release-review questions and the gate. Each question was
+answered with a falsifying example run against the real artifact *before* any fix, on the PR that
+follows #90 (#93). ADR 038 is the pattern.
+
+- **Stale actions.** At `228fdaf` a stale POST to a retired 308 path re-POSTed to the successor:
+  urlencoded ended on a 200 page as if it had worked, multipart on a bare "Server action not
+  found." (confirmed in Chromium — every prerendered page carries `experimentalBypassFor`
+  multipart), `text/plain` and JSON on a bare 405. The spec pinned that table as expected. Now
+  route handlers via `retiredRoute()`; 304/304 retired-route E2E on both projects.
+- **Analytics.** At `228fdaf` a forged `product_viewed` carrying `query` logged
+  `customer@example.com order 10001`. Now strict per-event schemas over catalogue values; search
+  reports `searchFacets()`, never text; "Measurement preferences" in every footer and on
+  `/privacy` reopens consent.
+- **Claim expiry, measured by `scripts/experiment-claim-expiry.mjs`.** Fixture approval expiring
+  the day of the build; a server running on the real clock whose `Date` and `performance` clocks
+  then jump two days:
+  - `228fdaf` — **FAIL** (2026-10-02T09:29:10.524Z): 24 requests over `/`, `/about`, `/materials`, every one a cache HIT still carrying the expired wording; share card unchanged.
+  - `9555256` — **PASS** (2026-10-02T09:30:04.891Z): first request STALE (the stated "plus one request"), second HIT with the wording gone from hero, metadata and every Footer; share card regenerated.
+  - The experiment's first design moved only `Date` (Next's cache reads `performance`) and
+    started a second server after the move; its FAIL for the fixed build, and its earlier
+    `228fdaf` FAIL, were discarded. A test now runs the preload in a child process and checks
+    both clocks.
+- **Live surface.** The 2 MB cap was applied after `response.text()` downloaded everything;
+  attribution ran before identity. Now a streaming cap with `truncated`, identity before cause,
+  and an issue a named person must `/ack` within 72h.
+- **Gate evidence.** GitHub reported PR #90 `mergeable_state: clean` while it was a draft, so
+  `denied` now also requires draft/conflict/behind readings and head–merge agreement.
+- **Review.** `/code-review` (high) found ten defects in this work — the worst a `/policies` 308
+  turned into a 404 — all fixed; `/security-review` found nothing reportable. A second
+  `/code-review` over the close-out (`c9a035c..20fbd26`) found nine. Six were fixed in `f8389b5`,
+  and the seventh in part:
+  - expired wording that *appears* after expiry is now FAIL;
+  - the hero-cap pin reads every declaration in `src`;
+  - every `LIVE` doc-number row must state its own value.
+
+  The spec's token-read ceiling, browser sentinels outside the audit, and commit-type history
+  stay as they are, with reasons in the commit.
+- **Assertion liveness.** The full probe over the finished branch found 37 of 38 vitest
+  sentinels alive. `merge-denial-attribution` was dead: its mutation ORed in `mergeable`, the old
+  name of judgeDenial's "merge button works" local, and the gate-evidence commit had renamed that
+  local and added a `mergeable` *parameter* that every NOT-DENIED fixture left null. The anchor
+  still matched, so nothing but the probe could tell. The NOT-DENIED fixtures now also run under
+  the ready preconditions, and the sentinel names `buttonWorks` again: 38 of 38 alive.
+- **The two browser sentinels, run by hand** (they need a production build and only run under
+  `--with-e2e`, never in the six-hourly audit). `product-tile-bound` is alive (10 tests red).
+  `hero-card-bound` had been **dead since it was written on 2026-08-28**. The card measures at
+  most 0.514 of the photograph, so the 0.60 cap never binds, and the hero spec reads its ceiling
+  from the same token. Raised to 0.98, nothing rendered moved and the ceiling moved with it: 48
+  passed. The claim "no more than 60%" could be changed silently. It is now two sentinels:
+  - `hero-card-bound` is a vitest sentinel. A `doc-numeric-claims` row pins the token to
+    CLAUDE.md's stated 0.60.
+  - `hero-card-measured` is a browser sentinel. It forces the card past its cap, which proves
+    the measurement fires.
+
+  That makes 41 sentinels, 39 vitest. After the second review below, the full probe on `f8389b5`
+  found all 39 vitest sentinels alive; the two browser ones are alive by hand.
+- **Claim expiry, JSON-LD.** The question named JSON-LD and the experiment reads it, but no
+  builder routes a claim into structured data, so it was `false` in every baseline and silently
+  outside the verdict. Every verdict now names its `unexercised` surfaces. Re-run on `09fafad`:
+  **PASS** (2026-10-02T15:31:48.099Z). `/`, `/about` and `/materials` were each STALE once, then
+  a HIT without the wording; the share card regenerated; `unexercised: ['jsonLd']`.
+- **Agents.** Two were started and both stopped on the account session limit within minutes,
+  leaving nothing. One integrator after that, by the owner's direction.
+
+### Still blocked, and on what
+
+- **The merge gate does not hold, and the cause is now read, not guessed.** The owner reported
+  the `main` ruleset created and read back. The canary ran on 2026-10-02 as PR #94: one failing
+  unit test, ready for review.
+  - `verify` failed, yet GitHub read `mergeable_state: unstable` twice: **NOT-DENIED**.
+  - #94 was then **merged into `main`** at 16:15:34 UTC from the owner's account (`ebdebc0`). No
+    agent merged it. It is direct proof the gate did not hold, and it put the failing test on
+    `main`. Production is functionally unaffected, because tests are not shipped.
+  - #93 was merged a minute later (`be34099`) at a head that did not yet remove the test, so
+    `main` stayed red. **#95 removes it.** Reverting #94 on its own is the other way back.
+  - **#93's merge auto-deployed this whole release to production while the gate was down**, so
+    `PREVIEW_VERIFIED` was skipped. The release is live and owes its production checks now.
+  - **The cause, read back on 2026-10-03:** ruleset `Main` (24077858) is active but holds **only a
+    `deletion` rule**, targets `~ALL`, and has an Integration bypass actor. The judge reads
+    `mismatched`. The full read is in the runbook's evidence table, and what changed at its last
+    update is unknown (history: 403).
+  - The `~ALL` target has to narrow to `main` before the pull-request rule is added; on every
+    branch, that rule would block every direct push.
+  - The canary is re-run only with a design that is inert if merged, and only after the rules read
+    back `enforced`.
+- The owner's 2026-09-27 platform observations (apex 307 → www; commerce variables still set;
+  no `RATE_LIMIT_KEY_SECRET` in the project inventory) are recorded in masterplan §7 as theirs:
+  this session's Vercel connector answered 403 for the team scope.
+- Contact copy ("Message sent" means provider acceptance) and a delivery-and-reply test are a
+  person's judgement; claims, privacy sign-off and retention stay with their owners.
 
 ## Session note — 2026-09-27
 

@@ -4,6 +4,58 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
+
+- **The merge gate is proven.** The repaired ruleset read back conclusive. Then the v2 canary
+  (#98) was refused: GitHub blocked a ready-for-review pull request with no conflicts, up to date
+  with `main`, whose `verify` had failed, and nobody pressed Merge. It was closed unmerged.
+  `merge-gate` is `configured`, and its registry entry says what the six-hourly probe cannot see
+  until an audit token is added. The proof holds for this version of the ruleset, and is run again
+  after any change to it.
+- **`Production admission` has run both ways for real**: admitted on `main`'s push, refused on
+  the canary. The deployment platform does not wait for it yet.
+- **The merge-gate canary was merged, and its failing test reached `main`.** #95 deleted it (`81fd782`). `main`'s push run is green on `verify` and E2E. The
+  incident is masterplan §13: detection worked; GitHub source admission and Vercel production
+  admission failed. Each is recorded as its own assertion, and four independent evidence flags
+  sit beside the state machine.
+- **A `Production admission` check passes only on explicit success**, so the deployment platform
+  can be told to wait for it before assigning production aliases. A skipped, cancelled or
+  missing result is a refusal. It is not configured in the platform yet, and it is never called
+  proven without an owner-approved test on the real promotion path
+  ([ADR 039](docs/adr/039-a-ready-build-is-not-a-passing-build.md)).
+- **The retained webhook receiver is proven to do nothing without its secret**: 503, no cache
+  invalidation, no order line. That is shown in a mutation-checked test and on a local
+  production build.
+- The ruleset runbook repairs the existing ruleset instead of adding one, and its read-backs take
+  their credential from a store, never from a typed token.
+
+## 2026-10-02 — PR #93: Release review for #90 — four controls asked what they actually observe
+
+- **A stale action on a retired path ends on a page a person can read.** The 308 families are
+  route handlers (`retiredRoute()`): browsing keeps the 308, every other method answers the 410
+  page. A multipart product form no longer dead-ends on "Server action not found.".
+- **A forged beacon cannot put a visitor's words into the log.** One strict schema per event;
+  search records the collections and metals it named, never the text. Consent can be withdrawn
+  from every page.
+- **An expired claim approval leaves the served page within an hour**, proven by a build-and-serve
+  experiment that fails on the old build and passes on the new.
+- **The live-surface probe reads under a real byte cap**, settles which build each host serves
+  before naming a cause, and opens an issue a named person must acknowledge.
+- **The canary proof** attributes a block to the failing check only for a non-draft,
+  conflict-free, up-to-date pull request whose head and merge commit agree.
+- **A sentinel a rename had killed is alive again.** `merge-denial-attribution` still applied
+  after a refactor gave its variable a new meaning, and stayed green; the full liveness probe
+  found it.
+- **The hero card's 60% cap can no longer be raised silently.** Its sentinel had been dead since
+  it was written: the cap never binds and the spec read its ceiling from the cap. The number is
+  now pinned to CLAUDE.md, wherever in `src` it is declared, and a separate browser sentinel
+  proves the measurement fires. All 41 sentinels are alive: 39 by the full probe, 2 by hand.
+- **The claim-expiry experiment says what it did not prove.** Every verdict names the surfaces no
+  page carried before expiry. Today that is JSON-LD, because no claim reaches structured data.
+- [ADR 038](docs/adr/038-what-a-control-observes-is-not-what-it-claims.md); `AGENTS.md` lists the
+  actions no agent takes; the masterplan's §6 is a state machine whose transitions need a recorded
+  observation.
+
 ## 2026-09-27 — PR #90: Masterplan v2 — the boundary compared at the right grain, and five live defects
 
 A proposed revision of the decommission plan was measured against the repository before it

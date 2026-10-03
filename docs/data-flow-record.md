@@ -41,11 +41,12 @@ event schema in depth.
 
 | | |
 |---|---|
-| Fields collected | Only after the visitor chooses Allow. `product_viewed` carries handle, collection and material. `collection_viewed` carries collection and product count. `search_performed` carries the query, trimmed, lower-cased and cut to 64 characters, and the result count. No identifier, cookie, IP address, user agent or referrer is in the record (`src/lib/analytics/events.ts`, `src/app/api/analytics/route.ts`) |
+| Fields collected | Only after the visitor chooses Allow. `product_viewed` carries handle, collection and material. `collection_viewed` carries collection and product count. `search_performed` carries the result count and the collections or metals the query named (`searchFacets()`) — never the query, since 2026-09-27. Every value is validated against the catalogue and anything else drops the whole event. No identifier, cookie, IP address, user agent or referrer is in the record (`src/lib/analytics/events.ts`, `src/app/api/analytics/route.ts`) |
 | Purpose | To learn which pieces, collections and searches draw attention. There is no conversion to measure (`docs/analytics.md`) |
 | Provider | Vercel, as the host of the function that writes the log line. There is no analytics vendor |
 | Storage location | One `[analytics] {json}` line per event in Vercel function logs, and nowhere else. The consent answer itself is one `localStorage` entry, `hj-analytics-consent`, in the visitor's own browser. It is never sent to the server |
-| Logs | The log line *is* the storage |
+| Logs | The log line *is* the storage. Separately, the hosting platform's request logs record every URL served, including `/search?q=…`; that is platform logging outside this pipeline, listed so it is not mistaken for absent |
+| Withdrawal | "Measurement preferences" in the footer of every page and on `/privacy` reopens the consent prompt; Decline stops the next event. Records already written are not deleted by it |
 | Access roles | Members of the Vercel project with log access: not yet decided — WS-G/WS-H |
 | Deletion procedure | None exists from this repository. Because a record carries no identifier, no record can be found for a particular person who asks. That is a consequence of the design, not a procedure |
 | Retention period | Vercel's function-log retention for the plan in use: not yet decided — WS-G/WS-H |

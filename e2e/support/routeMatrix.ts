@@ -153,6 +153,36 @@ export function variantsFor(row: ForbiddenRouteRow): RouteVariant[] {
   return out
 }
 
+/** Methods that ask for a page. Every other method asks the route to *do* something. */
+export const SAFE_METHODS: readonly MatrixMethod[] = ['GET', 'HEAD']
+
+/**
+ * What `method` must get for `variant` — the variant's own expectations are the browsing
+ * (GET/HEAD) answer.
+ *
+ * A 308 row redirects browsing only. Every other method gets the 410 page from
+ * `retiredRoute()`, because a 308 obliges the client to repeat the method at the successor
+ * and a stale POST re-sent to `/shop` is a dead end (contract §7, "What a 308 answers to an
+ * action"). So a hop that redirects to the row's **successor** becomes a 410 for an unsafe
+ * method. Next's own trailing-slash hop is not a successor redirect — its location is the
+ * slashless path, never the row's destination — and it stays a 308 for every method, which is
+ * how a POST to `/cart/` ends: 308 to `/cart`, then the 410 there.
+ */
+export function expectationFor(
+  variant: RouteVariant,
+  method: MatrixMethod,
+  rows: readonly ForbiddenRouteRow[]
+): { first: HopExpectation; then: HopExpectation | null } {
+  if (SAFE_METHODS.includes(method)) return { first: variant.first, then: variant.then }
+  const row = rows.find((r) => r.route === variant.family)
+  if (!row || row.status !== 308 || row.location === null) return { first: variant.first, then: variant.then }
+  const gone: HopExpectation = { status: 410, location: null }
+  const toSuccessor = (hop: HopExpectation) =>
+    hop.status === 308 && hop.location !== null && hop.location.split('?')[0] === row.location
+  const map = (hop: HopExpectation) => (toSuccessor(hop) ? gone : hop)
+  return { first: map(variant.first), then: variant.then === null ? null : map(variant.then) }
+}
+
 /** The whole matrix, one row at a time, in contract order. */
 export function retiredRouteMatrix(rows: readonly ForbiddenRouteRow[]): RouteVariant[] {
   return rows.flatMap(variantsFor)

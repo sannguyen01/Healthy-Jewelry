@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { legalLinks } from '@/config/navigation'
+import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 import { claimText } from '@/lib/catalog'
 
 /**
@@ -143,6 +145,42 @@ export function Footer() {
               </div>
             </div>
           ))}
+          {/* Shop column */}
+          <div>
+            <p style={columnHeadStyle}>Shop</p>
+            {shopLinks.map((link) => (
+              <Link key={link.href} href={link.href} style={linkStyle}>
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Info column */}
+          <div>
+            <p style={columnHeadStyle}>Info</p>
+            {infoLinks.map((link) => (
+              <Link key={link.href} href={link.href} style={linkStyle}>
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Legal column */}
+          <div>
+            <p style={columnHeadStyle}>Legal</p>
+            {legalLinks.map((link) => (
+              <Link key={link.href} href={link.href} style={linkStyle}>
+                {link.label}
+              </Link>
+            ))}
+            {/*
+              Withdrawing consent has to be as easy as giving it, and the prompt that gave it
+              appears once. This reopens it from every page (CONSENT_OPEN_EVENT in
+              src/lib/analytics/consent.ts). Styled as a link so the column reads as one list,
+              and a <button> underneath because it opens something rather than going anywhere.
+            */}
+            <MeasurementPreferences style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }} />
+          </div>
         </div>
 
         {/* Bottom bar */}

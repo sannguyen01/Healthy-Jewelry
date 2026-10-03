@@ -33,6 +33,7 @@ import {
   collectionSchema,
   productSchema,
   pendingFieldCount,
+  COLLECTION_HANDLES,
   MATERIAL_HANDLES,
   type CatalogCollection,
   type CatalogProduct,
@@ -230,6 +231,58 @@ export function searchProducts(query: string): readonly CatalogProduct[] {
       p.specification.toLowerCase().includes(q) ||
       p.collection.toLowerCase().includes(q)
   )
+}
+
+/** A collection or material a search named — what `search_performed` reports instead of the text. */
+export type SearchFacet = CollectionHandle | MaterialHandle
+
+/**
+ * Which word names which shelf, derived once from the catalogue.
+ *
+ * Each collection handle and its singular ("rings", "ring"), and every word of every product's
+ * `material` and `materialLabel` ("surgical", "steel", "316l"; "grade", "titanium"). Nothing
+ * here is typed by hand, so a renamed collection or a new material changes the vocabulary with
+ * no edit. A word that would name two different facets is dropped rather than guessed at, and
+ * words under three characters are ignored — "23" or "ti" alone say too little to report.
+ */
+const FACET_WORDS: ReadonlyMap<string, SearchFacet> = (() => {
+  const words = new Map<string, SearchFacet>()
+  const ambiguous = new Set<string>()
+  const add = (word: string, facet: SearchFacet) => {
+    if (word.length < 3 || ambiguous.has(word)) return
+    const seen = words.get(word)
+    if (seen === undefined) words.set(word, facet)
+    else if (seen !== facet) {
+      words.delete(word)
+      ambiguous.add(word)
+    }
+  }
+  for (const handle of COLLECTION_HANDLES) {
+    add(handle, handle)
+    add(handle.replace(/s$/, ''), handle)
+  }
+  for (const p of products) {
+    for (const word of `${p.material} ${p.materialLabel}`.toLowerCase().split(/[^a-z0-9]+/)) add(word, p.material)
+  }
+  return words
+})()
+
+/**
+ * The collections and materials a query names — sorted, unique, and nothing else.
+ *
+ * This is what analytics records about a search, so its output is the privacy boundary for
+ * the one free-text input the site has: every value it can return is a handle the catalogue
+ * already publishes. "customer@example.com ring" reports `['rings']`; an email alone reports
+ * `[]`. See `SearchFacet` in `src/lib/analytics/events.ts` for why the text itself stopped
+ * being recorded.
+ */
+export function searchFacets(query: string): SearchFacet[] {
+  const found = new Set<SearchFacet>()
+  for (const word of normaliseSearchQuery(query).split(/[^a-z0-9]+/)) {
+    const facet = FACET_WORDS.get(word)
+    if (facet) found.add(facet)
+  }
+  return [...found].sort()
 }
 
 /**

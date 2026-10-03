@@ -18,7 +18,10 @@
  *
  * ## Usage
  *
- *   GITHUB_TOKEN=… node scripts/probe-merge-denial.mjs --pr <number> [--out evidence.json]
+ *   GITHUB_TOKEN=… node scripts/probe-merge-denial.mjs --pr <number> [--out evidence.json] [--observer <name>]
+ *
+ * `--observer` is who ran it, recorded as given; without it the record says `null` rather than
+ * guessing a name from a token.
  *
  * The procedure that produces a canary pull request is in `docs/runbooks/main-ruleset.md`.
  *
@@ -69,10 +72,10 @@ async function get(pathname, token) {
 }
 
 /**
- * Parse `--pr N` and `--out path`.
+ * Parse `--pr N`, `--out path` and `--observer name`.
  *
  * @param {string[]} argv
- * @returns {{ pr: number | null, out: string | null }}
+ * @returns {{ pr: number | null, out: string | null, observer: string | null }}
  */
 export function parseArgs(argv) {
   const value = (flag) => {
@@ -81,13 +84,14 @@ export function parseArgs(argv) {
   }
   const raw = value('--pr')
   const pr = raw && /^\d+$/.test(raw) ? Number(raw) : null
-  return { pr, out: value('--out') }
+  const observer = value('--observer')
+  return { pr, out: value('--out'), observer: observer && observer.trim() ? observer.trim().slice(0, 100) : null }
 }
 
 async function main() {
-  const { pr: prNumber, out } = parseArgs(process.argv.slice(2))
+  const { pr: prNumber, out, observer } = parseArgs(process.argv.slice(2))
   if (prNumber === null) {
-    console.error('Usage: node scripts/probe-merge-denial.mjs --pr <number> [--out evidence.json]')
+    console.error('Usage: node scripts/probe-merge-denial.mjs --pr <number> [--out evidence.json] [--observer <name>]')
     return 2
   }
   const token = process.env.GITHUB_TOKEN
@@ -105,18 +109,37 @@ async function main() {
   const requiredContexts =
     protection.state === 'unevaluable' ? null : protection.state === 'absent' ? [] : protection.contexts
 
-  const checkRuns = headSha
-    ? ((await get(`/repos/${REPO}/commits/${headSha}/check-runs?per_page=100`, token)).body?.check_runs ?? [])
-    : []
-  const statuses = headSha
-    ? ((await get(`/repos/${REPO}/commits/${headSha}/status`, token)).body?.statuses ?? [])
-    : []
+  const runsAt = async (sha) => (await get(`/repos/${REPO}/commits/${sha}/check-runs?per_page=100`, token)).body?.check_runs ?? []
+  const statusesAt = async (sha) => (await get(`/repos/${REPO}/commits/${sha}/status`, token)).body?.statuses ?? []
+  // The test merge commit GitHub may evaluate instead of the head, read the same way. Absent
+  // until GitHub has computed mergeability, and then honestly `null` rather than empty.
+  const mergeCommitSha = prBody?.merge_commit_sha ?? null
+
+  // Five independent reads, concurrently. How far the head is behind its base matters because
+  // strict mode blocks that on its own; `null` when it could not be read — never assumed zero.
+  const [checkRuns, statuses, mergeCommitRuns, mergeCommitStatuses, compared] = await Promise.all([
+    headSha ? runsAt(headSha) : [],
+    headSha ? statusesAt(headSha) : [],
+    mergeCommitSha ? runsAt(mergeCommitSha) : null,
+    mergeCommitSha ? statusesAt(mergeCommitSha) : null,
+    headSha ? get(`/repos/${REPO}/compare/${encodeURIComponent(baseRef)}...${headSha}`, token) : null,
+  ])
+  const behindBy = compared?.status === 200 && Number.isInteger(compared.body?.behind_by) ? compared.body.behind_by : null
+
+  const draft = typeof prBody?.draft === 'boolean' ? prBody.draft : null
+  const mergeable = typeof prBody?.mergeable === 'boolean' ? prBody.mergeable : null
 
   const judgement = judgeDenial({
     mergeableState: prBody?.mergeable_state ?? null,
     requiredContexts,
     checkRuns,
     statuses,
+    draft,
+    mergeable,
+    behindBy,
+    requireUpToDate: typeof protection.strict === 'boolean' ? protection.strict : null,
+    mergeCommitRuns,
+    mergeCommitStatuses,
   })
 
   const record = evidenceRecord({
@@ -140,6 +163,12 @@ async function main() {
       },
     },
     judgement,
+    mergeCommitSha,
+    draft,
+    mergeable,
+    behindBy,
+    rulesetIds: Object.keys(readings.rulesets ?? {}),
+    observer,
   })
 
   const json = JSON.stringify(record, null, 2)

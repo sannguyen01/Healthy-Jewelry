@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  isAnalyticsEventName,
-  sanitiseQuery,
-  MAX_QUERY_LENGTH,
-  type AnalyticsEvent,
-} from '@/lib/analytics/events'
+import { z } from 'zod'
+import { isAnalyticsEventName, type AnalyticsEvent, type AnalyticsEventName } from '@/lib/analytics/events'
+import { getAllProducts } from '@/lib/catalog'
+import { COLLECTION_HANDLES, MATERIAL_HANDLES } from '@/lib/catalog/schema'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
@@ -29,9 +27,10 @@ import { readBoundedBody } from '@/lib/http/readBoundedBody'
  * ## What is deliberately not recorded
  *
  * No cookies, no identifiers, no IP address, no user agent, no referrer, no
- * session. Nothing here can be joined back to a person, which is why the payload
- * is a fixed shape rather than an open bag: an open bag is how PII arrives by
- * accident. `clientIp` is read for rate limiting and never written.
+ * session, and — since 2026-09-27 — no text anybody typed. Every value this route can
+ * write is one the catalogue already publishes (a product, collection or material
+ * handle) or a count no larger than the catalogue, so a log line cannot carry a word the
+ * site did not already contain. `clientIp` is read for rate limiting and never written.
  *
  * The client only reaches this route after explicit consent
  * (`src/lib/analytics/consent.ts`); the validation below is the second line, for
@@ -57,62 +56,74 @@ const limiter = createRateLimiter({
 /** Small by design. A legitimate event is a few hundred bytes. */
 const MAX_BODY_BYTES = 2_048
 
-const str = (value: unknown, max: number): string | undefined =>
-  typeof value === 'string' && value.length > 0 ? value.slice(0, max) : undefined
-const num = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isFinite(value) ? value : undefined
+/**
+ * **One strict schema per event — the exact fields that event defines, and nothing else.**
+ *
+ * Until 2026-09-27 this was one allowlist over the *union's* fields, so a direct POST could
+ * attach one event's field to another: `product_viewed` carrying `query`, the one free-text
+ * field, was logged with it. Lower-casing and cutting to 64 characters bounded how much of a
+ * pasted email address, phone number or order reference got written, not whether it did. And
+ * the other fields were open too — `handle` took any string, `productCount` any finite
+ * number, so a phone number was a valid count.
+ *
+ * Now every value is enumerated or bounded by the catalogue, and `.strict()` rejects any key
+ * the event does not define. **A payload that fails drops the whole event**: a record that is
+ * partly forged is not partly true, and keeping its valid half would tell an attacker which
+ * half got through. `search_performed` carries no text at all (see `SearchFacet`).
+ */
+const PRODUCT_HANDLES = new Set(getAllProducts().map((p) => p.handle))
 
-/** Every field any event in the union carries, other than its name. */
-type KeysOfUnion<T> = T extends unknown ? keyof T : never
-type EventField = Exclude<KeysOfUnion<AnalyticsEvent>, 'name'>
+/** The largest count the catalogue can produce: no collection or search holds more products than exist. */
+const MAX_COUNT = getAllProducts().length
+
+const count = z.number().int().min(0).max(MAX_COUNT)
+const collection = z.enum(COLLECTION_HANDLES)
+const material = z.enum(MATERIAL_HANDLES)
+
+const EVENT_SCHEMAS = {
+  product_viewed: z
+    .object({
+      name: z.literal('product_viewed'),
+      handle: z.string().refine((handle) => PRODUCT_HANDLES.has(handle)),
+      collection,
+      material,
+    })
+    .strict(),
+  collection_viewed: z.object({ name: z.literal('collection_viewed'), collection, productCount: count }).strict(),
+  search_performed: z
+    .object({
+      name: z.literal('search_performed'),
+      resultCount: count,
+      facets: z
+        .array(z.union([collection, material]))
+        .max(COLLECTION_HANDLES.length + MATERIAL_HANDLES.length)
+        .refine((facets) => new Set(facets).size === facets.length),
+    })
+    .strict(),
+} satisfies { [N in AnalyticsEventName]: z.ZodType<Extract<AnalyticsEvent, { name: N }>> }
 
 /**
- * One coercion per field the event union defines — **exactly** those fields.
- *
- * `satisfies Record<EventField, …>` makes the set a compile-time equality with
- * `AnalyticsEvent`: a field added to the union without a line here is a type error,
- * and so is a line here for a field no event defines. That second direction is the
- * one that had failed. Until 2026-09-25 this allowlist still copied `value`,
- * `currency`, `quantity`, `itemCount` and `reason` into the log — the price and
- * cart fields of four events deleted with the commerce UI — so anything posting
- * `{ value: '89.00', currency: 'USD' }` directly to this route had it written to a
- * log on a site that publishes no prices. No client sent them; the sink simply
- * outlived the vocabulary it was written for.
+ * The other direction of that `satisfies`: each schema's output is *exactly* its event, not
+ * merely assignable to it. A field added to an event without a line in its schema — or a
+ * schema accepting a field no event defines — is a type error, in the gate, before a beacon
+ * can carry it.
  */
-const FIELD_SANITISERS = {
-  handle: (value: unknown) => str(value, 128),
-  collection: (value: unknown) => str(value, 64),
-  material: (value: unknown) => str(value, 64),
-  productCount: num,
-  resultCount: num,
-  // Sanitised again server-side. The client already truncates, but a route that
-  // trusts its client for the one free-text field is not validating anything.
-  query: (value: unknown) =>
-    typeof value === 'string' ? sanitiseQuery(value.slice(0, MAX_QUERY_LENGTH)) : undefined,
-} satisfies Record<EventField, (value: unknown) => string | number | undefined>
+type Flat<T> = { [K in keyof T]: T[K] }
+type Same<A, B> = (<T>() => T extends Flat<A> ? 1 : 2) extends <T>() => T extends Flat<B> ? 1 : 2 ? true : false
+const exact: { [N in AnalyticsEventName]: Same<z.infer<(typeof EVENT_SCHEMAS)[N]>, Extract<AnalyticsEvent, { name: N }>> } = {
+  product_viewed: true,
+  collection_viewed: true,
+  search_performed: true,
+}
+void exact
 
-/**
- * Copy across only the fields the event union defines, coercing each.
- *
- * An allowlist, never a spread: spreading the request body would let anything a
- * caller invents reach the logs, which is precisely how a field carrying an email
- * address ends up in a log retention policy nobody wrote it into.
- *
- * The allowlist is the union's field set, not each event's own: a direct POST of
- * `product_viewed` carrying a `query` is logged with it, sanitised. Every field is
- * bounded, and the one free-text field is lower-cased and truncated whichever
- * event carries it, so per-event narrowing would tidy the record without changing
- * what it can hold. Recorded as a known limit rather than implied away.
- */
-function sanitiseEvent(body: Record<string, unknown>): Record<string, unknown> | null {
+/** The event exactly as its schema admits it, or `null` — never a partial record. */
+function parseEvent(body: unknown): AnalyticsEvent | null {
+  if (typeof body !== 'object' || body === null || !('name' in body)) return null
   const name = typeof body.name === 'string' ? body.name : ''
   if (!isAnalyticsEventName(name)) return null
-
-  const event: Record<string, unknown> = { name }
-  for (const [field, clean] of Object.entries(FIELD_SANITISERS)) {
-    event[field] = clean(body[field])
-  }
-  return event
+  const parsed = EVENT_SCHEMAS[name].safeParse(body)
+  return parsed.success ? parsed.data : null
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -136,11 +147,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 })
   }
 
-  if (typeof parsed !== 'object' || parsed === null) {
-    return new NextResponse(null, { status: 204 })
-  }
-
-  const event = sanitiseEvent(parsed as Record<string, unknown>)
+  const event = parseEvent(parsed)
   if (!event) return new NextResponse(null, { status: 204 })
 
   // `console.log`, deliberately, not `error` or `warn`. These are routine and

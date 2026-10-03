@@ -247,11 +247,81 @@ export const SENTINELS = [
     id: 'analytics-sink-allowlist',
     runner: 'vitest',
     file: 'src/app/api/analytics/route.ts',
-    find: '  const event: Record<string, unknown> = { name }',
-    replace: '  const event: Record<string, unknown> = { ...body, name }',
+    find: '  return parsed.success ? parsed.data : null',
+    replace: '  return parsed.success ? parsed.data : (body as AnalyticsEvent)',
     specs: ['src/tests/unit/api-analytics-route.test.ts'],
-    invariant: 'only fields the event union defines reach the analytics log line',
-    scar: 'After the purchase events were deleted, the sink still copied value, currency, quantity, itemCount and reason into its log, so a price posted to the route was logged on a site that publishes no prices.',
+    invariant: 'an analytics payload outside its event\'s strict schema is dropped whole, so no field or value the catalogue did not publish reaches the log line',
+    scar: 'After the purchase events were deleted, the sink still copied value, currency, quantity, itemCount and reason into its log; and until 2026-09-27 its allowlist was the union of every event\'s fields, so a forged product_viewed carrying a search query logged "customer@example.com order 10001".',
+  },
+  {
+    id: 'consent-withdrawal',
+    runner: 'vitest',
+    file: 'src/components/layout/ConsentBanner.tsx',
+    find: '      setOpenRequests((n) => n + 1)',
+    replace: '      setOpenRequests((n) => n)',
+    specs: ['src/tests/unit/analytics.test.ts'],
+    invariant: 'an answered consent prompt reopens from "Measurement preferences", so withdrawal is as easy as consent was',
+    scar: 'Until 2026-09-27 the banner appeared once and the only way to take an Allow back was clearing this site\'s data in the browser settings — the privacy page said so, and called it the way to change the answer.',
+  },
+  {
+    id: 'claim-withdrawal-bound',
+    runner: 'vitest',
+    file: 'src/app/layout.tsx',
+    find: 'export const revalidate = 3600',
+    replace: 'export const revalidate = 86400',
+    specs: ['src/tests/unit/claim-expiry.test.ts'],
+    invariant: 'every claim-bearing segment re-renders within CLAIM_WITHDRAWAL_BOUND_SECONDS, so an expired approval leaves served pages without a redeploy',
+    scar: 'Built at 228fdaf with an approval expiring that day and served two days later, the expired positioning claim was still in the homepage hero, its meta description and every Footer on 8 cache HITs out of 8 — all 37 prerendered routes had no revalidation at all.',
+  },
+  {
+    id: 'retired-action-gone',
+    runner: 'vitest',
+    file: 'src/lib/http/goneResponse.ts',
+    find: '  return { ...goneRoute(copy), GET: redirect, HEAD: redirect }',
+    replace: '  return { ...goneRoute(copy), GET: redirect, HEAD: redirect, POST: redirect }',
+    specs: ['src/tests/unit/commerce-route-inventory.test.ts'],
+    invariant: 'a stale POST to a retired 308 path answers the 410 page there, never a redirect that repeats the POST at the successor',
+    scar: 'Until 2026-09-27 the 308s were config redirects: an old multipart product form re-POSTed to /shop and a visitor in Chromium was left on a bare "Server action not found." — while the spec pinned that table as expected.',
+  },
+  {
+    id: 'bounded-response-read',
+    runner: 'vitest',
+    file: 'scripts/lib/bounded-read.mjs',
+    find: "        reason = 'byte-cap'",
+    replace: "        reason = 'complete'",
+    specs: ['src/tests/unit/bounded-read.test.ts'],
+    invariant: 'a body longer than the cap is reported truncated, so an absence found in a prefix is never reported as clean',
+    scar: 'The live-surface probe called response.text() and sliced it: the whole body was downloaded first, and a page longer than two megabytes read as if it had been inspected in full.',
+  },
+  {
+    id: 'live-surface-identity-before-cause',
+    runner: 'vitest',
+    file: 'scripts/lib/live-surface.mjs',
+    find: "  if (observation.agreement === 'disagree') {",
+    replace: "  if (observation.agreement === 'disagree' && edgeCommerce.length === 0) {",
+    specs: ['src/tests/unit/live-surface.test.ts'],
+    invariant: 'when the edge and the deployment serve different builds that both carry commerce, the verdict is multiple-causes, never the source chain alone',
+    scar: 'The first classifier went from "edge and deployment both show commerce" straight to "the build carries it" without asking whether they were the same build, which would have sent someone to fix half of two problems.',
+  },
+  {
+    id: 'live-surface-ack-standing',
+    runner: 'vitest',
+    file: 'scripts/lib/live-surface-issue.mjs',
+    find: "export const ACK_ASSOCIATIONS = /** @type {const} */ (['OWNER', 'MEMBER', 'COLLABORATOR'])",
+    replace: "export const ACK_ASSOCIATIONS = /** @type {const} */ (['OWNER', 'MEMBER', 'COLLABORATOR', 'NONE'])",
+    specs: ['src/tests/unit/live-surface-issue.test.ts'],
+    invariant: 'only an owner, member or collaborator can acknowledge a live-surface finding, so a drive-by comment cannot silence its escalation',
+    scar: 'Until 2026-09-27 a non-clean live-surface classification became a job summary and a 30-day artifact and was read by nobody; the acknowledgement that replaces that is only a control if not just anyone can give it.',
+  },
+  {
+    id: 'denial-preconditions',
+    runner: 'vitest',
+    file: 'scripts/lib/merge-denial.mjs',
+    find: 'export function blockingPrecondition({ draft = null, mergeable = null, behindBy = null, requireUpToDate = null }) {',
+    replace: 'export function blockingPrecondition({ draft = null, mergeable = null, behindBy = null, requireUpToDate = null }) {\n  return null',
+    specs: ['src/tests/unit/probe-merge-denial.test.ts'],
+    invariant: 'a canary is judged denied only when it is read as not a draft, free of conflicts and not behind its base — otherwise the block is not attributable to the failing check',
+    scar: 'GitHub reported PR #90 mergeable_state "clean" while it was a draft, so the state does not encode draft-ness; the judgement read "blocked" as "blocked by the check" with nothing ruling the other causes out.',
   },
   {
     id: 'commerce-register-exact-set',
@@ -298,7 +368,11 @@ export const SENTINELS = [
     runner: 'vitest',
     file: 'scripts/lib/merge-denial.mjs',
     find: '  if (mergeableState === \'blocked\') {',
-    replace: '  if (mergeableState === \'blocked\' || mergeable) {',
+    // `buttonWorks`, not `mergeable`: this read `|| mergeable` when that was the name of the
+    // "merge button works" local. 7cdb6ea renamed it and added a `mergeable` *parameter* (GitHub's
+    // conflict reading), so the anchor still matched and the mutation silently ORed in a value
+    // every NOT-DENIED fixture left null — dead, and only the liveness probe could tell.
+    replace: '  if (mergeableState === \'blocked\' || buttonWorks) {',
     specs: ['src/tests/unit/probe-merge-denial.test.ts'],
     invariant: 'a pull request GitHub would merge while a required check failed is NOT-DENIED, never denied',
     scar: 'The proposed exit test was to press merge on a known-bad pull request; a misconfigured rule would have deployed it to production.',
@@ -414,16 +488,69 @@ export const SENTINELS = [
     scar: 'The site shipped with no Content-Security-Policy at all, so the plan to strip former commerce origins from connect-src had nothing to act on.',
   },
 
-  // ── Playwright: need a production build, so opt-in via --with-e2e ──
   {
+    // A vitest sentinel since 2026-10-02, and dead for the five weeks it was a Playwright one.
+    // The card measures at most 0.514 of the photograph, so a 0.60 cap never binds, and the hero
+    // spec reads its ceiling from this token: raised to 0.98, nothing rendered moved and the
+    // spec's ceiling moved with it (48 passed). No rendered measurement can see a raise, so the
+    // number is pinned to CLAUDE.md's stated 0.60, and `hero-card-measured` below proves the
+    // measurement itself fires.
     id: 'hero-card-bound',
-    runner: 'playwright',
+    runner: 'vitest',
     file: 'src/app/globals.css',
     find: '--hj-hero-card-max-ratio: 0.60;',
     replace: '--hj-hero-card-max-ratio: 0.98;',
-    specs: ['e2e/hero-legibility.spec.ts'],
+    specs: ['src/tests/unit/doc-numeric-claims.test.ts'],
     invariant: 'the hero copy card never covers more than 60% of the photograph',
     scar: 'Every guardrail on the hero was satisfied better the larger the card grew, so the codified pressure pointed one way and the end state is a photograph behind a floating memo — ADR 013.',
+  },
+  {
+    // The old guard test asserted the 503 and nothing else, so an invalidation placed above the
+    // secret check left it green. Proven on 2026-10-03: this mutation, and an order log line in
+    // the same place, each turned the 12 no-effect cases red while the 503 test passed.
+    id: 'receiver-unconfigured-no-effect',
+    runner: 'vitest',
+    file: 'src/app/api/webhooks/shopify/route.ts',
+    find: "    console.error('[webhooks/shopify] SHOPIFY_WEBHOOK_SECRET not set')",
+    replace: "    revalidateTag(PRODUCTS_TAG, PURGE_NOW)\n    console.error('[webhooks/shopify] SHOPIFY_WEBHOOK_SECRET not set')",
+    specs: ['src/tests/unit/api-webhooks-shopify-route.test.ts'],
+    invariant: 'with its signing secret absent, the retained receiver answers 503 and invalidates and logs nothing',
+    scar: 'The signing secret left the project before the receiver did (incident PR-94), so "fails closed" became the only thing between a surviving subscription and a cache purge, and the test proved the status code only.',
+  },
+  {
+    // "Admit unless something failed" is the rule GitHub applies to a skipped required check,
+    // and the reading that let a skipped E2E sit beside a failed verify. Mutated to exactly that.
+    id: 'production-admission-explicit-success',
+    runner: 'vitest',
+    file: 'scripts/lib/production-admission.mjs',
+    find: '  const unmet = ADMISSION_JOBS.filter((job) => results[job] !== required[job]).map(',
+    replace: "  const unmet = ADMISSION_JOBS.filter((job) => results[job] === 'failure').map(",
+    specs: ['src/tests/unit/production-admission.test.ts'],
+    invariant: 'production admission passes only on explicit success; skipped, cancelled or missing is a refusal',
+    scar: 'On 2026-10-02 two READY production deployments were built from a main whose verify had failed: a build that finished was read as a build that passed (incident PR-94).',
+  },
+  {
+    // A predicate that never matches makes every canary pass silently and read NOT-DENIED for the
+    // wrong reason. The accepted fixtures in the canary test are what notice.
+    id: 'merge-gate-canary-ref',
+    runner: 'vitest',
+    file: 'scripts/lib/merge-denial.mjs',
+    find: "  return typeof ref === 'string' && MERGE_GATE_CANARY_REF.test(ref)",
+    replace: '  return false',
+    specs: ['src/tests/unit/merge-gate-canary.test.ts'],
+    invariant: 'a correctly named merge-gate canary branch is recognised, so its pull request fails verify',
+    scar: "#94's canary failed everywhere, so its merge turned main red. v2 fails only in its own pull request, which makes the branch-name predicate the one thing standing between a canary and a silent pass.",
+  },
+  // ── Playwright: need a production build, so opt-in via --with-e2e ──
+  {
+    id: 'hero-card-measured',
+    runner: 'playwright',
+    file: 'src/components/home/Hero.tsx',
+    find: "          maxWidth: 'calc(var(--hj-hero-card-max-ratio) * 100%)',",
+    replace: "          minWidth: '75%', maxWidth: 'none',",
+    specs: ['e2e/hero-legibility.spec.ts'],
+    invariant: 'the hero card is measured against its cap in a real browser, not trusted to obey it',
+    scar: 'The cap shipped as a max-width the spec could have taken on faith; a card that outgrows it — a replaced rule, an inline override — has to be seen by measuring the box.',
   },
   {
     id: 'product-tile-bound',

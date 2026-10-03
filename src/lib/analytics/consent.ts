@@ -67,3 +67,28 @@ export function analyticsAllowed(state: ConsentState): boolean {
 export function shouldAskForConsent(state: ConsentState): boolean {
   return state === 'unset'
 }
+
+/**
+ * The window event that reopens the consent prompt.
+ *
+ * Until 2026-09-27 the only way to change an answer was to clear this site's data in the
+ * browser — technically possible, and nothing like as easy as giving consent was, which is the
+ * standard withdrawal has to meet. "Measurement preferences" (the Footer, and `/privacy`)
+ * dispatches this and `ConsentBanner` listens for it, so the one prompt that asks is also the
+ * one that changes the answer: one component, one storage write, one set of tests.
+ *
+ * A DOM event rather than shared state because the site holds no client state across
+ * components on purpose (CLAUDE.md, "State: none"), and the two halves live in different
+ * trees — the banner in the root layout, the buttons in a Server Component footer.
+ */
+export const CONSENT_OPEN_EVENT = 'hj:consent-open'
+
+/** Ask the banner to reopen. A no-op outside a browser; never throws into a click handler. */
+export function openConsentPreferences(target: Pick<EventTarget, 'dispatchEvent'> | undefined = globalThis.window): void {
+  try {
+    target?.dispatchEvent(new Event(CONSENT_OPEN_EVENT))
+  } catch {
+    // An environment without Event, or a target that refuses it. The banner simply does not
+    // open, which is the same as the button doing nothing — never a broken page.
+  }
+}

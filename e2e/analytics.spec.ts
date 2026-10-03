@@ -94,6 +94,71 @@ test.describe('Analytics consent', () => {
   })
 
   /**
+   * **Withdrawing consent is as easy as giving it.**
+   *
+   * Until 2026-09-27 the banner appeared once, and the only way to take an Allow back was
+   * clearing this site's data in the browser. "Measurement preferences" in the footer now
+   * reopens the same prompt, and `track()` reads the stored answer on every call — so the
+   * assertion is behavioural: the beacon count must stop moving the moment Decline is pressed.
+   */
+  test('a visitor can withdraw from the footer, and the next page sends nothing', async ({ page }) => {
+    const hits = recordAnalyticsRequests(page)
+
+    await page.goto('/')
+    await page.getByRole('dialog', { name: /analytics consent/i }).getByRole('button', { name: /^allow$/i }).click()
+    await page.goto('/products/arc-band-titanium')
+    await expect.poll(() => hits.length, { message: 'no analytics after consent' }).toBeGreaterThan(0)
+
+    await page.getByTestId('measurement-preferences').first().click()
+    const banner = page.getByRole('dialog', { name: /analytics consent/i })
+    await expect(banner).toBeVisible()
+    await expect(banner).toContainText(/currently allowed/i)
+    await expect(banner.getByRole('button', { name: /^allow$/i })).toHaveAttribute('aria-pressed', 'true')
+    await banner.getByRole('button', { name: /^decline$/i }).click()
+    await expect(banner).toHaveCount(0)
+
+    const before = hits.length
+    await page.goto('/products/disc-studs-titanium')
+    await page.waitForLoadState('networkidle')
+    expect(hits.length, 'analytics fired after the visitor withdrew consent').toBe(before)
+  })
+
+  test('the withdrawal control is on every page footer and on the privacy page', async ({ page }) => {
+    // Literal navigations, one per page, so spec-anchor-contract can resolve each of them.
+    const footerControl = () => page.locator('footer').getByTestId('measurement-preferences')
+    await page.goto('/')
+    await expect(footerControl(), '/').toHaveCount(1)
+    await page.goto('/shop')
+    await expect(footerControl(), '/shop').toHaveCount(1)
+    await page.goto('/privacy')
+    await expect(footerControl(), '/privacy').toHaveCount(1)
+    await expect(page.locator('main').getByTestId('measurement-preferences')).toHaveCount(1)
+  })
+
+  /**
+   * **A search puts no words on the wire.** The beacon carried the query until 2026-09-27; it
+   * now carries the collections and metals the query named. Asserted on the request body a
+   * real browser sends, for a query shaped like the thing it must never carry.
+   */
+  test('a search beacon carries what was named, never what was typed', async ({ page }) => {
+    const bodies: string[] = []
+    await page.route('**/api/analytics', async (route) => {
+      bodies.push(route.request().postData() ?? '')
+      await route.fulfill({ status: 204 })
+    })
+
+    await page.goto('/')
+    await page.getByRole('dialog', { name: /analytics consent/i }).getByRole('button', { name: /^allow$/i }).click()
+    // `customer@example.com ring`, percent-encoded as a literal the anchor scan can resolve.
+    await page.goto('/search?q=customer%40example.com%20ring')
+    await expect.poll(() => bodies.some((b) => b.includes('search_performed'))).toBe(true)
+
+    const search = JSON.parse(bodies.find((b) => b.includes('search_performed')) as string)
+    expect(search).toEqual({ name: 'search_performed', resultCount: 0, facets: ['rings'] })
+    for (const body of bodies) expect(body).not.toContain('customer@example.com')
+  })
+
+  /**
    * **The banner must not sit on top of anything a customer came to click.**
    *
    * This started as a Checkout-button-only check, and `hero-legibility.spec.ts`

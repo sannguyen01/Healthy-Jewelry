@@ -29,9 +29,17 @@ const run = (name: string, conclusion: string | null, status = 'completed', comp
 const allPassing = REQUIRED.map((name) => run(name, 'success'))
 const verifyFails = [run(REQUIRED[0], 'failure'), run(REQUIRED[1], 'success'), run(REQUIRED[2], 'skipped')]
 
+/**
+ * What a canary must also be read as, before a block can be pinned on its failing check: not a
+ * draft, free of conflicts, and not behind its base. These fixtures carried none of it until
+ * 2026-09-27 and read `denied` — the judgement took GitHub's "blocked" as meaning "blocked by the
+ * check", when GitHub had reported PR #90 "clean" while it was a draft.
+ */
+const READY = { draft: false, mergeable: true, behindBy: 0 } as const
+
 describe('judgeDenial — each verdict from a known answer', () => {
   it('denied: blocked, and a required check failed on the head commit', () => {
-    const result = judgeDenial({ mergeableState: 'blocked', requiredContexts: REQUIRED, checkRuns: verifyFails })
+    const result = judgeDenial({ mergeableState: 'blocked', requiredContexts: REQUIRED, checkRuns: verifyFails, ...READY })
     expect(result.verdict).toBe('denied')
     expect(result.reason).toBe('required-context-unmet')
     expect(result.unmet).toEqual([REQUIRED[0]])
@@ -40,14 +48,28 @@ describe('judgeDenial — each verdict from a known answer', () => {
 
   it('denied also when the required check is still pending, or never reported', () => {
     for (const checkRuns of [[run(REQUIRED[0], null, 'in_progress')], []]) {
-      expect(judgeDenial({ mergeableState: 'blocked', requiredContexts: REQUIRED, checkRuns }).verdict).toBe('denied')
+      expect(judgeDenial({ mergeableState: 'blocked', requiredContexts: REQUIRED, checkRuns, ...READY }).verdict).toBe('denied')
     }
   })
 
-  it.each(['clean', 'unstable', 'has_hooks'])(
-    'NOT-DENIED: "%s" while a required check has failed — the gate did not hold',
-    (mergeableState) => {
-      const result = judgeDenial({ mergeableState, requiredContexts: REQUIRED, checkRuns: verifyFails })
+  // Under READY too, because that is how a canary the gate let through actually reads — not a
+  // draft, no conflicts, up to date. Both rows matter. The "unread" rows catch a working button
+  // misread as a block (`|| buttonWorks`): it falls through to `precondition-unknown`, which is
+  // not NOT-DENIED. The "ready" rows are the only ones that catch the same mistake written
+  // against the `mergeable` *parameter* (`|| mergeable`) — null in every unread fixture, so a
+  // no-op there. That form is what merge-denial-attribution read after 7cdb6ea renamed the
+  // local, and with only unread rows it stayed green.
+  it.each([
+    ['clean', 'unread', {}],
+    ['unstable', 'unread', {}],
+    ['has_hooks', 'unread', {}],
+    ['clean', 'ready', READY],
+    ['unstable', 'ready', READY],
+    ['has_hooks', 'ready', READY],
+  ] as const)(
+    'NOT-DENIED: "%s" (preconditions %s) while a required check has failed — the gate did not hold',
+    (mergeableState, _label, preconditions) => {
+      const result = judgeDenial({ mergeableState, requiredContexts: REQUIRED, checkRuns: verifyFails, ...preconditions })
       expect(result.verdict).toBe('NOT-DENIED')
       expect(result.detail).toContain(REQUIRED[0])
     }
@@ -98,6 +120,67 @@ describe('judgeDenial — each verdict from a known answer', () => {
 
   it('emits only the declared verdicts', () => {
     expect([...DENIAL_VERDICTS].sort()).toEqual(['NOT-DENIED', 'denied', 'unevaluable'])
+  })
+})
+
+describe('judgeDenial — a block is pinned on the check only when nothing else explains it', () => {
+  const blocked = { mergeableState: 'blocked', requiredContexts: REQUIRED, checkRuns: verifyFails }
+
+  it.each([
+    [{ draft: true, mergeable: true, behindBy: 0 }, 'draft'],
+    [{ draft: false, mergeable: false, behindBy: 0 }, 'conflicts'],
+    [{ draft: false, mergeable: true, behindBy: 3 }, 'behind-base'],
+    [{ draft: null, mergeable: true, behindBy: 0 }, 'precondition-unknown:draft'],
+    [{ draft: false, mergeable: null, behindBy: 0 }, 'precondition-unknown:mergeable'],
+    [{ draft: false, mergeable: true, behindBy: null }, 'precondition-unknown:behindBy'],
+  ])('%o → unevaluable (%s), never denied', (readings, reason) => {
+    expect(judgeDenial({ ...blocked, ...readings })).toMatchObject({ verdict: 'unevaluable', reason })
+  })
+
+  it('behind its base is no reason to withhold a denial when the rules do not require up to date', () => {
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: 1, requireUpToDate: false }).verdict).toBe('denied')
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: null, requireUpToDate: false }).verdict).toBe('denied')
+    // Strict, or strictness unknown: behind may be the reason, so it is ruled out first.
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: 1, requireUpToDate: true }).reason).toBe('behind-base')
+    expect(judgeDenial({ ...blocked, draft: false, mergeable: true, behindBy: 1 }).reason).toBe('behind-base')
+  })
+
+  it('NOT-DENIED is never held back by an unknown precondition — a gate that did not hold is reportable', () => {
+    expect(judgeDenial({ mergeableState: 'clean', requiredContexts: REQUIRED, checkRuns: verifyFails })).toMatchObject({
+      verdict: 'NOT-DENIED',
+    })
+  })
+
+  it('head failing and the test merge commit passing the same context → unevaluable, not denied', () => {
+    const result = judgeDenial({ ...blocked, ...READY, mergeCommitRuns: allPassing, mergeCommitStatuses: [] })
+    expect(result).toMatchObject({ verdict: 'unevaluable', reason: 'head-merge-attribution-disagrees' })
+    expect(result.detail).toContain(REQUIRED[0])
+  })
+
+  it('and the other direction: head passing, merge commit failing', () => {
+    const result = judgeDenial({
+      mergeableState: 'blocked',
+      requiredContexts: REQUIRED,
+      checkRuns: [run(REQUIRED[0], 'success'), run(REQUIRED[1], 'failure'), run(REQUIRED[2], 'success')],
+      ...READY,
+      mergeCommitRuns: allPassing.map((r) => (r.name === REQUIRED[1] ? { ...r, conclusion: 'success' } : r)).map((r) =>
+        r.name === REQUIRED[0] ? { ...r, conclusion: 'failure' } : r
+      ),
+      mergeCommitStatuses: [],
+    })
+    expect(result.reason).toBe('head-merge-attribution-disagrees')
+  })
+
+  it('nothing reported on the merge commit is not a disagreement: the head decides', () => {
+    const result = judgeDenial({ ...blocked, ...READY, mergeCommitRuns: [], mergeCommitStatuses: [] })
+    expect(result.verdict).toBe('denied')
+    expect(result.mergeContexts).toEqual(Object.fromEntries(REQUIRED.map((c) => [c, 'missing'])))
+  })
+
+  it('agreeing head and merge commit still deny, and both readings are kept', () => {
+    const result = judgeDenial({ ...blocked, ...READY, mergeCommitRuns: verifyFails, mergeCommitStatuses: [] })
+    expect(result.verdict).toBe('denied')
+    expect(result.mergeContexts?.[REQUIRED[0]]).toBe('failing')
   })
 })
 
@@ -172,8 +255,15 @@ describe('pollMergeable waits out GitHub computing mergeability lazily', () => {
 })
 
 describe('the evidence record', () => {
-  it('carries what the runbook template asks for, dated', () => {
-    const judgement = judgeDenial({ mergeableState: 'blocked', requiredContexts: REQUIRED, checkRuns: verifyFails })
+  it('carries every field the canary procedure asks to be recorded, dated and attributed', () => {
+    const judgement = judgeDenial({
+      mergeableState: 'blocked',
+      requiredContexts: REQUIRED,
+      checkRuns: verifyFails,
+      ...READY,
+      mergeCommitRuns: [],
+      mergeCommitStatuses: [],
+    })
     const record = evidenceRecord({
       now: new Date('2026-09-26T12:00:00Z'),
       repo: 'sannguyen01/healthy-jewelry',
@@ -184,24 +274,52 @@ describe('the evidence record', () => {
       mergeableState: 'blocked',
       protection: { state: 'protected' },
       judgement,
+      mergeCommitSha: 'b'.repeat(40),
+      ...READY,
+      rulesetIds: ['4242'],
+      observer: 'sannguyen01',
     })
+    // The owner's list: PR number, head SHA, ruleset ID, required-context states, mergeability
+    // result, timestamp, observer — plus the merge commit and the three preconditions.
     expect(record).toMatchObject({
       recordedAt: '2026-09-26T12:00:00.000Z',
+      observer: 'sannguyen01',
       pullRequest: 90,
       headSha: 'a'.repeat(40),
+      mergeCommitSha: 'b'.repeat(40),
+      rulesetIds: ['4242'],
       mergeableState: 'blocked',
+      draft: false,
+      mergeable: true,
+      behindBy: 0,
       verdict: 'denied',
       requiredContexts: REQUIRED,
     })
+    expect(record.contextStates[REQUIRED[0]]).toBe('failing')
+    expect(record.mergeCommitContextStates).toEqual(Object.fromEntries(REQUIRED.map((c) => [c, 'missing'])))
+    expect(record.note).toMatch(/skipped/)
     expect(record.method).toMatch(/read-only/)
+  })
+
+  it('records an unattributed run as unattributed, never a guessed name', () => {
+    const judgement = judgeDenial({ mergeableState: 'blocked', requiredContexts: REQUIRED, checkRuns: verifyFails, ...READY })
+    const record = evidenceRecord({
+      now: new Date(), repo: 'r', prNumber: 1, headSha: 'a', baseRef: 'main', attempts: 1,
+      mergeableState: 'blocked', protection: {}, judgement,
+    })
+    expect(record.observer).toBeNull()
+    expect(record.rulesetIds).toEqual([])
   })
 })
 
 describe('parseArgs', () => {
   it('reads --pr and --out, and refuses a non-numeric pull request', () => {
-    expect(parseArgs(['--pr', '90', '--out', 'e.json'])).toEqual({ pr: 90, out: 'e.json' })
-    expect(parseArgs(['--pr', '90; rm -rf /'])).toEqual({ pr: null, out: null })
-    expect(parseArgs([])).toEqual({ pr: null, out: null })
+    expect(parseArgs(['--pr', '90', '--out', 'e.json'])).toEqual({ pr: 90, out: 'e.json', observer: null })
+    expect(parseArgs(['--pr', '90; rm -rf /'])).toEqual({ pr: null, out: null, observer: null })
+    expect(parseArgs([])).toEqual({ pr: null, out: null, observer: null })
+    // Recorded as given, trimmed and bounded; never inferred from a token.
+    expect(parseArgs(['--pr', '7', '--observer', '  sannguyen01  ']).observer).toBe('sannguyen01')
+    expect(parseArgs(['--pr', '7', '--observer', '   ']).observer).toBeNull()
   })
 })
 

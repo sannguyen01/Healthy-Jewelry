@@ -809,12 +809,14 @@ jobs:
       # names, twice each so the cache can speak — and classifies what it finds by the four
       # rules in scripts/lib/live-surface.mjs: source, alias, retrieval, or clean.
       #
-      # Report-only, like the step above and for a stronger reason: the purchase-era copy it
-      # records (free shipping, returns, warranty) is in source today pending legal review,
-      # so an issue filed on it would ask CI for something only an adviser can give. It files
-      # nothing and its exit 1 on a non-clean classification is kept from failing the audit by
-      # `continue-on-error`, as every probe here is. The JSON is uploaded as an artifact
-      # because the summary is a digest and the per-request record is the evidence.
+      # Never a gate, and since 2026-09-27 never unread. The purchase-era copy it records (free
+      # shipping, returns, warranty) is in source pending legal review and is not a finding;
+      # the classification is. Its exit 1 on a non-clean classification is kept from failing
+      # the audit by `continue-on-error`, as every probe here is, and the step below turns any
+      # non-clean or unevaluable classification into one issue with an acknowledgement deadline.
+      # Until then the evidence lived only in a 30-day artifact nobody was required to open. The
+      # JSON is uploaded because the summary is a digest and the per-request record is the
+      # evidence.
       - name: Live surface — where does any commerce on the live site come from?
         id: live-surface
         continue-on-error: true
@@ -834,6 +836,49 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+      # The live-surface report has a person attached (scripts/lib/live-surface-issue.mjs): one
+      # issue, updated in place; a named human comments `/ack` within 72h; one escalation if
+      # nobody does; closed on clean. The decision is the library's (ADR 030); this block only
+      # reads, lists and applies. `always() &&` because an `if:` naming no status function has
+      # `success()` ANDed onto it (ADR 027).
+      - name: Report a live surface that needs a person
+        if: always() && steps.live-surface.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const lib = `file://${process.env.GITHUB_WORKSPACE}/scripts/lib/live-surface-issue.mjs`
+            const { liveSurfaceIssuePlan, ownersFromCodeowners, LIVE_SURFACE_LABEL } = await import(lib)
+            const repo = { owner: context.repo.owner, repo: context.repo.repo }
+            const runUrl = `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`
+            let evidence = null
+            try { evidence = JSON.parse(fs.readFileSync('live-surface.json', 'utf-8')) } catch { core.info('No live-surface.json.') }
+            let owners = []
+            try { owners = ownersFromCodeowners(fs.readFileSync('.github/CODEOWNERS', 'utf-8')) } catch { core.info('No CODEOWNERS.') }
+            const { data: openIssues } = await github.rest.issues.listForRepo({ ...repo, state: 'open', labels: LIVE_SURFACE_LABEL })
+            const comments = openIssues.length
+              ? await github.paginate(github.rest.issues.listComments, { ...repo, issue_number: openIssues[0].number, per_page: 100 })
+              : []
+            const plan = liveSurfaceIssuePlan({ evidence, openIssues, comments, now: new Date(), runUrl, owners })
+            for (const issue_number of plan.close) {
+              await github.rest.issues.createComment({ ...repo, issue_number, body: plan.closeComment })
+              await github.rest.issues.update({ ...repo, issue_number, state: 'closed', state_reason: 'completed' })
+            }
+            if (plan.create) {
+              await github.rest.issues.create({ ...repo, title: plan.title, body: plan.body, labels: plan.labels })
+            }
+            if (plan.update !== null) {
+              await github.rest.issues.update({ ...repo, issue_number: plan.update, body: plan.body })
+              if (plan.escalationComment) {
+                await github.rest.issues.createComment({ ...repo, issue_number: plan.update, body: plan.escalationComment })
+              }
+              if (plan.addLabels.length) await github.rest.issues.addLabels({ ...repo, issue_number: plan.update, labels: plan.addLabels })
+              for (const name of plan.removeLabels) {
+                try { await github.rest.issues.removeLabel({ ...repo, issue_number: plan.update, name }) } catch { /* not present */ }
+              }
+            }
+
       - name: Audit summary
         if: always()
         run: |
@@ -843,12 +888,12 @@ jobs:
             echo "| Control | Result |"
             echo "|---|---|"
             echo "| Merge gate (branch protection) | ${{ steps.merge-gate.outcome }} |"
-            echo "| Assertion liveness (31 vitest sentinels) | ${{ steps.liveness.outcome }} |"
+            echo "| Assertion liveness (42 vitest sentinels) | ${{ steps.liveness.outcome }} |"
             echo "| Production verification liveness | ${{ steps.smoke-liveness.outcome }} |"
             echo "| Merge gate liveness (is CI evaluating?) | ${{ steps.ci-liveness.outcome }} |"
             echo "| Canonical domain bound to production | ${{ steps.canonical-domain.outcome }} |"
             echo "| Browse-only catalogue (reports only) | ${{ steps.browse-only.outcome }} |"
-            echo "| Live surface — where commerce comes from (reports only) | ${{ steps.live-surface.outcome }} |"
+            echo "| Live surface — where commerce comes from (issue with an /ack deadline when not clean) | ${{ steps.live-surface.outcome }} |"
             echo ""
             if [ -s live-surface.md ]; then
               cat live-surface.md

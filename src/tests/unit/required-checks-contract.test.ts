@@ -57,6 +57,7 @@ interface Registry {
   controls: Array<{
     id: string
     requiredContexts?: string[]
+    context?: string
     contextSource?: string
   }>
 }
@@ -154,10 +155,32 @@ describe('the registry names the contexts ci.yml actually publishes', () => {
     }
   })
 
-  it('requires every job ci.yml runs, not a subset', () => {
-    // A gate that requires one of two jobs is a gate with a hole in it, and the hole is
-    // invisible: the PR goes green on the half that is enforced.
-    expect([...(mergeGate?.requiredContexts ?? [])].sort()).toEqual([...publishedNames].sort())
+  /**
+   * A job ci.yml runs is either a context the ruleset requires, or the declared context of
+   * another control that says why it is not one. Never both, never neither.
+   *
+   * The second class has one member: `Production admission`, which the deployment platform
+   * waits for before assigning production aliases (incident PR-94). Requiring it in the
+   * ruleset as well would add nothing on a pull request, where it passes only when the three
+   * already have, and it is refused on `merge_group` by design, so a queue would stall on it.
+   * What this keeps is the original point: a new job cannot appear unclassified, because an
+   * unrequired job nobody owns is a gate with a hole in it, and the hole is invisible.
+   */
+  it('requires every job ci.yml runs, except a context another control declares', () => {
+    const required = [...(mergeGate?.requiredContexts ?? [])]
+    const declaredElsewhere = registry.controls
+      .filter((c) => c.id !== 'merge-gate' && c.contextSource === '.github/workflows/ci.yml')
+      .map((c) => c.context)
+    expect(declaredElsewhere.every(Boolean), 'a control names ci.yml as its source and no context').toBe(true)
+
+    for (const name of publishedNames) {
+      const owners = [required.includes(name), declaredElsewhere.includes(name)].filter(Boolean)
+      expect(
+        owners.length,
+        `"${name}" is published by ci.yml and is ${owners.length ? 'both required and declared by another control' : 'neither required by merge-gate nor declared by any control'}`,
+      ).toBe(1)
+    }
+    expect([...required, ...declaredElsewhere].sort()).toEqual([...publishedNames].sort())
   })
 
   it('names no job ID — the specific string that would brick the repository', () => {

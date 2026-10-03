@@ -29,7 +29,7 @@ const SAMPLE_EVENT = {
   name: 'product_viewed',
   handle: 'arc-band-titanium',
   collection: 'rings',
-  material: 'Grade 23 Titanium',
+  material: 'titanium',
 } as const
 
 describe('BeaconSink — the analytics transport nothing exercised', () => {

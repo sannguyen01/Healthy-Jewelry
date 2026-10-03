@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   familyOf,
   QUERY_VARIANTS,
+  expectationFor,
   retiredRouteMatrix,
   variantsFor,
   WILDCARD_EXAMPLES,
@@ -65,6 +66,49 @@ describe('familyOf — which §7 row governs a concrete path', () => {
   it.each(['/shop', '/cartography', '/ordersx', '/api/proxy/x', '/'])('%s → no family', (path) => {
     // `/cartography` is the prefix trap: a startsWith without the slash would claim it.
     expect(familyOf(path, ROWS)).toBeNull()
+  })
+})
+
+describe('expectationFor — browsing is redirected, an action is told why', () => {
+  const ROWS_308 = [row('/cart', 308, '/shop'), row('/cart/:path*', 308, '/shop'), row('/stones', 308, '/')]
+
+  it('leaves GET and HEAD exactly as the variant states them', () => {
+    for (const variant of variantsFor(row('/cart', 308, '/shop'))) {
+      for (const method of ['GET', 'HEAD'] as const) {
+        expect(expectationFor(variant, method, ROWS_308)).toEqual({ first: variant.first, then: variant.then })
+      }
+    }
+  })
+
+  it('turns every successor redirect into the 410 for POST, query variants included', () => {
+    const variants = variantsFor(row('/cart', 308, '/shop'))
+    for (const variant of variants.filter((v) => v.kind !== 'trailing-slash')) {
+      expect(expectationFor(variant, 'POST', ROWS_308), variant.path).toEqual({
+        first: { status: 410, location: null },
+        then: null,
+      })
+    }
+  })
+
+  it("keeps Next's trailing-slash hop a 308 for POST, then lands on the 410", () => {
+    const slash = variantsFor(row('/cart', 308, '/shop')).find((v) => v.kind === 'trailing-slash')!
+    expect(expectationFor(slash, 'POST', ROWS_308)).toEqual({
+      first: { status: 308, location: '/cart' },
+      then: { status: 410, location: null },
+    })
+  })
+
+  it('recognises a successor of "/" without mistaking the slash hop for it', () => {
+    const [bare, slash] = variantsFor(row('/stones', 308, '/'))
+    expect(expectationFor(bare, 'POST', ROWS_308).first).toEqual({ status: 410, location: null })
+    expect(expectationFor(slash, 'POST', ROWS_308).first).toEqual({ status: 308, location: '/stones' })
+  })
+
+  it('changes nothing for a 410 or a 404 row', () => {
+    const rows = [row('/orders/:path*', 410, null), row('/api/auth/login', 404, null)]
+    for (const variant of retiredRouteMatrix(rows)) {
+      expect(expectationFor(variant, 'POST', rows)).toEqual({ first: variant.first, then: variant.then })
+    }
   })
 })
 

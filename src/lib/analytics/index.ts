@@ -24,11 +24,10 @@
 // it sent — for tests, not for control flow.
 
 import type { AnalyticsEvent } from './events'
-import { sanitiseQuery } from './events'
 import { analyticsAllowed, readConsent, type ConsentState } from './consent'
 
 export type { AnalyticsEvent, AnalyticsEventName } from './events'
-export { ANALYTICS_EVENT_NAMES, isAnalyticsEventName, sanitiseQuery } from './events'
+export { ANALYTICS_EVENT_NAMES, isAnalyticsEventName } from './events'
 export * from './consent'
 
 /** Where events go. Swappable so tests never touch the network. */
@@ -94,15 +93,10 @@ export function track(event: AnalyticsEvent, consent: ConsentState = currentCons
   if (!analyticsAllowed(consent)) return false
 
   try {
-    // Free text is the one field that could carry something personal — people
-    // paste order numbers and email addresses into search boxes. Sanitised here,
-    // at the boundary, rather than trusted to every call site.
-    const safe: AnalyticsEvent =
-      event.name === 'search_performed'
-        ? { ...event, query: sanitiseQuery(event.query) }
-        : event
-
-    sink.send(safe)
+    // No event carries free text any more — `search_performed` reports facets, not the
+    // query — so there is nothing to sanitise at this boundary. The route validates every
+    // field against the catalogue regardless: this client is not the only thing that posts.
+    sink.send(event)
     return true
   } catch {
     return false
