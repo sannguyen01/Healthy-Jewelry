@@ -203,9 +203,11 @@ mail provider returning a message id has accepted a message, not delivered it.
 
 ```
 UNPROTECTED                 main deploys with nothing required                ← today (ruleset 24077858 holds only a deletion rule; canary #94 NOT-DENIED, then merged)
-  │ an authorised effective-rules read: target `main` only; exactly the three contexts, sourced
-  │ from GitHub Actions; strict; a pull request required; the bypass list READABLE and empty.
-  │ A bypass list that cannot be read makes the read `unevaluable`, never "empty"
+  │ an authorised read of ALL effective protection: every ruleset (its target conditions, rules,
+  │ check sources and bypass list), the rules effective on `main`, and the classic layer. Conclusive
+  │ only for: `main` only; exactly the three contexts from GitHub Actions; strict; a pull request;
+  │ force-push and deletion blocked; the bypass list READABLE and empty. Anything unread is
+  │ `unevaluable` unless a recorded owner inspection closes that exact gap
   │                                                          (owner configures; runbooks/main-ruleset.md 1–2)
 GATE_UNPROVEN
   │ a v2 canary, inert if merged, fails `verify` in its own pull request only; probe-merge-denial
@@ -250,7 +252,7 @@ What may happen in each state:
 | State | Allowed | Forbidden |
 |---|---|---|
 | `UNPROTECTED` | draft work, previews, read-only diagnostics; the owner merging a *recovery* pull request (below) | merging anything else, revoking, deleting subscriptions, DNS changes |
-| `GATE_UNPROVEN` | the canary procedure, and the owner merging the pull requests it depends on (the `Production admission` check, R-C1; the v2 canary's permanent test, R-B2) once their head checks are green under the read-back ruleset | merging anything else; merging the canary itself |
+| `GATE_UNPROVEN` | the canary procedure, and the owner merging **PR #97 only, at its reviewed head SHA** (exception 2 below) | merging any other pull request; merging the canary; changing a platform setting under this exception |
 | `GATE_PROVEN` | ready-for-review PRs, review, small targeted fixes | external removals |
 | `PREVIEW_VERIFIED` | taking PRs out of draft, a human merge | external removals before production is verified |
 | `PRODUCTION_VERIFIED` | the external sequence above, in order, by people | skipping or reordering it |
@@ -261,11 +263,19 @@ and an agent still never merges.
 1. **In `UNPROTECTED`, a recovery pull request** (needed on 2026-10-02). The owner may merge one
    whose only effect is to remove a defect that an admission failure let onto `main`, once its
    head checks are green. #95 is that pull request: it deletes the canary test #94 put on `main`.
-2. **In `GATE_UNPROVEN`, the pull requests the canary depends on** (added 2026-10-03). The v2
-   canary cannot fail on a test that is not yet on `main`, and Vercel cannot select a check that
-   has never reported on `main`. So the `Production admission` pull request and the canary's
-   permanent test merge after the read-back, and before the denial is proven, under a ruleset
-   that by then requires their three checks.
+2. **In `GATE_UNPROVEN`, PR #97 only, at its reviewed head SHA** (added 2026-10-03, bounded the
+   same day at the owner's review).
+   - **The permission.** After an authorised read-back judges the repaired `main` rules
+     conclusive, the owner may merge #97, provided its three required checks and
+     `Production admission` succeed on that head or its test-merge commit.
+   - **What it authorises.** Installing the controls needed to prove the gate: the v2 canary
+     cannot fail on a test that is not yet on `main`, and Vercel cannot select a check that has
+     never reported there.
+   - **What it does not.** No other pull request, no canary merge, and no platform-setting
+     change. It is not a category a different, wider pull request can adopt.
+   - **Its evidence.** Before #97 leaves draft, its description records the head SHA, the
+     changed files, the checks and the reviewer. If another commit lands after review, the
+     exception is evaluated again against the new head.
 
 **The release is already live.** #93 (this review) was merged at 16:16:44 UTC on 2026-10-02 and
 auto-deployed to production while `main` was `UNPROTECTED`, so `PREVIEW_VERIFIED` was skipped, not
@@ -487,6 +497,7 @@ Four rules came out of keeping these apart:
 | 02:29:00 | 09:29:00 | **#95 merged** by the owner → `81fd782`. The canary path is absent from its tree | GitHub; `git ls-tree` |
 | 02:29:29 | 09:29:29 | Vercel's status on `81fd782`: "Deployment has completed", **6 min 23 s before CI on the same commit finished**. Production admission still does not wait for tests. This time they passed | commit status |
 | 02:35:52 | 09:35:52 | `main`'s push run 37089958244 on `81fd782`: `verify` success, E2E success, `Dependency scope` skipped (push) | GitHub |
+| 02:45:20 | 09:45:20 | #97's pull-request run 37090486106 at `af9d447`: `Production admission` logs `ADMITTED (pull_request): verify success, e2e success, dependencyScope success`. This is the check's first real run, and it shows **the passing path only**. It is not a `main` push, not a failing path, and not evidence that Vercel waits for it | job log |
 
 ### What it proves, and what it does not
 
@@ -572,15 +583,18 @@ R-E   store-side inventory → dependency-ordered receiver removal    → storeD
 | | Workstream | Owner | Exit test |
 |---|---|---|---|
 | **R-A** | Recover `main`: delete the canary (#95). A surgical deletion, not a revert of #94, because later commits changed the tree | engineer prepares; **owner merges** | On the **merge** SHA: the canary path is absent from the tree (`git ls-tree`), `main`'s push run has `verify` and E2E at `success`, and the deployment for that SHA serves the site. That last needs the owner's read or network access, and the record names which. If the owner uses GitHub's Revert on #94 instead, #95 is re-judged before anything merges |
-| **R-B** | Governance: repair the ruleset (§7 row 1), then read it back **before** any canary. The read must be authorised: through the control audit's `CONTROL_AUDIT_TOKEN`, or a credential the owner's tools supply, never a literal. It must show `main` only, the three contexts from GitHub Actions, strict mode, a pull request required, and a **readable, empty** bypass list. Unreadable is `unevaluable`. A reported edit is not a read | owner configures; verifier reads back | The read is conclusive, then the v2 canary below reads `denied` and is closed unmerged. #94 stays recorded as a failed experiment |
+| **R-B** | Governance: repair the ruleset (§7 row 1), then read it back **before** any canary. The read must be authorised: through the control audit's `CONTROL_AUDIT_TOKEN`, or a credential the owner's tools supply, never a literal. It must cover all effective protection, not one ruleset object: every ruleset, with its enforcement, target conditions (`main` only; reading `rules/branches/main` cannot show that `~ALL` was narrowed), rules, check-source `integration_id`s and bypass list; the rules effective on `main`; and the classic layer, from `branches/main`'s summary plus the owner's recorded Settings → Branches inspection, because the full endpoint answers 403 and a 403 is not absence. It must show exactly the three contexts from integration 15368, strict mode, a pull request, force-push and deletion blocked, and a **readable, empty** bypass list. Unreadable is `unevaluable`. `evaluateProtection()` judges the readings it is given and never stands in for a missing one. A reported edit is not a read. Integration 15368 (check source) and 1236702 (bypass actor) answer different questions and are never interchanged. The owner identifies 1236702 before removing its bypass | owner configures; verifier reads back | The read is conclusive, then the v2 canary below reads `denied` and is closed unmerged. #94 stays recorded as a failed experiment |
 | **R-C** | Deployment admission: `Production admission` (ADR 039) is unique across workflows, read on the deployment's commit SHA, and selected in a platform deployment check that blocks production alias assignment. Force Promote is a bypass and is recorded like one. It holds the custom domains only | engineer (done); **owner** configures the platform | `configured-unproven` once read back. `proven` only by an owner-approved negative test on the real promotion path that keeps the last good aliases. A custom-environment failure is a *configuration rehearsal*. A bad `main` commit is never manufactured for this |
 | **R-D** | Non-commerce operations: mail-provider acceptance plus a controlled inbox delivery; limiter distribution and keying mode; shared bindings checked without decrypting or displaying values | owner | Contact and abuse protection observed working, not inferred from a READY build |
 | **R-E** | Receiver removal as a dependency graph. Inventory first: subscriptions → route → HMAC and size checks → cache tags → workflow mocks and verification scripts → unit fixtures, negative controls and the sentinel → register and contract rows → active runbooks and docs. Removed in that order, with tests that reject orphaned references and stale controls. ADRs stay historical | engineer; **owner confirms the inventory** | The read-only **store-side** inventory shows no subscription targeting this site, as closure evidence rather than a reported deletion. Then the route's post-removal answer and the build are verified |
 
-**The v2 canary (R-B2), designed so that merging it is harmless.**
-- `isMergeGateCanaryRef(ref)` is true only for `canary/merge-gate-*`. A permanent test fails only
-  when `GITHUB_HEAD_REF` names such a branch. On every other run it asserts the predicate's cases
-  and passes, so the canary's own diff touches no test.
+**The v2 canary (R-B2), designed so that its own test cannot follow a mistaken merge.**
+- `isMergeGateCanaryRef(ref)` is true only for a bare branch name `canary/merge-gate-YYYY-MM-DD`,
+  with an optional `-suffix`. It checks the format, not the calendar, by decision.
+- The permanent test `src/tests/unit/merge-gate-canary.test.ts` fails only when `GITHUB_HEAD_REF`
+  names such a branch, and checks that a `pull_request` run receives that field at all. On every
+  other run it asserts the predicate's cases and passes, so the canary's own diff touches no
+  test.
 - The canary pull request's diff is one dated line in `docs/runbooks/merge-gate-canary-log.md`.
   It cannot alter a workflow, a ruleset or a required context.
 - That environment is proven on real runs, not just locally: an ordinary pull request passes, a
@@ -588,11 +602,15 @@ R-E   store-side inventory → dependency-ordered receiver removal    → storeD
   **untested**.
 - The canary is read without merging: `draft`, `mergeable_state`, `behind_by`, and the check runs
   on the head, test-merge and base SHAs, all judged by `judgeDenial()`.
-  - If `denied`, close it unmerged, delete the branch, record it, and move `merge-gate` to
-    `configured`.
-  - Otherwise, stop and record the readings, then close it.
-  - If it is merged by mistake, `main` stays green by construction. That is recorded as a failed
-    experiment, never a success.
+  - Whatever the verdict (`denied`, `NOT-DENIED` or `unevaluable`), record the readings and
+    **close it unmerged at once**. Leaving a red pull request open with a working merge button
+    is how #94 was merged.
+  - Only a conclusive, check-attributed `denied` moves `merge-denial-proof` to `configured` and
+    `githubGate` to `proven`. The owner deletes the branch. (`merge-gate`, the configuration
+    claim, moves to `configured` earlier, on the conclusive read-back.)
+  - If a canary is mistakenly merged, this canary-specific test will not intentionally fail on
+    `main`'s push. That is the only safety claim. Other checks can still fail, and the merge is
+    recorded as a failed experiment, never a success.
 
 ### Rules for the recovery
 

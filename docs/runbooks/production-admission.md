@@ -13,7 +13,12 @@ evidence moves the control's status, and what never does. The reasoning is in
 ## What the check is
 
 `Production admission` is the `production-admission` job in `.github/workflows/ci.yml`. It runs
-after `verify`, `e2e` and `dependency-scope` under `always()`, so it runs and fails when they fail.
+after `verify`, `e2e` and `dependency-scope` under `always()`, which makes it eligible to run, and
+fail, when they fail or are skipped. That is all `always()` guarantees. A cancelled run, a
+workflow that never triggers, a runner failure, or a missing or colliding check name can each
+leave no verdict, and each is a separate observation. Vercel also builds a production deployment
+before its deployment check decides whether that deployment gets the custom domains, so a READY
+build is never evidence either way.
 
 | Event | Admitted only when |
 |---|---|

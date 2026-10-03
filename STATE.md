@@ -42,8 +42,11 @@ Four independent flags in §6 replace any single state that could hide them:
   - on a push to `main`, verify and E2E, with dependency scope exactly `skipped`;
   - anything else is refused, `merge_group` included.
 
-  It runs under `always()`, so it fails when `verify` does, and both incident runs replay as
-  refusals. It is not a ruleset context. It is `not-configured` until Vercel waits for it, and
+  It runs under `always()`, which makes it *eligible* to run, and fail, when `verify` fails. It
+  does not guarantee a verdict for a cancelled or never-triggered run. Both incident runs replay
+  as refusals in its tests. Its first real run, #97's pull-request run 37090486106, logged
+  `ADMITTED (pull_request)`. That is the passing path only: not a `main` push, not the failing
+  path, and not Vercel waiting. It is not a ruleset context. It is `not-configured` until Vercel waits for it, and
   `proven` only by an owner-approved test on the real promotion path ([ADR 039](docs/adr/039-a-ready-build-is-not-a-passing-build.md)).
   43 sentinels, 41 vitest.
 

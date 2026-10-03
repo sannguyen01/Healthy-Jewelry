@@ -431,8 +431,10 @@ jobs:
   # `always()`, not the default `success()`. Without a status function a job whose needs failed
   # is skipped, and a skipped check is the exact reading this job exists to refuse: it has to
   # *run* when `verify` fails, so that it can fail. It names its status function, as ADR 027
-  # requires. A cancelled run therefore reports a refusal too, which is correct: a commit whose
-  # run was cancelled has not been tested.
+  # requires. What `always()` buys is eligibility to run after failed or skipped prerequisites,
+  # and no more: a cancelled run, a workflow that never triggers, a runner failure, and a missing
+  # or colliding check name can each leave no verdict at all. Those are separate observations,
+  # never readings of this job.
   #
   # Not a required context in the ruleset, which keeps its three. A pull request's own three
   # results are already required there; this context is for the platform, and is selected in

@@ -116,12 +116,25 @@ gh api --method POST repos/sannguyen01/healthy-jewelry/rulesets --input ruleset.
 `~DEFAULT_BRANCH` and `refs/heads/main`, and Integration 1236702 on its bypass list (Evidence).
 
 1. **Identify Integration 1236702 first** (Settings → Rules → the ruleset → Bypass list names
-   it). Record what it is. Then remove it: the bypass list must be empty.
+   it), and record what it is and what uses it. Removing its bypass is the owner's decision once
+   that is known; the gate needs the list empty. It is the bypass **actor**. Integration 15368 in
+   the JSON above is the check **source**. They answer different questions: never substitute one
+   for the other, and verify each rather than copying it.
 2. **Narrow the target to `main` before adding the pull-request rule.** On `~ALL`, a
    pull-request rule blocks every direct push to every branch, agents' working branches
    included.
-3. Replace its rules with the JSON above. `PUT` replaces the whole ruleset with the file, which is
-   the intent: the file is the policy.
+3. **`PUT` replaces the whole ruleset.** Every rule, condition and bypass entry not in the file
+   is removed. It is a full-policy replacement, not an append, so compare before applying:
+
+   | | Before (read 2026-10-03) | After (the JSON above) |
+   |---|---|---|
+   | Enforcement | `active` | `active` |
+   | Target | `~ALL`, `~DEFAULT_BRANCH`, `refs/heads/main` | `refs/heads/main` |
+   | Rules | `deletion` | `deletion`, `non_fast_forward`, `pull_request` (0 approvals), `required_status_checks` (the three contexts from integration 15368, strict) |
+   | Bypass | Integration 1236702, `always` | none |
+   | Name | `Main` | `main — merge gate` |
+
+   Then apply it, and read it back at once (Step 2):
 
 ```sh
 gh api --method PUT repos/sannguyen01/healthy-jewelry/rulesets/24077858 --input ruleset.json
@@ -159,18 +172,32 @@ command line, the shell history, chat, issues and files. Either:
   repos/sannguyen01/healthy-jewelry/rulesets/24077858`). That is how the 2026-10-03 reading
   below was taken.
 
-Expected: `"verdict": "enforced"` and `"agrees": false` — the registry still says
-`not-configured`, and the probe says so. Conclusive means all of these, read rather than assumed:
+**What to read: all of it.** One ruleset object is not the protection on `main`.
 
-| Property | Read from | Conclusive when |
+| Layer | Read from | Conclusive when |
 |---|---|---|
-| Target | `rulesets/{id}` → `conditions.ref_name.include` | `refs/heads/main` only |
-| Contexts | `rules/branches/main` → `required_status_checks` | exactly the three, each with `integration_id` 15368 (GitHub Actions). The probe checks the names, and a person checks the source |
+| Every ruleset | `rulesets?includes_parents=true`, then `rulesets/{id}` for each | every ruleset that reaches `main` is listed and read in full, and none but the repaired one adds a rule or a bypass |
+| Target | `rulesets/{id}` → `conditions.ref_name.include` and `exclude` | `refs/heads/main` only. `rules/branches/main` cannot show that `~ALL` was narrowed |
+| Effective rules | `rules/branches/main`, each rule attributed by its `ruleset_id` | every rule comes from a ruleset read above |
+| Contexts | the `required_status_checks` rule | exactly the three, each with `integration_id` 15368 (GitHub Actions). The probe checks the names, and a person confirms the source |
 | Strict | the same rule's `strict_required_status_checks_policy` | `true` |
 | Pull request | a `pull_request` rule | present, zero approvals |
-| Bypass list | `rulesets/{id}` → `bypass_actors` | **returned, and empty**. Not returned is `unevaluable`, never "empty" | Then set `merge-gate`'s `status` to `configured` in
-`docs/controls.json` in a pull request; the next audit reads `agrees: true` and closes the
-`merge-gate-unenforced` issue.
+| Force push, deletion | the `non_fast_forward` and `deletion` rules | both present |
+| Bypass list | `rulesets/{id}` → `bypass_actors`, for every ruleset that reaches `main` | **returned, and empty**. Not returned is `unevaluable`, never "empty" |
+| Classic protection | `branches/main` → `protection` (a summary), and `branches/main/protection` (the full rule) | the summary reads `enabled: false`, **and** the owner's recorded Settings → Branches inspection shows no classic rule, because the full endpoint answers 403 from the agent session. A 403 is not absence |
+
+**Anything unread keeps the verdict `unevaluable`**, unless a recorded owner inspection closes
+that exact gap: the evidence record says who looked, at what, and when.
+`evaluateProtection()` and the probe judge the readings they are given. Their output is attached
+beside the raw readings, never instead of them, and a verdict never stands in for a reading that
+was not taken.
+
+With every row conclusive, the probe reads `"verdict": "enforced"` and `"agrees": false`: the
+registry still says `not-configured`. Fill the evidence record below. Then, in a pull request,
+set `merge-gate`'s `status` to `configured` in `docs/controls.json`. That control claims the
+configuration, and this read is what proves it. The next audit reads `agrees: true` and closes
+the `merge-gate-unenforced` issue. Whether GitHub *refuses* a failing pull request is a separate
+claim, `merge-denial-proof`, and only Step 3 proves it.
 
 A workflow token cannot see a ruleset's bypass list, so the scheduled audit will read
 `unevaluable` unless `CONTROL_AUDIT_TOKEN` is set. That is deliberate: "not shown" is not
@@ -184,24 +211,33 @@ to prevent, performed as its test. GitHub already computes whether the merge wou
 the proof is reading that.
 
 An agent may carry out steps 3a–3d only with the owner's explicit permission to push the canary
-branch, and only **after** steps 1 and 2 have recorded an active ruleset read back as
-`enforced`. A canary pushed before that reads `NOT-DENIED` by definition and proves nothing.
+branch, and only **after** Step 2's evidence record is filled with every row conclusive. A canary
+pushed before that reads `NOT-DENIED` by definition and proves nothing. #94 was pushed on a
+report rather than a read, and was merged.
 
-> **Do not run 3a as written.** A merged `expect(1).toBe(2)` canary turns `main` red. That is what
-> #94 did on 2026-10-02, and it took two more pull requests to undo. The next canary must fail only
-> in its own pull-request context and pass on `main`. Until this step is rewritten for that design,
-> step 3 is on hold.
+**The v2 design, since 2026-10-03.** #94's canary was `expect(1).toBe(2)`, which failed
+everywhere, so its merge turned `main` red. Now:
+- The failure lives in `src/tests/unit/merge-gate-canary.test.ts`. It fails only when
+  `GITHUB_HEAD_REF` (a pull request's source branch) names a canary branch.
+- The canary changes nothing but one dated line in `docs/runbooks/merge-gate-canary-log.md`.
+- If it is mistakenly merged, that test will not intentionally fail on `main`'s push. That is
+  the only safety claim. Other checks can still fail, and a canary is never merged.
 
-1. **3a.** From an up-to-date `main`, create `canary/merge-gate-<yyyy-mm-dd>` with one commit
-   that fails a required check and changes nothing else — a unit test asserting
-   `expect(1).toBe(2)` in `src/tests/unit/zz-merge-gate-canary.test.ts`. No credential, no
-   customer data, no other file.
+1. **3a.** From an up-to-date `main`, create `canary/merge-gate-$(date -u +%F)` (add `-2`, `-3`
+   for another run that day). Make one commit that appends one line to
+   `docs/runbooks/merge-gate-canary-log.md`: the date, the branch, and why it was run. No other
+   file, no credential, no customer data.
 2. **3b.** Push it and open a pull request titled `CANARY — DO NOT MERGE`, **ready for review,
-   not draft**. Wait until `Lint · Type-check · Unit tests · Build` has concluded `failure`.
-   Expect the other two contexts to read: `Dependency scope` — success (it fails only on an
-   unjustified major dependency bump, and the canary bumps nothing); `E2E tests (Playwright)` —
-   **skipped**, because it `needs: verify`. GitHub counts a skipped required check as
-   satisfied, so the denial rests on `verify` alone, and the evidence record says so.
+   not draft, no auto-merge**. Wait until `Lint · Type-check · Unit tests · Build` has concluded
+   `failure`. The failing test must be `the merge-gate canary`, and nothing else. Expect:
+   - `Dependency scope`: success. It fails only on an unjustified major dependency bump, and the
+     canary bumps nothing.
+   - `E2E tests (Playwright)`: **skipped**, because it `needs: verify`.
+   - `Production admission`: **failure**, `REFUSED (pull_request)`. This is the first real run
+     of its failing path; record that run.
+
+   GitHub counts a skipped required check as satisfied, so the denial rests on `verify` alone,
+   and the evidence record says so.
 3. **3c.** Read the verdict — from any checkout of `main`; the probe is there since `be34099`:
 
    ```sh
@@ -222,21 +258,79 @@ branch, and only **after** steps 1 and 2 have recorded an active ruleset read ba
      head-merge-attribution-disagrees`, and the pull request's checks tab and merge box are
      compared by hand before anything is recorded.
 
-   Exit 1, `NOT-DENIED`, means the merge button works on a failing pull request. Record the
-   readings on the pull request, then **close it unmerged at once**, and read
-   `probe-branch-protection.mjs`'s findings. Closing destroys no evidence: the readings are recorded,
+   **Whatever the verdict, record the readings and close it unmerged at once.** Exit 1,
+   `NOT-DENIED`, means the merge button works on a failing pull request: read
+   `probe-branch-protection.mjs`'s findings next. Closing destroys no evidence: the readings are recorded,
    and the PR can be reopened. Leaving a red PR open with a working merge button is how #94 was
    merged. Exit 2 is `unevaluable`: read
    `reason`. `precondition-unknown:*` and `mergeability-not-computed` usually mean "re-run in a
    minute"; `draft`, `conflicts` and `behind-base` mean the canary is not testing what it should
    — fix the canary, never the verdict.
-4. **3d.** Close the pull request **without merging** and delete the branch. Record the
-   evidence below — every field comes from `canary-evidence.json`.
+4. **3d.** Close the pull request **without merging**; the owner deletes the branch. Fill the
+   canary evidence record below; every field comes from `canary-evidence.json` and the check
+   runs. Only a conclusive `denied`, attributable to the failing check, moves
+   `merge-denial-proof` to `configured` and `githubGate` to `proven`.
 
 ## Evidence
 
 Filled in only when the action has happened, in words, with a date and who observed it. An
 empty cell is the honest state.
+
+Each transition also gets one record in these shapes, copied below the table and filled from the
+readings. `null` means *not read*, which is different from `false` or `[]`. While any field a
+verdict depends on is `null`, that verdict is `unevaluable`: `bypassListReadable: false` keeps
+`bypassActors: null`, and the read cannot be conclusive. Names and IDs only, never a credential.
+
+The read-back (Step 2):
+
+```json
+{
+  "control": "githubGate",
+  "verdict": null,
+  "observedAt": null,
+  "observer": null,
+  "rulesets": [{ "id": null, "updatedAt": null, "enforcement": null, "include": null, "exclude": null }],
+  "effectiveRuleSources": null,
+  "effectiveContexts": null,
+  "contextIntegrationIds": null,
+  "contextSourceVerified": null,
+  "strict": null,
+  "pullRequestRequired": null,
+  "nonFastForward": null,
+  "deletion": null,
+  "bypassListReadable": null,
+  "bypassActors": null,
+  "classicSummaryEnabled": null,
+  "classicFullReadable": null,
+  "classicOwnerInspection": null,
+  "judgeOutput": null,
+  "canaryVerdict": "not-run"
+}
+```
+
+The canary (Step 3):
+
+```json
+{
+  "control": "merge-denial-proof",
+  "branch": null,
+  "pullRequest": null,
+  "headSha": null,
+  "testMergeSha": null,
+  "baseSha": null,
+  "checkRuns": [{ "name": null, "id": null, "sha": null, "conclusion": null }],
+  "draft": null,
+  "mergeable": null,
+  "mergeableState": null,
+  "behindBy": null,
+  "productionAdmission": { "runId": null, "conclusion": null, "line": null },
+  "verdict": null,
+  "reason": null,
+  "closedUnmerged": null,
+  "closedAt": null,
+  "observer": null
+}
+```
 
 | Step | Observed (what, in words) | Date | By | Evidence (verdict, run, PR) |
 |---|---|---|---|---|

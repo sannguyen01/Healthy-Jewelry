@@ -50,8 +50,11 @@ Three facts shaped the decision:
    A missing, empty or unrecognised result is `missing`, and `missing` never passes.
 2. **The job runs under `always()`.** Under the default `success()` it would be skipped when
    `verify` failed, and a skipped check is the exact reading it exists to refuse. It names its
-   status function, as ADR 027 requires. A cancelled run is therefore refused, which is correct:
-   a commit whose run was cancelled has not been tested.
+   status function, as ADR 027 requires. That makes the job *eligible* to run after failed or
+   skipped prerequisites, and nothing more. A cancelled run, a workflow that never triggers, a
+   runner failure, or a missing or colliding check name can each leave no verdict at all. Each
+   is a separate observation, and none is a refusal this job reported. (Corrected 2026-10-03 at
+   the owner's review; the first text said a cancelled run "is therefore refused".)
 3. **It is not a required context in the ruleset**, which keeps its three. On a pull request it
    passes only when the three already have, so requiring it adds nothing. It is refused on
    `merge_group` by design, so a queue would stall on it. `required-checks-contract.test.ts` still
