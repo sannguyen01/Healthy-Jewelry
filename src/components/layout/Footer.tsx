@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { legalLinks } from '@/config/navigation'
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 import { claimText } from '@/lib/catalog'
 
@@ -13,18 +12,39 @@ function tagline(): string {
   return claimText('brand-positioning', { kind: 'site' })
 }
 
-const shopLinks = [
-  { label: 'Rings', href: '/shop/rings' },
-  { label: 'Necklaces', href: '/shop/necklaces' },
-  { label: 'Earrings', href: '/shop/earrings' },
-  { label: 'Bracelets', href: '/shop/bracelets' },
-  { label: 'Charms', href: '/shop/charms' },
-]
-
-const infoLinks = [
-  { label: 'Our Story', href: '/about' },
-  { label: 'Materials', href: '/materials' },
-  { label: 'Contact', href: '/contact' },
+const groups = [
+  {
+    title: 'Explore',
+    links: [
+      { label: 'Pieces', href: '/shop' },
+      { label: 'Metals', href: '/materials' },
+      { label: 'Our Story', href: '/about' },
+    ]
+  },
+  {
+    title: 'Help',
+    links: [
+      { label: 'Contact', href: '/contact' },
+      { label: 'Care and sizing', href: '/care' },
+      { label: 'FAQ', href: '/faq' },
+    ]
+  },
+  {
+    title: 'Company',
+    links: [
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
+      { label: 'Legal information', href: '/legal' },
+    ]
+  },
+  {
+    title: 'Find us',
+    links: [
+      { label: 'Location & events', href: '/events' },
+      { label: 'Instagram', href: '#' },
+      { label: 'Twitter', href: '#' },
+    ]
+  }
 ]
 
 const columnHeadStyle: React.CSSProperties = {
@@ -33,7 +53,6 @@ const columnHeadStyle: React.CSSProperties = {
   letterSpacing: '0.22em',
   textTransform: 'uppercase' as const,
   color: 'var(--graphite)',
-  marginBottom: '16px',
 }
 
 const linkStyle: React.CSSProperties = {
@@ -67,7 +86,7 @@ export function Footer() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr repeat(3, auto)',
+            gridTemplateColumns: '1fr repeat(4, auto)',
             gap: 'clamp(32px, 4vw, 64px)',
             alignItems: 'start',
             marginBottom: 'clamp(40px, 5vw, 64px)',
@@ -75,7 +94,7 @@ export function Footer() {
           className="hj-footer-grid"
         >
           {/* Brand column */}
-          <div>
+          <div className="hj-brand-col">
             <Link
               href="/"
               aria-label="Healthy Jewelry — home"
@@ -106,42 +125,29 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Shop column */}
-          <div>
-            <p style={columnHeadStyle}>Shop</p>
-            {shopLinks.map((link) => (
-              <Link key={link.href} href={link.href} style={linkStyle}>
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Info column */}
-          <div>
-            <p style={columnHeadStyle}>Info</p>
-            {infoLinks.map((link) => (
-              <Link key={link.href} href={link.href} style={linkStyle}>
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Legal column */}
-          <div>
-            <p style={columnHeadStyle}>Legal</p>
-            {legalLinks.map((link) => (
-              <Link key={link.href} href={link.href} style={linkStyle}>
-                {link.label}
-              </Link>
-            ))}
-            {/*
-              Withdrawing consent has to be as easy as giving it, and the prompt that gave it
-              appears once. This reopens it from every page (CONSENT_OPEN_EVENT in
-              src/lib/analytics/consent.ts). Styled as a link so the column reads as one list,
-              and a <button> underneath because it opens something rather than going anywhere.
-            */}
-            <MeasurementPreferences style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }} />
-          </div>
+          {/* Accordion Columns */}
+          {groups.map((group, i) => (
+            <div key={group.title} className="footer-group">
+              <input type="checkbox" id={`footer-group-${i}`} className="footer-checkbox" aria-hidden="true" />
+              <label htmlFor={`footer-group-${i}`} className="footer-summary" style={columnHeadStyle}>
+                {group.title}
+                <span className="footer-icon">+</span>
+              </label>
+              <div className="footer-group-content">
+                <div className="footer-group-inner">
+                  {group.links.map((link) => (
+                    <Link key={link.label} href={link.href} style={linkStyle}>
+                      {link.label}
+                    </Link>
+                  ))}
+                  {/* Append MeasurementPreferences to the Company column */}
+                  {group.title === 'Company' && (
+                    <MeasurementPreferences style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }} />
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Bottom bar */}
@@ -182,14 +188,68 @@ export function Footer() {
       </div>
 
       <style>{`
-        @media (max-width: 768px) {
-          .hj-footer-grid {
-            grid-template-columns: 1fr 1fr !important;
+        .footer-checkbox {
+          display: none;
+        }
+        .footer-icon {
+          display: none;
+        }
+        .footer-group-inner {
+          padding-top: 16px;
+        }
+        
+        @media (min-width: 769px) {
+          .footer-summary {
+            margin-bottom: 16px;
+            display: block;
+            pointer-events: none;
           }
         }
-        @media (max-width: 480px) {
+
+        @media (max-width: 768px) {
           .hj-footer-grid {
             grid-template-columns: 1fr !important;
+            gap: 0 !important;
+          }
+          .hj-brand-col {
+            margin-bottom: 32px;
+          }
+          
+          .footer-group {
+            border-top: 1px solid var(--ash);
+          }
+          .footer-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            cursor: pointer;
+            margin-bottom: 0;
+          }
+          .footer-icon {
+            display: inline-block;
+            font-size: 1.2rem;
+            transition: transform 0.3s ease-out;
+            font-weight: 300;
+          }
+          
+          .footer-group-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            opacity: 0;
+          }
+          .footer-group-inner {
+            padding-top: 0;
+            padding-bottom: 16px;
+          }
+          
+          .footer-checkbox:checked ~ .footer-group-content {
+            max-height: 300px;
+            opacity: 1;
+          }
+          .footer-checkbox:checked ~ .footer-summary .footer-icon {
+            transform: rotate(45deg);
           }
         }
       `}</style>
