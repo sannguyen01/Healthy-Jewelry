@@ -1,7 +1,62 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-10-02
+Last refreshed by hand: 2026-10-03
+
+## Session note — 2026-10-03
+
+**Incident PR-94: detection worked, and both admission boundaries ignored it.** The canary's
+`verify` failed. It was merged anyway (`ebdebc0`), and the owner's 2026-10-02 read of the
+platform shows READY Production deployments from that commit and from #93's merge (`be34099`),
+aliased to the apex and `www`. Masterplan §13 records it as five separate assertions, so that
+none can be inferred from another:
+- **Detection** worked.
+- **GitHub source admission** failed.
+- **Vercel production admission** failed.
+- **Recovery** is prepared and not on `main`.
+- **External operations** are partly observed.
+
+Four independent flags in §6 replace any single state that could hide them:
+`githubGate: failed`, `productionPromotion: failed`, `contactOperations: unknown` and
+`storeDisconnection: unknown`.
+
+- **R-A, recovery.** #95 deletes the canary test. Its head `8c93505` is green on all four checks
+  (run 37088040887), and it was marked ready at 02:05 UTC. A head check is not a post-merge
+  check: once the owner merges it, the merge SHA's tree, `main`'s push run and the deployment are
+  checked separately.
+- **The cause, read.** Ruleset 24077858 has one `deletion` rule, targets `~ALL`, and has
+  Integration 1236702 on its bypass list. It is judged `mismatched`. Its state at merge time is
+  unknown, because its history answers 403.
+- **The receiver fails closed, now proven rather than read.** Twelve unit cases cover the secret
+  removed or empty, every handled topic, and forged and would-be-valid signatures: 503, no
+  invalidation, no order line. They were seen red under two mutations, and the sentinel is
+  `receiver-unconfigured-no-effect`. On a local production build with no commerce variable,
+  four POSTs answered 503 and logged only "not set". The production endpoint is unobserved from
+  here. The sentinel names the route, so the register went from 34 to 35 rows (WS-F).
+- **R-C, production admission.** A `Production admission` job passes only on explicit success:
+  - on a pull request, all three jobs;
+  - on a push to `main`, verify and E2E, with dependency scope exactly `skipped`;
+  - anything else is refused, `merge_group` included.
+
+  It runs under `always()`, so it fails when `verify` does, and both incident runs replay as
+  refusals. It is not a ruleset context. It is `not-configured` until Vercel waits for it, and
+  `proven` only by an owner-approved test on the real promotion path ([ADR 039](docs/adr/039-a-ready-build-is-not-a-passing-build.md)).
+  43 sentinels, 41 vitest.
+
+### Still blocked, and on what
+
+- **Owner:**
+  - merge #95;
+  - repair the ruleset (narrow the target to `main`, add the three contexts with strict mode and
+    the pull-request rule, empty the bypass list after identifying 1236702);
+  - add the platform deployment check and restrict Force Promote;
+  - confirm contact delivery and the limiter's keying (R-D);
+  - reconnect for the read-only store-side inventory (R-E).
+- **Agent, after the owner:**
+  - the post-merge checks for #95;
+  - the authorised read-back, which must be conclusive before any canary;
+  - the v2 canary, inert if merged (§13, R-B2), which is also the first real run of the
+    admission check's failing path.
 
 ## Session note — 2026-10-02
 

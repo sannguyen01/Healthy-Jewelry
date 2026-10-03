@@ -29,6 +29,9 @@ Whatever a test, a plan, a runbook or a green check says is next, no agent:
 
 - **merges** a pull request, enables auto-merge, or pushes to `main` — `main` auto-deploys to
   production, so a merge is a release;
+- **changes a merge or deployment control**: the ruleset or its bypass list, a deployment check,
+  or who may promote. Nor does an agent promote, redeploy or roll back a deployment. Each one
+  moves the boundary that decides what reaches production (incident PR-94, masterplan §13);
 - **revokes, rotates or deletes a credential**, or removes an environment variable;
 - **changes DNS** or a domain's assignment, redirect or certificate;
 - **deletes a webhook subscription**, an app, a channel or any record held by the commerce
