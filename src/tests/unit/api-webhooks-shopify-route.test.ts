@@ -68,6 +68,57 @@ describe('POST /api/webhooks/shopify', () => {
       const json = (await res.json()) as { error: string }
       expect(json.error).toMatch(/not configured/i)
     })
+
+    /**
+     * **Fails closed, and does nothing on the way.** The test above proves the status. It did
+     * not prove the absence of effect, and since the signing secret was removed from the
+     * project before this route was (incident PR-94, masterplan §13), the absence of effect
+     * is the whole claim: whatever still reaches this endpoint must not invalidate a cache or
+     * write an order line to the function log.
+     *
+     * Two secret states, because they are different values: `undefined` is a deployment
+     * with the variable removed, and `''` is one where it was set to nothing. Every handled
+     * prefix, so a fourth topic inherits the check. Two signatures each: one forged, and one
+     * computed with a real secret, which is the request that would have been accepted had
+     * the variable been set. The body carries a handle and an order's fields, so every
+     * branch below the guard would have something to act on.
+     *
+     * The only output allowed is the single line saying why.
+     */
+    describe.each([
+      ['removed', undefined],
+      ['empty', ''],
+    ] as const)('with the secret %s', (_label, secret) => {
+      const topics = HANDLED_TOPIC_PREFIXES.map((prefix) => `${prefix}update`)
+      const body = JSON.stringify({ id: 1, handle: 'arc-band-titanium', name: '#1001', line_items: [] })
+      const signatures = [
+        ['forged', 'Zm9yZ2VkLXNpZ25hdHVyZQ=='],
+        ['would-be-valid', createHmac('sha256', TEST_SECRET).update(Buffer.from(body)).digest('base64')],
+      ] as const
+
+      afterEach(() => {
+        vi.restoreAllMocks()
+      })
+
+      it.each(topics.flatMap((topic) => signatures.map(([kind, sig]) => [topic, kind, sig] as const)))(
+        '%s with a %s signature answers 503 and has no effect',
+        async (topic, _kind, sig) => {
+          vi.stubEnv('SHOPIFY_WEBHOOK_SECRET', secret)
+          const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+          const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+          const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+
+          const res = await POST(makeReqWithSig(body, sig, topic))
+
+          expect(res.status).toBe(503)
+          expect(revalidateTag).not.toHaveBeenCalled()
+          expect(revalidatePath).not.toHaveBeenCalled()
+          expect(info).not.toHaveBeenCalled()
+          expect(warn).not.toHaveBeenCalled()
+          expect(error.mock.calls).toEqual([['[webhooks/shopify] SHOPIFY_WEBHOOK_SECRET not set']])
+        },
+      )
+    })
   })
 
   describe('HMAC validation', () => {

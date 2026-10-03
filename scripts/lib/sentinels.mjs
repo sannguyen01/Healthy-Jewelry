@@ -504,6 +504,19 @@ export const SENTINELS = [
     invariant: 'the hero copy card never covers more than 60% of the photograph',
     scar: 'Every guardrail on the hero was satisfied better the larger the card grew, so the codified pressure pointed one way and the end state is a photograph behind a floating memo — ADR 013.',
   },
+  {
+    // The old guard test asserted the 503 and nothing else, so an invalidation placed above the
+    // secret check left it green. Proven on 2026-10-03: this mutation, and an order log line in
+    // the same place, each turned the 12 no-effect cases red while the 503 test passed.
+    id: 'receiver-unconfigured-no-effect',
+    runner: 'vitest',
+    file: 'src/app/api/webhooks/shopify/route.ts',
+    find: "    console.error('[webhooks/shopify] SHOPIFY_WEBHOOK_SECRET not set')",
+    replace: "    revalidateTag(PRODUCTS_TAG, PURGE_NOW)\n    console.error('[webhooks/shopify] SHOPIFY_WEBHOOK_SECRET not set')",
+    specs: ['src/tests/unit/api-webhooks-shopify-route.test.ts'],
+    invariant: 'with its signing secret absent, the retained receiver answers 503 and invalidates and logs nothing',
+    scar: 'The signing secret left the project before the receiver did (incident PR-94), so "fails closed" became the only thing between a surviving subscription and a cache purge, and the test proved the status code only.',
+  },
   // ── Playwright: need a production build, so opt-in via --with-e2e ──
   {
     id: 'hero-card-measured',
