@@ -4,8 +4,16 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
-## 2026-10-03 — Incident PR-94: recovery, and production admission
+## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
 
+- **The merge gate is proven.** The repaired ruleset read back conclusive. Then the v2 canary
+  (#98) was refused: GitHub blocked a ready-for-review pull request with no conflicts, up to date
+  with `main`, whose `verify` had failed, and nobody pressed Merge. It was closed unmerged.
+  `merge-gate` is `configured`, and its registry entry says what the six-hourly probe cannot see
+  until an audit token is added. The proof holds for this version of the ruleset, and is run again
+  after any change to it.
+- **`Production admission` has run both ways for real**: admitted on `main`'s push, refused on
+  the canary. The deployment platform does not wait for it yet.
 - **The merge-gate canary was merged, and its failing test reached `main`.** #95 deleted it (`81fd782`). `main`'s push run is green on `verify` and E2E. The
   incident is masterplan §13: detection worked; GitHub source admission and Vercel production
   admission failed. Each is recorded as its own assertion, and four independent evidence flags

@@ -58,8 +58,8 @@ This fourth context is for Vercel only.
 canary" takes precedence. If no safe path on the real promotion route exists, the status stays
 *configured, unproven*, and that is the honest answer.
 
-The check's own failing path is observed in a real run on a pull request where `verify` fails,
-which is the next merge-gate canary. On a push to `main` it is unit-tested only.
+The check's own failing path was first observed in a real run on 2026-10-03, on the merge-gate
+canary #98, where `verify` failed (Evidence). On a push to `main` it is unit-tested only.
 
 ## Stop and report, do not guess, when
 
@@ -76,9 +76,10 @@ honest state.
 
 | Item | Observed | Date | Observer | Link |
 |---|---|---|---|---|
-| Git integration connected; automatic production aliasing on | | | | |
-| `Production admission` `success` on a pull request run | | | | |
-| `Production admission` `success` on `main`'s push run | | | | |
+| Git integration connected; automatic production aliasing on | partly: `vercel[bot]` created Production deployments for the three newest `main` commits (`ddaac1c` at 05:15:03 UTC, `81fd782`, `be34099`). Alias assignment is not readable from this session; the owner's read of the settings is still owed | 2026-10-03 | agent session (GitHub deployments) | deployment 6823636165 |
+| `Production admission` `success` on a pull request run | `ADMITTED (pull_request): pull_request: verify success, e2e success, dependencyScope success`, in #97's runs 37090486106 and 37092189280 | 2026-10-03 | agent session (job logs) | #97 |
+| `Production admission` `success` on `main`'s push run | `ADMITTED (push-main): push-main: verify success, e2e success, dependencyScope skipped`, run 37099187496 on `ddaac1c`. **Step 2 is met**: Vercel can now select the check | 2026-10-03 | agent session (job log) | check run 111136315373 |
+| `Production admission` `failure` on a pull request run (its failing path) | `REFUSED (pull_request): pull_request: verify: got failure, needs success; e2e: got skipped, needs success`, canary #98's run 37107871838 | 2026-10-03 | agent session (job log) | check run 111160105504 |
 | Deployment check added, blocking production alias assignment | | | | |
 | Who can Force Promote | | | | |
 | Read-back of the project's alias-blocking checks | | | | |

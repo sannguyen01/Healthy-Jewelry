@@ -16,9 +16,10 @@ none can be inferred from another:
 - **Recovery** is prepared and not on `main`.
 - **External operations** are partly observed.
 
-Four independent flags in §6 replace any single state that could hide them:
-`githubGate: failed`, `productionPromotion: failed`, `contactOperations: unknown` and
-`storeDisconnection: unknown`.
+Four independent flags in §6 replace any single state that could hide them. At the incident
+they read `githubGate: failed`, `productionPromotion: failed`, `contactOperations: unknown` and
+`storeDisconnection: unknown`. Since 07:56 UTC on 2026-10-03, `githubGate` is `proven` (below);
+the other three are unchanged.
 
 - **R-A, recovery: on `main`.** #95 was green on its head and was merged by the owner at 02:29 UTC
   as `81fd782`. The post-merge checks ran on that merge SHA, not the head:
@@ -65,21 +66,49 @@ Four independent flags in §6 replace any single state that could hide them:
   - With the owner's recorded inspection (no classic rule; 1236702 was the Claude GitHub App),
     the read is conclusive. `githubGate` is `configured-unproven`, and #97 merges under
     exception 2.
-  - Owed: `merge-gate` flipped to `configured` in a separate pull request, then the v2 canary.
+  - Owed then: the v2 canary, and `merge-gate` flipped to `configured`. Both are below.
+
+- **#97 merged (05:14 UTC), and `Production admission` passed on `main`'s push.** The owner
+  merged it at its reviewed head, under exception 2, as `ddaac1c` (identical tree). Push run
+  37099187496 logged `ADMITTED (push-main)` with `Dependency scope` skipped: matrix row 3. Vercel
+  reported the deployment complete 6 min 49 s before that run finished, so production still does
+  not wait. The 05:25 audit's merge-gate probe read `unevaluable`: `CONTROL_AUDIT_TOKEN` is unset or
+  lacks administration read. Its live-surface step read the site clean and closed #96.
+
+- **The gate is proven: the v2 canary #98 read `denied` (07:56 UTC), and was closed unmerged.**
+  - Its only change was one dated line in the canary log. `verify` failed on exactly one test, the
+    canary case, whose message named the branch.
+  - `Production admission` logged `REFUSED (pull_request)`: its failing path, observed for the
+    first time (matrix row 2).
+  - `judgeDenial()` gave `denied` / `required-context-unmet`, on `verify` alone: not a draft, no
+    conflicts, 0 behind, strict, the test-merge commit reporting nothing, `verify` passing on the
+    base. `blocked`
+    was read twice.
+  - `githubGate` → **`proven`**, and the state machine is in **`GATE_PROVEN`**. `merge-gate` →
+    `configured` in the records pull request.
+  - `merge-denial-proof` stays `not-configured`: the registry reserves `configured` for a probe
+    that runs on its own, and a canary runs only with the owner's permission. The runbook and
+    masterplan said otherwise until this record, and are corrected.
+  - The proof holds for ruleset 24077858 as updated at 04:59:37 UTC. A change to it means
+    reading it back and running a canary again.
+  - Attribution limit: GitHub records the close under the owner's account, because the session's
+    connector acts with the owner's credential.
 
 ### Still blocked, and on what
 
 - **Owner:**
   - read the deployment for `81fd782`, or allow the hosts in this environment's network settings;
-  - repair the ruleset (narrow the target to `main`, add the three contexts with strict mode and
-    the pull-request rule, empty the bypass list after identifying 1236702);
-  - add the platform deployment check and restrict Force Promote;
+  - add, or fix, the `CONTROL_AUDIT_TOKEN` secret (administration read), so the six-hourly probe can see a
+    ruleset regression; without it, every regression except a phantom context reads `unevaluable`;
+  - delete the spent branches `canary/merge-gate-2026-10-02`, `canary/merge-gate-2026-10-03` and
+    `claude/incident-pr94-followup`;
+  - add the platform deployment check and restrict Force Promote. Its precondition is met, because
+    the check has reported on a `main` commit;
   - confirm contact delivery and the limiter's keying (R-D);
   - reconnect for the read-only store-side inventory (R-E).
-- **Agent, after the owner:**
-  - the authorised read-back, which must be conclusive before any canary;
-  - the v2 canary, inert if merged (§13, R-B2), which is also the first real run of the
-    admission check's failing path.
+- **Agent, after the owner:** read back the platform check once it is added
+  (`productionPromotion` → `configured-unproven`, never further on configuration alone). The
+  read-back and the canary are done.
 
 ## Session note — 2026-10-02
 

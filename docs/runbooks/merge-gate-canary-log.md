@@ -11,6 +11,9 @@ push. That is the only safety claim made here. Other checks can still fail, and 
 merged: it is read with `scripts/probe-merge-denial.mjs` and closed unmerged whatever the verdict
 (`docs/runbooks/main-ruleset.md`, step 3).
 
-One line per canary: the date, the branch, and why it was run.
+One line per canary: the date, the branch, and why it was run. A canary is never merged, so its
+line reaches `main` through the records pull request that follows it, with the pull request and
+the verdict appended.
 
 <!-- canary lines below -->
+- 2026-10-03 · `canary/merge-gate-2026-10-03` · first v2 run, after the 05:00 UTC conclusive read-back of ruleset 24077858 · #98 · `denied`, closed unmerged
