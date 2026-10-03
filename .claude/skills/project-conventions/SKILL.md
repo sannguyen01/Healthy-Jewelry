@@ -92,16 +92,19 @@ CI is two jobs — `verify` (lint, type-check, unit, build; the merge gate) and
 the recorded a11y exception.
 
 **Whether those are *required* checks is not this file's to assert.**
-`docs/controls.json` is authoritative, and its `merge-gate` entry has read
-`not-configured` throughout — branch protection is off. This file claimed the
-opposite until 2026-08-30, which is exactly what
+`docs/controls.json` is authoritative. Its `merge-gate` entry read
+`not-configured` until 2026-10-03, when ruleset 24077858 read back conclusive
+and the v2 canary (#98) read `denied`. It now reads `configured`, and its
+`knownLimit` says what the six-hourly probe can and cannot see. This file
+claimed the checks were required, while they were not, until 2026-08-30,
+which is exactly what
 `docs/adr/018-a-claim-about-a-control-is-not-a-control.md` forbids: a document
 asserting a control that no probe reads. It mattered. Eleven commits reached
 `main` unverified during the 2026-08-29 blackout precisely because nothing
 required these checks, while this file told every reader they were required.
 
-The two context strings protection *should* require, when someone enables it,
-are the names GitHub actually publishes — never the job IDs `verify` and `e2e`,
+The three context strings the ruleset requires are the names GitHub actually
+publishes — never the job IDs `verify` and `e2e`,
 which appear nowhere in the checks API and would block every PR forever
 (ADR 015):
 
