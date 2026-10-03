@@ -2,7 +2,12 @@
 
 import { useReveal } from '@/lib/hooks/useReveal'
 
-export function CareSection() {
+/**
+ * `body` is resolved from the claims registry by the server page, so this client component never
+ * imports the registry. It renders the approved wording, or the registry's neutral fallback until a
+ * named reviewer approves the claim.
+ */
+export function CareSection({ body }: { body: string }) {
   const [sectionRef, visible] = useReveal(0.1)
 
   return (
@@ -84,8 +89,7 @@ export function CareSection() {
             margin: '0 auto',
           }}
         >
-          Grade 23 titanium, anodized niobium and 316L surgical steel. Care and finish statements
-          are published only once they have been reviewed.
+          {body}
         </p>
       </div>
     </section>

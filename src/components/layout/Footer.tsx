@@ -264,19 +264,23 @@ export function Footer() {
           }
           
           .footer-group-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.3s ease-out, opacity 0.3s ease-out;
             opacity: 0;
           }
           .footer-group-inner {
+            min-height: 0;
+            overflow: hidden;
             padding-top: 0;
-            padding-bottom: 16px;
           }
           
           .footer-checkbox:checked ~ .footer-group-content {
-            max-height: 300px;
+            grid-template-rows: 1fr;
             opacity: 1;
+          }
+          .footer-checkbox:checked ~ .footer-group-content .footer-group-inner {
+            padding-bottom: 16px;
           }
           .footer-checkbox:checked ~ .footer-summary .footer-icon {
             transform: rotate(45deg);

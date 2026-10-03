@@ -9,7 +9,7 @@ import {
   MaterialsSection,
   RealMoment,
   CareSection,
-  FollowUp
+  FollowUp,
 } from '@/components/home'
 import type { CollectionTile } from '@/components/home/CollectionGrid'
 import {
@@ -70,22 +70,22 @@ export default function HomePage() {
       <main>
         {/* 1. Hero */}
         <Hero headlineLines={claimLines('brand-positioning', SITE)} />
-        
+
         {/* 2. The metals */}
         <MaterialsSection />
-        
+
         {/* 3. A few pieces (4-6 items) */}
         <HorizontalScroll label="CURATED PIECES" products={curatedPieces} />
-        
+
         {/* 4. Explore by type */}
         <CollectionGrid tiles={collectionTiles} />
-        
+
         {/* 5. The moment */}
         <RealMoment />
-        
+
         {/* 6. Reviewed care */}
-        <CareSection />
-        
+        <CareSection body={claimText('materials-faq-skin', { kind: 'site' })} />
+
         {/* 7. Continue the encounter */}
         <FollowUp />
       </main>
