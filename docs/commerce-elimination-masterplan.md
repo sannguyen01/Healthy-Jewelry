@@ -202,7 +202,7 @@ canary blocked because it is a draft or conflicted has not proved the required-c
 mail provider returning a message id has accepted a message, not delivered it.
 
 ```
-UNPROTECTED                 main deploys with nothing required                ← today (2026-10-02; canary #94: NOT-DENIED)
+UNPROTECTED                 main deploys with nothing required                ← today (ruleset 24077858 holds only a deletion rule; canary #94 NOT-DENIED, then merged)
   │ ruleset active, read back `enforced`, bypass list empty   (owner; runbooks/main-ruleset.md 1–2)
 GATE_UNPROVEN
   │ ready-for-review canary fails `verify`; probe-merge-denial reads `denied` with draft:false,
@@ -234,6 +234,17 @@ What may happen in each state:
 | `GATE_PROVEN` | ready-for-review PRs, review, small targeted fixes | external removals |
 | `PREVIEW_VERIFIED` | taking PRs out of draft, a human merge | external removals before production is verified |
 | `PRODUCTION_VERIFIED` | the external sequence above, in order, by people | skipping or reordering it |
+
+**One exception, recorded because it was needed on 2026-10-02.** In `UNPROTECTED`, the owner
+may merge a *recovery* pull request: one whose only effect is to remove a defect that an admission
+failure let onto `main`, after its head checks are green. #95 is that pull request; it deletes the
+canary test #94 put on `main`. Nothing else rides on the exception, and an agent still never
+merges.
+
+**The release is already live.** #93 (this review) was merged at 16:16:44 UTC on 2026-10-02 and
+auto-deployed to production while `main` was `UNPROTECTED`, so `PREVIEW_VERIFIED` was skipped, not
+reached. Production now serves the release (routes, analytics, claims). The production checks
+§6 puts after `PREVIEW_VERIFIED` (live surface, contact, egress) are owed now, not later.
 
 No agent performs a forbidden action, or any of `AGENTS.md`'s human-only actions, because a
 test or this plan says it is next.

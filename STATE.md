@@ -73,16 +73,25 @@ follows #90 (#93). ADR 038 is the pattern.
 
 ### Still blocked, and on what
 
-- **The merge gate does not hold yet.** The owner reported the `main` ruleset created and read
-  back, and the canary ran on 2026-10-02 as PR #94: one failing unit test, ready for review.
-  - `verify` failed, yet GitHub read `mergeable_state: unstable` twice. The merge button works on a
-    red pull request, so the verdict is **NOT-DENIED**.
-  - A wrong context name would read `blocked`, so the likelier causes are in the ruleset itself:
-    enforcement set to *Evaluate*, a target that misses `main`, or a missing required-checks rule.
-  - The agent session could not read the rules (its token was refused), so the owner checks them
-    in Settings → Rules, or by running `probe-branch-protection.mjs` with an admin-read token.
-  - #94 stays open and unmerged. Once corrected it should read `blocked` with no new push; then it
-    is closed and its branch deleted.
+- **The merge gate does not hold, and the cause is now read, not guessed.** The owner reported
+  the `main` ruleset created and read back. The canary ran on 2026-10-02 as PR #94: one failing
+  unit test, ready for review.
+  - `verify` failed, yet GitHub read `mergeable_state: unstable` twice: **NOT-DENIED**.
+  - #94 was then **merged into `main`** at 16:15:34 UTC from the owner's account (`ebdebc0`). No
+    agent merged it. It is direct proof the gate did not hold, and it put the failing test on
+    `main`. Production is functionally unaffected, because tests are not shipped.
+  - #93 was merged a minute later (`be34099`) at a head that did not yet remove the test, so
+    `main` stayed red. **#95 removes it.** Reverting #94 on its own is the other way back.
+  - **#93's merge auto-deployed this whole release to production while the gate was down**, so
+    `PREVIEW_VERIFIED` was skipped. The release is live and owes its production checks now.
+  - **The cause, read back on 2026-10-03:** ruleset `Main` (24077858) is active but holds **only a
+    `deletion` rule**, targets `~ALL`, and has an Integration bypass actor. The judge reads
+    `mismatched`. The full read is in the runbook's evidence table, and what changed at its last
+    update is unknown (history: 403).
+  - The `~ALL` target has to narrow to `main` before the pull-request rule is added; on every
+    branch, that rule would block every direct push.
+  - The canary is re-run only with a design that is inert if merged, and only after the rules read
+    back `enforced`.
 - The owner's 2026-09-27 platform observations (apex 307 → www; commerce variables still set;
   no `RATE_LIMIT_KEY_SECRET` in the project inventory) are recorded in masterplan §7 as theirs:
   this session's Vercel connector answered 403 for the team scope.

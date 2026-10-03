@@ -1,6 +1,6 @@
 # Runbook — the `main` ruleset, and the read-only proof that it holds
 
-**Owner:** the repository owner (`sannguyen01`). **Workstream:** WS-C. **Status:** canary run 2026-10-02 (#94): **NOT-DENIED**, so the ruleset as created does not enforce. See Evidence.
+**Owner:** the repository owner (`sannguyen01`). **Workstream:** WS-C. **Status:** canary #94 (2026-10-02) read **NOT-DENIED** and was then merged. The ruleset reads back `mismatched`, with only a `deletion` rule. **Step 3 is on hold** until the rules read `enforced` *and* the canary is inert if merged. Details are in Evidence.
 
 `main` auto-deploys to production. Until this runbook is carried out, the merge button is the
 deploy button with no required check between them (`docs/controls.json`, `merge-gate`:
@@ -146,6 +146,11 @@ An agent may carry out steps 3a–3d only with the owner's explicit permission t
 branch, and only **after** steps 1 and 2 have recorded an active ruleset read back as
 `enforced`. A canary pushed before that reads `NOT-DENIED` by definition and proves nothing.
 
+> **Do not run 3a as written.** A merged `expect(1).toBe(2)` canary turns `main` red. That is what
+> #94 did on 2026-10-02, and it took two more pull requests to undo. The next canary must fail only
+> in its own pull-request context and pass on `main`. Until this step is rewritten for that design,
+> step 3 is on hold.
+
 1. **3a.** From an up-to-date `main`, create `canary/merge-gate-<yyyy-mm-dd>` with one commit
    that fails a required check and changes nothing else — a unit test asserting
    `expect(1).toBe(2)` in `src/tests/unit/zz-merge-gate-canary.test.ts`. No credential, no
@@ -156,8 +161,7 @@ branch, and only **after** steps 1 and 2 have recorded an active ruleset read ba
    unjustified major dependency bump, and the canary bumps nothing); `E2E tests (Playwright)` —
    **skipped**, because it `needs: verify`. GitHub counts a skipped required check as
    satisfied, so the denial rests on `verify` alone, and the evidence record says so.
-3. **3c.** Read the verdict — from a checkout that has the probe (it is not on `main` until the
-   decommission PRs merge):
+3. **3c.** Read the verdict — from any checkout of `main`; the probe is there since `be34099`:
 
    ```sh
    GITHUB_TOKEN=<token> node scripts/probe-merge-denial.mjs --pr <number> --observer <your name> --out canary-evidence.json
@@ -177,8 +181,11 @@ branch, and only **after** steps 1 and 2 have recorded an active ruleset read ba
      head-merge-attribution-disagrees`, and the pull request's checks tab and merge box are
      compared by hand before anything is recorded.
 
-   Exit 1, `NOT-DENIED`, means the merge button works on a failing pull request — stop, do not
-   merge, and read `probe-branch-protection.mjs`'s findings. Exit 2 is `unevaluable`: read
+   Exit 1, `NOT-DENIED`, means the merge button works on a failing pull request. Record the
+   readings on the pull request, then **close it unmerged at once**, and read
+   `probe-branch-protection.mjs`'s findings. Closing destroys no evidence: the readings are recorded,
+   and the PR can be reopened. Leaving a red PR open with a working merge button is how #94 was
+   merged. Exit 2 is `unevaluable`: read
    `reason`. `precondition-unknown:*` and `mergeability-not-computed` usually mean "re-run in a
    minute"; `draft`, `conflicts` and `behind-base` mean the canary is not testing what it should
    — fix the canary, never the verdict.
@@ -194,9 +201,9 @@ empty cell is the honest state.
 |---|---|---|---|---|
 | Contexts confirmed by `required-checks-contract` | | | | |
 | Ruleset created (id) | the owner reported it created and read back; the id could not be read from the agent session | 2026-10-02 | owner (reported) | none readable: the session's token answered 401, and anonymous reads were rate-limited |
-| `probe-branch-protection.mjs` read back `enforced` | **not observed.** From the agent session it read `unevaluable`: 401 "Bad credentials" with the environment token, and an anonymous-rate-limit 403 without it. That is an inability to ask, not evidence either way | 2026-10-02 | agent session | `verdict: unevaluable` |
+| `probe-branch-protection.mjs` read back `enforced` | **Not enforced.** On 2026-10-02 the read was `unevaluable` (401, then an anonymous rate limit). On 2026-10-03 the session's GitHub proxy read the rules, and the probe's own `evaluateProtection()` judged them `mismatched`. Ruleset `Main` (24077858) is `active`, targeting `~ALL`, `~DEFAULT_BRANCH` and `refs/heads/main`. Its only rule is `deletion`, with no required checks, no pull-request rule and no force-push block. Its bypass list holds Integration 1236702 (`always`). Classic protection and the ruleset's history answered 403 | 2026-10-02, 2026-10-03 | agent session | `verdict: mismatched`: contexts missing, not strict, no PR required, bypass actor present |
 | `docs/controls.json` `merge-gate` set to `configured` | | | | |
 | Canary PR opened, ready for review, `verify` failed (PR number) | opened ready for review from `main` at `726dfc3`. `verify` failed, `Dependency scope` passed, E2E was skipped (`needs: verify`) | 2026-10-02 | agent session | #94, head `81099f6` |
-| `probe-merge-denial.mjs` verdict `denied` — head SHA, merge commit SHA, ruleset ID | **NOT denied.** GitHub read `mergeable_state: unstable` twice: the merge button worked on a failing PR. `judgeDenial()` on those readings gave `NOT-DENIED / mergeable-with-unmet-required-context` against the runbook's contexts, and `unevaluable / rules-unreadable` against what the session could read. The readings came through the GitHub connector, because the probe's own token was refused. Merge commit SHA and ruleset ID were not readable | 2026-10-02 | agent session | #94 comment with the readings; canary left open |
+| `probe-merge-denial.mjs` verdict `denied` — head SHA, merge commit SHA, ruleset ID | **NOT denied.** GitHub read `mergeable_state: unstable` twice: the merge button worked on a failing PR. `judgeDenial()` on those readings gave `NOT-DENIED / mergeable-with-unmet-required-context` against the runbook's contexts, and `unevaluable / rules-unreadable` against what the session could read. The readings came through the GitHub connector, because the probe's own token was refused. Merge commit SHA and ruleset ID were not readable | 2026-10-02 | agent session | #94 comment with the readings; canary left open for diagnosis, then merged (next row) |
 | Required-context states (head and merge commit), `draft`, `mergeable`, `behind_by` | head: verify failing, Dependency scope passing, E2E skipped. `draft: false`. No conflicts: `unstable` is not `dirty`. `behind_by: 0` | 2026-10-02 | agent session | #94 |
-| Canary closed unmerged, branch deleted | | | | |
+| Canary closed unmerged, branch deleted | **No: the canary was merged.** It was left open for diagnosis after the NOT-DENIED reading, then merged at 16:15:34 UTC from the owner's account as merge commit `ebdebc0`. No agent merged it. The merge is the strongest possible evidence that the gate did not hold: a pull request whose required check had failed went into `main`. That put the failing test on `main` (CI red, production unaffected: tests are not shipped). #93 was merged a minute later (`be34099`) at a head that did not yet remove it, so `main` stayed red; the follow-up pull request that removes it (#95) carries this record. The branch `canary/merge-gate-2026-10-02` was **not deleted** and still exists at `81099f6`; the ruleset's `~ALL` deletion rule covers it | 2026-10-02 | GitHub (merges by `sannguyen01`); agent session (record) | #94 merged as `ebdebc0`; #93 merged as `be34099`; removal in #95; branch still present |
