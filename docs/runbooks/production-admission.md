@@ -34,8 +34,9 @@ This fourth context is for Vercel only.
    that adds it merges. Vercel can only select a check it has seen. Its `Production admission` row
    should read `success`.
 3. **Add a deployment check** on the GitHub check named exactly `Production admission`, set to
-   block production alias assignment. The command-line equivalent lists as
-   `vercel project checks --blocks deployment-alias`. Vercel reads the check on the
+   block production alias assignment. It then appears in
+   `vercel project checks --blocks deployment-alias`, the list of checks that block alias
+   assignment, which step 5 reads back. Vercel reads the check on the
    **deployment's commit SHA**: the merge commit's own push run, not the pull request's head.
 4. **Restrict Force Promote.** A person who can promote can bypass the check. Record who holds
    that right. It is a bypass, so it belongs in the same place as the ruleset's bypass list.

@@ -222,9 +222,11 @@ describe('the runner', () => {
 describe('the production-admission job in ci.yml', () => {
   const ci = read('.github/workflows/ci.yml')
   const start = ci.indexOf('\n  production-admission:\n')
-  const rest = ci.slice(start + 1)
-  const next = rest.slice(1).search(/\n {2}[A-Za-z0-9_-]+:\s*\n/)
-  const job = next === -1 ? rest : rest.slice(0, next + 2)
+  // The job runs until the next line indented two spaces: the next job's key, or the comment
+  // block above it. Cutting at the key alone would read that comment as part of this job.
+  const lines = ci.slice(start + 1).split('\n')
+  const end = lines.findIndex((line, i) => i > 0 && /^ {2}\S/.test(line))
+  const job = (end === -1 ? lines : lines.slice(0, end)).join('\n')
 
   it('exists', () => {
     expect(start).toBeGreaterThan(-1)
