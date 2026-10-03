@@ -1,7 +1,85 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-10-02
+Last refreshed by hand: 2026-10-03
+
+## Session note — 2026-10-03
+
+**Incident PR-94: detection worked, and both admission boundaries ignored it.** The canary's
+`verify` failed. It was merged anyway (`ebdebc0`), and the owner's 2026-10-02 read of the
+platform shows READY Production deployments from that commit and from #93's merge (`be34099`),
+aliased to the apex and `www`. Masterplan §13 records it as five separate assertions, so that
+none can be inferred from another:
+- **Detection** worked.
+- **GitHub source admission** failed.
+- **Vercel production admission** failed.
+- **Recovery** is prepared and not on `main`.
+- **External operations** are partly observed.
+
+Four independent flags in §6 replace any single state that could hide them:
+`githubGate: failed`, `productionPromotion: failed`, `contactOperations: unknown` and
+`storeDisconnection: unknown`.
+
+- **R-A, recovery: on `main`.** #95 was green on its head and was merged by the owner at 02:29 UTC
+  as `81fd782`. The post-merge checks ran on that merge SHA, not the head:
+  - the canary path is absent from the tree;
+  - `main`'s push run 37089958244 has `verify` and E2E at `success`;
+  - the deployment's serving is unobserved, because the hosts are refused here.
+
+  Vercel reported the deployment complete 6 min 23 s before that CI run finished: production
+  still does not wait for tests.
+- **The cause, read.** Ruleset 24077858 has one `deletion` rule, targets `~ALL`, and has
+  Integration 1236702 on its bypass list. It is judged `mismatched`. Its state at merge time is
+  unknown, because its history answers 403.
+- **The receiver fails closed, now proven rather than read.** Twelve unit cases cover the secret
+  removed or empty, every handled topic, and forged and would-be-valid signatures: 503, no
+  invalidation, no order line. They were seen red under two mutations, and the sentinel is
+  `receiver-unconfigured-no-effect`. On a local production build with no commerce variable,
+  four POSTs answered 503 and logged only "not set". The production endpoint is unobserved from
+  here. The sentinel names the route, so the register went from 34 to 35 rows (WS-F).
+- **R-C, production admission.** A `Production admission` job passes only on explicit success:
+  - on a pull request, all three jobs;
+  - on a push to `main`, verify and E2E, with dependency scope exactly `skipped`;
+  - anything else is refused, `merge_group` included.
+
+  It runs under `always()`, which makes it *eligible* to run, and fail, when `verify` fails. It
+  does not guarantee a verdict for a cancelled or never-triggered run. Both incident runs replay
+  as refusals in its tests. Its first real run, #97's pull-request run 37090486106, logged
+  `ADMITTED (pull_request)`. That is the passing path only: not a `main` push, not the failing
+  path, and not Vercel waiting. It is not a ruleset context. It is `not-configured` until Vercel waits for it, and
+  `proven` only by an owner-approved test on the real promotion path ([ADR 039](docs/adr/039-a-ready-build-is-not-a-passing-build.md)).
+  43 sentinels, 41 vitest.
+
+- **Ruleset updated, read back, not conclusive; #97 to be merged by owner override.** At 03:48 UTC the owner
+  narrowed 24077858 to `main`, emptied its bypass list, and added `non_fast_forward`. The 03:49
+  read found no pull-request rule and no required checks, so `main` still requires no check
+  (judge: `unevaluable`). The owner chose to merge #97 as a recorded override, not under the
+  bounded exception. `githubGate` stays `failed`; the rest of the ruleset is still owed before
+  any canary.
+
+- **The ruleset reads back conclusive (05:00 UTC), and the override is withdrawn.**
+  - A second update at 04:48 required one context, `Github Actions`: the source app's name typed
+    as a check name. Nothing publishes it, so #97 read `blocked`; the judge said `mismatched`.
+  - The third update, at 04:59, has the three real contexts from integration 15368, strict, and
+    a pull-request rule.
+  - With the owner's recorded inspection (no classic rule; 1236702 was the Claude GitHub App),
+    the read is conclusive. `githubGate` is `configured-unproven`, and #97 merges under
+    exception 2.
+  - Owed: `merge-gate` flipped to `configured` in a separate pull request, then the v2 canary.
+
+### Still blocked, and on what
+
+- **Owner:**
+  - read the deployment for `81fd782`, or allow the hosts in this environment's network settings;
+  - repair the ruleset (narrow the target to `main`, add the three contexts with strict mode and
+    the pull-request rule, empty the bypass list after identifying 1236702);
+  - add the platform deployment check and restrict Force Promote;
+  - confirm contact delivery and the limiter's keying (R-D);
+  - reconnect for the read-only store-side inventory (R-E).
+- **Agent, after the owner:**
+  - the authorised read-back, which must be conclusive before any canary;
+  - the v2 canary, inert if merged (§13, R-B2), which is also the first real run of the
+    admission check's failing path.
 
 ## Session note — 2026-10-02
 

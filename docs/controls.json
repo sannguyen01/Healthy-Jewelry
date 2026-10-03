@@ -237,7 +237,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 41 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 44 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -414,7 +414,24 @@
       "adr": "docs/adr/015-a-gate-that-was-only-ever-documented.md",
       "backstop": "human:weekly",
       "acceptedSince": "2026-10-03",
-      "acceptedWhy": "Restated 2026-10-03. The ruleset that exists reads back mismatched (only a deletion rule; see docs/runbooks/main-ruleset.md, Evidence). Canary #94 read NOT-DENIED on 2026-10-02 and was then merged, turning main red. So nothing proves the gate yet, and this canary design breaks main if merged. The proof becomes runnable when the rules read back enforced and the canary fails only in its own pull-request context."
+      "acceptedWhy": "Restated 2026-10-03. Canary #94 read NOT-DENIED on 2026-10-02 and was then merged, turning main red. Since 05:00 UTC on 2026-10-03 the ruleset reads back enforced (docs/runbooks/main-ruleset.md, Evidence), and the v2 canary fails only in its own pull-request context. The proof becomes runnable when that design is on main; until a canary reads denied, nothing proves that GitHub refuses a failing pull request."
+    },
+    {
+      "id": "production-admission",
+      "claims": "production aliases go only to a commit whose own CI run explicitly passed verify and E2E (and, on a pull request, dependency scope); a skipped, cancelled or missing result is never read as a pass",
+      "status": "not-configured",
+      "context": "Production admission",
+      "contextSource": ".github/workflows/ci.yml",
+      "probe": "scripts/check-production-admission.mjs",
+      "probeLibrary": "scripts/lib/production-admission.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": false,
+      "knownLimit": "The check runs on every CI run and its verdict is exhaustively unit-tested, but it gates nothing on its own: until Vercel is told to wait for it, a red Production admission sits beside a deployment that takes the aliases anyway, which is what happened twice on 2026-10-02. Once Vercel waits for it, four limits remain. (1) A person with promote rights can Force Promote past a failing check, so it governs the automatic path, not people. (2) It holds the custom production domains (the apex and www); the deployment's own URL is still created and reachable. (3) It judges only its own run: merge_group and pushes to any other branch are refused by policy, not evaluated, and its failing path on a push to main is unit-tested only, because no bad commit is manufactured on main to observe it. (4) A failing check on a custom environment is a configuration rehearsal, not proof for production. (5) always() makes the job eligible to run after failed or skipped prerequisites, and no more: a cancelled run, a workflow that never triggers, a runner failure, or a missing or colliding check name can each leave no verdict, and each is a separate observation. Vercel also creates the production build before its deployment check decides alias assignment. Observed so far: the passing path only, on #97's pull-request run (37090486106). (6) The verdict runs a script from the tree it judges: on a pull request the ruleset's own required checks still bind, but once merged that script governs main's push runs, which is why both admission scripts are in .github/CODEOWNERS. Its status moves only on the evidence named in docs/runbooks/production-admission.md.",
+      "humanAction": "Follow docs/runbooks/production-admission.md: in Vercel's project settings confirm the Git integration and automatic production aliasing, add a deployment check on the GitHub check `Production admission` that blocks production alias assignment (it is read on the deployment's commit SHA), and restrict and record who can Force Promote. Then record, dated, the main push run showing the check, and Vercel's check list read back. Proof beyond configuration needs an owner-approved negative test on the real promotion path that keeps the last good aliases; never manufacture a bad commit on main for it.",
+      "adr": "docs/adr/039-a-ready-build-is-not-a-passing-build.md",
+      "backstop": "human:weekly",
+      "acceptedSince": "2026-10-03",
+      "acceptedWhy": "Accepted 2026-10-03, the day after incident PR-94, when two READY production deployments were built from a main whose verify had failed. The repository half exists from this change: a check that passes only on explicit success. The other half is a Vercel project setting nobody in CI can make, so the gap is accepted, dated and escalated by probe-accepted-gap.mjs when it goes stale, rather than claimed as closed because a job turned green."
     },
     {
       "id": "codeowners-coverage",

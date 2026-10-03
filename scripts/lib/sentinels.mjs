@@ -504,6 +504,43 @@ export const SENTINELS = [
     invariant: 'the hero copy card never covers more than 60% of the photograph',
     scar: 'Every guardrail on the hero was satisfied better the larger the card grew, so the codified pressure pointed one way and the end state is a photograph behind a floating memo — ADR 013.',
   },
+  {
+    // The old guard test asserted the 503 and nothing else, so an invalidation placed above the
+    // secret check left it green. Proven on 2026-10-03: this mutation, and an order log line in
+    // the same place, each turned the 12 no-effect cases red while the 503 test passed.
+    id: 'receiver-unconfigured-no-effect',
+    runner: 'vitest',
+    file: 'src/app/api/webhooks/shopify/route.ts',
+    find: "    console.error('[webhooks/shopify] SHOPIFY_WEBHOOK_SECRET not set')",
+    replace: "    revalidateTag(PRODUCTS_TAG, PURGE_NOW)\n    console.error('[webhooks/shopify] SHOPIFY_WEBHOOK_SECRET not set')",
+    specs: ['src/tests/unit/api-webhooks-shopify-route.test.ts'],
+    invariant: 'with its signing secret absent, the retained receiver answers 503 and invalidates and logs nothing',
+    scar: 'The signing secret left the project before the receiver did (incident PR-94), so "fails closed" became the only thing between a surviving subscription and a cache purge, and the test proved the status code only.',
+  },
+  {
+    // "Admit unless something failed" is the rule GitHub applies to a skipped required check,
+    // and the reading that let a skipped E2E sit beside a failed verify. Mutated to exactly that.
+    id: 'production-admission-explicit-success',
+    runner: 'vitest',
+    file: 'scripts/lib/production-admission.mjs',
+    find: '  const unmet = ADMISSION_JOBS.filter((job) => results[job] !== required[job]).map(',
+    replace: "  const unmet = ADMISSION_JOBS.filter((job) => results[job] === 'failure').map(",
+    specs: ['src/tests/unit/production-admission.test.ts'],
+    invariant: 'production admission passes only on explicit success; skipped, cancelled or missing is a refusal',
+    scar: 'On 2026-10-02 two READY production deployments were built from a main whose verify had failed: a build that finished was read as a build that passed (incident PR-94).',
+  },
+  {
+    // A predicate that never matches makes every canary pass silently and read NOT-DENIED for the
+    // wrong reason. The accepted fixtures in the canary test are what notice.
+    id: 'merge-gate-canary-ref',
+    runner: 'vitest',
+    file: 'scripts/lib/merge-denial.mjs',
+    find: "  return typeof ref === 'string' && MERGE_GATE_CANARY_REF.test(ref)",
+    replace: '  return false',
+    specs: ['src/tests/unit/merge-gate-canary.test.ts'],
+    invariant: 'a correctly named merge-gate canary branch is recognised, so its pull request fails verify',
+    scar: "#94's canary failed everywhere, so its merge turned main red. v2 fails only in its own pull request, which makes the branch-name predicate the one thing standing between a canary and a silent pass.",
+  },
   // ── Playwright: need a production build, so opt-in via --with-e2e ──
   {
     id: 'hero-card-measured',

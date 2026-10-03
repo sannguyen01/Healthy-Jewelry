@@ -419,3 +419,43 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+
+  # **Production admission: one verdict the deployment platform can wait for.**
+  #
+  # On 2026-10-02 a commit whose `verify` had failed was merged and then given the production
+  # aliases (incident PR-94, masterplan §13). This job is the input to the platform-side check
+  # that would have stopped the second half: it passes only when this run's own results are
+  # explicitly what this event requires, and the policy lives in
+  # scripts/lib/production-admission.mjs, where it is exhaustively tested.
+  #
+  # `always()`, not the default `success()`: a skipped check is the reading this job exists to
+  # refuse, so it must be eligible to run, and fail, when `verify` fails (ADR 027 names the
+  # status function). What `always()` does not guarantee is ADR 039, decision 2.
+  #
+  # Not a required context in the ruleset, which keeps its three. A pull request's own three
+  # results are already required there; this context is for the platform, and is selected in
+  # its deployment-check settings. Dependency-free, like the control-audit probes, so it cannot
+  # be broken by the dependency change it is judging.
+  production-admission:
+    name: Production admission
+    runs-on: ubuntu-latest
+    needs: [verify, e2e, dependency-scope]
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Admit this commit only on explicit success
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          SCOPE_RESULT: ${{ needs['dependency-scope'].result }}
+        run: node scripts/check-production-admission.mjs

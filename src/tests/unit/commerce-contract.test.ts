@@ -91,10 +91,14 @@ const register = parseRegister(read(REGISTER_PATH))
  * runbook rows opened in WS-D/E/F, and the WS-B handle-contract row closed with the exemption it
  * guarded); 34 on 2026-09-27, when a row-by-row audit found the only two a repository could
  * close before WS-F — the escalation caveat's vendor-specific cause and the Playwright web
- * server's commerce env, both WS-C. Recomputed by the integrator after each change that closes
- * a row; `pnpm verify:commerce-contract --summary` prints the live figure by workstream.
+ * server's commerce env, both WS-C. 35 on 2026-10-03, the first row *added* since the register
+ * was compiled: `scripts/lib/sentinels.mjs` now names the retained webhook route, because its
+ * signing secret left the project before the route did (incident PR-94) and the route's
+ * fail-closed answer needed a sentinel. It is WS-F's, and leaves with the route. Recomputed by
+ * the integrator after each change that closes or opens a row; `pnpm verify:commerce-contract
+ * --summary` prints the live figure by workstream.
  */
-const EXPECTED_REGISTER_ROWS = 34
+const EXPECTED_REGISTER_ROWS = 35
 
 /** A file that trips nothing, used as the negative case for every rule below. */
 const INERT = { path: 'src/lib/inert.ts', source: 'export const x = 1\n' }
