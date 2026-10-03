@@ -658,6 +658,11 @@
   .hj-menu-link:hover, .hj-menu-link:focus-visible {
     color: var(--nacre);
     transform: scale(1.02);
-    outline: none;
+  }
+
+  /* Keyboard focus needs a ring the colour change alone cannot provide (WCAG 2.4.7). */
+  .hj-menu-link:focus-visible {
+    outline: 2px solid var(--on-dark);
+    outline-offset: 4px;
   }
 }

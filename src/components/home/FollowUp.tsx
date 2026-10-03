@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useReveal } from '@/lib/hooks/useReveal'
+import { SOCIAL_LINKS } from '@/config/site'
 
 export function FollowUp() {
   const [sectionRef, visible] = useReveal(0.1)
@@ -20,7 +21,9 @@ export function FollowUp() {
       }}
     >
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <h2 className="label-eyebrow" style={{ marginBottom: '24px' }}>Continue the encounter</h2>
+        <h2 className="label-eyebrow" style={{ marginBottom: '24px' }}>
+          Continue the encounter
+        </h2>
         <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link
             href="/contact"
@@ -32,13 +35,13 @@ export function FollowUp() {
               color: 'var(--ink)',
               padding: '12px 24px',
               border: '1px solid var(--ink)',
-              transition: 'all 0.3s var(--ease)'
+              transition: 'all 0.3s var(--ease)',
             }}
           >
             Contact Us
           </Link>
           <Link
-            href="https://instagram.com"
+            href={SOCIAL_LINKS.instagram}
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -49,7 +52,7 @@ export function FollowUp() {
               color: 'var(--ink)',
               padding: '12px 24px',
               border: '1px solid transparent',
-              transition: 'all 0.3s var(--ease)'
+              transition: 'all 0.3s var(--ease)',
             }}
           >
             Instagram

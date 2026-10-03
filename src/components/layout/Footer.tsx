@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { legalLinks } from '@/config/navigation'
+import { SOCIAL_LINKS } from '@/config/site'
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 import { claimText } from '@/lib/catalog'
 
@@ -20,32 +21,24 @@ const groups = [
       { label: 'Pieces', href: '/shop' },
       { label: 'Metals', href: '/materials' },
       { label: 'Our Story', href: '/about' },
-    ]
+    ],
   },
   {
     title: 'Help',
     links: [
       { label: 'Contact', href: '/contact' },
-      { label: 'Care and sizing', href: '/care' },
       { label: 'FAQ', href: '/faq' },
-    ]
-  },
-  {
-    title: 'Company',
-    links: [
-      { label: 'Privacy', href: '/privacy' },
-      { label: 'Terms', href: '/terms' },
-      { label: 'Legal information', href: '/legal' },
-    ]
+    ],
   },
   {
     title: 'Find us',
     links: [
-      { label: 'Location & events', href: '/events' },
-      { label: 'Instagram', href: '#' },
-      { label: 'Twitter', href: '#' },
-    ]
-  }
+      { label: 'Instagram', href: SOCIAL_LINKS.instagram },
+      { label: 'TikTok', href: SOCIAL_LINKS.tiktok },
+      { label: 'Pinterest', href: SOCIAL_LINKS.pinterest },
+      { label: 'YouTube', href: SOCIAL_LINKS.youtube },
+    ],
+  },
 ]
 
 const columnHeadStyle: React.CSSProperties = {
@@ -129,41 +122,43 @@ export function Footer() {
           {/* Accordion Columns */}
           {groups.map((group, i) => (
             <div key={group.title} className="footer-group">
-              <input type="checkbox" id={`footer-group-${i}`} className="footer-checkbox" aria-hidden="true" />
-              <label htmlFor={`footer-group-${i}`} className="footer-summary" style={columnHeadStyle}>
+              <input
+                type="checkbox"
+                id={`footer-group-${i}`}
+                className="footer-checkbox"
+                aria-hidden="true"
+              />
+              <label
+                htmlFor={`footer-group-${i}`}
+                className="footer-summary"
+                style={columnHeadStyle}
+              >
                 {group.title}
                 <span className="footer-icon">+</span>
               </label>
               <div className="footer-group-content">
                 <div className="footer-group-inner">
-                  {group.links.map((link) => (
-                    <Link key={link.label} href={link.href} style={linkStyle}>
-                      {link.label}
-                    </Link>
-                  ))}
+                  {group.links.map((link) =>
+                    link.href.startsWith('http') ? (
+                      <a
+                        key={link.label}
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={linkStyle}
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link key={link.label} href={link.href} style={linkStyle}>
+                        {link.label}
+                      </Link>
+                    )
+                  )}
                 </div>
               </div>
             </div>
           ))}
-          {/* Shop column */}
-          <div>
-            <p style={columnHeadStyle}>Shop</p>
-            {shopLinks.map((link) => (
-              <Link key={link.href} href={link.href} style={linkStyle}>
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Info column */}
-          <div>
-            <p style={columnHeadStyle}>Info</p>
-            {infoLinks.map((link) => (
-              <Link key={link.href} href={link.href} style={linkStyle}>
-                {link.label}
-              </Link>
-            ))}
-          </div>
 
           {/* Legal column */}
           <div>
@@ -179,7 +174,9 @@ export function Footer() {
               src/lib/analytics/consent.ts). Styled as a link so the column reads as one list,
               and a <button> underneath because it opens something rather than going anywhere.
             */}
-            <MeasurementPreferences style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }} />
+            <MeasurementPreferences
+              style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }}
+            />
           </div>
         </div>
 
