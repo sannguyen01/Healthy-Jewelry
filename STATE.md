@@ -57,6 +57,16 @@ Four independent flags in §6 replace any single state that could hide them:
   bounded exception. `githubGate` stays `failed`; the rest of the ruleset is still owed before
   any canary.
 
+- **The ruleset reads back conclusive (05:00 UTC), and the override is withdrawn.**
+  - A second update at 04:48 required one context, `Github Actions`: the source app's name typed
+    as a check name. Nothing publishes it, so #97 read `blocked`; the judge said `mismatched`.
+  - The third update, at 04:59, has the three real contexts from integration 15368, strict, and
+    a pull-request rule.
+  - With the owner's recorded inspection (no classic rule; 1236702 was the Claude GitHub App),
+    the read is conclusive. `githubGate` is `configured-unproven`, and #97 merges under
+    exception 2.
+  - Owed: `merge-gate` flipped to `configured` in a separate pull request, then the v2 canary.
+
 ### Still blocked, and on what
 
 - **Owner:**

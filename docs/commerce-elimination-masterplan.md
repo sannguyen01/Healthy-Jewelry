@@ -202,14 +202,14 @@ canary blocked because it is a draft or conflicted has not proved the required-c
 mail provider returning a message id has accepted a message, not delivered it.
 
 ```
-UNPROTECTED                 main deploys with nothing required                ← today (ruleset 24077858 holds only a deletion rule; canary #94 NOT-DENIED, then merged)
+UNPROTECTED                 main deploys with nothing required                (until 2026-10-03 04:59 UTC; canary #94 NOT-DENIED, then merged)
   │ an authorised read of ALL effective protection: every ruleset (its target conditions, rules,
   │ check sources and bypass list), the rules effective on `main`, and the classic layer. Conclusive
   │ only for: `main` only; exactly the three contexts from GitHub Actions; strict; a pull request;
   │ force-push and deletion blocked; the bypass list READABLE and empty. Anything unread is
   │ `unevaluable` unless a recorded owner inspection closes that exact gap
   │                                                          (owner configures; runbooks/main-ruleset.md 1–2)
-GATE_UNPROVEN
+GATE_UNPROVEN               ← today (read back conclusive 2026-10-03 05:00 UTC; no canary yet)
   │ a v2 canary, inert if merged, fails `verify` in its own pull request only; probe-merge-denial
   │ reads `denied` with draft:false, mergeable:true, behind_by 0, and head, test-merge and base
   │ SHAs recorded and in agreement; closed unmerged             (agent, with permission; §13 R-B2)
@@ -238,7 +238,7 @@ configuration alone never makes a flag `proven`.
 
 | Flag | 2026-10-03 | The observation behind it | `proven` only when |
 |---|---|---|---|
-| `githubGate` | **`failed`** | #94 merged into `main` with a failed required check (`ebdebc0`, 2026-10-02). Ruleset 24077858 read back on 2026-10-03: a `deletion` rule only, an Integration bypass actor, judged `mismatched` | the read above is conclusive, then a v2 canary reads `denied` and is closed unmerged (§13, R-B) |
+| `githubGate` | **`configured-unproven`** (was `failed`) | #94 merged with a failed required check (`ebdebc0`, 2026-10-02). On 2026-10-03 at 05:00 UTC ruleset 24077858 read back conclusive: `main` only; the three contexts from integration 15368, strict; a pull request; force-push and deletion blocked; bypass list readable and empty; no classic rule (the owner's inspection). Judge: `enforced` | the read above is conclusive, then a v2 canary reads `denied` and is closed unmerged (§13, R-B) |
 | `productionPromotion` | **`failed`** | READY Production deployments from `ebdebc0` and `be34099`, aliased to the apex and `www` (the owner's 2026-10-02 read of the project). On 2026-10-03 the platform reported `81fd782` deployed 6 min 23 s before its CI finished | an owner-approved negative test on the real promotion path keeps a failing commit off the aliases (§13, R-C). Adding the platform check makes it `configured-unproven`, no more |
 | `contactOperations` | `unknown` | the owner's 2026-10-02 inventory: `RESEND_*`, `UPSTASH_*` and `RATE_LIMIT_KEY_SECRET` absent from the project's returned variables; shared bindings unread | provider acceptance plus a human-confirmed inbox delivery, and the limiter's keying mode read from `/api/health` (§13, R-D) |
 | `storeDisconnection` | `unknown` | the project holds no commerce-named variable (owner's read); the retained receiver answers 503 with no effect on a local production build (agent, 2026-10-03); the store side is unread (connector needs re-authentication) | a read-only store-side inventory shows no subscription, app or feed expects this site, and only then is the receiver removed (§13, R-E) |
@@ -277,7 +277,9 @@ and an agent still never merges.
      changed files, the checks and the reviewer. If another commit lands after review, the
      exception is evaluated again against the new head.
 
-**Owner override, 2026-10-03 (not exception 2).**
+**Owner override, 2026-10-03: withdrawn before use.** The owner completed the ruleset at 04:59 UTC, and the 05:00 read-back was conclusive, so #97 merges under **exception 2** and this override was never exercised. It is kept as the record of a decision that was made and then made unnecessary.
+
+*As recorded at ~03:55 UTC:*
 - **The decision.** After the ruleset update at 03:48 UTC, the owner chose to merge #97 at its
   reviewed head before the read-back was conclusive.
 - **Why exception 2 does not cover it.** The 03:49 read found the target narrowed to `main`, the
@@ -305,7 +307,7 @@ empty. **An empty cell is the honest state.**
 
 | # | Action | Runbook | Evidence |
 |---|---|---|---|
-| 1 | **Repair** the `main` ruleset (24077858) to the runbook's JSON: target `main` only (drop `~ALL`, which with a pull-request rule would block every direct push), add the pull-request, required-checks (the three contexts from GitHub Actions, strict) and force-push rules, keep `deletion`, and **empty the bypass list** after identifying Integration 1236702 | `docs/runbooks/main-ruleset.md` | a ruleset existed; read back 2026-10-03 as `mismatched` (§13) |
+| 1 | **Repair** the `main` ruleset (24077858) to the runbook's JSON: target `main` only (drop `~ALL`, which with a pull-request rule would block every direct push), add the pull-request, required-checks (the three contexts from GitHub Actions, strict) and force-push rules, keep `deletion`, and **empty the bypass list** after identifying Integration 1236702 | `docs/runbooks/main-ruleset.md` | done 2026-10-03: the owner's updates at 03:48, 04:48 and 04:59 UTC; read back conclusive at 05:00 (runbook Evidence). Integration 1236702 was the Claude GitHub App; its bypass is gone |
 | 2 | Grant permission to push a v2 canary branch, only after the read-back is conclusive; the read-only denial proof is then run and recorded | same, step 3 | #94 ran before that read and was merged (§13) |
 | 2a | Merge the recovery pull request #95; then the tree, push-run and deployment checks are recorded | §13, R-A | merged 2026-10-03 02:29 UTC (`81fd782`); tree and push run checked by the agent; the deployment's serving is still the owner's read |
 | 2b | Add a Vercel deployment check on `Production admission` that blocks production alias assignment; restrict and record Force Promote | `docs/runbooks/production-admission.md` | |
@@ -388,7 +390,7 @@ production-build E2E, then preview probes.
 
 | # | Statement | Demonstrated by | State |
 |---|---|---|---|
-| 1 | `main` refuses a pull request with a failing required check | `probe-merge-denial.mjs` against a canary, `denied` | **failed** 2026-10-02 (#94 merged); waiting on the ruleset repair, then a v2 canary |
+| 1 | `main` refuses a pull request with a failing required check | `probe-merge-denial.mjs` against a canary, `denied` | **failed** 2026-10-02 (#94 merged); the ruleset reads back conclusive since 2026-10-03 05:00 UTC; waiting on a v2 canary |
 | 2 | A clean clone builds and tests without commerce credentials | CI on a fresh runner | met, except the webhook's mock secret |
 | 3 | The register is empty under the phase rule | `verify:commerce-contract`, phase `complete` | 35 rows (one added 2026-10-03: a sentinel on the retained receiver, leaving with it) |
 | 4 | Source, lockfile, build output, browser traffic and server calls show no commerce dependency | scanner, `auditPackages`, artifact scan, egress fixture, server harness | met, except the retained route |
@@ -482,7 +484,7 @@ The failing check worked; the two boundaries that should have consumed its resul
 | Assertion | Status | Evidence | What would change it |
 |---|---|---|---|
 | Detection | **worked** | `verify` failed on #94's head (`81099f6`) and on every run that included the test | n/a |
-| GitHub source admission | **failed** | #94 merged with that check red (`ebdebc0`). The ruleset read on 2026-10-03 holds a `deletion` rule only | a conclusive authorised read, then a v2 canary read `denied` (R-B) |
+| GitHub source admission | **failed, now configured and unproven** | #94 merged with that check red (`ebdebc0`). By 05:00 UTC on 2026-10-03 the ruleset read back conclusive (§6 `githubGate`) | a v2 canary read `denied` (R-B) |
 | Vercel production admission | **failed** | READY Production deployments from `ebdebc0` and `be34099` took the apex and `www` (the owner's 2026-10-02 read) | an approved negative test on the real promotion path (R-C) |
 | Recovery | **on `main`**, two of three post-merge checks observed | Head checks on `8c93505` were green (run 37088040887). The owner merged #95 at 02:29:00 UTC as `81fd782`. On that *merge* SHA the canary path is absent from the tree, and `main`'s push run 37089958244 has `verify` and E2E at `success` (agent, 2026-10-03). The deployment's serving is unobserved: the platform's status says only "Deployment has completed" | the owner's read of the deployment for `81fd782` |
 | External operations | **partly observed** | the owner's 2026-10-02 project inventory; no contact, limiter or store-side observation | R-D and R-E evidence |
@@ -514,6 +516,9 @@ Four rules came out of keeping these apart:
 | 03:48:12 | 10:48:12 | The owner updates ruleset 24077858: target `~DEFAULT_BRANCH` and `refs/heads/main` (`~ALL` removed), rules `deletion` and `non_fast_forward`, bypass list empty | ruleset `updated_at` |
 | 03:49:22 | 10:49:22 | Full read-back: one ruleset reaches `main`; the bypass list is readable and empty; **no pull-request rule, no required status checks**; classic summary `enabled: false`, full endpoint 403. `evaluateProtection`: `unevaluable` (`contexts-mismatch`, `not-strict`, `no-pull-request-required`) | `gh api`; judge |
 | ~03:55 | ~10:55 | **The owner chooses to merge #97 as an override** (§6), not under exception 2. `githubGate` stays `failed` | owner, in session |
+| 04:48:48 | 11:48:48 | Second update: target `refs/heads/main` exactly, and a `required_status_checks` rule (strict) whose one context is **`Github Actions`**, the source app's name typed as a check name. Nothing publishes that, so every pull request, #97 included, reads `blocked`. Judge: `mismatched` (`contexts-mismatch: blocking`), ADR 015's trap | ruleset; #97 `mergeable_state` |
+| 04:59:37 | 11:59:37 | Third update: the three real contexts, each from integration 15368, strict; a `pull_request` rule (0 approvals); bypass list still empty | ruleset `updated_at` |
+| 05:00:17 | 12:00:17 | **Read-back conclusive.** One ruleset reaches `main`; every rule matches the runbook; judge `enforced`. The owner records no classic rule in Settings → Branches, and identifies 1236702 as the Claude GitHub App. `githubGate` → `configured-unproven`; #97 is `clean` and merges under exception 2; the override is withdrawn | `gh api`; judge; owner's inspection |
 
 ### What it proves, and what it does not
 
@@ -573,7 +578,7 @@ changed nothing.
     "removalMergeCommit": "81fd782ccf35f8e82ad7e7ee1a686aafceaa1ac3",
     "postMergePushRun": { "id": 37089958244, "verify": "success", "e2e": "success" },
     "postMergeDeployment": "platform-status-only",
-    "githubGate": "failed",
+    "githubGate": "configured-unproven",
     "productionPromotion": "failed",
     "nextAction": "owner-repairs-and-reads-back-the-ruleset"
   }
