@@ -129,6 +129,16 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/webp', 'image/avif'],
   },
+  // Bundle analyzer (dev only)
+  // npm install @next/bundle-analyzer
+  ...(process.env.ANALYZE === 'true' && {
+    webpack: (config) => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer')
+      config.plugins.push(new BundleAnalyzerPlugin())
+      return config
+    },
+  }),
   async headers() {
     return [
       {
