@@ -183,7 +183,7 @@ fail by a sentinel in `scripts/lib/sentinels.mjs`.
 |---|---|---|---|
 | **A** Application | revalidate route, vendor config and API-version module deleted; version route keeps the fingerprint; contact honesty; IP pseudonymisation; the 308 families are route handlers, so a stale action ends on its 410 page rather than re-posting to the successor (2026-10-02); the retained receiver proven to do nothing without its secret, by a mutation-checked test and a local HTTP observation (2026-10-03) | the webhook route and `cacheTags.ts` | WS-F ordering |
 | **B** Content | claims registry; enforce-now copy; form taxonomy (17 unassigned); §8 read from the contract; legal-review inventory; an expired approval leaves the served page within `CLAIM_WITHDRAWAL_BOUND_SECONDS` plus one request, measured by build-and-serve experiment (2026-10-02) | a named reviewer approving claims against documents; a person assigning forms; an expiry reminder to that reviewer, built with the first approval | evidence and reviewers |
-| **C** CI/CD | exact-set scanner; differential lexer; phase state; artifact scan; egress, CSP, route matrix, fresh session; ruleset-aware probe; merge-denial proof; live-surface probe; premise; CODEOWNERS; `merge_group`; denial withheld on draft, conflict, behind or head/merge disagreement; live surface read under a streaming cap and attributed after identity, with an issue a person must `/ack` (2026-10-02); a `Production admission` check that passes only on explicit success, for the platform to wait on (2026-10-03, ADR 039) | the ruleset repair and its read-back; a v2 canary, inert if merged; the platform's deployment check; retire the production-smoke vendor tier (`preflight-secrets.mjs`) with WS-F | the owner's ruleset and platform settings; WS-F |
+| **C** CI/CD | exact-set scanner; differential lexer; phase state; artifact scan; egress, CSP, route matrix, fresh session; ruleset-aware probe; merge-denial proof; live-surface probe; premise; CODEOWNERS; `merge_group`; denial withheld on draft, conflict, behind or head/merge disagreement; live surface read under a streaming cap and attributed after identity, with an issue a person must `/ack` (2026-10-02); a `Production admission` check that passes only on explicit success, for the platform to wait on (2026-10-03, ADR 039); the ruleset repaired, read back conclusive and proven by the v2 canary #98 (2026-10-03) | the audit token that lets the six-hourly probe see a ruleset regression; the platform's deployment check; retire the production-smoke vendor tier (`preflight-secrets.mjs`) with WS-F | the owner's secret and platform settings; WS-F |
 | **D** Infrastructure | mock environment reduced to what code reads; runbook | remove variables from Vercel in all three environments; cold rebuild and scan | dashboard access |
 | **E** DNS | premise watching the checkout host; runbook | apex/`www` fix; the thirty-day checkout-host clock; CAA | dashboard access |
 | **F** Third-party | read-only inventory runbook | reconnect; inventory; reconcile 22 vs 17 products; delete subscriptions; delete the route; revoke by blast radius | connector re-authentication |
@@ -209,11 +209,11 @@ UNPROTECTED                 main deploys with nothing required                (u
   │ force-push and deletion blocked; the bypass list READABLE and empty. Anything unread is
   │ `unevaluable` unless a recorded owner inspection closes that exact gap
   │                                                          (owner configures; runbooks/main-ruleset.md 1–2)
-GATE_UNPROVEN               ← today (read back conclusive 2026-10-03 05:00 UTC; no canary yet)
+GATE_UNPROVEN               (2026-10-03 05:00 → 07:56 UTC: read back conclusive; #97 merged under exception 2)
   │ a v2 canary, inert if merged, fails `verify` in its own pull request only; probe-merge-denial
   │ reads `denied` with draft:false, mergeable:true, behind_by 0, and head, test-merge and base
   │ SHAs recorded and in agreement; closed unmerged             (agent, with permission; §13 R-B2)
-GATE_PROVEN
+GATE_PROVEN                 ← today (v2 canary #98 read `denied` 2026-10-03 07:56 UTC; closed unmerged)
   │ PR #90 + this review's PR reviewed on their current heads; the four release questions answered
   │ (retired actions end on a page, forged beacons log nothing, an expired claim leaves the served
   │ page within the bound, the live surface is attributed after identity)
@@ -238,8 +238,8 @@ configuration alone never makes a flag `proven`.
 
 | Flag | 2026-10-03 | The observation behind it | `proven` only when |
 |---|---|---|---|
-| `githubGate` | **`configured-unproven`** (was `failed`) | #94 merged with a failed required check (`ebdebc0`, 2026-10-02). On 2026-10-03 at 05:00 UTC ruleset 24077858 read back conclusive: `main` only; the three contexts from integration 15368, strict; a pull request; force-push and deletion blocked; bypass list readable and empty; no classic rule (the owner's inspection). Judge: `enforced` | the read above is conclusive, then a v2 canary reads `denied` and is closed unmerged (§13, R-B) |
-| `productionPromotion` | **`failed`** | READY Production deployments from `ebdebc0` and `be34099`, aliased to the apex and `www` (the owner's 2026-10-02 read of the project). On 2026-10-03 the platform reported `81fd782` deployed 6 min 23 s before its CI finished | an owner-approved negative test on the real promotion path keeps a failing commit off the aliases (§13, R-C). Adding the platform check makes it `configured-unproven`, no more |
+| `githubGate` | **`proven`** (was `failed`, then `configured-unproven` from 05:00 UTC) | #94 merged with a failed required check (`ebdebc0`, 2026-10-02). On 2026-10-03 at 05:00 UTC ruleset 24077858 read back conclusive: `main` only; the three contexts from integration 15368, strict; a pull request; force-push and deletion blocked; bypass list readable and empty; no classic rule (the owner's inspection). Judge: `enforced`. At 07:56 UTC the v2 canary #98 read **`denied`** on `verify` alone (not a draft, no conflicts, 0 behind, head and test-merge in agreement, `verify` passing on the base) and was closed unmerged | met. It holds for the ruleset version it ran against (`updated_at` 04:59:37 UTC): a change to the ruleset sends it back to `configured-unproven` until R-B2 runs again |
+| `productionPromotion` | **`failed`** | READY Production deployments from `ebdebc0` and `be34099`, aliased to the apex and `www` (the owner's 2026-10-02 read of the project). On 2026-10-03 the platform reported `81fd782` deployed 6 min 23 s before its CI finished, and `ddaac1c` (#97's merge) 6 min 49 s before. `Production admission` itself is observed on both paths (§13), and nothing waits for it | an owner-approved negative test on the real promotion path keeps a failing commit off the aliases (§13, R-C). Adding the platform check makes it `configured-unproven`, no more |
 | `contactOperations` | `unknown` | the owner's 2026-10-02 inventory: `RESEND_*`, `UPSTASH_*` and `RATE_LIMIT_KEY_SECRET` absent from the project's returned variables; shared bindings unread | provider acceptance plus a human-confirmed inbox delivery, and the limiter's keying mode read from `/api/health` (§13, R-D) |
 | `storeDisconnection` | `unknown` | the project holds no commerce-named variable (owner's read); the retained receiver answers 503 with no effect on a local production build (agent, 2026-10-03); the store side is unread (connector needs re-authentication) | a read-only store-side inventory shows no subscription, app or feed expects this site, and only then is the receiver removed (§13, R-E) |
 
@@ -276,6 +276,8 @@ and an agent still never merges.
    - **Its evidence.** Before #97 leaves draft, its description records the head SHA, the
      changed files, the checks and the reviewer. If another commit lands after review, the
      exception is evaluated again against the new head.
+   - **Spent.** The owner merged #97 at its reviewed head `209c2ae` at 05:14:26 UTC on 2026-10-03
+     (`ddaac1c`, an identical tree). The exception authorises nothing further.
 
 **Owner override, 2026-10-03: withdrawn before use.** The owner completed the ruleset at 04:59 UTC, and the 05:00 read-back was conclusive, so #97 merges under **exception 2** and this override was never exercised. It is kept as the record of a decision that was made and then made unnecessary.
 
@@ -308,7 +310,7 @@ empty. **An empty cell is the honest state.**
 | # | Action | Runbook | Evidence |
 |---|---|---|---|
 | 1 | **Repair** the `main` ruleset (24077858) to the runbook's JSON: target `main` only (drop `~ALL`, which with a pull-request rule would block every direct push), add the pull-request, required-checks (the three contexts from GitHub Actions, strict) and force-push rules, keep `deletion`, and **empty the bypass list** after identifying Integration 1236702 | `docs/runbooks/main-ruleset.md` | done 2026-10-03: the owner's updates at 03:48, 04:48 and 04:59 UTC; read back conclusive at 05:00 (runbook Evidence). Integration 1236702 was the Claude GitHub App; its bypass is gone |
-| 2 | Grant permission to push a v2 canary branch, only after the read-back is conclusive; the read-only denial proof is then run and recorded | same, step 3 | #94 ran before that read and was merged (§13) |
+| 2 | Grant permission to push a v2 canary branch, only after the read-back is conclusive; the read-only denial proof is then run and recorded | same, step 3 | #94 ran before that read and was merged (§13). Granted 2026-10-03; #98 read `denied` at 07:56 UTC and was closed unmerged. **Delete** the branches `canary/merge-gate-2026-10-02` and `canary/merge-gate-2026-10-03` |
 | 2a | Merge the recovery pull request #95; then the tree, push-run and deployment checks are recorded | §13, R-A | merged 2026-10-03 02:29 UTC (`81fd782`); tree and push run checked by the agent; the deployment's serving is still the owner's read |
 | 2b | Add a Vercel deployment check on `Production admission` that blocks production alias assignment; restrict and record Force Promote | `docs/runbooks/production-admission.md` | |
 | 3 | Clear the apex redirect, then set `www` → apex (in that order — the reverse loops) | `docs/runbooks/ws-e-dns.md` | |
@@ -390,7 +392,7 @@ production-build E2E, then preview probes.
 
 | # | Statement | Demonstrated by | State |
 |---|---|---|---|
-| 1 | `main` refuses a pull request with a failing required check | `probe-merge-denial.mjs` against a canary, `denied` | **failed** 2026-10-02 (#94 merged); the ruleset reads back conclusive since 2026-10-03 05:00 UTC; waiting on a v2 canary |
+| 1 | `main` refuses a pull request with a failing required check | `probe-merge-denial.mjs` against a canary, `denied` | **met** 2026-10-03 07:56 UTC: #98 `denied`, closed unmerged, after the 05:00 conclusive read-back. It failed on 2026-10-02 (#94 merged). It holds for the ruleset version it ran against |
 | 2 | A clean clone builds and tests without commerce credentials | CI on a fresh runner | met, except the webhook's mock secret |
 | 3 | The register is empty under the phase rule | `verify:commerce-contract`, phase `complete` | 35 rows (one added 2026-10-03: a sentinel on the retained receiver, leaving with it) |
 | 4 | Source, lockfile, build output, browser traffic and server calls show no commerce dependency | scanner, `auditPackages`, artifact scan, egress fixture, server harness | met, except the retained route |
@@ -484,8 +486,8 @@ The failing check worked; the two boundaries that should have consumed its resul
 | Assertion | Status | Evidence | What would change it |
 |---|---|---|---|
 | Detection | **worked** | `verify` failed on #94's head (`81099f6`) and on every run that included the test | n/a |
-| GitHub source admission | **failed, now configured and unproven** | #94 merged with that check red (`ebdebc0`). By 05:00 UTC on 2026-10-03 the ruleset read back conclusive (§6 `githubGate`) | a v2 canary read `denied` (R-B) |
-| Vercel production admission | **failed** | READY Production deployments from `ebdebc0` and `be34099` took the apex and `www` (the owner's 2026-10-02 read) | an approved negative test on the real promotion path (R-C) |
+| GitHub source admission | **failed on 2026-10-02; proven on 2026-10-03** | #94 merged with that check red (`ebdebc0`). At 05:00 UTC on 2026-10-03 the ruleset read back conclusive, and at 07:56 UTC the v2 canary #98 read `denied` and was closed unmerged (§6 `githubGate`) | a change to ruleset 24077858 (R-B2 runs again), or the merge-gate probe reading a disagreement |
+| Vercel production admission | **failed** | READY Production deployments from `ebdebc0` and `be34099` took the apex and `www` (the owner's 2026-10-02 read). On 2026-10-03 `ddaac1c` was reported deployed before its CI finished: nothing waits yet | an approved negative test on the real promotion path (R-C) |
 | Recovery | **on `main`**, two of three post-merge checks observed | Head checks on `8c93505` were green (run 37088040887). The owner merged #95 at 02:29:00 UTC as `81fd782`. On that *merge* SHA the canary path is absent from the tree, and `main`'s push run 37089958244 has `verify` and E2E at `success` (agent, 2026-10-03). The deployment's serving is unobserved: the platform's status says only "Deployment has completed" | the owner's read of the deployment for `81fd782` |
 | External operations | **partly observed** | the owner's 2026-10-02 project inventory; no contact, limiter or store-side observation | R-D and R-E evidence |
 
@@ -512,13 +514,22 @@ Four rules came out of keeping these apart:
 | 02:29:00 | 09:29:00 | **#95 merged** by the owner → `81fd782`. The canary path is absent from its tree | GitHub; `git ls-tree` |
 | 02:29:29 | 09:29:29 | Vercel's status on `81fd782`: "Deployment has completed", **6 min 23 s before CI on the same commit finished**. Production admission still does not wait for tests. This time they passed | commit status |
 | 02:35:52 | 09:35:52 | `main`'s push run 37089958244 on `81fd782`: `verify` success, E2E success, `Dependency scope` skipped (push) | GitHub |
-| 02:45:20 | 09:45:20 | #97's pull-request run 37090486106 at `af9d447`: `Production admission` logs `ADMITTED (pull_request): verify success, e2e success, dependencyScope success`. This is the check's first real run, and it shows **the passing path only**. It is not a `main` push, not a failing path, and not evidence that Vercel waits for it | job log |
+| 02:45:20 | 09:45:20 | #97's pull-request run 37090486106 at `af9d447`: `Production admission` logs `ADMITTED (pull_request): pull_request: verify success, e2e success, dependencyScope success`. This is the check's first real run, and it shows **the passing path only**. It is not a `main` push, not a failing path, and not evidence that Vercel waits for it | job log |
 | 03:48:12 | 10:48:12 | The owner updates ruleset 24077858: target `~DEFAULT_BRANCH` and `refs/heads/main` (`~ALL` removed), rules `deletion` and `non_fast_forward`, bypass list empty | ruleset `updated_at` |
 | 03:49:22 | 10:49:22 | Full read-back: one ruleset reaches `main`; the bypass list is readable and empty; **no pull-request rule, no required status checks**; classic summary `enabled: false`, full endpoint 403. `evaluateProtection`: `unevaluable` (`contexts-mismatch`, `not-strict`, `no-pull-request-required`) | `gh api`; judge |
 | ~03:55 | ~10:55 | **The owner chooses to merge #97 as an override** (§6), not under exception 2. `githubGate` stays `failed` | owner, in session |
 | 04:48:48 | 11:48:48 | Second update: target `refs/heads/main` exactly, and a `required_status_checks` rule (strict) whose one context is **`Github Actions`**, the source app's name typed as a check name. Nothing publishes that, so every pull request, #97 included, reads `blocked`. Judge: `mismatched` (`contexts-mismatch: blocking`), ADR 015's trap | ruleset; #97 `mergeable_state` |
 | 04:59:37 | 11:59:37 | Third update: the three real contexts, each from integration 15368, strict; a `pull_request` rule (0 approvals); bypass list still empty | ruleset `updated_at` |
 | 05:00:17 | 12:00:17 | **Read-back conclusive.** One ruleset reaches `main`; every rule matches the runbook; judge `enforced`. The owner records no classic rule in Settings → Branches, and identifies 1236702 as the Claude GitHub App. `githubGate` → `configured-unproven`; #97 is `clean` and merges under exception 2; the override is withdrawn | `gh api`; judge; owner's inspection |
+| 05:14:26 | 12:14:26 | **#97 merged** by the owner under exception 2, at its reviewed head `209c2ae` → `ddaac1c`. The trees are identical | GitHub; `git diff` |
+| 05:15:03 | 12:15:03 | Vercel: Production deployment of `ddaac1c` reported complete, **6 min 49 s before CI on the same commit finished**. Production still does not wait | GitHub deployments; commit status |
+| 05:21:53 | 12:21:53 | `main`'s push run 37099187496: `verify` and E2E success, `Dependency scope` skipped, `Production admission` **`ADMITTED (push-main)`**. Matrix row 3, observed: the canary test passes on a push | job log |
+| 05:25:16 | 12:25:16 | Scheduled audit 37099758460. The merge-gate probe reads `unevaluable`: the token it ran with cannot see the bypass list, so `CONTROL_AUDIT_TOKEN` is unset or lacks administration read (the secret list is unreadable from here). The live-surface step reads the site clean and closes issue #96 (05:28:04) | audit run |
+| 07:53:47 | 14:53:47 | **v2 canary #98 opened**, ready for review, auto-merge off: `canary/merge-gate-2026-10-03` from `ddaac1c`, one dated line in the canary log | GitHub |
+| 07:55:33 | 14:55:33 | PR run 37107871838: `verify` **failure**, one test, the canary case, naming its branch. E2E skipped; `Dependency scope` success | job log |
+| 07:55:38 | 14:55:38 | `Production admission` **`REFUSED (pull_request)`**: verify failure, e2e skipped. Its first failing path in a real run, matrix row 2 | job log |
+| 07:56:00 | 14:56:00 | **Judge: `denied` / `required-context-unmet`** on `verify` alone. `draft: false`, `mergeable: true`, `blocked`, 0 behind, strict; the test-merge commit `9b31663` reports no checks; `verify` success on the base `ddaac1c`. `blocked` read again at 07:56:23. `githubGate` → `proven`; state → `GATE_PROVEN` | `gh api`; `judgeDenial()` |
+| 07:56:27 | 14:56:27 | **#98 closed unmerged** (`merged: false`); `main` still `ddaac1c`. Its Vercel deployment was a Preview | GitHub |
 
 ### What it proves, and what it does not
 
@@ -527,6 +538,9 @@ Four rules came out of keeping these apart:
 - **Proved since (2026-10-03):** at the time of the read, the ruleset carried no
   required-checks rule, no pull-request rule and a bypass actor. Any of those alone would
   explain the merge.
+- **Proved since (2026-10-03, 07:56 UTC):** the repaired ruleset refuses a ready-for-review pull
+  request whose required `verify` context failed, with draft, conflict and staleness ruled out by
+  separate readings (#98). It is proven for that ruleset version, not for every later one.
 - **Not proved:** what the ruleset held at 23:15:34 on 2026-10-02. It was edited 20 seconds
   earlier, and its history is unreadable here. The merge proves only that protection did not
   stop this change at that time.
@@ -578,9 +592,10 @@ changed nothing.
     "removalMergeCommit": "81fd782ccf35f8e82ad7e7ee1a686aafceaa1ac3",
     "postMergePushRun": { "id": 37089958244, "verify": "success", "e2e": "success" },
     "postMergeDeployment": "platform-status-only",
-    "githubGate": "configured-unproven",
+    "githubGate": "proven",
+    "canaryV2": { "pullRequest": 98, "verdict": "denied", "closedUnmerged": true },
     "productionPromotion": "failed",
-    "nextAction": "owner-repairs-and-reads-back-the-ruleset"
+    "nextAction": "owner-adds-the-platform-deployment-check (R-C)"
   }
 }
 ```
@@ -604,7 +619,7 @@ R-E   store-side inventory → dependency-ordered receiver removal    → storeD
 | | Workstream | Owner | Exit test |
 |---|---|---|---|
 | **R-A** | Recover `main`: delete the canary (#95). A surgical deletion, not a revert of #94, because later commits changed the tree | engineer prepares; **owner merges** | On the **merge** SHA: the canary path is absent from the tree (`git ls-tree`), `main`'s push run has `verify` and E2E at `success`, and the deployment for that SHA serves the site. That last needs the owner's read or network access, and the record names which. If the owner uses GitHub's Revert on #94 instead, #95 is re-judged before anything merges |
-| **R-B** | Governance: repair the ruleset (§7 row 1), then read it back **before** any canary. The read must be authorised: through the control audit's `CONTROL_AUDIT_TOKEN`, or a credential the owner's tools supply, never a literal. It must cover all effective protection, not one ruleset object: every ruleset, with its enforcement, target conditions (`main` only; reading `rules/branches/main` cannot show that `~ALL` was narrowed), rules, check-source `integration_id`s and bypass list; the rules effective on `main`; and the classic layer, from `branches/main`'s summary plus the owner's recorded Settings → Branches inspection, because the full endpoint answers 403 and a 403 is not absence. It must show exactly the three contexts from integration 15368, strict mode, a pull request, force-push and deletion blocked, and a **readable, empty** bypass list. Unreadable is `unevaluable`. `evaluateProtection()` judges the readings it is given and never stands in for a missing one. A reported edit is not a read. Integration 15368 (check source) and 1236702 (bypass actor) answer different questions and are never interchanged. The owner identifies 1236702 before removing its bypass | owner configures; verifier reads back | The read is conclusive, then the v2 canary below reads `denied` and is closed unmerged. #94 stays recorded as a failed experiment |
+| **R-B** | Governance: repair the ruleset (§7 row 1), then read it back **before** any canary. The read must be authorised: through the control audit's `CONTROL_AUDIT_TOKEN`, or a credential the owner's tools supply, never a literal. It must cover all effective protection, not one ruleset object: every ruleset, with its enforcement, target conditions (`main` only; reading `rules/branches/main` cannot show that `~ALL` was narrowed), rules, check-source `integration_id`s and bypass list; the rules effective on `main`; and the classic layer, from `branches/main`'s summary plus the owner's recorded Settings → Branches inspection, because the full endpoint answers 403 and a 403 is not absence. It must show exactly the three contexts from integration 15368, strict mode, a pull request, force-push and deletion blocked, and a **readable, empty** bypass list. Unreadable is `unevaluable`. `evaluateProtection()` judges the readings it is given and never stands in for a missing one. A reported edit is not a read. Integration 15368 (check source) and 1236702 (bypass actor) answer different questions and are never interchanged. The owner identifies 1236702 before removing its bypass | owner configures; verifier reads back | The read is conclusive, then the v2 canary below reads `denied` and is closed unmerged. #94 stays recorded as a failed experiment. **Met 2026-10-03:** conclusive at 05:00 UTC, #98 `denied` at 07:56 UTC |
 | **R-C** | Deployment admission: `Production admission` (ADR 039) is unique across workflows, read on the deployment's commit SHA, and selected in a platform deployment check that blocks production alias assignment. Force Promote is a bypass and is recorded like one. It holds the custom domains only | engineer (done); **owner** configures the platform | `configured-unproven` once read back. `proven` only by an owner-approved negative test on the real promotion path that keeps the last good aliases. A custom-environment failure is a *configuration rehearsal*. A bad `main` commit is never manufactured for this |
 | **R-D** | Non-commerce operations: mail-provider acceptance plus a controlled inbox delivery; limiter distribution and keying mode; shared bindings checked without decrypting or displaying values | owner | Contact and abuse protection observed working, not inferred from a READY build |
 | **R-E** | Receiver removal as a dependency graph. Inventory first: subscriptions → route → HMAC and size checks → cache tags → workflow mocks and verification scripts → unit fixtures, negative controls and the sentinel → register and contract rows → active runbooks and docs. Removed in that order, with tests that reject orphaned references and stale controls. ADRs stay historical | engineer; **owner confirms the inventory** | The read-only **store-side** inventory shows no subscription targeting this site, as closure evidence rather than a reported deletion. Then the route's post-removal answer and the build are verified |
@@ -626,9 +641,12 @@ R-E   store-side inventory → dependency-ordered receiver removal    → storeD
   - Whatever the verdict (`denied`, `NOT-DENIED` or `unevaluable`), record the readings and
     **close it unmerged at once**. Leaving a red pull request open with a working merge button
     is how #94 was merged.
-  - Only a conclusive, check-attributed `denied` moves `merge-denial-proof` to `configured` and
-    `githubGate` to `proven`. The owner deletes the branch. (`merge-gate`, the configuration
-    claim, moves to `configured` earlier, on the conclusive read-back.)
+  - Only a conclusive, check-attributed `denied` moves `githubGate` to `proven`. The owner
+    deletes the branch. `merge-gate`, the registry's configuration claim, moved to `configured`
+    in the records pull request after #98, on both observations. `merge-denial-proof` stays
+    `not-configured`: in the registry that status means nothing re-runs the proof on its own,
+    which is true of a canary. (Until 2026-10-03 this line said the proof would make it
+    `configured`; `control-registry.test.ts` forbids that for a hand-run probe.)
   - If a canary is mistakenly merged, this canary-specific test will not intentionally fail on
     `main`'s push. That is the only safety claim. Other checks can still fail, and the merge is
     recorded as a failed experiment, never a success.
