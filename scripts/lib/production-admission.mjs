@@ -79,7 +79,9 @@ export function requiredResults(event, ref) {
  * @returns {'success' | 'failure' | 'cancelled' | 'skipped' | 'missing'}
  */
 export function jobResult(value) {
-  return typeof value === 'string' && JOB_RESULTS.includes(value) ? /** @type {never} */ (value) : 'missing'
+  return typeof value === 'string' && JOB_RESULTS.includes(value)
+    ? /** @type {'success' | 'failure' | 'cancelled' | 'skipped'} */ (value)
+    : 'missing'
 }
 
 /**

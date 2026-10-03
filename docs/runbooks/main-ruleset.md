@@ -141,9 +141,9 @@ union, but two mechanisms stating one policy is two places for it to drift.
 **No canary runs until this read is conclusive.** The owner reporting that the ruleset was
 edited is not a read. #94 ran on a report, and was merged.
 
-The read needs a credential that can see the bypass list, which means one with write access to
-the ruleset. It must come from a mechanism that keeps it out of the command line, the shell
-history, chat, issues and files. Either:
+GitHub omits `bypass_actors` from a ruleset read by a credential without enough access, so the
+read needs one it will show them to. It must come from a mechanism that keeps it out of the
+command line, the shell history, chat, issues and files. Either:
 
 - **in CI:** run *Actions → Control audit → Run workflow*. Its probe step uses the
   `CONTROL_AUDIT_TOKEN` repository secret (a token with `administration:read`) and prints the
