@@ -517,6 +517,18 @@ export const SENTINELS = [
     invariant: 'with its signing secret absent, the retained receiver answers 503 and invalidates and logs nothing',
     scar: 'The signing secret left the project before the receiver did (incident PR-94), so "fails closed" became the only thing between a surviving subscription and a cache purge, and the test proved the status code only.',
   },
+  {
+    // "Admit unless something failed" is the rule GitHub applies to a skipped required check,
+    // and the reading that let a skipped E2E sit beside a failed verify. Mutated to exactly that.
+    id: 'production-admission-explicit-success',
+    runner: 'vitest',
+    file: 'scripts/lib/production-admission.mjs',
+    find: '  const unmet = ADMISSION_JOBS.filter((job) => results[job] !== required[job]).map(',
+    replace: "  const unmet = ADMISSION_JOBS.filter((job) => results[job] === 'failure').map(",
+    specs: ['src/tests/unit/production-admission.test.ts'],
+    invariant: 'production admission passes only on explicit success; skipped, cancelled or missing is a refusal',
+    scar: 'On 2026-10-02 two READY production deployments were built from a main whose verify had failed: a build that finished was read as a build that passed (incident PR-94).',
+  },
   // ── Playwright: need a production build, so opt-in via --with-e2e ──
   {
     id: 'hero-card-measured',
