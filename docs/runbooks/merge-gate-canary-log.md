@@ -14,3 +14,4 @@ merged: it is read with `scripts/probe-merge-denial.mjs` and closed unmerged wha
 One line per canary: the date, the branch, and why it was run.
 
 <!-- canary lines below -->
+- 2026-10-03 · `canary/merge-gate-2026-10-03` · first v2 run, after the 05:00 UTC conclusive read-back of ruleset 24077858
