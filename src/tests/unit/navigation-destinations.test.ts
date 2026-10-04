@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { mainNav, footerGroups, legalLinks, byHref, type NavLink } from '@/config/navigation'
 
@@ -21,9 +21,21 @@ const rendered: Array<{ source: string; link: NavLink }> = [
   ...legalLinks.map((link) => ({ source: 'legal', link })),
 ]
 
+/** A literal directory per segment, or a dynamic `[param]` one, ending in a page. */
 const routeExists = (href: string): boolean => {
   const segments = href.split(/[?#]/)[0].split('/').filter(Boolean)
-  return existsSync(join(APP, ...segments, 'page.tsx'))
+  let dir = APP
+  for (const segment of segments) {
+    const literal = join(dir, segment)
+    if (existsSync(literal)) {
+      dir = literal
+      continue
+    }
+    const dynamic = readdirSync(dir).find((entry) => /^\[[^\]]+\]$/.test(entry))
+    if (!dynamic) return false
+    dir = join(dir, dynamic)
+  }
+  return existsSync(join(dir, 'page.tsx'))
 }
 
 describe('navigation destinations', () => {

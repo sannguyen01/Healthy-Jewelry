@@ -4,6 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { ProductGrid } from '@/components/product/ProductGrid'
 import { Breadcrumbs } from '@/components/seo/Breadcrumbs'
 import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
+import Link from 'next/link'
+import { collectionsNav } from '@/config/navigation'
 import { getAllProducts } from '@/lib/catalog'
 
 const BREADCRUMB_ITEMS = [{ label: 'Home', href: '/' }, { label: 'Shop' }]
@@ -44,6 +46,29 @@ export default async function ShopPage() {
           >
             The Collection
           </h1>
+          <nav
+            aria-label="Collections"
+            style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px', marginTop: '28px' }}
+          >
+            {collectionsNav.map((collection) => (
+              <Link
+                key={collection.handle}
+                href={collection.href}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink)',
+                  textDecoration: 'none',
+                  padding: '10px 0',
+                  borderBottom: '1px solid var(--ash)',
+                }}
+              >
+                {collection.title}
+              </Link>
+            ))}
+          </nav>
         </section>
 
         {/* Product grid with filters */}

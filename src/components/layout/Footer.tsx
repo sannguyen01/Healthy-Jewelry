@@ -53,7 +53,7 @@ export function Footer() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr repeat(4, auto)',
+            gridTemplateColumns: '1fr repeat(5, auto)',
             gap: 'clamp(32px, 4vw, 64px)',
             alignItems: 'start',
             marginBottom: 'clamp(40px, 5vw, 64px)',

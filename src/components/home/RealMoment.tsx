@@ -50,6 +50,7 @@ export function RealMoment() {
           </p>
         </div>
         <div
+          className="hj-real-moment-media"
           style={{
             flex: '1 1 60%',
             position: 'relative',
@@ -72,6 +73,12 @@ export function RealMoment() {
           .hj-real-moment-inner {
             flex-direction: column !important;
             align-items: flex-start !important;
+          }
+          /* A fill image has no intrinsic width, so in a column flex container with
+             align-items: flex-start its box collapsed to 0x0 on phones. */
+          .hj-real-moment-media {
+            width: 100%;
+            flex: 0 0 auto !important;
           }
         }
       `}</style>
