@@ -246,6 +246,19 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     },
   },
   {
+    // The header's mark-only breakpoint (ADR 041): the name is display:none up to one pixel
+    // below the stated width, and header-fit.spec.ts sweeps that the two agree.
+    doc: 'CLAUDE.md',
+    context: 'below 360px the name is not rendered',
+    claimed: '360px',
+    actual: () => {
+      const hiddenTo = read('src/app/globals.css').match(
+        /@media \(max-width: (\d+)px\)\s*\{[^@]*?\.hj-lockup-text\s*\{\s*display:\s*none/
+      )?.[1]
+      return `${hiddenTo === undefined ? undefined : Number(hiddenTo) + 1}px`
+    },
+  },
+  {
     doc: 'CLAUDE.md',
     context: 'breakpoint at 900px',
     claimed: '900px',
@@ -328,6 +341,9 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   { doc: 'CLAUDE.md', context: 'required 414px' },
   { doc: 'CLAUDE.md', context: 'empty and 435px with a bag badge' },
   { doc: 'CLAUDE.md', context: 'This is why the 768px breakpoint' },
+  // Measured by header-fit.spec.ts on the build that introduced the lockup; the live figure is
+  // its `brand lockup` annotation, printed on every run.
+  { doc: 'CLAUDE.md', context: 'Measured 2026-10-04, the whole name keeps' },
   { doc: 'CLAUDE.md', context: 'sweeps 320–1440px' },
   { doc: 'CLAUDE.md', context: '**≥901px**' },
   { doc: 'CLAUDE.md', context: 'at `right: -120px`' },

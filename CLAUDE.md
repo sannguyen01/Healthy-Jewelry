@@ -1,7 +1,7 @@
-# CLAUDE.md — Healthy Jewelry Website
+# CLAUDE.md — Healthy Jewellery Website
 
 ## Brand Identity
-Healthy Jewelry is a premium titanium and non-corrosion metal jewelry brand. Implant-grade materials, biocompatible, designed for people with metal sensitivities.
+Healthy Jewellery is a premium titanium and non-corrosion metal jewelry brand. Implant-grade materials, biocompatible, designed for people with metal sensitivities.
 
 **Positioning**: *Metal that works with your body.*
 No stones. No gemstones. No healing crystals. No chakras. Pure material science.
@@ -97,14 +97,15 @@ homepage hero is the one exception, since it owns `--text-hero`.
 - Horizontal scroll strips on homepage (no product grids)
 - Void-white (#F7F5F1) everywhere
 - Single dark interruption: campaign band (#0A0A0A)
-- Nav: transparent → frosted glass (scrollY > 60)
+- Nav: transparent over the hero → solid `--bg` with a hairline (scrollY > 60). Flat: no blur,
+  no shadow (`design-consistency.test.ts`). It said "frosted glass" until 2026-10-04.
 - Cards: image + name + price only (minimal)
 
 ### Header composition — two layouts, breakpoint at 768px
-- **≥769px**: brand lockup · centred primary links · Search · Bag.
-- **≤768px**: brand lockup · Bag · Menu. **Search moves into the full-screen
-  overlay** (`.hj-desktop-only`), which also carries the three primary links. It is not
-  duplicated — the header copy is `display: none` down here.
+- **≥769px**: MENU · centred brand lockup (knot mark + name) · SEARCH · CONTACT.
+- **≤768px**: MENU · brand lockup · a Search icon. CONTACT leaves the bar; the full-screen
+  overlay carries every `mainNav` link and a second Search. (Until 2026-10-04 these two lines
+  described a Bag control and centred primary links, neither of which survived the redesign.)
 - The header **must fit 320px**. It did not: with four controls in the bar it required 414px
   empty and 435px with a bag badge, so on every phone the MENU button — the only route to
   navigation there is — was cut off at the viewport edge. See
@@ -115,16 +116,31 @@ homepage hero is the one exception, since it owns `--text-hero`.
   the defect cost, and replacing them with today's figures would falsify that account rather
   than correct it. The live number is the one `e2e/header-fit.spec.ts` prints on every run
   as a `minimum fitting width` annotation — read that, not this line.
-- **The brand gives, the controls never do.** The brand link is `flex: 0 1 auto; min-width: 0`
-  and the wordmark ellipsises; the control cluster is `flexShrink: 0`. A truncated wordmark is
-  a cosmetic loss, an unreachable control is a functional one. This is why the 768px breakpoint
+- **The brand gives, the controls never do.** The lockup's column can shrink
+  (`.hj-header-center { min-width: 0 }`), the mark never does, and the name is shown whole or
+  not at all: below 360px the name is not rendered and the knot mark stands alone, because a
+  cut-off name reads as a fault. Measured 2026-10-04, the whole name keeps the controls' own 24px spacing from 353px.
+  An unreachable control is a functional loss; a hidden name is not. This is why the 768px breakpoint
   is a *composition* choice rather than a correctness dependency: get it wrong and the layout
   degrades instead of amputating.
 - Enforced by `e2e/header-fit.spec.ts`, which sweeps 320–1440px and binary-searches the
-  narrowest fitting width per layout mode. Probes are geometric — element boxes against
+  narrowest fitting width per layout mode, and prints the lockup's measured headroom as a
+  `brand lockup` annotation. Probes are geometric — element boxes against
   `window.innerWidth` — because `scrollWidth` is blind here twice over (the header is `fixed`,
   and `globals.css` sets `overflow-x: hidden`), and because `toBeVisible()` and `.click()` both
   pass on a control whose centre is off-screen.
+
+### Brand name and mark
+- The name renders only through `SITE_NAME` ("Healthy Jewellery", spelled as the domain is).
+  `LEGAL_ENTITY_NAME` ("Healthy Jewelry") is the registered company on `/legal`, `/terms`,
+  `/privacy`, `/shipping` and the footer's copyright line, and is counsel's to change (WS-H).
+  `brand-name.test.ts` fails on a typed copy of either spelling anywhere else in rendered code.
+- The mark is `BRAND_MARK_PATH`, rendered by `BrandLockup.tsx` in the header and the footer.
+  Every served copy is derived from `assets/brand/knot-master.png` by
+  `node scripts/build-brand-mark.mjs` — never exported from an image editor.
+  `brand-mark-asset.test.ts` compares each copy with what the master derives, pixel for pixel,
+  and checks its edges for the black matte the master was keyed out of. See
+  [ADR 041](docs/adr/041-a-transparent-logo-is-a-measurement.md).
 
 ## Homepage Section Sequence
 Seven beats, decided in [ADR 040](docs/adr/040-seven-beats-one-strip.md) (the earlier eight-beat
@@ -163,7 +179,8 @@ change all three together.
 5. CollectionGrid — 5 collection paths (Charms and Earrings tiles use real photography; Rings/Necklaces/Bracelets still use the SVG placeholder pending photos)
 6. RealMoment — "The Moment"
 7. FollowUp — links come from `SOCIAL_LINKS`, never a generic domain
-8. Footer
+
+Then the Footer, which is site chrome rather than a beat (it was numbered 8 under "seven beats").
 
 ## Product Detail Page — the image tile
 
@@ -265,6 +282,13 @@ Full detail in **`docs/testing-strategy.md`**. In short:
   automated coverage the UI layer has.** Anything a user has to see or click belongs in `e2e/`.
 - Presence is not visibility. `e2e/visual-assets.spec.ts` asserts imagery actually renders — bytes
   arrive, the box is non-zero, and the effective opacity clears the legibility floor.
+- **And absence is invisible to both.** Every per-image check passes on zero images: the logo
+  was missing from the header and footer for the whole redesign, and everything stayed green.
+  `e2e/visual-assets.spec.ts` now asserts the marks are *there*.
+- **A page can be measured before it arrives.** The root `loading.tsx` fallback can still be on
+  screen when `page.goto` resolves, with the real page in a hidden streamed segment; a probe that
+  measured then saw zero-sized boxes and passed. `settle()` waits for the reveal, and a probe
+  root with no box throws. See [ADR 042](docs/adr/042-a-page-measured-before-it-arrived.md).
 - **And visibility is not reachability.** `toBeVisible()` returns true for a control whose centre
   is outside the viewport, and `.click()` deliberately aims at an in-viewport point instead, so
   both pass on a button a thumb cannot hit. `e2e/support/viewportFit.ts` measures geometry

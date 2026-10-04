@@ -96,3 +96,63 @@ describe('design consistency', () => {
     }
   })
 })
+
+/**
+ * **DESIGN.md may only say what the code does.**
+ *
+ * Its first draft (0fd2f40) prescribed `backdrop-filter: blur(12px)` on the scrolled header and
+ * rounded cards with a whisper `box-shadow` — the two things the assertions above forbid — and
+ * "density 4, variance 8, motion 6", which no reader could check. A design document that
+ * disagrees with the tests is a second design system, and the next contributor gets to pick.
+ * These hold the rewrite to the code: no forbidden prescription returns, every file it cites as
+ * an enforcer exists, and every pixel figure it states is read back out of the stylesheet.
+ */
+describe('DESIGN.md agrees with the code', () => {
+  const doc = read('DESIGN.md')
+  const css = read('src/app/globals.css')
+
+  it('does not prescribe what this file forbids', () => {
+    expect(doc).not.toMatch(/backdrop-filter:\s*blur/)
+    expect(doc).not.toMatch(/box-shadow:\s*\d/)
+    expect(doc).not.toMatch(/glassmorphism/i)
+    expect(doc).not.toMatch(/\b(density|variance|motion)\b[^.\n]*\(\d+\)|set to a balanced/i)
+  })
+
+  it('names only enforcers that exist', () => {
+    const cited = [
+      ...doc.matchAll(/`((?:src|e2e|scripts|assets|docs)\/[^`\s]+\.[a-z]+)`/g),
+      ...doc.matchAll(/\]\(((?:docs)\/[^)\s]+\.md)\)/g),
+    ].map((m) => m[1])
+    expect(cited.length, 'the document cites no files — the parse is wrong').toBeGreaterThan(10)
+    const missing = cited.filter((path) => {
+      try {
+        read(path)
+        return false
+      } catch {
+        return true
+      }
+    })
+    expect(missing).toEqual([])
+  })
+
+  it('states each pixel figure as the stylesheet does', () => {
+    const fromCss: Record<string, string | undefined> = {
+      // "below 360px the mark stands alone": the name is display:none up to 359px.
+      '360px': (() => {
+        const m = css.match(/@media \(max-width: (\d+)px\)\s*\{[^@]*?\.hj-lockup-text\s*\{\s*display:\s*none/)
+        return m ? `${Number(m[1]) + 1}px` : undefined
+      })(),
+      // "at least 44px": the shared header-control rule.
+      '44px': css
+        .slice(css.indexOf('.hj-menu-btn, .hj-icon-btn, .hj-wordmark {'))
+        .match(/min-height:\s*(\d+px)/)?.[1],
+      // "a 2px --ink outline": the global focus ring.
+      '2px': css.slice(css.indexOf(':focus-visible {')).match(/outline:\s*(\d+px) solid var\(--ink\)/)?.[1],
+    }
+    const stated = [...new Set([...doc.matchAll(/(\d+)px/g)].map((m) => `${m[1]}px`))].sort()
+    expect(stated, 'a pixel figure in DESIGN.md with no source to check it against').toEqual(
+      Object.keys(fromCss).sort()
+    )
+    for (const [figure, actual] of Object.entries(fromCss)) expect(actual, figure).toBe(figure)
+  })
+})

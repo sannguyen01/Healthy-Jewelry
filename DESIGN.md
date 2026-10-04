@@ -1,57 +1,87 @@
-# Design System: Healthy Jewellery Editorial UI
+# DESIGN.md — Healthy Jewellery
 
-## 1. Visual Theme & Atmosphere
-A restrained, gallery-airy interface with confident asymmetric layouts and fluid spring-physics motion. The atmosphere is clinical yet warm — like a well-lit architectural studio emphasizing real materials. Density is set to a balanced 4, with high layout variance (8) to break predictable grids. Motion (6) feels weighty, leveraging CSS transforms and glassmorphism to create spatial depth without overwhelming the product photography.
+Every rule here is either enforced by the file named beside it or marked **unenforced**. A rule
+with no enforcement is a preference, and it says so. Values live in `src/app/globals.css` and
+the token table in `CLAUDE.md`; this document names them and never restates a hex or a ratio,
+so it cannot drift from them. It replaces a draft (0fd2f40) that prescribed frosted glass on the
+header and rounded, shadowed cards — both of which the tests below forbid — and generator
+settings ("density", "variance") that described no decision anyone could check.
 
-## 2. Color Palette & Roles
-- **Canvas Void** (`#F7F5F1`) — Primary background surface (`--bg`).
-- **Nacre Surface** (`#EDEAE4`) — Card and container fill (`--nacre`).
-- **Ink Charcoal** (`#1A1714`) — Primary text, deep depth (`--ink`).
-- **Graphite Steel** (`#6B6762`) — Secondary text, descriptions, metadata (`--graphite`).
-- **Ash Border** (`#D8D3CB`) — Card borders, 1px structural lines (`--ash`).
-- **Titanium Accent** (`#9DA7AF`) — Single accent for active states and subtle focus rings (`--titanium`).
+## Surface and colour
 
-*(Note: Restricted to 1 primary accent. Saturation < 80%. No purple/neon.)*
+- **Void-white is the page.** `--bg` everywhere; `--nacre` for tiles; one dark interruption per
+  homepage, the Care band (`--black`, `--on-dark`, `--mist`). Enforced by
+  `e2e/homepage-composition.spec.ts` (one dark section, first half of the page) and
+  [ADR 040](docs/adr/040-seven-beats-one-strip.md).
+- **Every text colour is a classified pairing.** `--titanium` and `--sage` are accents, never
+  text on light surfaces; their `-text` siblings carry text. Enforced by
+  `src/tests/unit/design-tokens-contrast.test.ts`, which also reads the table in `CLAUDE.md`.
+- **No pure black.** `--black` is the darkest value. **Unenforced.**
 
-## 3. Typography Rules
-- **Display:** `Barlow Condensed` — Track-tight, controlled scale, weight-driven hierarchy. Used for Editorial Heroes.
-- **Body:** `DM Sans` — Relaxed leading (1.65), 65ch max-width, neutral secondary color.
-- **Mono:** `DM Sans` (tabular nums) — For metadata, timestamps, or technical material specs.
-- **Banned:** `Inter`, generic system fonts, and generic serifs (Times New Roman, Georgia, Garamond).
+## Type
 
-## 4. Component Stylings
-* **Buttons:** Flat, no outer glow. Tactile -1px translate on active state with a minimum `0.3s ease-out` transition. Ghost/outline for secondary.
-* **Cards:** Generously rounded corners. Diffused whisper shadow (`box-shadow: 0 20px 40px rgba(0,0,0,0.05)`). High-density: replace with border-top dividers.
-* **Glassmorphism:** Overlays (like the scrolled header) use subtle translucency and background blur (`backdrop-filter: blur(12px)`).
-* **Inputs:** Label above, error below. Focus ring in accent color (`2px solid var(--ink)`). No floating labels.
-* **Loaders:** Skeletal shimmer matching exact layout dimensions. No generic circular spinners.
-* **Empty States:** Composed, illustrated compositions indicating how to populate data — not just "No data" text.
+- Barlow Condensed for display, DM Sans for UI and body, in the loaded weights only. Enforced by
+  `src/tests/unit/typography-weights.test.ts`.
+- Page titles go through `PageHeader`. See `CLAUDE.md`, Typography.
 
-## 5. Layout Principles
-- **Grid-first Architecture:** Asymmetric splits for Hero sections.
-- **Spatial Separation:** No overlapping elements — every element occupies its own clear spatial zone. No absolute-positioned content stacking (except intentional hero overlays).
-- **Responsive Collapse:** Strict single-column collapse below 768px.
-- **Containment:** Max-width containment. No flexbox percentage math. Generous internal padding.
-- **Avoid Clichés:** No 3-column equal card layouts. Use 2-column zig-zag or asymmetric grids instead.
+## The header and the footer
 
-## 6. Motion & Interaction
-- **Physics:** Spring physics for all interactive elements (weighty feel).
-- **Staggered Orchestration:** Staggered cascade reveals for grids (e.g., Collection grids drop in like dominoes).
-- **Performance:** Hardware-accelerated transforms only (`will-change: transform`). Never animate `top`, `left`, `width`, `height`.
-- **Accessibility:** All animations must respect `@media (prefers-reduced-motion: reduce)`.
+- **Flat.** The header has a solid fill and a hairline in its scrolled state — no blur, no
+  shadow; the menu drawer likewise. Enforced by `src/tests/unit/design-consistency.test.ts`.
+- **The brand lockup is the knot mark and the name, as one link home** (`BrandLockup.tsx`):
+  inline in the header, stacked in the footer. The name is always `SITE_NAME`; enforced by
+  `src/tests/unit/brand-name.test.ts`.
+- **The brand gives, the controls never do** ([ADR 016](docs/adr/016-fit-is-a-measurement-nobody-took.md)).
+  In the header the name is shown whole or not at all; below 360px the mark stands alone.
+  Enforced, with the measured headroom printed on every run, by `e2e/header-fit.spec.ts`.
+- **Every header and footer control is at least 44px in each direction** on touch widths.
+  Enforced by `e2e/layout-invariants.spec.ts` and `src/tests/unit/design-consistency.test.ts`.
 
-## 7. Anti-Patterns (Banned)
-- **NO emojis anywhere.**
-- **NO `Inter` font or generic serif fonts.**
-- **NO pure black (`#000000`).**
-- **NO neon/outer glow shadows or oversaturated accents.**
-- **NO excessive gradient text on large headers.**
-- **NO custom mouse cursors.**
-- **NO overlapping elements** (clean spatial separation always).
-- **NO 3-column equal card layouts.**
-- **NO generic names** ("John Doe", "Acme", "Nexus").
-- **NO fake round numbers** (`99.99%`, `50%`).
-- **NO AI copywriting clichés** ("Elevate", "Seamless", "Unleash", "Next-Gen").
-- **NO filler UI text** ("Scroll to explore", "Swipe down", scroll arrows, bouncing chevrons).
-- **NO broken image links** (use placeholders like `picsum.photos` if needed, but prefer real editorial photos).
-- **NO centered Hero sections.**
+## The logo
+
+- **One master, derived copies.** Only `assets/brand/knot-master.png` is edited by hand.
+  `scripts/build-brand-mark.mjs` produces every served copy; `src/tests/unit/brand-mark-asset.test.ts`
+  fails on any copy that differs from what the master derives.
+- **Transparent at the edges, not only the corners.** The derivation removes the black matte the
+  master was keyed out of. Same test, with thresholds measured on both sides of the defect.
+  See [ADR 041](docs/adr/041-a-transparent-logo-is-a-measurement.md).
+- **Silver on light surfaces; a `--black` tile for icons.** The silver knot is a graphic, never a
+  text colour, and the ink name beside it carries the lockup's contrast. A bare silver icon is
+  near-invisible on a light browser tab, so the tab and home-screen icons sit on a tile.
+- **Present, once each, in the header and the footer.** Enforced by `e2e/visual-assets.spec.ts`.
+
+## Imagery
+
+- **Bytes arrive, the box is non-zero, the pixels are legible.** Enforced for every homepage
+  image by `e2e/visual-assets.spec.ts`.
+- **Product media is square** (`--ratio-product`) and never a fixed pixel height. Enforced by
+  `src/tests/unit/design-consistency.test.ts` and `e2e/product-image-fit.spec.ts`.
+- **No floor without a ceiling** on any box. Enforced by `src/tests/unit/bounded-geometry.test.ts`.
+
+## Rhythm
+
+- Section padding comes from the rhythm tokens (`--space-section`, `-sm`, `-lg`) and the
+  horizontal gutter from `--space-gutter` alone. Enforced by
+  `src/tests/unit/design-consistency.test.ts`.
+- Cards do not lift on hover. Same test.
+
+## Motion
+
+- The four keyframes in `globals.css` (`hjSlideUp`, `hjFadeDown`, `hjSlideIn`, `hjFadeIn`), timed
+  by `--duration-*` and eased by `--ease` / `--ease-sharp`.
+- **Reduced motion collapses every transition**; `globals.css` carries the
+  `prefers-reduced-motion` block, and `e2e/header-fit.spec.ts` runs under it.
+- **Content is visible without JavaScript.** A reveal that never fires must not hide a section.
+  Enforced by `e2e/layout-invariants.spec.ts` ("JavaScript disabled").
+
+## Focus
+
+- A 2px `--ink` outline, offset, on every `:focus-visible`; `--on-dark` inside the drawer.
+  Enforced by `e2e/layout-invariants.spec.ts` ("visible focus indicators").
+
+## Copy
+
+- No stones, gemstones, crystals, chakras, healing or spiritual language; no prices. Enforced by
+  the claims registry and `src/tests/unit/claim-lexicon.test.tsx`,
+  `src/tests/unit/price-absence-contract.test.tsx`. See `CLAUDE.md`, PROHIBITED.
+- No emoji, no urgency or scarcity copy. **Unenforced.**
