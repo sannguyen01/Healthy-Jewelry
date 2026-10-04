@@ -146,7 +146,7 @@ export function Hero({ headlineLines }: HeroProps) {
           <p
             style={{
               fontFamily: 'var(--font-body)',
-              fontWeight: 300,
+              fontWeight: 400,
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               margin: '0 0 44px',

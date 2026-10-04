@@ -28,7 +28,7 @@ const bodyStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 300,
+  fontWeight: 400,
   margin: '0 0 16px',
 }
 
@@ -37,7 +37,7 @@ const listStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 300,
+  fontWeight: 400,
   margin: '0 0 16px',
   paddingLeft: '24px',
 }
@@ -64,7 +64,7 @@ const tdStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  fontWeight: 300,
+  fontWeight: 400,
   padding: '14px 16px',
   borderBottom: '1px solid var(--ash)',
 }

@@ -40,7 +40,7 @@ export default function ContactPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '520px',
               margin: 0,
             }}
@@ -87,7 +87,7 @@ export default function ContactPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--ink)',
-                    fontWeight: 300,
+                    fontWeight: 400,
                     margin: 0,
                   }}
                 >
@@ -139,7 +139,7 @@ export default function ContactPage() {
               fontSize: 'var(--text-base)',
               color: 'var(--ash)',
               lineHeight: 1.7,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '460px',
               margin: 0,
             }}

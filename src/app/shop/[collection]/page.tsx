@@ -157,7 +157,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               lineHeight: 1.6,
-              fontWeight: 300,
+              fontWeight: 400,
               margin: 0,
               maxWidth: '480px',
               position: 'relative',

@@ -24,7 +24,7 @@ const bodyStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 300,
+  fontWeight: 400,
   margin: '0 0 16px',
 }
 

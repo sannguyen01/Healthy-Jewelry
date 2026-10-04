@@ -211,7 +211,7 @@ export default function FAQPage() {
                         fontSize: 'var(--text-base)',
                         color: 'var(--graphite)',
                         lineHeight: 1.75,
-                        fontWeight: 300,
+                        fontWeight: 400,
                         margin: 0,
                       }}
                     >
@@ -248,7 +248,7 @@ export default function FAQPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.7,
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: '0 0 20px',
               }}
             >

@@ -96,7 +96,7 @@ test.describe('glyph coverage', () => {
 
     const family = (families[0] as string).replace(/["']/g, '')
     const weights = report.loaded.filter((face) => face.family === family).map((face) => face.weight)
-    // The hero heading is 500 and the body copy 300/400: all three faces are in use above the fold.
-    expect(weights.sort(), `faces loaded for ${family}: ${JSON.stringify(report.loaded)}`).toEqual(['300', '400', '500'])
+    // The hero heading is 500 and everything else 400: both faces are in use above the fold.
+    expect(weights.sort(), `faces loaded for ${family}: ${JSON.stringify(report.loaded)}`).toEqual(['400', '500'])
   })
 })

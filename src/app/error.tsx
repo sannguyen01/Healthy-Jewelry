@@ -54,7 +54,7 @@ export default function Error({ error, reset }: ErrorProps) {
       <p
         style={{
           fontFamily: 'var(--font-body, "Zen Kaku Gothic Antique", sans-serif)',
-          fontWeight: 300,
+          fontWeight: 400,
           fontSize: '1rem',
           color: 'var(--graphite, #4A4744)',
           maxWidth: '400px',

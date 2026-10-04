@@ -39,7 +39,7 @@ export function BrowseOnlyNotice() {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 300,
+          fontWeight: 400,
           fontSize: 'var(--text-base)',
           lineHeight: 1.7,
           color: 'var(--ink)',

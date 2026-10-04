@@ -12,8 +12,10 @@ import { ConsentBanner } from '@/components/layout/ConsentBanner'
  * classical, brush-softened strokes.
  *
  * Self-hosted, and only the *latin* slice: Google serves this CJK family as 121 slices per
- * weight, and `next/font/google` downloads every one of them at build time to serve the dozen
- * a Latin page uses. The three files here are 9.6 KB each. The characters they cover are the
+ * weight, and `next/font/google` downloads every one of them at build time to serve the one
+ * a Latin page uses. The two files here are 9.7 KB each. There is no 300: weight numbers do
+ * not carry between families, and this one's 300 carries about half the ink DM Sans 300 did
+ * (globals.css, `body`), so the 300 role became 400. The characters they cover are the
  * characters the site may render — `e2e/glyph-coverage.spec.ts` fails on any other, since a
  * missing glyph silently renders in the fallback face. Provenance and licence:
  * `src/app/fonts/README.md`; `font-files.test.ts` reads each file's own tables to hold the
@@ -21,7 +23,6 @@ import { ConsentBanner } from '@/components/layout/ConsentBanner'
  */
 const zenKakuGothicAntique = localFont({
   src: [
-    { path: './fonts/zen-kaku-gothic-antique-latin-300.woff2', weight: '300', style: 'normal' },
     { path: './fonts/zen-kaku-gothic-antique-latin-400.woff2', weight: '400', style: 'normal' },
     { path: './fonts/zen-kaku-gothic-antique-latin-500.woff2', weight: '500', style: 'normal' },
   ],

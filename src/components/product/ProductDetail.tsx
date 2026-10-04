@@ -181,7 +181,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <p
             style={{
               fontFamily: 'var(--font-body)',
-              fontWeight: 300,
+              fontWeight: 400,
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               lineHeight: 1.7,

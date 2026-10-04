@@ -157,7 +157,7 @@ export function ContactForm() {
             fontSize: 'var(--text-base)',
             color: 'var(--graphite)',
             lineHeight: 1.7,
-            fontWeight: 300,
+            fontWeight: 400,
             margin: 0,
           }}
         >

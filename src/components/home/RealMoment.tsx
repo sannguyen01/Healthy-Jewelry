@@ -40,7 +40,7 @@ export function RealMoment() {
           <p
             style={{
               fontFamily: 'var(--font-body)',
-              fontWeight: 300,
+              fontWeight: 400,
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.6,

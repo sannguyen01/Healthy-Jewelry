@@ -80,9 +80,13 @@ list is the next step, not a judgement that they already match.
 
 ## Type
 
-- **One family, three weights.** Zen Kaku Gothic Antique at 300, 400 and 500 sets every role;
+- **One family, two weights.** Zen Kaku Gothic Antique at 400 and 500 sets every role;
   `--font-display`, `--font-ui` and `--font-body` remain separate tokens because they name roles.
   Only weights the loader ships are asked for. Enforced by `src/tests/unit/typography-weights.test.ts`.
+- **Weights are chosen by typographic colour, not by number.** Body copy and small labels were
+  DM Sans 300; this family's 300 carries about half that ink, its 400 nearly all of it, so the
+  300 role is 400 and no Light face ships. See `src/app/fonts/README.md`. **Unenforced** beyond
+  the loader: a 300 cannot be asked for because none is loaded.
 - **The files are what the loader says they are.** Each file's own `OS/2` weight class matches the
   weight `layout.tsx` declares, under the licence shipped beside it, with the SHA-256 its README
   records. Enforced by `src/tests/unit/font-files.test.ts`.

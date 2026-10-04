@@ -6,14 +6,13 @@ in — see `DESIGN.md`, "Reference: Songmont", for the evidence and what is stil
 
 | File | Weight | `OS/2` weight class | SHA-256 |
 |---|---|---|---|
-| `zen-kaku-gothic-antique-latin-300.woff2` | Light | 300 | `55aba51c57ee8f487013b6738cb848b2f3387d50751bc8a9fc5b78a085100a95` |
 | `zen-kaku-gothic-antique-latin-400.woff2` | Regular | 400 | `8a7ab467520efcba7960b9e576e8b6edad236ee3812c4de575b16003974af053` |
 | `zen-kaku-gothic-antique-latin-500.woff2` | Medium | 500 | `3c5566ca218dd2c7a4755ccf490eeab27ffba7a2d3474414d82c71608c2ceee5` |
 
 ## Where they come from
 
 Each file is the `/* latin */` `@font-face` source Google Fonts serves for
-`https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+Antique:wght@300;400;500`
+`https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+Antique:wght@400;500`
 (version `v19`, fetched 2026-10-04), byte for byte. Nothing was re-encoded or re-subset here.
 
 - Designer: Yoshimichi Ohira. Upstream: https://github.com/googlefonts/zen-kakugothic
@@ -28,10 +27,19 @@ Each file is the `/* latin */` `@font-face` source Google Fonts serves for
 ## Why self-hosted, and why only the latin slice
 
 Google serves this family — a Japanese typeface — as 121 unicode-range slices per weight.
-`next/font/google` downloads every slice at build time (363 files for three weights) to serve
-the one slice a Latin page uses. The latin slice is 9.6 KB per weight: 29.0 KB for all three,
+`next/font/google` downloads every slice at build time (121 files per weight) to serve
+the one slice a Latin page uses. The latin slice is 9.7 KB per weight: 19.4 KB for both,
 against the 66.3 KB of preloaded latin faces they replace (Barlow Condensed 400 and 500 at
 14.7 KB each, and DM Sans as one 37.0 KB variable file), measured from the 2026-10-04 builds.
+
+## Why 400 and 500, and no 300
+
+Weight numbers do not carry between families. The site set its body copy and small labels in
+DM Sans 300; measured as ink per unit of text in Chromium (advance width × font size, at 1× and
+2×), this family's 300 lays down **43–56%** of what DM Sans 300 did and its 400 **75–95%**. Kept
+at 300, every paragraph and label would have rendered about half as dark as it shipped — a
+legibility loss no contrast ratio sees, because the colour never changed. So the 300 role became
+400, and the Light file, with nothing left to set, is not shipped.
 
 The cost is coverage: the slice draws 219 characters — printable Latin-1, typographic quotes and
 dashes, the ellipsis, the bullet, the euro sign. A character outside it does not fail; the

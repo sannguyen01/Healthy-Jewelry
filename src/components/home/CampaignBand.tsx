@@ -40,7 +40,7 @@ export function CampaignBand({
         <p
           style={{
             fontFamily: 'var(--font-body)',
-            fontWeight: 300,
+            fontWeight: 400,
             fontSize: 'var(--text-lg)',
             color: 'rgba(247,245,241,0.6)',
             lineHeight: 1.65,

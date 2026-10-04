@@ -82,7 +82,7 @@ export function CareSection({ body }: { body: string }) {
         <p
           style={{
             fontFamily: 'var(--font-body)',
-            fontWeight: 300,
+            fontWeight: 400,
             fontSize: 'clamp(18px, 2vw, 24px)',
             color: 'var(--on-dark)',
             lineHeight: 1.6,

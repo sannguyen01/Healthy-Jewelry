@@ -44,7 +44,7 @@ export default function NotFound() {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 300,
+          fontWeight: 400,
           fontSize: '0.9rem',
           color: 'var(--graphite)',
           margin: '0 0 40px',

@@ -25,7 +25,7 @@ The site's own catalogue already wrote names in Title Case. Thirty-seven `text-t
 uppercase` declarations on headings and names were overriding the content to produce the Gentle
 Monster look.
 
-Switching the face exposed three dependencies nobody had chosen:
+Switching the face exposed four dependencies nobody had chosen:
 
 1. **Inherited weights.** Twenty-seven headings and names declared no weight and inherited the
    body's 300. Barlow Condensed had no 300 face, so the browser rounded up and they rendered at
@@ -39,17 +39,25 @@ Switching the face exposed three dependencies nobody had chosen:
    desktop clamp's 16px floor and 0.10em, the name needed 397px to clear the controls by the
    24px `header-fit.spec.ts` requires — hiding it on every 390px phone, which is far past the
    owner's "mark only at the narrowest widths".
+4. **Weight numbers.** Body copy and small labels were DM Sans 300. Measured as ink per unit of
+   text in Chromium (advance width × font size, at 1× and 2×), this family's 300 lays down
+   43–56% of what DM Sans 300 did; its 400 lays down 75–95%. At 300 every paragraph and label
+   rendered about half as dark as it shipped — a loss no contrast ratio registers, because the
+   colour never changed. It showed in the first side-by-side, not in any test.
 
 ## Decision
 
-- **Zen Kaku Gothic Antique, for every role, at 300/400/500.** The closest openly licensed
+- **Zen Kaku Gothic Antique, for every role, at 400 and 500.** The closest openly licensed
   relative of Tsukiji Gothic: an antique gothic of the same lineage, SIL OFL with no Reserved
   Font Name. Tsukiji Gothic itself is a commercial face with no web licence here, and its Latin
   is the weakest part of it. The three `--font-*` tokens stay, because they name roles.
 - **Self-hosted, latin slice only** (`src/app/fonts/`), through `next/font/local`.
-  `next/font/google` downloads all 363 slices at build time to serve one; the three latin files
-  are 29.0 KB together, against 66.3 KB of preloaded faces before. Provenance, licence and
+  `next/font/google` downloads all 121 slices per weight at build time to serve one; the two
+  latin files are 19.4 KB together, against 66.3 KB of preloaded faces before. Provenance, licence and
   SHA-256 per file in `src/app/fonts/README.md`.
+- **Weights by typographic colour, not by number.** The 300 role is 400: fifty `300`
+  declarations and the body default move, and the Light file is not shipped. With no 300
+  loaded, `typography-weights.test.ts` fails any request for one.
 - **The file is read, not trusted.** `src/lib/design/fontFile.ts` reads a WOFF2's own tables —
   `cmap`, `name`, `OS/2` — so the weight class, family, licence and coverage are measured. No
   dependency: the table directory, the Brotli stream and three tables are 250 lines over

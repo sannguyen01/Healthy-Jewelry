@@ -135,7 +135,7 @@ async function SearchResults({ query }: { query: string }) {
                 border: '1px solid var(--ash)',
                 borderRight: 'none',
                 outline: 'none',
-                fontWeight: 300,
+                fontWeight: 400,
               }}
             />
             <button
@@ -163,7 +163,7 @@ async function SearchResults({ query }: { query: string }) {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
-                fontWeight: 300,
+                fontWeight: 400,
                 marginTop: '16px',
               }}
             >
@@ -207,7 +207,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 300,
+                  fontWeight: 400,
                   margin: '0 0 32px',
                 }}
               >
@@ -247,7 +247,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 300,
+                  fontWeight: 400,
                   margin: '0 0 32px',
                 }}
               >
@@ -280,7 +280,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 300,
+                  fontWeight: 400,
                   margin: '0 0 8px',
                 }}
               >

@@ -2,7 +2,7 @@
 
 /* ═══════════════════════════════════════════════════════════════
    HEALTHY JEWELLERY — T4 DESIGN SYSTEM
-   One family, Zen Kaku Gothic Antique: 500 headings and names · 300/400 UI and body
+   One family, Zen Kaku Gothic Antique: 400 and 500, chosen by typographic colour
    ═══════════════════════════════════════════════════════════════ */
 
 @layer base {
@@ -148,7 +148,11 @@
     background-color: var(--bg);
     color: var(--ink);
     font-family: var(--font-body);
-    font-weight: 300;
+    /* 400, not the 300 DM Sans used here: weight numbers do not carry between families.
+       Measured as ink per unit of text (2026-10-04, ADR 043), Zen Kaku Gothic Antique's 300
+       lays down 43-56% of DM Sans 300's and its 400 lays down 75-95%, so 400 is the face
+       that keeps body copy and small labels as dark as they shipped. */
+    font-weight: 400;
     font-size: var(--text-base);
     line-height: 1.65;
     overflow-x: hidden;

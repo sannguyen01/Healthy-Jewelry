@@ -143,7 +143,7 @@ export function MaterialsSection() {
             <p
               style={{
                 fontFamily: 'var(--font-body)',
-                fontWeight: 300,
+                fontWeight: 400,
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
                 lineHeight: 1.7,

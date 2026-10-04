@@ -139,7 +139,7 @@ export default function MaterialsPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '580px',
             }}
           >
@@ -220,7 +220,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.75,
-                    fontWeight: 300,
+                    fontWeight: 400,
                     margin: '0 0 28px',
                   }}
                 >
@@ -338,7 +338,7 @@ export default function MaterialsPage() {
                           padding: '14px 20px',
                           color: 'var(--ink)',
                           borderBottom: '1px solid var(--ash)',
-                          fontWeight: 300,
+                          fontWeight: 400,
                         }}
                       >
                         {cell}
@@ -395,7 +395,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.75,
-                    fontWeight: 300,
+                    fontWeight: 400,
                     margin: 0,
                   }}
                 >

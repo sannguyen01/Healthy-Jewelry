@@ -38,15 +38,18 @@ Every test passed, because no test asked whether a mark was *there*.
 
 **Later still: the typeface** (ADR 043). Songmont's identity is one family (FW Tsukiji Gothic, per
 Founder Type's case page) and names its pieces in Title Case. The site now sets every role in Zen
-Kaku Gothic Antique — its closest OFL relative — self-hosted as the 9.6 KB latin slice per weight,
-and headings and names render in the case the catalogue writes them. The switch surfaced three
-things the old faces had hidden, each now a rule:
+Kaku Gothic Antique — its closest OFL relative — self-hosted as the 9.7 KB latin slice per weight,
+and headings and names render in the case the catalogue writes them. The switch surfaced four
+things the old faces had hidden, three of them now rules:
 - 27 headings inherited the body's 300 and had rendered at 400 only because Barlow had no 300 face.
   Written out as 400; `typography-weights` fails a display style that inherits its weight.
 - "View All →" and "Shop →" used a glyph the slice does not have. Arrows removed;
   `e2e/glyph-coverage.spec.ts` holds every route's text to the font's own `cmap`.
 - The wider name needed 397px to clear the header controls. The phone logotype is 13px/0.08em,
   measured to fit from 357px against the 360px breakpoint.
+- Weight numbers do not carry between families: this face's 300 lays down 43–56% of DM Sans 300's
+  ink, its 400 75–95%. Fifty `300` declarations and the body default became 400, and no Light
+  face ships (two files, 19.4 KB).
 
 ### Still blocked, and on what
 

@@ -155,6 +155,9 @@ test.describe('Header fit', () => {
     test(`no header control leaves the viewport at any supported width — ${state}`, async ({
       page,
     }) => {
+      // A 141-width sweep: ~11-13s alone, a third of the default budget. See the note on the
+      // lockup sweep below for what that costs under the full suite.
+      test.slow()
       await page.goto('/')
       await expect(page.locator('header')).toBeVisible()
 
@@ -249,6 +252,11 @@ test.describe('Header fit', () => {
   })
 
   test('the brand lockup is whole or absent at every width — never cut off', async ({ page }) => {
+    // The same 141-width sweep plus the breakpoint's two pixels: 10.6-11.7s alone (eight runs,
+    // 2026-10-04), and once past 30s inside the full two-worker suite, where it shares the
+    // machine with the 14-route glyph-coverage pass. Its cost is the width count, not a wait
+    // that can hang, so the budget is tripled rather than the sweep thinned.
+    test.slow()
     // ADR 016 makes the brand the thing that gives. Since 2026-10-04 it gives in two steps: the
     // name stays whole while it fits, and below NAME_SHOWN_FROM_PX it is not rendered at all and
     // the knot mark carries the brand alone. What must never happen is the third state an

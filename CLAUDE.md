@@ -85,7 +85,12 @@ the role:
 
 | Token | Font | Weights available |
 |-------|------|-------------------|
-| `--font-display` / `--font-ui` / `--font-body` | Zen Kaku Gothic Antique | **300, 400, 500** |
+| `--font-display` / `--font-ui` / `--font-body` | Zen Kaku Gothic Antique | **400, 500** |
+
+There is deliberately **no 300**. Weight numbers do not carry between families: measured as ink
+per unit of text, this family's 300 lays down about half of what the DM Sans 300 it replaced did,
+and its 400 nearly all of it. Body copy and small labels are therefore 400, which is what keeps
+them as dark as they shipped (`src/app/fonts/README.md`).
 
 A weight with no downloaded face is not ignored — the browser *synthesises* it,
 smearing the strokes of the nearest face and distorting the letterforms, so the text reads as a

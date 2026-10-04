@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { describeWoff2, uncoveredCharacters } from '@/lib/design/fontFile'
 
 /**
- * The typeface is three files in the repository, so what they are is checkable — read out of
+ * The typeface is two files in the repository, so what they are is checkable — read out of
  * their own tables, not taken from their names. See `src/app/fonts/README.md` for why the site
  * self-hosts one slice of a CJK family, and `src/lib/design/fontFile.ts` for the reader.
  *
@@ -35,7 +35,7 @@ const fonts = declared.map(({ file, weight }) => {
 
 describe('the font files are what layout.tsx says they are', () => {
   it('finds the loader entries, so every check below has something to check', () => {
-    expect(declared.map((d) => d.weight)).toEqual([300, 400, 500])
+    expect(declared.map((d) => d.weight)).toEqual([400, 500])
   })
 
   it('ships exactly the declared files, so none is left behind unused or loaded unlisted', () => {
@@ -49,8 +49,8 @@ describe('the font files are what layout.tsx says they are', () => {
   })
 
   it('every file is the brand family', () => {
-    // Light and Medium file themselves under legacy family names ("… Light"), as families
-    // with more than four styles do when they carry no typographic family (name ID 16).
+    // Medium files itself under a legacy family name ("… Medium"), as families with more
+    // than four styles do when they carry no typographic family (name ID 16).
     for (const { file, font } of fonts) expect(font.family.startsWith(FAMILY), file).toBe(true)
   })
 })
@@ -87,7 +87,7 @@ describe('provenance and licence', () => {
 describe('the face draws every character the content can render', () => {
   const coverage = fonts[0].font.codepoints
 
-  it('all three weights cover the same characters, so coverage is one question', () => {
+  it('every weight covers the same characters, so coverage is one question', () => {
     for (const { file, font } of fonts) expect([...font.codepoints].sort(), file).toEqual([...coverage].sort())
   })
 
