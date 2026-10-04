@@ -113,7 +113,14 @@
     --space-section-sm: clamp(40px, 5vw, 64px);
     /* Clear of the fixed 64px header with room to spare. */
     --space-page-top: clamp(96px, 10vw, 128px);
-    --ratio-product: 1 / 1;
+    /* The listing crop: product cards on /shop, the collection pages, search and the homepage
+       strip. 3:4 portrait since 2026-10-04 (ADR 044), the crop the homepage's collection and
+       materials tiles already used, so one listing crop runs through the page. Measured on the
+       17 illustrations: 8 are taller than wide, and their height bound in a square tile made
+       them the smallest things on the page; at 3:4 they draw up to 1.33x larger and no piece
+       draws smaller. The product detail tile is a separate decision and stays square
+       (.hj-product-tile, ADR 017). */
+    --ratio-product: 3 / 4;
     --tracking-label: 0.14em;
     /* Mixed-case tracking. Headings close up a hair, because a wide gothic at display sizes
        reads loose at its default spacing; names keep a hair of air at card sizes. The

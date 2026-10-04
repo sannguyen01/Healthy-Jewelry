@@ -62,13 +62,11 @@ things the old faces had hidden, three of them now rules:
   first paint is fixed: the root `loading.tsx` is gone — see below.)
 - **W6, W7:** contact delivery evidence and the production admission read-back need the owner's
   accounts; unchanged from 2026-10-03.
-- **Owner, for the rest of the Songmont pass:** the typeface and case are matched from verified
-  sources; **header proportions and image crops are not**, and cannot be from here — the network
-  policy denies `songmontofficial.com`, `shop.app`, `behance.net` and `foundertype.com` (rechecked
-  2026-10-04, after the typeface work). Allow `songmontofficial.com` in the cloud environment's
-  network settings, or share screenshots of its homepage, a collection page and a product page at
-  desktop and phone width. Until then the 1:1 product crop and the current header stand, and
-  `DESIGN.md` says so rather than claiming a match.
+- **Songmont pass, closed without the live page** (ADR 044). The network policy denies
+  `songmontofficial.com`, and the owner ruled it need not be reached: the Latin font (the one
+  family), the listing crop (3:4) and the header (kept) are decided from the verified language and
+  recorded as decisions, not measurements. Open for the owner: photography in the verified
+  direction (pieces worn, linen, soft grounds) to replace the hero image.
 - **Local-only, recorded so it is not rediscovered:** with this container's Chromium (1194, older
   than the one Playwright 1.63 pins), `layout-invariants` "visible focus indicators" reads a 0px
   outline on product-card links at the instant of focus — reduced motion's 0.01ms transitions on

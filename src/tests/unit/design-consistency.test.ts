@@ -46,13 +46,26 @@ describe('design consistency', () => {
     expect(offenders).toEqual([])
   })
 
-  it('product media is square, never a fixed pixel height', () => {
+  it('product media takes the listing crop token, never a fixed pixel height', () => {
     for (const file of ['src/components/product/ProductCard.tsx', 'src/components/home/HorizontalScroll.tsx']) {
       const source = read(file)
       expect(source, `${file} lost the product ratio token`).toContain('var(--ratio-product)')
       expect(source, `${file} has a fixed-height image box again`).not.toMatch(
         /height:\s*'(280|300)px'/
       )
+    }
+  })
+
+  it('the homepage has one listing crop: product cards, collection tiles and material tiles agree', () => {
+    // ADR 044. The strip of product cards sat square between two rows of 3:4 tiles; the
+    // token and the two literal crops are held to one value so that cannot recur unnoticed.
+    const token = read('src/app/globals.css').match(/--ratio-product:\s*([\d.]+\s*\/\s*[\d.]+);/)?.[1]
+    expect(token, '--ratio-product is not a ratio in globals.css').toBeDefined()
+    const normalise = (ratio: string) => ratio.replace(/\s+/g, '')
+    for (const file of ['src/components/home/CollectionGrid.tsx', 'src/components/home/MaterialsSection.tsx']) {
+      const crop = read(file).match(/aspectRatio:\s*'([^']+)'/)?.[1]
+      expect(crop, `${file} has no aspectRatio`).toBeDefined()
+      expect(normalise(crop as string), `${file} crops differently from --ratio-product`).toBe(normalise(token as string))
     }
   })
 

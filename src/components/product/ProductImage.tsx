@@ -82,7 +82,7 @@ export function ProductImage({
   if (media.kind === 'illustration-pending') {
     // Nothing, deliberately. See the note above: a default illustration on a real piece
     // is a claim about the object made by a fallback. The empty frame keeps the tile's
-    // geometry (`aspect-ratio: 1 / 1`, per CLAUDE.md) so the grid does not reflow.
+    // geometry (the tile's own `aspect-ratio`) so the grid does not reflow.
     return <div className={className} aria-hidden="true" />
   }
 

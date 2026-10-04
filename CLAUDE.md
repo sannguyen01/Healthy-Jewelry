@@ -117,8 +117,9 @@ homepage hero is the one exception, since it owns `--text-hero`.
 
 ### Architecture — quiet editorial, referenced to Songmont
 The design reference is Songmont (the owner's choice, 2026-10-04; it was Gentle Monster before).
-What was verified about it, what was adopted and what still needs the live site is in
-`DESIGN.md`, "Reference: Songmont" — read that before changing a token, a section or a card.
+What was verified about it, what was adopted, and what was decided from the language without
+the live page (the owner's ruling, 2026-10-04) is in `DESIGN.md`, "Reference: Songmont" — read
+that before changing a token, a section or a card.
 - Horizontal scroll strips on homepage (no product grids), each with a "View All" link
 - The Pampas ground (`--bg`) everywhere, with `--graphite` carrying secondary text in the
   Tundora role
@@ -126,7 +127,9 @@ What was verified about it, what was adopted and what still needs the live site 
   replaced is gone
 - Nav: transparent over the hero → solid `--bg` with a hairline (scrollY > 60). Flat: no blur,
   no shadow (`design-consistency.test.ts`). It said "frosted glass" until 2026-10-04.
-- Cards: image + name + material — never a price (see "No prices, anywhere")
+- Cards: image + name + material — never a price (see "No prices, anywhere"). Listing cards crop
+  3:4 (`--ratio-product`), the same crop as the homepage's collection and material tiles; the
+  product detail tile alone is square ([ADR 044](docs/adr/044-decided-from-the-language-not-the-page.md))
 
 ### Header composition — two layouts, breakpoint at 768px
 - **≥769px**: MENU · centred brand lockup (knot mark + name) · SEARCH · CONTACT.

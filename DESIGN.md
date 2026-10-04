@@ -53,19 +53,26 @@ denies songmontofficial.com and every mirror tried — so each row names its sec
   the Latin glyphs of its antique variant are also its weakest part. The adopted family shares
   its antique-gothic lineage and is SIL OFL.
 
-### Not verified yet: needs the live site
+### Decided from the language, not measured from the page
 
-- **The English site's own web font, sizes and tracking.** The identity's typeface is verified;
-  which face the US storefront serves for Latin text, and at what sizes, is not.
-- **The header's composition and the homepage's proportions** beyond the modules above.
-- **Image crops, backgrounds and aspect ratios** on product cards and campaign imagery. The one
-  thing known is the photographic direction — pieces worn with cream, beige and tan linen against
-  soft, blurred grounds — which describes photography this site does not yet have, not a crop.
+The live storefront could not be read from the build environment, and on 2026-10-04 the owner
+ruled that it need not be: the three dimensions below are decided from the verified language
+above, each for a reason this repository can check. None is presented as a measurement of
+Songmont's site. ([ADR 044](docs/adr/044-decided-from-the-language-not-the-page.md))
 
-Each needs the page itself: songmontofficial.com, shop.app, Behance and Founder Type all sit
-behind the build environment's network policy (checked again 2026-10-04). Until they are seen,
-the header below, the 1:1 product crop (`--ratio-product`) and the hero photograph stand. This
-list is the next step, not a judgement that they already match.
+| Dimension | Decision | Why | Enforced by |
+|---|---|---|---|
+| Latin web font | The identity's one family, Zen Kaku Gothic Antique, for every role | One family is the verified principle; a second face for Latin text would break it | `src/tests/unit/typography-weights.test.ts`, `src/tests/unit/font-files.test.ts`, `e2e/glyph-coverage.spec.ts` |
+| Listing crop | 3:4 portrait (`--ratio-product`) for product cards and the homepage strip, the crop the collection and material tiles already used | One crop through the homepage instead of a square strip between two portrait rows; 8 of the 17 illustrations are taller than wide, and at 3:4 they draw up to 1.33x larger while no piece draws smaller; portrait is the frame of the verified photographic direction, pieces worn | `src/tests/unit/design-consistency.test.ts`, `e2e/layout-invariants.spec.ts` |
+| Header | Kept: centred knot-and-name lockup, two quiet text controls each side, flat fill with a hairline once scrolled, 44px targets | The verified register is restraint — tonal, typographic, nothing laid over content — and the composition already says only that | `src/tests/unit/design-consistency.test.ts`, `e2e/header-fit.spec.ts` |
+
+The product detail tile stays square and bounded ([ADR 017](docs/adr/017-a-box-that-could-not-be-both.md)):
+at 3:4 its cap would make it taller than a laptop window leaves below the header (the figures
+are in ADR 044).
+
+**Photography is content, not a token.** The verified direction — pieces worn with cream, beige and
+tan linen against soft, blurred grounds — describes images this site does not have yet. The hero
+photograph stands until the owner replaces it; no filter is laid over it to imitate a palette.
 
 ## Surface and colour
 
@@ -129,8 +136,11 @@ list is the next step, not a judgement that they already match.
 
 - **Bytes arrive, the box is non-zero, the pixels are legible.** Enforced for every homepage
   image by `e2e/visual-assets.spec.ts`.
-- **Product media is square** (`--ratio-product`) and never a fixed pixel height. Enforced by
-  `src/tests/unit/design-consistency.test.ts` and `e2e/product-image-fit.spec.ts`.
+- **One listing crop, 3:4** (`--ratio-product`), never a fixed pixel height: product cards, the
+  homepage strip and the collection and material tiles agree. Enforced by
+  `src/tests/unit/design-consistency.test.ts` and `e2e/layout-invariants.spec.ts`.
+- **The product detail tile is square and bounded.** Enforced by `e2e/product-image-fit.spec.ts`
+  ([ADR 017](docs/adr/017-a-box-that-could-not-be-both.md)).
 - **No floor without a ceiling** on any box. Enforced by `src/tests/unit/bounded-geometry.test.ts`.
 
 ## Rhythm
