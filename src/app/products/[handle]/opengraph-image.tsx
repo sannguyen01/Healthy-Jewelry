@@ -28,15 +28,19 @@ import { SITE_NAME } from '@/config/site'
 // site ships, and the family's full TTF is a CJK font of several megabytes per
 // weight. Putting the share card in the brand face means a Latin-subset TTF built
 // for it — a deliberate change with its own glyph-coverage question.
-const FONT_FILES = {
-  regular: path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf'),
-  bold: path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf'),
-} as const
-
+//
+// **The two paths are written at the call, and must stay there.** They were a `FONT_FILES`
+// object until 2026-10-04, and Turbopack cannot resolve a path read out of an object, so it
+// treated `readFile(FONT_FILES.regular)` as reading *any* file and traced the whole
+// repository into this function: 752 files and 54 MB against ~250 and 43 MB for every
+// other route — the tests, the ADRs, the scripts and the e2e specs shipped as server code
+// on every deploy. A literal `path.join(process.cwd(), '…')` is the scoped form its warning
+// asks for. `scripts/audit-function-traces.mjs` fails the build if any function traces
+// repository files again (ADR 047).
 async function loadCardFonts() {
   const [regular, bold] = await Promise.all([
-    readFile(FONT_FILES.regular),
-    readFile(FONT_FILES.bold),
+    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf')),
   ])
   return [
     { name: 'Noto Sans', data: regular, weight: 400 as const, style: 'normal' as const },

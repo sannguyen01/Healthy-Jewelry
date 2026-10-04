@@ -250,3 +250,194 @@ function readRootImporterSpecifiers(source) {
 
   return map.size === 0 ? null : map
 }
+
+/**
+ * **The lockfile half, which ADR 031 left to pnpm and which came back.**
+ *
+ * ADR 031 declined to scan `pnpm-lock.yaml` for duplicate keys: pnpm refuses such a file
+ * outright, so the failure was already loud. On 2026-10-03 it happened again — PR #101's
+ * conflict with `main` was resolved in GitHub's web editor by keeping both sides of all 22
+ * hunks (`ed7594a`), which left the lockfile ten duplicated keys — and the step this module
+ * backs, **named "Manifest and lockfile integrity"**, printed two ticks and exited 0 one line
+ * above the install that died on it. Loud was true. Checked was not: a step whose name
+ * promises lockfile integrity, passing a lockfile pnpm will not parse, is a claim about a
+ * control rather than a control (ADR 018). See ADR 046.
+ *
+ * ## Why a scanner for this subset, and why it says when it cannot run
+ *
+ * The objection in ADR 031 was that this needs a YAML parser, which is a dependency, and
+ * this runs before dependencies exist. It does not need *a* YAML parser; it needs the subset
+ * pnpm writes, which was measured rather than assumed (2026-10-04, 5,088 lines): block keys,
+ * `key: scalar`, single-line flow collections (`resolution: {integrity: …}`, `cpu: [x64]`),
+ * and plain-scalar sequences under `bundledDependencies` / `transitivePeerDependencies` —
+ * nothing else. Siblings are the keys at one indentation inside one parent, which a stack of
+ * indentations answers exactly for that subset.
+ *
+ * Anything outside it — a block scalar, an anchor or alias, a merge key, a flow collection
+ * that spans lines, a mapping inside a sequence, a tab, an indentation the structure does not
+ * explain — returns `unevaluable` with the line, never `ok` (ADR 010). And its coverage is
+ * measured, not asserted: `manifest-integrity.test.ts` checks it against the `yaml` package
+ * (`uniqueKeys: true`) on this repository's real lockfile and on hundreds of seeded
+ * mutations of it, so a disagreement with a real parser is a failing test rather than a hole
+ * nobody has found (ADR 007).
+ *
+ * @param {string} source
+ * @returns {{ status: 'ok' | 'unevaluable', duplicates: Array<{ key: string, line: number, firstLine: number, path: string[] }>, reason?: string, line?: number }}
+ */
+export function findDuplicateLockfileKeys(source) {
+  const lines = source.split('\n')
+  /** @type {Array<{ key: string, line: number, firstLine: number, path: string[] }>} */
+  const duplicates = []
+  /** Sibling sets, innermost last. Root is indentation 0. */
+  const frames = [{ indent: 0, seen: new Map(), path: [] }]
+  /** A `key:` with no inline value, waiting for its children at a deeper indentation. */
+  let open = null
+  /** The indentation of the sequence currently being read, if any. */
+  let sequenceIndent = null
+
+  const unevaluable = (lineNo, why) => ({
+    status: /** @type {const} */ ('unevaluable'),
+    duplicates,
+    line: lineNo,
+    reason: `pnpm-lock.yaml line ${lineNo}: ${why}. This scanner reads the YAML subset pnpm writes and reports that it could not run rather than reporting agreement it did not verify.`,
+  })
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineNo = i + 1
+    const raw = lines[i].endsWith('\r') ? lines[i].slice(0, -1) : lines[i]
+    if (raw.trim() === '' || /^\s*#/.test(raw)) continue
+    if (raw === '---' || raw === '...') {
+      frames.length = 1
+      frames[0] = { indent: 0, seen: new Map(), path: [] }
+      open = null
+      sequenceIndent = null
+      continue
+    }
+    if (/^[ ]*\t/.test(raw)) return unevaluable(lineNo, 'a tab in the indentation')
+
+    const indent = raw.length - raw.trimStart().length
+    const content = raw.slice(indent)
+
+    if (content === '-' || content.startsWith('- ')) {
+      const item = content.slice(1).trim()
+      if (sequenceIndent === null) {
+        if (open === null || indent <= open.indent) {
+          return unevaluable(lineNo, 'a sequence item that no key opened')
+        }
+        sequenceIndent = indent
+        open = null
+      } else if (indent !== sequenceIndent) {
+        return unevaluable(lineNo, 'a sequence item at an indentation its sequence does not use')
+      }
+      if (item === '' || /^(&|\*|!|\||>)/.test(item) || parseKeyLine(item) !== null) {
+        return unevaluable(lineNo, 'a sequence item that is not a plain scalar')
+      }
+      continue
+    }
+
+    const parsed = parseKeyLine(content)
+    if (parsed === null) return unevaluable(lineNo, 'a line that is neither a key nor a sequence item')
+    if (parsed.key === '<<') return unevaluable(lineNo, 'a merge key, which can introduce keys this scan cannot see')
+
+    sequenceIndent = null
+    while (frames.length > 1 && frames.at(-1).indent > indent) frames.pop()
+    let frame = frames.at(-1)
+    if (indent > frame.indent) {
+      if (open === null || indent <= open.indent || open.indent !== frame.indent) {
+        return unevaluable(lineNo, 'an indentation the structure above it does not explain')
+      }
+      frame = { indent, seen: new Map(), path: [...open.path, open.key] }
+      frames.push(frame)
+    } else if (indent < frame.indent) {
+      return unevaluable(lineNo, 'a dedent to an indentation no enclosing key uses')
+    }
+
+    const firstLine = frame.seen.get(parsed.key)
+    if (firstLine !== undefined) duplicates.push({ key: parsed.key, line: lineNo, firstLine, path: frame.path })
+    else frame.seen.set(parsed.key, lineNo)
+
+    const value = parsed.value
+    if (value === null) {
+      open = { key: parsed.key, indent, path: frame.path }
+      continue
+    }
+    open = null
+    if (/^(&|\*|!)/.test(value)) return unevaluable(lineNo, 'an anchor, alias or tag')
+    if (/^[|>]/.test(value)) return unevaluable(lineNo, 'a block scalar')
+    if (/^[[{]/.test(value) && !/[\]}]\s*(#.*)?$/.test(value)) {
+      return unevaluable(lineNo, 'a flow collection that does not close on its own line')
+    }
+  }
+
+  return { status: 'ok', duplicates }
+}
+
+/**
+ * `{ key, value }` for a `key:` / `key: value` line, with the key unquoted so `'a'` and `a`
+ * are the same key as YAML says they are, or `null` if the line is not a mapping entry.
+ *
+ * @param {string} content a line with its indentation removed
+ * @returns {{ key: string, value: string | null } | null}
+ */
+function parseKeyLine(content) {
+  let key
+  let rest
+  if (content.startsWith("'")) {
+    let j = 1
+    let text = ''
+    for (;;) {
+      if (j >= content.length) return null
+      if (content[j] === "'") {
+        if (content[j + 1] === "'") {
+          text += "'"
+          j += 2
+          continue
+        }
+        break
+      }
+      text += content[j++]
+    }
+    key = text
+    rest = content.slice(j + 1)
+  } else if (content.startsWith('"')) {
+    const m = content.match(/^"((?:[^"\\]|\\.)*)"/)
+    if (!m) return null
+    try {
+      key = JSON.parse(`"${m[1]}"`)
+    } catch {
+      return null
+    }
+    rest = content.slice(m[0].length)
+  } else {
+    const m = content.match(/^([^\s'"#[\]{},&*!|>%@`-][^:#]*?|-[^\s:#][^:#]*?):(?=\s|$)/)
+    if (!m) return null
+    key = m[1].trimEnd()
+    rest = content.slice(m[1].length)
+  }
+  if (!rest.startsWith(':')) return null
+  const after = rest.slice(1)
+  if (after !== '' && !/^\s/.test(after)) return null
+  const value = after.trim()
+  return { key, value: value === '' || value.startsWith('#') ? null : value }
+}
+
+/**
+ * Every line that is a git conflict marker: `<<<<<<<`, `|||||||`, `=======`, `>>>>>>>`.
+ *
+ * A file committed with markers is what an abandoned resolution leaves. pnpm can resolve
+ * markers in a lockfile itself, but only from a non-frozen `pnpm install` on a workstation;
+ * a frozen install in CI or on Vercel refuses the file, and `JSON.parse` refuses a manifest
+ * that carries them — which, before this check, threw out of this probe with a stack trace
+ * instead of a verdict.
+ *
+ * @param {string} source
+ * @returns {Array<{ line: number, marker: string }>}
+ */
+export function findConflictMarkers(source) {
+  const found = []
+  source.split('\n').forEach((text, i) => {
+    const m = text.match(/^(<{7}|\|{7}|={7}|>{7})(?=\s|$)/)
+    if (m) found.push({ line: i + 1, marker: m[1] })
+  })
+  return found
+}

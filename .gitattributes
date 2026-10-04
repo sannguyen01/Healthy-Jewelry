@@ -1,0 +1,12 @@
+# pnpm-lock.yaml is generated, and git must never text-merge it.
+#
+# Twice (1c0419c on 2026-09-18, ed7594a on 2026-10-03) a lockfile conflict was resolved by
+# keeping both sides of every hunk. Each time the result held ten duplicated keys, and pnpm,
+# CI and Vercel all refused it (ERR_PNPM_BROKEN_LOCKFILE). With `merge=binary`, git treats a
+# change on both sides as one unmergeable conflict: it keeps the current branch's copy and
+# writes no markers, so there is nothing to "accept both" of. Diffs are unaffected.
+#
+# To resolve: take the base branch's copy and let pnpm rebuild it from package.json, e.g.
+#   git checkout origin/main -- pnpm-lock.yaml && pnpm install --lockfile-only
+# docs/runbooks/lockfile-conflicts.md · docs/adr/046-a-resolved-conflict-is-a-write-nobody-reviewed.md
+pnpm-lock.yaml merge=binary

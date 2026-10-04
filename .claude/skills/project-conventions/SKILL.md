@@ -42,7 +42,7 @@ flag it if you see:
 
 ## Testing baseline
 
-The suite spans **118 unit spec files** and **20 E2E spec files**.
+The suite spans **119 unit spec files** and **20 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a

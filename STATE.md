@@ -65,7 +65,46 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
   rate limiter's IP is not spoofable on this deployment.
 - `e2e/responsive-sweep.spec.ts` now holds the width sweep on every PR.
 
+**Last: the latest failed deployment, debugged** (ADRs 046, 047). `dpl_Fs9crbjE8nJ4M2uJvbVT41Apzje5`
+(Vercel, `ERROR`, `ERR_PNPM_BROKEN_LOCKFILE`) built PR #101 at `ed7594a`.
+- **Root cause.** PR #101's merge of `main` was resolved on github.com by keeping both sides of all
+  22 conflict hunks. Both files are byte-identical to that resolution: ten duplicated lockfile keys,
+  and, hidden behind the install, a footer referencing deleted `shopLinks`/`infoLinks`
+  (`TS2304`). CI failed the same way in 21 seconds, after the step named "Manifest and lockfile
+  integrity" had passed.
+- **PR #101 is superseded**: #103 (`0bcb55c`) says so and carried its footer. Production
+  (`dpl_8S2TqXpWgPX9AjwxXAzMXkGEkLc7`, `main` `0bcb55c`) and every #104 preview are `READY`.
+- **The pattern.** 9 of the project's 13 failed deployments are lockfile failures (7 broken, 2
+  outdated). Three of the nine were production builds of `main`, after PRs #68, #72 and #73.
+  Replayed, the first incident (`1c0419c`) is also a 7-hunk conflict kept both ways, not the
+  clean merge ADR 031 records.
+- **Prevented, not just detected.** `.gitattributes` makes git refuse to text-merge the lockfile
+  (both incidents replayed: no markers, nothing to keep both of). The integrity step now reads the
+  lockfile's keys, measured against the `yaml` parser, plus conflict markers in both files.
+  `docs/runbooks/lockfile-conflicts.md` gives the resolution.
+- **Found on the way:** one unresolvable `readFile` in the share card traced 520 repository files
+  (tests, ADRs, scripts) into two server functions on every deploy. The path is now literal and
+  `scripts/audit-function-traces.mjs` checks every trace after the build.
+- **Environment, read without decrypting.** One variable is set (`NEXT_PUBLIC_SITE_URL`).
+  `RESEND_API_KEY`, the two Upstash variables, `RATE_LIMIT_KEY_SECRET` and
+  `SHOPIFY_WEBHOOK_SECRET` are unset, all known items below. The dashboard says Node `24.x`, but
+  `engines.node` (`22.x`) overrides it on Vercel (per its documentation), matching CI.
+
 ### Still blocked, and on what
+
+- **PR #101 (owner):** close it as superseded by #103. Keeping it means:
+  - regenerate its lockfile from `main`'s (`git checkout origin/main -- pnpm-lock.yaml &&
+    pnpm install --lockfile-only` makes the frozen install pass, verified on `ed7594a`);
+  - then resolve its footer, which still fails type-check.
+
+  Until one of these happens, every push to it is a failing Vercel preview and a failing CI run.
+- **Vercel connector scope (owner):** build logs, runtime logs/errors and authenticated deployment
+  fetches return 403 for the team `sannguyen01s-projects`, while project and deployment metadata
+  read fine. Re-authorise the Vercel connection for that team so runtime errors can be read.
+- **Observation pending:** how GitHub's conflict editor and "Update branch" present a conflict on a
+  `merge=binary` path. Record it on the first lockfile conflict after #104 merges.
+- **Vercel project settings (owner, cosmetic):** Node.js Version reads `24.x`; set it to `22.x` to
+  match `engines`, or move both to 24 together before Node 22 leaves maintenance (2027-04-30).
 
 - **Two dependency upgrades, deliberately not in #104** (dev-only, each a major): Vitest to ≥4.1.11
   for GHSA-82fw-gwwq-j7x9, and `eslint-config-next` to the 16.x line, which should drop the only

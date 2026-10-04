@@ -346,6 +346,19 @@ Full detail in **`docs/testing-strategy.md`**. In short:
   becomes a question about execution — see
   [ADR 027](docs/adr/027-governance-and-execution-are-different-questions.md), enforced by
   `src/tests/unit/workflow-condition-contract.test.ts`.
+- **`pnpm-lock.yaml` is regenerated, never merged.** Twice a lockfile conflict was resolved by
+  keeping both sides of every hunk — the second time in GitHub's web editor on PR #101 — and each
+  time pnpm, CI and Vercel refused the result (`ERR_PNPM_BROKEN_LOCKFILE`). `.gitattributes` now
+  sets `merge=binary`, so git leaves no hunks to keep. The "Manifest and lockfile integrity" step,
+  which passed on that lockfile, now reads its keys and both files' conflict markers before the
+  install. Resolve with `docs/runbooks/lockfile-conflicts.md`. See
+  [ADR 046](docs/adr/046-a-resolved-conflict-is-a-write-nobody-reviewed.md).
+- **A server function ships what it traces.** A `readFile` whose path Turbopack cannot resolve
+  traces the whole repository into the function — tests, ADRs and scripts went out with the
+  product share card on every deploy, shown only as a build warning. Write filesystem paths at the
+  call (`path.join(process.cwd(), 'public/…')`). `scripts/audit-function-traces.mjs` fails
+  `verify` on any repository file in a trace that `RUNTIME_READS` does not name, and on a named
+  runtime read missing from its trace. See [ADR 047](docs/adr/047-a-function-ships-what-it-traces.md).
 
 ## PROHIBITED
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand

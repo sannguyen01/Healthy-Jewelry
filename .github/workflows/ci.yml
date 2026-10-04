@@ -235,6 +235,15 @@ jobs:
       - name: Build artifact scan
         run: node scripts/scan-build-artifacts.mjs
 
+      # What each server function ships. On 2026-10-04 one unresolvable `readFile`
+      # made Turbopack trace the whole repository — tests, ADRs, scripts — into two
+      # functions, and said so only as a build warning. This reads the `.nft.json`
+      # traces the build just wrote: no repository file in any function unless
+      # RUNTIME_READS names it, and every file a function reads present in its
+      # trace (ADR 047). Before the upload, for the reason the scan above gives.
+      - name: Server function trace scope
+        run: node scripts/audit-function-traces.mjs
+
       # Handed to the E2E job so it exercises the exact artifact this gate
       # approved, and so the build is paid for once rather than twice.
       - name: Upload build output

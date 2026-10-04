@@ -171,13 +171,23 @@
     },
     {
       "id": "manifest-integrity",
-      "claims": "package.json declares each key once, and its ranges agree with pnpm-lock.yaml, checked before the install that both files break",
+      "claims": "neither package.json nor pnpm-lock.yaml carries a conflict marker or declares a key twice, and the manifest's ranges agree with the lockfile's, checked before the install that all of these break",
       "status": "configured",
       "probe": "scripts/audit-manifest-integrity.mjs",
       "probeRunsIn": ".github/workflows/ci.yml",
       "selfMonitoring": true,
-      "knownLimit": "Two questions, one of them newly answered and one newly *named*. Duplicate keys in package.json is the half nothing else asks: JSON permits them, JSON.parse takes the last occurrence silently, and on 2026-09-18 main carried five of them while every tool read one value from a file that stated two. Manifest/lockfile divergence is already detected by `pnpm install --frozen-lockfile` — what this adds is that the failure arrives as a named red check with a package and two version strings, instead of as a dead install step that leaves every later check reporting `skipped` (ADR 011). It does **not** check pnpm-lock.yaml for duplicate keys: that needs a YAML parser, which is a dependency, and this runs before dependencies exist — pnpm already refuses such a lockfile outright. It reads the root importer only, so a workspace package would be outside it, and it compares declared ranges rather than resolved versions.",
-      "adr": "docs/adr/031-a-clean-merge-is-not-a-correct-merge.md",
+      "knownLimit": "Four questions. Duplicate keys in package.json is the half nothing else asks: JSON permits them, JSON.parse takes the last occurrence silently, and on 2026-09-18 main carried five of them while every tool read one value from a file that stated two. Duplicate keys in pnpm-lock.yaml were left to pnpm until 2026-10-04 (ADR 031), and on 2026-10-03 this step printed two ticks above an install that died on ten of them (PR #101, ed7594a; ADR 046). They are now read by a scanner for the YAML subset pnpm writes, measured against the `yaml` package on the real lockfile and on 120 seeded mutations of it, which reports `unevaluable` (exit 2) on any construct outside that subset rather than `ok`. Conflict markers in either file are a finding, and no longer throw out of the probe. Manifest/lockfile divergence is already detected by `pnpm install --frozen-lockfile`; this names it. It reads the root importer only, so a workspace package would be outside the range comparison, and it compares declared ranges rather than resolved versions. Detection only: the prevention is `.gitattributes` (`pnpm-lock.yaml merge=binary`), asserted as behaviour by a real three-way merge in the same test file. Whether GitHub's web conflict editor honours that attribute has not yet been observed on a live conflict.",      "adr": "docs/adr/031-a-clean-merge-is-not-a-correct-merge.md",
+      "backstop": "control:merge-gate"
+    },
+    {
+      "id": "function-trace-scope",
+      "claims": "no server function's trace ships repository files — source, tests, docs, scripts — unless a runtime read is named for it, and every file a function reads at runtime is in that function's trace",
+      "status": "configured",
+      "probe": "scripts/audit-function-traces.mjs",
+      "probeRunsIn": ".github/workflows/ci.yml",
+      "selfMonitoring": true,
+      "knownLimit": "Reads the `.nft.json` traces of the build CI just made, which are what Vercel packages each function from; it does not read Vercel's own output, so a platform-side packaging difference is outside it. Exits 2 when there are no traces to read, never 0 (ADR 020). The 'nothing missing' half could not be provoked on a real build: on 2026-10-04 four mutations of the share card's font path, `turbopackIgnore` among them, all left the fonts traced, because Turbopack folds constant paths and the trace pass follows partly unknown ones by wildcard. It is kept because that behaviour belongs to two tools, and a missing file fails only on Vercel. RUNTIME_READS is a hand-kept list; a new runtime read has to be added to it, which is the point.",
+      "adr": "docs/adr/047-a-function-ships-what-it-traces.md",
       "backstop": "control:merge-gate"
     },
     {
@@ -235,7 +245,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 50 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 53 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -557,6 +567,7 @@
     "protects. A decision is reasoning that is wrong out loud when violated."
   ],
   "decisionAdrs": {
+    "docs/adr/046-a-resolved-conflict-is-a-write-nobody-reviewed.md": "Records the second lockfile incident (PR #101, ed7594a, 2026-10-03: all 22 conflict hunks resolved by keeping both sides) and corrects ADR 031's account of the first, which replays as a 7-hunk conflict rather than a clean merge. Its decisions are mechanisms already classified elsewhere: the lockfile half of the manifest-integrity control (whose `adr` remains ADR 031) and `.gitattributes`, whose behaviour that control's test asserts by a real merge.",
     "docs/adr/037-a-reconciliation-at-the-wrong-grain.md": "A rule about the grain at which a reconciliation compares: a table parsed and reduced to a key before comparing has thrown away the columns it was meant to check. Its mechanism is the commerce-elimination-boundary control, which ADR 036 already classifies; this records why that control compares identifier sets rather than paths, and why a lexer that hides findings is erring in the unsafe direction.",
     "docs/adr/001-two-webhook-secrets.md": "Records which of two secrets Shopify signs with. A fact about an external system, not a mechanism that can go missing.",
     "docs/adr/002-cart-completion-discriminator.md": "A code-level discriminator. Its absence is a failing test, not a silent one.",
