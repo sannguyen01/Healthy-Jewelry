@@ -12,7 +12,7 @@ export function FollowUp() {
       ref={sectionRef as React.RefObject<HTMLElement>}
       style={{
         backgroundColor: 'var(--bg)',
-        padding: 'clamp(64px, 8vw, 96px) var(--space-gutter, clamp(20px,4vw,64px))',
+        padding: 'var(--space-section) var(--space-gutter)',
         borderTop: '1px solid var(--ash)',
         textAlign: 'center',
         opacity: visible ? 1 : 0,

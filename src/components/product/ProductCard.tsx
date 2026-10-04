@@ -21,17 +21,14 @@ export function ProductCard({ product, className }: ProductCardProps) {
         style={{
           position: 'relative',
           cursor: 'pointer',
-          transition: `transform var(--duration-fast) var(--ease)`,
         }}
         onMouseEnter={(e) => {
           const el = e.currentTarget as HTMLElement
-          el.style.transform = 'translateY(-3px)'
           const spec = el.querySelector<HTMLElement>('[data-spec]')
           if (spec) spec.style.opacity = '1'
         }}
         onMouseLeave={(e) => {
           const el = e.currentTarget as HTMLElement
-          el.style.transform = 'translateY(0)'
           const spec = el.querySelector<HTMLElement>('[data-spec]')
           if (spec) spec.style.opacity = '0'
         }}
@@ -39,7 +36,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
         {/* Photograph when Shopify has one, illustration when not — see ProductImage. */}
         <div
           style={{
-            height: '280px',
+            aspectRatio: 'var(--ratio-product)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

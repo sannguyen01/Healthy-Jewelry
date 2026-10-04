@@ -52,10 +52,10 @@ describe('Footer', () => {
     })
   })
 
-  describe('help group', () => {
-    it('shows "Help" group heading', () => {
+  describe('about group', () => {
+    it('shows "About" group heading', () => {
       render(<Footer />)
-      expect(screen.getByText('Help')).toBeTruthy()
+      expect(screen.getByText('About')).toBeTruthy()
     })
 
     it('links to Contact and FAQ', () => {

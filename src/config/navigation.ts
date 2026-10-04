@@ -118,22 +118,15 @@ export const byHref = (...hrefs: string[]): NavLink[] =>
   })
 
 export const footerGroups: FooterGroupSpec[] = [
-  { title: 'Explore', links: byHref('/shop', '/materials', '/about') },
-  { title: 'Help', links: [...byHref('/contact'), { label: 'FAQ', href: '/faq' }] },
   {
-    title: 'Collections',
-    links: collectionsNav.map((collection) => ({
-      label: collection.title,
-      href: collection.href,
-    })),
+    title: 'Shop',
+    links: [
+      ...byHref('/shop'),
+      ...collectionsNav.map((collection) => ({ label: collection.title, href: collection.href })),
+    ],
   },
   {
-    title: 'Find us',
-    links: [
-      { label: 'Instagram', href: SOCIAL_LINKS.instagram, external: true },
-      { label: 'TikTok', href: SOCIAL_LINKS.tiktok, external: true },
-      { label: 'Pinterest', href: SOCIAL_LINKS.pinterest, external: true },
-      { label: 'YouTube', href: SOCIAL_LINKS.youtube, external: true },
-    ],
+    title: 'About',
+    links: [...byHref('/materials', '/about', '/contact'), { label: 'FAQ', href: '/faq' }],
   },
 ]

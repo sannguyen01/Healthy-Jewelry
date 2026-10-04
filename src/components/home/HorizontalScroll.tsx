@@ -24,7 +24,7 @@ export function HorizontalScroll({
       ref={sectionRef as React.RefObject<HTMLElement>}
       style={{
         backgroundColor: 'var(--bg)',
-        padding: 'clamp(48px, 6vw, 80px) 0',
+        padding: 'var(--space-section) 0',
         borderBottom: '1px solid var(--ash)',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
@@ -34,7 +34,7 @@ export function HorizontalScroll({
       {/* Section header */}
       <div
         style={{
-          padding: '0 var(--space-gutter, clamp(20px,4vw,64px))',
+          padding: '0 var(--space-gutter)',
           marginBottom: '28px',
           display: 'flex',
           alignItems: 'center',
@@ -80,8 +80,8 @@ export function HorizontalScroll({
           display: 'flex',
           overflowX: 'auto',
           gap: '2px',
-          paddingLeft: 'var(--space-gutter, clamp(20px,4vw,64px))',
-          paddingRight: 'var(--space-gutter, clamp(20px,4vw,64px))',
+          paddingLeft: 'var(--space-gutter)',
+          paddingRight: 'var(--space-gutter)',
           paddingBottom: '4px',
         }}
       >
@@ -104,20 +104,13 @@ export function HorizontalScroll({
               width: 'clamp(200px, 68vw, 260px)',
               flexShrink: 0,
               textDecoration: 'none',
-              transition: 'transform 0.3s var(--ease)',
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-4px)'
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)'
             }}
           >
             {/* Card image area */}
             <div
               className="card-tile"
               style={{
-                height: '300px',
+                aspectRatio: 'var(--ratio-product)',
                 position: 'relative',
                 display: 'flex',
                 alignItems: 'center',

@@ -13,7 +13,7 @@ export function RealMoment() {
       style={{
         backgroundColor: 'var(--bg)',
         borderBottom: '1px solid var(--ash)',
-        padding: 'clamp(96px, 12vw, 160px) var(--space-gutter, clamp(20px,4vw,64px))',
+        padding: 'var(--space-section-lg) var(--space-gutter)',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
         transition: 'opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1)',

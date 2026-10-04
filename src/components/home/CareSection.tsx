@@ -16,7 +16,7 @@ export function CareSection({ body }: { body: string }) {
       style={{
         backgroundColor: 'var(--black)',
         color: 'var(--on-dark)',
-        padding: 'clamp(120px, 15vw, 200px) var(--space-gutter, clamp(20px,4vw,64px))',
+        padding: 'var(--space-section-lg) var(--space-gutter)',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
         transition:

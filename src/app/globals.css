@@ -99,6 +99,17 @@
     /* ── Spacing ── */
     --space-section: clamp(56px, 8vw, 96px);
     --space-gutter:  clamp(24px, 5vw, 72px);
+    /* The one editorial band per page (dark care band, the moment) breathes more than a
+       standard section; everything else uses --space-section. */
+    --space-section-lg: clamp(96px, 12vw, 160px);
+    --space-section-sm: clamp(40px, 5vw, 64px);
+    /* Clear of the fixed 64px header with room to spare. */
+    --space-page-top: clamp(96px, 10vw, 128px);
+    --ratio-product: 1 / 1;
+    --tracking-label: 0.14em;
+    --tracking-display: 0.04em;
+    /* A hairline instead of a shadow: the page stays flat and quiet. */
+    --line: rgba(26, 23, 20, 0.08);
 
     /* ── Duration ── */
     --duration-fast: 240ms;
@@ -528,11 +539,8 @@
   }
 
   .hj-header[data-state="solid"] {
-    background-color: rgba(247, 245, 241, 0.94);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(26, 23, 20, 0.08);
-    box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.08);
+    background-color: var(--bg);
+    border-bottom: 1px solid var(--line);
     color: var(--ink);
   }
 
@@ -575,10 +583,22 @@
     border: none;
     cursor: pointer;
     text-decoration: none;
+    /* WCAG 2.2 target size: every header control is at least 44px tall. */
+    min-height: 44px;
+  }
+
+  .hj-menu-btn {
+    min-width: 44px;
+  }
+
+  .hj-wordmark {
+    display: inline-flex;
+    align-items: center;
   }
 
   .hj-icon-btn {
     display: flex;
+    min-width: 44px;
     align-items: center;
     justify-content: center;
   }
@@ -615,9 +635,7 @@
     position: fixed;
     inset: 0;
     z-index: 89;
-    background-color: rgba(26, 23, 20, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background-color: var(--ink);
     display: flex;
     flex-direction: column;
     align-items: center;

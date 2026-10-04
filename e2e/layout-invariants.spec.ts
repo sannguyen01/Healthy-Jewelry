@@ -1,0 +1,616 @@
+import { test, expect, type Page } from './support/test'
+import { OVERHANG_TOLERANCE_PX, settle } from './support/viewportFit'
+
+/**
+ * Layout invariants that a visual restyle (calmer, editorial, square 1:1 crops, consistent
+ * section rhythm) must not break. Written BEFORE the restyle, so every number below is
+ * derived from reading the CSS/TSX at the time, not from a run. Where a probe is expected
+ * to be red against the pre-restyle build, the comment on it says so.
+ *
+ * Conventions follow homepage-composition / header-fit / product-image-fit: the `test` import
+ * comes from './support/test' (egress boundary fixture), reduced motion collapses the
+ * one-shot reveal, and every probe is geometric. Every probe THROWS (never passes) when it
+ * cannot find what it measures.
+ */
+
+const WIDTHS = [320, 390, 768, 1024, 1440] as const
+const TOUCH_WIDTHS: readonly number[] = [320, 390, 768]
+const PATHS = ['/', '/shop'] as const
+const HEIGHT = 900
+const MIN_HIT_PX = 44
+const RATIO_TOLERANCE = 0.02
+
+test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+async function visit(page: Page, path: string, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: HEIGHT })
+  await page.goto(path)
+  await expect(page.locator('main')).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  await settle(page)
+}
+
+/* ───────────────────────── 1. horizontal overflow ───────────────────────── */
+
+interface OverflowReport {
+  scrollWidth: number
+  innerWidth: number
+  offenders: string[]
+}
+
+/**
+ * Two-part probe. (a) the literal `documentElement.scrollWidth <= innerWidth` the brief asks
+ * for. (b) a geometric sweep, because globals.css sets `overflow-x: hidden` on html AND body:
+ * body clips its own children, so (a) is clamped to innerWidth and is blind to anything
+ * inside body (viewportFit.ts header comment; ADR 016). Elements under an ancestor whose
+ * overflow-x is not `visible` (hero, care band, the strip scroller) are clipped by design
+ * and skipped; the clipping ancestor itself is still measured.
+ */
+async function overflowProbe(page: Page): Promise<OverflowReport> {
+  return page.evaluate((tolerance) => {
+    const vw = window.innerWidth
+    const clipped = (el: Element) => {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX !== 'visible') return true
+      }
+      return false
+    }
+    const offenders: string[] = []
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.closest('svg') && el.tagName.toLowerCase() !== 'svg') continue
+      const style = getComputedStyle(el)
+      if (style.display === 'none' || style.visibility === 'hidden') continue
+      const box = el.getBoundingClientRect()
+      if (box.width === 0 && box.height === 0) continue
+      if (clipped(el)) continue
+      if (box.right > vw + tolerance || box.left < -tolerance) {
+        const id = el.id ? `#${el.id}` : ''
+        const marker = el.getAttribute('data-hj-known-bad') ? '[known-bad]' : ''
+        offenders.push(
+          `${el.tagName.toLowerCase()}${id}${marker} "${(el.textContent ?? '').trim().slice(0, 24)}" ` +
+            `x ${Math.round(box.left)}..${Math.round(box.right)} vs viewport ${vw}`
+        )
+      }
+    }
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: vw,
+      offenders,
+    }
+  }, OVERHANG_TOLERANCE_PX + 0.5)
+}
+
+test.describe('no horizontal overflow', () => {
+  for (const path of PATHS) {
+    test(`${path} fits every width (scrollWidth and element geometry)`, async ({ page }) => {
+      const failures: string[] = []
+      for (const width of WIDTHS) {
+        await visit(page, path, width)
+        const report = await overflowProbe(page)
+        if (report.scrollWidth > report.innerWidth) {
+          failures.push(
+            `${width}px: scrollWidth ${report.scrollWidth} > innerWidth ${report.innerWidth}`
+          )
+        }
+        for (const offender of report.offenders) failures.push(`${width}px: ${offender}`)
+      }
+      expect(failures, `horizontal overflow on ${path}:\n  ${failures.join('\n  ')}`).toEqual([])
+    })
+  }
+
+  test('known-bad proof: a 2000px element is flagged by the geometric probe', async ({ page }) => {
+    await visit(page, '/', 390)
+    const before = await overflowProbe(page)
+    await page.evaluate(() => {
+      const bad = document.createElement('div')
+      bad.setAttribute('data-hj-known-bad', '1')
+      bad.style.cssText = 'width:2000px;height:10px;background:#000'
+      document.querySelector('main')!.appendChild(bad)
+    })
+    const after = await overflowProbe(page)
+    expect(
+      after.offenders.filter((o) => o.includes('[known-bad]')),
+      'the probe did not flag a 2000px-wide element; it cannot fail, so it proves nothing'
+    ).toHaveLength(1)
+    expect(after.offenders.length).toBeGreaterThan(before.offenders.length)
+    // Recorded, not asserted either way: the scrollWidth half is expected to stay blind
+    // here (body overflow-x: hidden), which is why the geometric half exists.
+    test.info().annotations.push({
+      type: 'scrollWidth with 2000px child',
+      description: `${after.scrollWidth} vs innerWidth ${after.innerWidth}`,
+    })
+  })
+})
+
+/* ───────────────────────── 2. images vs containers ───────────────────────── */
+
+test.describe('images match their containers', () => {
+  for (const path of PATHS) {
+    test(`${path}: every <img> in main has a box and its container's aspect ratio (+-2%)`, async ({
+      page,
+    }) => {
+      const failures: string[] = []
+      let inspected = 0
+      for (const width of WIDTHS) {
+        await visit(page, path, width)
+        const rows = await page.evaluate(() =>
+          [...document.querySelectorAll('main img')].map((img) => {
+            const a = img.getBoundingClientRect()
+            const c = (img.parentElement as HTMLElement).getBoundingClientRect()
+            return {
+              src: (img.getAttribute('src') ?? '').slice(0, 50),
+              iw: a.width,
+              ih: a.height,
+              cw: c.width,
+              ch: c.height,
+            }
+          })
+        )
+        inspected += rows.length
+        for (const r of rows) {
+          if (r.iw === 0 || r.ih === 0 || r.cw === 0 || r.ch === 0) {
+            failures.push(
+              `${width}px ${r.src}: zero box (img ${r.iw}x${r.ih}, container ${r.cw}x${r.ch})`
+            )
+            continue
+          }
+          const drift = Math.abs(r.iw / r.ih / (r.cw / r.ch) - 1)
+          if (drift > RATIO_TOLERANCE) {
+            failures.push(
+              `${width}px ${r.src}: img ${r.iw.toFixed(0)}x${r.ih.toFixed(0)} vs container ` +
+                `${r.cw.toFixed(0)}x${r.ch.toFixed(0)} (drift ${(drift * 100).toFixed(1)}%)`
+            )
+          }
+        }
+      }
+      // '/' always carries the hero + moment photographs. /shop may be all illustrations (svg).
+      if (path === '/') expect(inspected, 'no <img> found in main on /').toBeGreaterThan(0)
+      expect(failures, failures.join('\n')).toEqual([])
+    })
+  }
+})
+
+/* ───────────────────────── 3. /shop cards ───────────────────────── */
+
+const CURRENCY = /[$€£¥₫]|\b(USD|EUR|GBP|VND|JPY|AUD|CAD)\b|\bprice\b|\b\d+[.,]\d{2}\b/i
+const MATERIAL = /\b(titanium|niobium|steel)\b/i
+
+test.describe('/shop product cards', () => {
+  test('are square tiles with name + material and no price', async ({ page }) => {
+    const failures: string[] = []
+    for (const width of WIDTHS) {
+      await visit(page, '/shop', width)
+      const cards = await page.evaluate(() =>
+        [...document.querySelectorAll('main a[href^="/products/"]')].map((a) => {
+          // The "tile" is the box that holds the picture: parent of the <img>/<svg>, else the
+          // first block of the card. NOT the whole card, which also carries the text rows.
+          const media = a.querySelector('img, svg')
+          const tile =
+            (media?.parentElement as HTMLElement | null) ??
+            (a.querySelector('article')?.firstElementChild as HTMLElement | null) ??
+            (a as HTMLElement)
+          const box = tile.getBoundingClientRect()
+          const lines = ((a as HTMLElement).innerText ?? '')
+            .split('\n')
+            .map((l) => l.trim())
+            .filter(Boolean)
+          return { href: a.getAttribute('href') ?? '', w: box.width, h: box.height, lines }
+        })
+      )
+      expect(cards.length, `no product cards found on /shop at ${width}px`).toBeGreaterThan(0)
+      for (const card of cards) {
+        const where = `${width}px ${card.href}`
+        if (card.w === 0 || card.h === 0) {
+          failures.push(`${where}: zero-size tile`)
+        } else if (Math.abs(card.w / card.h - 1) > RATIO_TOLERANCE) {
+          failures.push(`${where}: tile ${card.w.toFixed(0)}x${card.h.toFixed(0)} is not square`)
+        }
+        if (card.lines.length < 2)
+          failures.push(
+            `${where}: expected a name line and a material line, got ${JSON.stringify(card.lines)}`
+          )
+        if (!card.lines.some((l) => MATERIAL.test(l)))
+          failures.push(`${where}: no material text in ${JSON.stringify(card.lines)}`)
+        const priced = card.lines.filter((l) => CURRENCY.test(l))
+        if (priced.length) failures.push(`${where}: price/currency text ${JSON.stringify(priced)}`)
+      }
+    }
+    expect(failures, failures.join('\n')).toEqual([])
+  })
+})
+
+/* ───────────────────────── 4. controls: hit area + containment ───────────────────────── */
+
+interface ControlBox {
+  label: string
+  width: number
+  height: number
+  left: number
+  right: number
+  /** Inside an overflow-x scroller (the homepage strip): horizontal containment is not expected. */
+  scrolls: boolean
+}
+
+async function measureControls(page: Page, selector: string, what: string): Promise<ControlBox[]> {
+  const found = await page.evaluate((sel) => {
+    return [...document.querySelectorAll(sel)]
+      .filter((el) => {
+        const style = getComputedStyle(el)
+        const box = el.getBoundingClientRect()
+        return (
+          style.visibility !== 'hidden' &&
+          box.width > 0 &&
+          box.height > 0 &&
+          !el.closest('[inert]') &&
+          !el.closest('[aria-hidden="true"]')
+        )
+      })
+      .map((el) => {
+        const box = el.getBoundingClientRect()
+        let scrolls = false
+        for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+          const ox = getComputedStyle(p).overflowX
+          if (ox === 'auto' || ox === 'scroll') scrolls = true
+        }
+        const label =
+          el.getAttribute('aria-label') ||
+          ((el as HTMLElement).innerText || el.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 30) ||
+          el.tagName.toLowerCase()
+        return {
+          label,
+          width: box.width,
+          height: box.height,
+          left: box.left,
+          right: box.right,
+          scrolls,
+        }
+      })
+  }, selector)
+  if (found.length === 0)
+    throw new Error(`no visible controls matched "${selector}" (${what}); probe has no default`)
+  return found
+}
+
+const REGIONS = {
+  header: 'header a, header button',
+  footer: 'footer a, footer button, footer summary',
+  cards: 'main a[href^="/products/"], main .hj-coll-tile',
+} as const
+
+async function openDrawer(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /open menu/i }).click()
+  await expect(page.getByRole('dialog', { name: /mobile navigation/i })).toBeVisible()
+  await settle(page)
+}
+// The navigation drawer only: the consent banner is also role="dialog" and its in-sentence
+// Privacy link is an inline link, which WCAG 2.5.8 exempts from the target-size minimum.
+const DRAWER = '[aria-label="Mobile navigation"] a, [aria-label="Mobile navigation"] button'
+
+function judge(width: number, region: string, controls: ControlBox[], failures: string[]): void {
+  for (const c of controls) {
+    if (
+      TOUCH_WIDTHS.includes(width) &&
+      (c.width < MIN_HIT_PX - 0.5 || c.height < MIN_HIT_PX - 0.5)
+    ) {
+      failures.push(
+        `${width}px ${region} "${c.label}": hit area ${c.width.toFixed(0)}x${c.height.toFixed(0)} < ${MIN_HIT_PX}`
+      )
+    }
+    if (
+      !c.scrolls &&
+      (c.left < -OVERHANG_TOLERANCE_PX || c.right > width + OVERHANG_TOLERANCE_PX)
+    ) {
+      failures.push(
+        `${width}px ${region} "${c.label}": x ${c.left.toFixed(0)}..${c.right.toFixed(0)} outside 0..${width}`
+      )
+    }
+  }
+}
+
+test.describe('interactive controls', () => {
+  // Expected RED before the restyle (from CSS, unrun): .hj-menu-btn/.hj-icon-btn/.hj-wordmark
+  // have no padding or height (0.68rem text), footer links are display:block at ~14px type with
+  // a 10px margin, and ProductGrid's minmax(280px,1fr) cannot fit a 272px column at 320px.
+  for (const path of PATHS) {
+    test(`${path}: header, footer and card controls (>=44px on touch widths, inside viewport)`, async ({
+      page,
+    }) => {
+      const failures: string[] = []
+      for (const width of WIDTHS) {
+        await visit(page, path, width)
+        for (const [region, selector] of Object.entries(REGIONS)) {
+          judge(
+            width,
+            region,
+            await measureControls(page, selector, `${region} on ${path}`),
+            failures
+          )
+        }
+      }
+      expect(failures, failures.join('\n')).toEqual([])
+    })
+
+    test(`${path}: opened drawer links (>=44px on touch widths, inside viewport)`, async ({
+      page,
+    }) => {
+      const failures: string[] = []
+      for (const width of WIDTHS) {
+        await visit(page, path, width)
+        await openDrawer(page)
+        judge(width, 'drawer', await measureControls(page, DRAWER, `drawer on ${path}`), failures)
+      }
+      expect(failures, failures.join('\n')).toEqual([])
+    })
+  }
+})
+
+/* ───────────────────────── 5. focus indicators ───────────────────────── */
+
+interface Indicator {
+  tag: string
+  label: string
+  focusVisible: boolean
+  outlineStyle: string
+  outlineWidth: number
+  boxShadow: string
+}
+
+/** Reads the focused element's own computed indicator. globals.css: `:focus-visible` = 2px solid ink, 3px offset. */
+async function activeIndicator(page: Page): Promise<Indicator> {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement
+    const s = getComputedStyle(el)
+    return {
+      tag: el.tagName.toLowerCase(),
+      label: (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 30),
+      focusVisible: el.matches(':focus-visible'),
+      outlineStyle: s.outlineStyle,
+      outlineWidth: parseFloat(s.outlineWidth) || 0,
+      boxShadow: s.boxShadow,
+    }
+  })
+}
+
+function expectIndicator(ind: Indicator, where: string): void {
+  expect(
+    ind.focusVisible,
+    `${where}: element did not match :focus-visible (keyboard modality lost): ${JSON.stringify(ind)}`
+  ).toBe(true)
+  const hasOutline = ind.outlineStyle !== 'none' && ind.outlineWidth > 0
+  const hasShadow = ind.boxShadow !== 'none'
+  expect(
+    hasOutline || hasShadow,
+    `${where}: no visible focus indicator ${JSON.stringify(ind)}`
+  ).toBe(true)
+}
+
+/** Tab until focus lands inside `selector` (real keyboard path), capped. */
+async function tabInto(page: Page, selector: string): Promise<void> {
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press('Tab')
+    if (await page.evaluate((s) => !!document.activeElement?.closest(s), selector)) return
+  }
+  throw new Error(`Tab never reached "${selector}" within 12 stops`)
+}
+
+/** One real Tab sets keyboard modality; then focus the region's first visible control. */
+async function focusFirstIn(page: Page, controlSelector: string): Promise<void> {
+  await page.keyboard.press('Tab')
+  const ok = await page.evaluate((sel) => {
+    const el = [...document.querySelectorAll<HTMLElement>(sel)].find((e) => {
+      const b = e.getBoundingClientRect()
+      return b.width > 0 && b.height > 0 && getComputedStyle(e).visibility !== 'hidden'
+    })
+    if (!el) return false
+    el.scrollIntoView({ block: 'center' })
+    el.focus()
+    return document.activeElement === el
+  }, controlSelector)
+  expect(ok, `could not focus a visible control matching "${controlSelector}"`).toBe(true)
+}
+
+test.describe('visible focus indicators', () => {
+  for (const width of [390, 1440]) {
+    for (const path of PATHS) {
+      test(`${path} @${width}: header, drawer, footer and card first stops`, async ({ page }) => {
+        await visit(page, path, width)
+
+        // Header: genuine Tab from a fresh page.
+        await tabInto(page, 'header')
+        expectIndicator(await activeIndicator(page), `header first stop (${path} @${width})`)
+
+        // Drawer: activate MENU from the keyboard, then read the first drawer link.
+        await page.keyboard.press('Enter')
+        await expect(page.getByRole('dialog', { name: /mobile navigation/i })).toBeVisible()
+        await page
+          .waitForFunction(() => !!document.activeElement?.closest('[role="dialog"]'), undefined, {
+            timeout: 2000,
+          })
+          .catch(() => page.keyboard.press('Tab'))
+        expect(
+          await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))
+        ).toBe(true)
+        expect(
+          (await activeIndicator(page)).tag,
+          'drawer focus should be on a link or button'
+        ).toMatch(/^(a|button)$/)
+        expectIndicator(await activeIndicator(page), `drawer first stop (${path} @${width})`)
+        await page.keyboard.press('Escape')
+        await visit(page, path, width)
+
+        await focusFirstIn(page, 'footer a')
+        expectIndicator(await activeIndicator(page), `footer link (${path} @${width})`)
+
+        await focusFirstIn(page, 'main a[href^="/products/"]')
+        expectIndicator(await activeIndicator(page), `card link (${path} @${width})`)
+      })
+    }
+  }
+})
+
+/* ───────────────────────── 6. one h1 ───────────────────────── */
+
+test.describe('heading structure', () => {
+  for (const path of PATHS) {
+    test(`${path} has exactly one h1`, async ({ page }) => {
+      for (const width of WIDTHS) {
+        await visit(page, path, width)
+        expect(await page.locator('h1').count(), `${path} @${width}px: h1 count`).toBe(1)
+      }
+    })
+  }
+})
+
+/* ───────────────────────── 7. homepage vertical rhythm ───────────────────────── */
+
+/**
+ * Band, derived from the section TSX (not measured):
+ *   gap(prev -> next) = padBottom(prev) + padTop(next) + borderBottom(prev) + borderTop(next)
+ * with vertical padding per section (clamp(min, vw%, max), identical top and bottom):
+ *   standard (materials, strip, collection-grid, follow-up) = --space-section 56/8vw/96
+ *   editorial (care-band, real-moment) = --space-section-lg 96/12vw/160
+ * Borders are read from computed style (strip bottom 1px, real-moment bottom 1px, follow-up
+ * top 1px). Band = [sum - 1, sum + 1 + 2*INNER_SLACK_PX]. Lower edge: leaf content cannot sit
+ * closer than the padding. Upper slack: the content block is measured from in-flow leaf
+ * elements, and an inline leaf (e.g. .material-tag span) has a rect shorter than its line box,
+ * so each side may add a few px. 8px per side is a guess to be tuned once, from the first run;
+ * padding itself must not be tuned. Hero seam excluded: min-height 100dvh with centred copy
+ * makes it a function of viewport height, not of section padding. translateY transforms
+ * (RealMoment media: 40px) are neutralised in-page so layout, not animation, is measured.
+ */
+const PAD_CLAMP: Record<string, [number, number, number]> = {
+  // --space-section: clamp(56px, 8vw, 96px); --space-section-lg: clamp(96px, 12vw, 160px)
+  materials: [56, 8, 96],
+  'care-band': [96, 12, 160],
+  collection: [56, 8, 96],
+  strip: [56, 8, 96],
+  'real-moment': [96, 12, 160],
+  'follow-up': [56, 8, 96],
+}
+const INNER_SLACK_PX = 8
+
+function pad(kind: string, vw: number): number {
+  const [min, pct, max] = PAD_CLAMP[kind]
+  return Math.min(max, Math.max(min, (vw * pct) / 100))
+}
+
+test.describe('homepage vertical rhythm', () => {
+  for (const width of WIDTHS) {
+    test(`section content gaps stay in the stated band @${width}px`, async ({ page }) => {
+      await visit(page, '/', width)
+      await page.addStyleTag({
+        content: 'main *{transform:none !important;transition:none !important}',
+      })
+      await settle(page)
+
+      const sections = await page.evaluate(() => {
+        const kindOf = (s: Element) => {
+          if (s.querySelector('h1')) return 'hero'
+          const eyebrow = s.querySelector('.label-eyebrow')?.textContent?.trim() ?? ''
+          if (/^care\s*&\s*craft$/i.test(eyebrow)) return 'care-band'
+          if (/^the moment$/i.test(eyebrow)) return 'real-moment'
+          if (/^materials$/i.test(eyebrow)) return 'materials'
+          if (s.querySelector('a[href*="instagram"], a[href*="tiktok"]')) return 'follow-up'
+          if (/^collections$/i.test(eyebrow)) return 'collection'
+          return eyebrow ? 'strip' : 'unknown'
+        }
+        // Content block = union of in-flow leaves. A leaf has no in-flow element children
+        // (absolute/fixed children do not count); <svg> is a leaf; absolute subtrees are skipped.
+        const inFlow = (e: Element) => !['absolute', 'fixed'].includes(getComputedStyle(e).position)
+        return [...document.querySelectorAll('main > section')].map((s) => {
+          let top = Infinity
+          let bottom = -Infinity
+          for (const e of s.querySelectorAll('*')) {
+            const owningSvg = e.closest('svg')
+            if (e.tagName === 'BR' || (owningSvg !== null && owningSvg !== e)) continue
+            let skip = false
+            for (let p: Element | null = e; p && p !== s; p = p.parentElement) {
+              if (!inFlow(p)) skip = true
+            }
+            if (skip) continue
+            const isLeaf =
+              e.tagName.toLowerCase() === 'svg' || ![...e.children].some((c) => inFlow(c))
+            if (!isLeaf) continue
+            const cs = getComputedStyle(e)
+            const b = e.getBoundingClientRect()
+            if (
+              cs.display === 'none' ||
+              cs.visibility === 'hidden' ||
+              b.height === 0 ||
+              b.width === 0
+            )
+              continue
+            top = Math.min(top, b.top + window.scrollY)
+            bottom = Math.max(bottom, b.bottom + window.scrollY)
+          }
+          const cs = getComputedStyle(s)
+          return {
+            kind: kindOf(s),
+            top,
+            bottom,
+            borderTop: parseFloat(cs.borderTopWidth) || 0,
+            borderBottom: parseFloat(cs.borderBottomWidth) || 0,
+          }
+        })
+      })
+
+      expect(
+        sections.map((s) => s.kind),
+        'unidentified or missing homepage sections'
+      ).not.toContain('unknown')
+      expect(sections.length, 'expected the seven-beat homepage').toBeGreaterThanOrEqual(7)
+      const failures: string[] = []
+      let seams = 0
+      for (let i = 1; i < sections.length; i++) {
+        const prev = sections[i - 1]
+        const next = sections[i]
+        if (prev.kind === 'hero') continue
+        seams++
+        const gap = next.top - prev.bottom
+        const expected =
+          pad(prev.kind, width) + pad(next.kind, width) + prev.borderBottom + next.borderTop
+        const lo = expected - 1
+        const hi = expected + 1 + 2 * INNER_SLACK_PX
+        if (!(gap >= lo && gap <= hi)) {
+          failures.push(
+            `${prev.kind} -> ${next.kind}: gap ${gap.toFixed(1)}px outside [${lo.toFixed(1)}, ${hi.toFixed(1)}]`
+          )
+        }
+      }
+      expect(seams, 'no seams measured').toBeGreaterThanOrEqual(5)
+      expect(failures, failures.join('\n')).toEqual([])
+    })
+  }
+})
+
+/* ───────────────────────── 8. no-JS: nothing hidden ───────────────────────── */
+
+test.describe('JavaScript disabled', () => {
+  test.use({ javaScriptEnabled: false })
+
+  test('every top-level section on / is opaque, visible and has content', async ({ page }) => {
+    // useReveal starts visible=true (fails open) and only hides after mount.
+    await page.setViewportSize({ width: 390, height: HEIGHT })
+    await page.goto('/')
+    const sections = await page.locator('main > section').evaluateAll((els) =>
+      els.map((el, index) => ({
+        index,
+        label: (el.querySelector('h1, h2')?.textContent ?? 'section').trim().slice(0, 30),
+        opacity: parseFloat(getComputedStyle(el).opacity),
+        visibility: getComputedStyle(el).visibility,
+        // Not getBoundingClientRect().height: Chromium evaluates `100dvh` to 0 when script is
+        // disabled under viewport emulation, which collapses the hero and everything after it
+        // in the measurement without any visitor ever seeing that.
+        text: (el.textContent ?? '').trim().length,
+      }))
+    )
+    expect(sections.length, 'no sections rendered without JS').toBeGreaterThanOrEqual(7)
+    expect(
+      sections.filter((s) => s.opacity !== 1 || s.visibility !== 'visible' || s.text === 0),
+      'a section is hidden or collapsed without JavaScript'
+    ).toEqual([])
+  })
+})

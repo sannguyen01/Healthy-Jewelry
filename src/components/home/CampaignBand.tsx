@@ -20,7 +20,7 @@ export function CampaignBand({
       className="campaign-band"
       style={{
         backgroundColor: 'var(--black)',
-        padding: `clamp(64px, 9vw, 112px) var(--space-gutter, clamp(20px,4vw,64px))`,
+        padding: `clamp(64px, 9vw, 112px) var(--space-gutter)`,
       }}
     >
       <div style={{ maxWidth: '800px' }}>

@@ -98,7 +98,7 @@ export function ConsentBanner() {
           paying; overlapping the buttons is not.
         */
         position: 'fixed',
-        right: 'var(--space-gutter, clamp(20px,4vw,64px))',
+        right: 'var(--space-gutter)',
         // `left` only below the split, where the hero stacks and full width reads
         // better than a floating card.
         left: 'auto',

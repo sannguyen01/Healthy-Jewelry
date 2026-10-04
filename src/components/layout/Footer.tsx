@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { footerGroups, legalLinks } from '@/config/navigation'
+import { footerGroups, legalLinks, socialLinks } from '@/config/navigation'
 import { FooterGroup } from '@/components/layout/FooterGroup'
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 import { claimText } from '@/lib/catalog'
@@ -16,8 +16,8 @@ function tagline(): string {
 
 const columnHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
-  fontSize: '0.62rem',
-  letterSpacing: '0.22em',
+  fontSize: 'var(--text-xs)',
+  letterSpacing: 'var(--tracking-label)',
   textTransform: 'uppercase' as const,
   color: 'var(--graphite)',
 }
@@ -26,10 +26,12 @@ const linkStyle: React.CSSProperties = {
   display: 'block',
   fontFamily: 'var(--font-body)',
   fontWeight: 300,
-  fontSize: 'var(--text-sm, 0.85rem)',
+  fontSize: 'var(--text-sm)',
   color: 'var(--graphite)',
   textDecoration: 'none',
-  marginBottom: '10px',
+  // 12px above and below clears the 44px touch target on a 0.85rem line.
+  padding: '12px 0',
+  marginBottom: 0,
   transition: 'color 0.2s ease',
 }
 
@@ -40,7 +42,7 @@ export function Footer() {
       style={{
         backgroundColor: 'var(--bg)',
         borderTop: '1px solid var(--ash)',
-        padding: 'clamp(48px, 6vw, 80px) var(--space-gutter, clamp(20px,4vw,64px))',
+        padding: 'var(--space-section) var(--space-gutter)',
       }}
     >
       <div
@@ -53,7 +55,7 @@ export function Footer() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr repeat(5, auto)',
+            gridTemplateColumns: '1.4fr repeat(3, 1fr)',
             gap: 'clamp(32px, 4vw, 64px)',
             alignItems: 'start',
             marginBottom: 'clamp(40px, 5vw, 64px)',
@@ -66,14 +68,15 @@ export function Footer() {
               href="/"
               aria-label="Healthy Jewelry — home"
               style={{
-                display: 'block',
+                display: 'inline-block',
+                padding: '12px 0',
                 fontFamily: 'var(--font-display)',
                 fontSize: '1.1rem',
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 color: 'var(--ink)',
                 textDecoration: 'none',
-                marginBottom: '16px',
+                marginBottom: '4px',
               }}
             >
               Healthy Jewelry
@@ -82,7 +85,7 @@ export function Footer() {
               style={{
                 fontFamily: 'var(--font-body)',
                 fontWeight: 300,
-                fontSize: 'var(--text-sm, 0.85rem)',
+                fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
                 maxWidth: '280px',
                 lineHeight: 1.7,
@@ -90,6 +93,22 @@ export function Footer() {
             >
               {tagline()} Grade 23 titanium, niobium and 316L surgical steel.
             </p>
+            <nav
+              aria-label="Social"
+              style={{ display: 'flex', flexWrap: 'wrap', gap: '0 4px', marginTop: '12px' }}
+            >
+              {socialLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ ...linkStyle, display: 'inline-block', padding: '12px 8px' }}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </nav>
           </div>
 
           {/* Disclosure columns */}
@@ -116,23 +135,13 @@ export function Footer() {
           ))}
 
           {/* Legal column */}
-          <div>
-            <p style={columnHeadStyle}>Legal</p>
+          <FooterGroup title="Legal" headStyle={columnHeadStyle}>
             {legalLinks.map((link) => (
               <Link key={link.href} href={link.href} style={linkStyle}>
                 {link.label}
               </Link>
             ))}
-            {/*
-              Withdrawing consent has to be as easy as giving it, and the prompt that gave it
-              appears once. This reopens it from every page (CONSENT_OPEN_EVENT in
-              src/lib/analytics/consent.ts). Styled as a link so the column reads as one list,
-              and a <button> underneath because it opens something rather than going anywhere.
-            */}
-            <MeasurementPreferences
-              style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }}
-            />
-          </div>
+          </FooterGroup>
         </div>
 
         {/* Bottom bar */}
@@ -150,18 +159,29 @@ export function Footer() {
           <span
             style={{
               fontFamily: 'var(--font-ui)',
-              fontSize: '0.65rem',
-              letterSpacing: '0.12em',
+              fontSize: 'var(--text-xs)',
+              letterSpacing: 'var(--tracking-label)',
               color: 'var(--titanium-text)',
             }}
           >
             © 2026 Healthy Jewelry
           </span>
+          {/*
+            Withdrawing consent has to be as easy as giving it, and the prompt that gave it
+            appears once. This reopens it from every page (CONSENT_OPEN_EVENT in
+            src/lib/analytics/consent.ts). It lives in the bottom bar rather than a link group
+            because the groups collapse on phones, and a control that is one tap further away
+            when you want to leave than when you arrived is not as easy. A <button>
+            underneath, since it opens something rather than going anywhere.
+          */}
+          <MeasurementPreferences
+            style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }}
+          />
           <span
             style={{
               fontFamily: 'var(--font-ui)',
-              fontSize: '0.65rem',
-              letterSpacing: '0.14em',
+              fontSize: 'var(--text-xs)',
+              letterSpacing: 'var(--tracking-label)',
               textTransform: 'uppercase',
               color: 'var(--titanium-text)',
               fontStyle: 'italic',
