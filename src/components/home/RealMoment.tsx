@@ -46,7 +46,7 @@ export function RealMoment() {
               lineHeight: 1.6,
             }}
           >
-            A digital continuation of a street-first relationship. We started with real people and real materials, building trust through direct encounters before ever writing a line of code.
+            A digital continuation of a street-first relationship.
           </p>
         </div>
         <div
@@ -60,24 +60,11 @@ export function RealMoment() {
         >
           <Image
             src="/images/lifestyle/hero-banner.jpg"
-            alt="The street-first brand in action"
+            alt=""
             fill
+            sizes="(max-width: 900px) 100vw, 600px"
             style={{ objectFit: 'cover' }}
           />
-          <div style={{
-            position: 'absolute',
-            bottom: '-24px',
-            left: '-24px',
-            padding: '32px 40px',
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            color: 'var(--ink)'
-          }}>
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', letterSpacing: '0.25em', textTransform: 'uppercase', fontWeight: 500 }}>
-              No Compromise
-            </span>
-          </div>
         </div>
       </div>
       <style>{`
