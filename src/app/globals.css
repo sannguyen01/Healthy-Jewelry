@@ -16,6 +16,9 @@
     --font-display: 'Zen Kaku Gothic Antique', sans-serif;
     --font-ui:      'Zen Kaku Gothic Antique', sans-serif;
     --font-body:    'Zen Kaku Gothic Antique', sans-serif;
+    /* The brand name's own face, kept from before the Songmont reference (ADR 048). Used by
+       the logotype (.hj-lockup-text) and by nothing else. */
+    --font-brand:   'Barlow Condensed', 'Arial Narrow', sans-serif;
 
     /* ── T4 Color Tokens ── */
     /* The ground and the secondary text follow Songmont's palette (DESIGN.md, Reference): a
@@ -651,8 +654,9 @@
     justify-content: center;
   }
 
-  /* The logotype is a --font-ui label in tracked capitals (the shared rule above), in the
-     header and the footer alike: --font-display is for text set in its own case. */
+  /* The header logotype's size, weight and tracking, as the brand name was set before the
+     Songmont reference: 500, clamp(1rem, 1.4vw, 1.25rem), 0.10em. Its face is set on the name
+     itself (.hj-lockup-text, below), so the header and the footer cannot disagree about it. */
   .hj-wordmark {
     font-weight: 500;
     font-size: clamp(1rem, 1.4vw, 1.25rem);
@@ -700,7 +704,13 @@
     height: 44px;
   }
 
+  /* The name in its own typography: Barlow Condensed in tracked capitals, which the brand
+     had before the Songmont reference and keeps (the owner's ruling, ADR 048). The only rule
+     that names --font-brand; typography-weights.test.ts fails if another one does. Weight,
+     size and tracking come from the variant: .hj-wordmark in the header, Footer.tsx below. */
   .hj-lockup-text {
+    font-family: var(--font-brand);
+    text-transform: uppercase;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -715,16 +725,11 @@
       width: 24px;
       height: 24px;
     }
-    /* The phone logotype is sized to a measurement, not a taste. The brand face is a wide
-       gothic: at the desktop clamp's 16px floor and 0.10em tracking the whole name needed
-       397px to clear the controls by 24px, which would have hidden it on every 390px phone —
-       far past the owner's "logo only at the narrowest widths". 13px with 0.08em brings the
-       measured fit back under the 360px breakpoint; e2e/header-fit.spec.ts holds it between
-       the breakpoint and 16px below it, and prints the figure. */
-    .hj-lockup[data-variant="inline"] .hj-lockup-text {
-      font-size: 0.8125rem;
-      letter-spacing: 0.08em;
-    }
+    /* No phone-only size for the name. In its own condensed face the desktop clamp's 16px floor
+       at 0.10em fits whole from about 353px, under the 360px breakpoint below. The 13px
+       override that stood here was for the wide gothic the name was set in for one round, and
+       left with it. e2e/header-fit.spec.ts holds the fit between the breakpoint and 16px
+       below it, and prints the figure. */
   }
 
   @media (max-width: 359px) {

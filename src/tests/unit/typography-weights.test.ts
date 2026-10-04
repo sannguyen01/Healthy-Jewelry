@@ -76,7 +76,7 @@ function loadedWeightsByToken(): Map<string, Set<number>> {
 
   // `'--font-display': 'var(--font-bc, …)'` in the <html> style object.
   const byToken = new Map<string, Set<number>>()
-  for (const alias of source.matchAll(/'(--font-(?:display|ui|body))':\s*'var\((--font-[\w-]+)/g)) {
+  for (const alias of source.matchAll(/'(--font-(?:display|ui|body|brand))':\s*'var\((--font-[\w-]+)/g)) {
     const weights = byVariable.get(alias[2])
     if (weights) byToken.set(alias[1], weights)
   }
@@ -189,7 +189,11 @@ describe('font loading', () => {
   it('resolves each --font-* token to the weights its loader declares', () => {
     // Guards the whole file: if either parsing hop stops matching, every
     // assertion below would pass against empty sets.
-    expect([...loadedByToken.keys()].sort()).toEqual(['--font-body', '--font-display', '--font-ui'])
+    expect([...loadedByToken.keys()].sort()).toEqual(['--font-body', '--font-brand', '--font-display', '--font-ui'])
+  })
+
+  it('loads the brand name\'s two weights: 500 in the header, 400 in the footer (ADR 048)', () => {
+    expect([...(loadedByToken.get('--font-brand') ?? [])].sort()).toEqual([400, 500])
   })
 
   it('loads the 500 that PageHeader and the homepage hero depend on', () => {
@@ -278,6 +282,37 @@ function cssBySelector(): Map<string, Map<string, string>> {
 const displaySelectors = [...cssBySelector()].filter(([, props]) => props.get('font-family') === 'var(--font-display)')
 
 /**
+ * **The brand face sets the brand name and nothing else.**
+ *
+ * The owner kept the logotype in its original typography (2026-10-04, ADR 048) — an exception
+ * to "one family", granted for the name alone. An exception that is not bounded spreads: the
+ * next heading that wants "something with more character" reaches for the token that is
+ * already there. So exactly one rule may use `--font-brand`, the logotype's, and every file
+ * that mentions the token is accounted for.
+ */
+describe('the brand face is the logotype\'s alone', () => {
+  const css = readFileSync(GLOBALS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+
+  it('only .hj-lockup-text sets its family in --font-brand', () => {
+    const users = [...cssBySelector()].filter(([, props]) => props.get('font-family') === 'var(--font-brand)').map(([s]) => s)
+    expect(users).toEqual(['.hj-lockup-text'])
+  })
+
+  it('no component names the token: the logotype takes it from globals.css', () => {
+    const named = tsxFiles(SRC)
+      .filter((file) => !file.endsWith(`${path.sep}layout.tsx`))
+      .filter((file) => readFileSync(file, 'utf8').includes('--font-brand'))
+      .map((file) => path.relative(SRC, file))
+    expect(named).toEqual([])
+  })
+
+  it('is used in globals.css only where it is defined and where the logotype reads it', () => {
+    // The :root fallback definition and the one rule above; anything else is a new user.
+    expect(css.match(/--font-brand/g)?.length).toBe(2)
+  })
+})
+
+/**
  * **A heading or a name is set in the case it is written in.**
  *
  * Until 2026-10-04 every `--font-display` element was forced to capitals: condensed uppercase
@@ -286,8 +321,8 @@ const displaySelectors = [...cssBySelector()].filter(([, props]) => props.get('f
  * Bag"), and the catalogue already writes names that way — the capitals were a stylesheet
  * overriding the content. So the rule is by role: `--font-display` (headings, product and
  * collection names) never carries `text-transform: uppercase`; small `--font-ui` labels may.
- * The logotype is not an exception to this — it is set as a `--font-ui` label, in the header
- * and the footer alike.
+ * The logotype is not an exception to this either: it is the brand name in its own face
+ * (`--font-brand`, above), in the tracked capitals it has always had.
  */
 describe('headings and names are set in their own case', () => {
   it('no --font-display style forces capitals', () => {

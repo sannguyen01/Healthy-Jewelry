@@ -1,7 +1,6 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import type { CSSProperties, MouseEventHandler } from 'react'
-import { BRAND_MARK_PATH, SITE_NAME } from '@/config/site'
+import { BRAND_MARK_SRC, SITE_NAME } from '@/config/site'
 
 /**
  * The knot mark and the name, as one link home. Used by the header (`inline`) and the footer
@@ -12,10 +11,14 @@ import { BRAND_MARK_PATH, SITE_NAME } from '@/config/site'
  *   inside the label ("Healthy Jewellery — home"), which is what WCAG 2.5.3 asks of a
  *   control whose name differs from its text.
  * - Its size lives in CSS (`.hj-lockup-mark` in `globals.css`), because the header changes it
- *   at two breakpoints. `width`/`height` give the intrinsic box (no layout shift); `sizes`
- *   states the rendered size per breakpoint, which is what makes next/image emit a full `w`
- *   srcset instead of only 1x/2x — without it a DPR-3 phone upscaled the 2x raster and blurred
- *   the edges the matte removal exists to keep clean.
+ *   at two breakpoints. `width`/`height` give the intrinsic box (no layout shift).
+ * - **A plain `<img>`, not next/image, so the background stays transparent.** next/image
+ *   re-encodes through the image optimiser, lossily, and lossy alpha is not transparency: its
+ *   AVIF gave half the pixels that should be clear an alpha of up to 19/255, a faint haze round
+ *   the knot. Browsers were spared it only because `images.formats` lists WebP first. These are
+ *   lossless PNGs at 1x, 2x and 3x of the variant's largest size (`BRAND_MARK_SRC`, 2–23 KB),
+ *   derived pixel-for-pixel from the master, so the mark is clear exactly where the master is
+ *   and no format setting can change that (ADR 048). A DPR-3 phone still gets a 3x raster.
  * - In the header the name is the part that gives way. Below the breakpoint in `globals.css` it
  *   is not rendered at all and the mark carries the brand alone: ADR 016's rule, "the brand
  *   gives, the controls never do", taken one step further than an ellipsis. A cut-off name
@@ -33,11 +36,6 @@ export interface BrandLockupProps {
 /** The largest CSS size each variant renders the mark at, in px. Mirrors `globals.css`. */
 const MARK_BOX = { inline: 30, stacked: 44 } as const
 
-/** The rendered size at each breakpoint, as `globals.css` sets it on `.hj-lockup-mark`. */
-const MARK_SIZES = {
-  inline: '(max-width: 359px) 30px, (max-width: 768px) 24px, 28px',
-  stacked: '44px',
-} as const
 
 export function BrandLockup({ variant, className, style, onClick, eager = false }: BrandLockupProps) {
   return (
@@ -49,13 +47,15 @@ export function BrandLockup({ variant, className, style, onClick, eager = false 
       style={style}
       onClick={onClick}
     >
-      <Image
-        src={BRAND_MARK_PATH}
+      {/* eslint-disable-next-line @next/next/no-img-element -- lossless on purpose: see above. */}
+      <img
+        src={BRAND_MARK_SRC[variant][0]}
+        srcSet={BRAND_MARK_SRC[variant].map((src, i) => `${src} ${i + 1}x`).join(', ')}
         alt=""
         width={MARK_BOX[variant]}
         height={MARK_BOX[variant]}
-        sizes={MARK_SIZES[variant]}
         loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
         className="hj-lockup-mark"
         data-brand-mark=""
       />

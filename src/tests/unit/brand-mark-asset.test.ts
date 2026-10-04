@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { repoRoot } from '@/tests/support/renderedStrings'
-import { BRAND_LOGO_PATH, BRAND_MARK_PATH } from '@/config/site'
+import { BRAND_LOGO_PATH, BRAND_MARK_PATH, BRAND_MARK_SRC } from '@/config/site'
 
 const {
   DERIVATIVES,
@@ -56,15 +56,29 @@ const RIM_ON_BG_FLOOR = 196 // on the Pampas --bg: clean 200.1, matte 187.4
  * AVIF or WebP of it; the raw PNG is fetched by search engines reading the Organization
  * logo. The icons are fetched as they are, on every first visit.
  */
-const BYTE_BUDGET = { mark: 240_000, icon: 4_000, apple: 40_000, logo: 160_000 } as const
+const BYTE_BUDGET = {
+  mark: 240_000,
+  icon: 4_000,
+  apple: 40_000,
+  logo: 160_000,
+  // The lockup copies are fetched on every page, so each is held near what it measured
+  // (2.2–23.4 KB, 2026-10-04): lossless costs a few kilobytes over WebP, not tens.
+  inline1x: 4_000,
+  inline2x: 10_000,
+  inline3x: 18_000,
+  stacked1x: 6_000,
+  stacked2x: 18_000,
+  stacked3x: 32_000,
+} as const
+
+type Name = keyof typeof DERIVATIVES
+const NAMES = Object.keys(DERIVATIVES) as Name[]
 
 const master = decode(MASTER_PATH)
-const committed = {
-  mark: decode(DERIVATIVES.mark.path),
-  icon: decode(DERIVATIVES.icon.path),
-  apple: decode(DERIVATIVES.apple.path),
-  logo: decode(DERIVATIVES.logo.path),
-}
+const committed = Object.fromEntries(NAMES.map((name) => [name, decode(DERIVATIVES[name].path)])) as Record<Name, Rgba>
+
+/** Every copy that is not on a tile: the ones a visitor sees over the page or the browser tab. */
+const TRANSPARENT = NAMES.filter((name) => !DERIVATIVES[name].tile)
 
 describe('the served knot mark', () => {
   // Its own budget: deriving four images from a 2560-pixel master is ~2.5s of arithmetic,
@@ -74,7 +88,7 @@ describe('the served knot mark', () => {
     // So no derivative can be re-exported by hand: an image editor's file differs from the
     // pipeline's in every anti-aliased pixel. Fix: `node scripts/build-brand-mark.mjs`.
     const derived = deriveAll(master)
-    for (const name of ['mark', 'icon', 'apple', 'logo'] as const) {
+    for (const name of NAMES) {
       expect([committed[name].width, committed[name].height], name).toEqual([derived[name].width, derived[name].height])
       expect(Buffer.compare(Buffer.from(committed[name].data), Buffer.from(derived[name].data)), name).toBe(0)
     }
@@ -108,6 +122,18 @@ describe('the served knot mark', () => {
 
   it('is the file the site config points at, and the master is not served', () => {
     expect(`public${BRAND_MARK_PATH}`).toBe(DERIVATIVES.mark.path)
+    // The lockup renders these three per variant, at 1x, 2x and 3x of its largest CSS size.
+    expect(BRAND_MARK_SRC.inline.map((src) => `public${src}`)).toEqual([
+      DERIVATIVES.inline1x.path,
+      DERIVATIVES.inline2x.path,
+      DERIVATIVES.inline3x.path,
+    ])
+    expect(BRAND_MARK_SRC.stacked.map((src) => `public${src}`)).toEqual([
+      DERIVATIVES.stacked1x.path,
+      DERIVATIVES.stacked2x.path,
+      DERIVATIVES.stacked3x.path,
+    ])
+    expect([DERIVATIVES.inline1x.size, DERIVATIVES.stacked1x.size], 'the CSS sizes BrandLockup reserves').toEqual([30, 44])
     expect(`public${BRAND_LOGO_PATH}`).toBe(DERIVATIVES.logo.path)
     expect(MASTER_PATH.startsWith('public/')).toBe(false)
     expect(existsSync(join(ROOT, 'public/logo.png')), 'the 1.1 MB master is back in public/').toBe(false)
@@ -119,13 +145,56 @@ describe('the served knot mark', () => {
   })
 })
 
+describe('every copy a visitor sees is transparent', () => {
+  /*
+   * The owner's instruction (2026-10-04): the logo's background is transparent. Every copy that
+   * is not on a platform-required tile is held to the same three properties as the mark: clear
+   * corners, a real share of fully clear pixels, and edges with no black matte.
+   */
+  it.each(TRANSPARENT.map((name) => [name, DERIVATIVES[name].path] as const))('%s (%s)', (name) => {
+    const img = committed[name]
+    const last = img.width - 1
+    expect([alphaAt(img, 0, 0), alphaAt(img, last, 0), alphaAt(img, 0, last), alphaAt(img, last, last)]).toEqual([0, 0, 0, 0])
+    let clear = 0
+    for (let i = 3; i < img.data.length; i += 4) if (img.data[i] === 0) clear++
+    expect(clear / (img.width * img.height)).toBeGreaterThan(0.3)
+    expect(edgeMetrics(img, BG).faintEdgeLum).toBeGreaterThanOrEqual(FAINT_EDGE_FLOOR)
+  })
+
+  it('covers the copies the site renders, so this list cannot quietly shrink', () => {
+    expect(TRANSPARENT).toEqual(['mark', 'icon', 'inline1x', 'inline2x', 'inline3x', 'stacked1x', 'stacked2x', 'stacked3x'])
+  })
+})
+
 describe('the icons', () => {
-  it.each(['icon', 'apple', 'logo'] as const)('%s is an opaque --black tile with the knot inside it', (name) => {
+  /*
+   * The owner's ruling (2026-10-04, ADR 048): the logo's background is transparent wherever
+   * the platform will show transparency. The browser-tab icon is therefore the bare mark, as
+   * the site renders it. Two copies stay on a tile because their platform cannot show
+   * transparency as transparency: iOS paints every clear pixel of an apple-touch-icon black,
+   * and Google requires the Organization logo to look as intended on pure white, naming a grey
+   * logo as the case that does not.
+   */
+  it('the browser-tab icon is the transparent mark: clear corners, no matte, cropped to the knot', () => {
+    const img = committed.icon
+    const last = img.width - 1
+    expect([img.width, img.height]).toEqual([DERIVATIVES.icon.size, DERIVATIVES.icon.size])
+    expect([alphaAt(img, 0, 0), alphaAt(img, last, 0), alphaAt(img, 0, last), alphaAt(img, last, last)]).toEqual([0, 0, 0, 0])
+    let clear = 0
+    for (let i = 3; i < img.data.length; i += 4) if (img.data[i] === 0) clear++
+    expect(clear / (img.width * img.height), 'share of fully transparent pixels').toBeGreaterThan(0.3)
+    // A black matte would drag the edge pixels' stored colour toward 0 (edgeMetrics, above).
+    expect(edgeMetrics(img, BG).faintEdgeLum).toBeGreaterThanOrEqual(FAINT_EDGE_FLOOR)
+    const b = alphaBounds(img)
+    expect(b!.x0 + b!.y0).toBeLessThanOrEqual(2)
+    expect(DERIVATIVES.icon.tile).toBe(false)
+  })
+
+  it.each(['apple', 'logo'] as const)('%s is an opaque --black tile with the knot inside it', (name) => {
     const img = committed[name]
     const spec = DERIVATIVES[name]
     expect([img.width, img.height]).toEqual([spec.size, spec.size])
-    // Opaque everywhere: iOS fills transparency with black anyway, and a light browser tab
-    // strip would swallow a bare silver knot at 16px.
+    // Opaque everywhere, by platform rule rather than taste (see above).
     let translucent = 0
     for (let i = 3; i < img.data.length; i += 4) if (img.data[i] !== 255) translucent++
     expect(translucent, 'pixels that are not fully opaque').toBe(0)

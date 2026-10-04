@@ -298,6 +298,7 @@ describe('positions: code, prose, and the line between them', () => {
     expect(languageOf('public/brand/knot-silver.png')).toBe(null)
     expect(languageOf('src/app/page.tsx')).toBe('c-style-jsx')
     expect(languageOf('docs/x.md')).toBe('all-prose')
+    expect(languageOf('.gitattributes'), 'a dotfile is classified by its name').toBe('hash')
   })
 })
 

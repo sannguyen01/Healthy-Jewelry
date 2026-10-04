@@ -20,8 +20,10 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 ## Tech Stack
 - Framework: Next.js 16, App Router, TypeScript (strict mode)
 - Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`)
-- Fonts: Zen Kaku Gothic Antique, one family for every role, self-hosted (latin slice) from
-  `src/app/fonts/` — Barlow Condensed + DM Sans until 2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md))
+- Fonts: Zen Kaku Gothic Antique for every role of the site's text, and Barlow Condensed for the
+  brand name alone, both self-hosted (latin slice) from `src/app/fonts/`. Barlow Condensed + DM
+  Sans set everything until 2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md));
+  the name kept its face by the owner's ruling ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md))
 - State: **none.** This said "Zustand (cart store)" until 2026-09-20; `src/store/` and the
   dependency both went with the bag. Nothing on this site holds client state across a
   navigation, which is a property worth keeping rather than an absence to fill.
@@ -71,21 +73,27 @@ option, because "unclassified" is how `--sage` shipped as 9–13px text at 1.97:
 - `--ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00)` (sharp snap)
 
 ### Typography
-One family sets every role, as one family sets Songmont's identity (`DESIGN.md`, "Reference:
-Songmont"). The three tokens stay separate because they name **roles**, and the case rule keys on
-the role:
+One family sets every role of the site's text. The three tokens stay separate because they name
+**roles**, and the case rule keys on the role:
 - `--font-display` → headings, product and collection names, collection numbers, the menu
   overlay's links. **Set in the case they are written in** (the catalogue writes Title Case),
   **at a declared weight**, tracked with `--tracking-display` / `--tracking-name`.
 - `--font-ui` → nav controls, eyebrows, buttons, badges, metadata, the logotype. Small, and the
   only role that may be set in tracked capitals.
 - `--font-body` → body text and descriptions.
+- `--font-brand` → **the brand name, and nothing else**: the logotype in the header and the
+  footer, in Barlow Condensed, the typography it had before the Songmont reference — 500 in the
+  header, 400 in the footer, in tracked capitals. The owner's ruling (2026-10-04,
+  [ADR 048](docs/adr/048-the-name-keeps-its-own-face.md)): Songmont is a reference for the site,
+  not a template for the brand. `typography-weights.test.ts` fails if any rule but
+  `.hj-lockup-text` uses it, and `e2e/glyph-coverage.spec.ts` if any other element renders in it.
 
 **Loaded weights — never request one that isn't here:**
 
 | Token | Font | Weights available |
 |-------|------|-------------------|
 | `--font-display` / `--font-ui` / `--font-body` | Zen Kaku Gothic Antique | **400, 500** |
+| `--font-brand` (the brand name only) | Barlow Condensed | **400, 500** |
 
 There is deliberately **no 300**. Weight numbers do not carry between families: measured as ink
 per unit of text, this family's 300 lays down about half of what the DM Sans 300 it replaced did,
@@ -117,8 +125,10 @@ homepage hero is the one exception, since it owns `--text-hero`.
 
 ### Architecture — quiet editorial, referenced to Songmont
 The design reference is Songmont (the owner's choice, 2026-10-04; it was Gentle Monster before).
-What was verified about it, what was adopted, and what was decided from the language without
-the live page (the owner's ruling, 2026-10-04) is in `DESIGN.md`, "Reference: Songmont" — read
+**A reference, not a template** (the owner's ruling, 2026-10-04): take what suits Healthy
+Jewellery and leave what does not; much of it would not. Its typeface is not studied further,
+and the brand name keeps its own. What was verified about it, what was adopted, and what was
+decided from the language without the live page is in `DESIGN.md`, "Reference: Songmont" — read
 that before changing a token, a section or a card.
 - Horizontal scroll strips on homepage (no product grids), each with a "View All" link
 - The Pampas ground (`--bg`) everywhere, with `--graphite` carrying secondary text in the
@@ -150,8 +160,8 @@ that before changing a token, a section or a card.
   (`.hj-header-center { min-width: 0 }`), the mark never does, and the name is shown whole or
   not at all: below 360px the name is not rendered and the knot mark stands alone, because a
   cut-off name reads as a fault. Measured 2026-10-04, the whole name keeps the controls' own 24px spacing from 353px
-  in Barlow Condensed; in the brand family the phone logotype is set at 13px, 0.08em to hold that,
-  and it fits from 357px (the spec bounds the gap to the breakpoint at 16px either way).
+  in Barlow Condensed — the face the name is set in (ADR 048) — at the header's own size, with no
+  phone-only override (the spec bounds the gap to the breakpoint at 16px either way).
   An unreachable control is a functional loss; a hidden name is not. This is why the 768px breakpoint
   is a *composition* choice rather than a correctness dependency: get it wrong and the layout
   degrades instead of amputating.
@@ -167,7 +177,12 @@ that before changing a token, a section or a card.
   `LEGAL_ENTITY_NAME` ("Healthy Jewelry") is the registered company on `/legal`, `/terms`,
   `/privacy`, `/shipping` and the footer's copyright line, and is counsel's to change (WS-H).
   `brand-name.test.ts` fails on a typed copy of either spelling anywhere else in rendered code.
-- The mark is `BRAND_MARK_PATH`, rendered by `BrandLockup.tsx` in the header and the footer.
+- The mark is rendered by `BrandLockup.tsx` in the header and the footer, from `BRAND_MARK_SRC`:
+  lossless PNG at 1x, 2x and 3x, served as they are. **Its background is transparent, exactly**
+  (the owner's instruction, ADR 048), which rules out the image optimiser: its lossy re-encode
+  left alpha where the mark is clear. The browser-tab icon is transparent too. The home-screen
+  icon and the search-engine logo stay on a `--black` tile because their platforms cannot show
+  transparency (iOS paints it black; Google lays the logo on white).
   Every served copy is derived from `assets/brand/knot-master.png` by
   `node scripts/build-brand-mark.mjs` — never exported from an image editor.
   `brand-mark-asset.test.ts` compares each copy with what the master derives, pixel for pixel,

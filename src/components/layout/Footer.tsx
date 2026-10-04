@@ -70,10 +70,11 @@ export function Footer() {
               variant="stacked"
               style={{
                 padding: '12px 0',
-                // A logotype, not a heading: set like the header's, as a --font-ui label in
-                // tracked capitals. --font-display is for text set in its own case.
-                fontFamily: 'var(--font-ui)',
-                fontWeight: 500,
+                // The name as the footer set it before the Songmont reference: 1.1rem, 0.12em,
+                // capitals, and 400 — the face it rendered at, since it declared no weight and
+                // the body's 300 fell to the nearest real one. Its face, Barlow Condensed, is set
+                // on the name itself by .hj-lockup-text in globals.css (ADR 048).
+                fontWeight: 400,
                 fontSize: '1.1rem',
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',

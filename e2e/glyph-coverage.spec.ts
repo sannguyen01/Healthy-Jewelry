@@ -18,10 +18,18 @@ import { describeWoff2, uncoveredCharacters } from '../src/lib/design/fontFile'
  * points at, leaves every page in the fallback and every check above still green, because the
  * characters are measured against the file rather than against the screen. So the second test
  * asks the browser which face it used for each role, and whether it loaded.
+ *
+ * The brand name is the one exception to "one face", by the owner's ruling (ADR 048): the
+ * logotype keeps Barlow Condensed, the typography it had before the Songmont reference. The
+ * third test holds that exception to exactly the logotype, in both of its places.
  */
 
 const COVERAGE = describeWoff2(
   readFileSync(join(__dirname, '../src/app/fonts/zen-kaku-gothic-antique-latin-400.woff2'))
+).codepoints
+
+const BRAND_COVERAGE = describeWoff2(
+  readFileSync(join(__dirname, '../src/app/fonts/barlow-condensed-latin-500.woff2'))
 ).codepoints
 
 /** Every page route, at one representative URL each. Literal, so spec-anchor-contract resolves them. */
@@ -98,5 +106,42 @@ test.describe('glyph coverage', () => {
     const weights = report.loaded.filter((face) => face.family === family).map((face) => face.weight)
     // The hero heading is 500 and everything else 400: both faces are in use above the fold.
     expect(weights.sort(), `faces loaded for ${family}: ${JSON.stringify(report.loaded)}`).toEqual(['400', '500'])
+  })
+
+  test('the brand name, and only the brand name, is set in its own face, and both weights loaded', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+    await page.evaluate(() => document.fonts.ready)
+    const report = await page.evaluate(() => {
+      const first = (el: Element) => getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/["']/g, '')
+      // next/font names the face after its loader (`barlowCondensed`), so the family is read from
+      // the variable the loader sets on <html> rather than spelled here.
+      const brandFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-bc').split(',')[0].trim().replace(/["']/g, '')
+      const names = [...document.querySelectorAll('header .hj-lockup-text, footer .hj-lockup-text')].map((el) => ({
+        family: first(el),
+        weight: getComputedStyle(el).fontWeight,
+        transform: getComputedStyle(el).textTransform,
+        text: (el as HTMLElement).innerText,
+      }))
+      // Everything else that draws text: no element outside the logotype may resolve to the
+      // brand face, or the exception has spread.
+      const elsewhere = [...document.querySelectorAll('body *')]
+        .filter((el) => !el.closest('.hj-lockup-text') && (el as HTMLElement).innerText?.trim())
+        .map(first)
+        .filter((family) => family === brandFamily).length
+      const loaded = [...document.fonts]
+        .filter((face) => face.status === 'loaded' && face.family.replace(/["']/g, '') === brandFamily)
+        .map((face) => face.weight)
+      return { brandFamily, names, elsewhere, loaded }
+    })
+
+    expect(report.brandFamily, 'the brand loader\'s family').toMatch(/barlow/i)
+    expect(report.names.map((n) => n.family), 'the header and footer logotypes').toEqual([report.brandFamily, report.brandFamily])
+    // As the name was set before the Songmont reference: 500 in the header, 400 in the footer.
+    expect(report.names.map((n) => n.weight)).toEqual(['500', '400'])
+    expect(report.names.map((n) => n.transform)).toEqual(['uppercase', 'uppercase'])
+    expect(report.elsewhere, 'elements outside the logotype rendering in the brand face').toBe(0)
+    expect(report.loaded.sort(), `${report.brandFamily} faces loaded`).toEqual(['400', '500'])
+    for (const { text } of report.names) expect(uncoveredCharacters(text, BRAND_COVERAGE), text).toEqual([])
   })
 })

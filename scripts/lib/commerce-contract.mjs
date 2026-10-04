@@ -94,6 +94,9 @@ const LANGUAGES = {
   example: 'hash',
   sh: 'hash',
   txt: 'all-prose',
+  // `.gitattributes` (ADR 046): `#` comments, and this repository's carries prose about why the
+  // lockfile is never text-merged. Scanned rather than excluded, so that prose is read too.
+  gitattributes: 'hash',
 }
 
 /** The language rule for a path, or `null` when nothing claims it. */

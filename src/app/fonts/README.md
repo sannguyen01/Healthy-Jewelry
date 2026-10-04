@@ -1,6 +1,7 @@
-# Brand typeface — Zen Kaku Gothic Antique, latin slice
+# Typefaces — Zen Kaku Gothic Antique for the site, Barlow Condensed for the name
 
-One family sets every role on the site (display, UI, body). It is chosen as the closest openly
+Two families, one job each. The brand name has its own (see the last section); one family sets
+every other role on the site (display, UI, body). It is chosen as the closest openly
 licensed relative of the FW Tsukiji Gothic family (方正FW筑紫黑) that Songmont's identity is set
 in — see `DESIGN.md`, "Reference: Songmont", for the evidence and what is still unverified.
 
@@ -51,3 +52,34 @@ browser quietly takes it from the fallback face, mid-line. So the set is enforce
 - `e2e/glyph-coverage.spec.ts` does the same for the text each route actually renders.
 
 To replace a file, update the table above in the same commit; the test compares them.
+
+## The brand name — Barlow Condensed, latin slice
+
+The logotype ("HEALTHY JEWELLERY" in the header and the footer) keeps the face it had before the
+Songmont reference. It is the owner's ruling (2026-10-04, [ADR 048](../../../docs/adr/048-the-name-keeps-its-own-face.md)):
+Songmont is a reference for the site, not a template for the brand. It is set as it was: 500 in the
+header, 400 in the footer, in tracked capitals. `--font-brand` names it, and
+`typography-weights.test.ts` fails if any rule but the logotype's uses it.
+
+| File | Weight | `OS/2` weight class | SHA-256 |
+|---|---|---|---|
+| `barlow-condensed-latin-400.woff2` | Regular | 400 | `7fff1bb22e5773f0d1a55d3093068b6dac4539e8bb3ac23fb9f0a729df2c7bb4` |
+| `barlow-condensed-latin-500.woff2` | Medium | 500 | `460f141ec8f6c9a1516bfd2bd9fe71656246d7a9d04a0955faf53158d8970c4c` |
+
+- **Source:** each file is the `/* latin */` `@font-face` source Google Fonts serves for
+  `https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500` (version `v13`, fetched
+  2026-10-04), byte for byte. It is the same family `next/font/google` served before 2026-10-04,
+  now self-hosted beside the site face.
+- **Designer:** Jeremy Tribby. Upstream: https://github.com/jpt/barlow
+- **Copyright**, as each file's own `name` table states it:
+
+  > Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+- **Licence:** SIL Open Font License 1.1, in `OFL-BarlowCondensed.txt` beside these files, copied
+  unmodified from `google/fonts/ofl/barlowcondensed/OFL.txt`. It declares no Reserved Font Name.
+- **Size:** 21.2 KB and 21.4 KB. The name renders above the fold in the header, so both are
+  preloaded with the site face.
+- **Coverage:** 227 characters per weight, every letter of the name in both cases.
+  `font-files.test.ts` checks this against `SITE_NAME`, and `e2e/glyph-coverage.spec.ts` checks it
+  against the rendered logotype. That spec also checks the face loaded and that no other element
+  renders in it.
+

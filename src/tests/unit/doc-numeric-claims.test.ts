@@ -269,18 +269,6 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     actual: () => `${nameShownFromPx(read('src/app/globals.css'))}px`,
   },
   {
-    // The phone logotype size the header fit depends on; globals.css states it in rem.
-    doc: 'CLAUDE.md',
-    context: 'phone logotype is set at 13px',
-    claimed: '13px',
-    actual: () => {
-      const rem = read('src/app/globals.css').match(
-        /@media \(max-width: 768px\)\s*\{[^@]*?\.hj-lockup\[data-variant="inline"\] \.hj-lockup-text\s*\{\s*font-size:\s*([\d.]+)rem/
-      )?.[1]
-      return rem === undefined ? 'missing' : `${Number(rem) * 16}px`
-    },
-  },
-  {
     // The headroom bound header-fit.spec.ts enforces in both directions.
     doc: 'CLAUDE.md',
     context: 'breakpoint at 16px either way',
@@ -373,7 +361,6 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   // Measured by header-fit.spec.ts on the build that introduced the lockup; the live figure is
   // its `brand lockup` annotation, printed on every run.
   { doc: 'CLAUDE.md', context: 'Measured 2026-10-04, the whole name keeps' },
-  { doc: 'CLAUDE.md', context: 'and it fits from 357px' },
   { doc: 'CLAUDE.md', context: "button off-screen at 320px" },
   { doc: 'CLAUDE.md', context: 'sweeps 320–1440px' },
   { doc: 'CLAUDE.md', context: '**≥901px**' },

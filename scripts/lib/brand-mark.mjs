@@ -33,19 +33,34 @@ import pngjs from 'pngjs'
  * @property {Uint8Array} data   RGBA, row-major, straight (non-premultiplied) alpha
  */
 
-/** `--black`, the campaign-band dark. The icon tile, chosen rather than inherited: iOS fills a
- *  transparent apple-touch-icon with black anyway, and a bare silver knot is near-invisible on
- *  a light browser tab strip at 16px. */
+/** `--black`, the campaign-band dark: the ground for the two copies whose platform cannot show
+ *  transparency as transparency. iOS ignores an apple-touch-icon's alpha and paints every clear
+ *  pixel black, so that icon is flattened onto a ground chosen here rather than one iOS picks.
+ *  Google requires the Organization logo to look as intended on pure white, and names a grey
+ *  logo as the case that does not. The browser-tab icon has neither constraint and is
+ *  transparent (the owner's ruling, 2026-10-04; ADR 048). */
 export const TILE_RGB = /** @type {const} */ ([0x0a, 0x0a, 0x0a])
 
 /** Every derivative, its size, and how far the knot sits in from the tile edge (0 = no tile). */
 export const DERIVATIVES = /** @type {const} */ ({
   mark: { path: 'public/brand/knot-silver.png', size: 512, tile: false, inset: 0 },
-  icon: { path: 'src/app/icon.png', size: 32, tile: true, inset: 3 },
+  // The browser-tab icon: the transparent mark itself, cropped to the artwork like `mark`.
+  icon: { path: 'src/app/icon.png', size: 32, tile: false, inset: 0 },
   apple: { path: 'src/app/apple-icon.png', size: 180, tile: true, inset: 25 },
   // What search engines show as the Organization logo. They lay it on white, where the bare
   // silver mark is a pale smudge, so it sits on the same tile as the icons.
   logo: { path: 'public/brand/knot-tile.png', size: 512, tile: true, inset: 72 },
+  // What the header (inline) and footer (stacked) render: lossless PNG at 1x, 2x and 3x of each
+  // variant's largest CSS size, served as they are rather than through the image optimiser.
+  // The optimiser re-encodes lossily, and lossy alpha is not transparent: its AVIF gave half the
+  // pixels that should be clear an alpha of up to 19/255, a faint haze round the knot, and only
+  // the order of `images.formats` in next.config.ts kept browsers on WebP (ADR 048).
+  inline1x: { path: 'public/brand/knot-30.png', size: 30, tile: false, inset: 0 },
+  inline2x: { path: 'public/brand/knot-60.png', size: 60, tile: false, inset: 0 },
+  inline3x: { path: 'public/brand/knot-90.png', size: 90, tile: false, inset: 0 },
+  stacked1x: { path: 'public/brand/knot-44.png', size: 44, tile: false, inset: 0 },
+  stacked2x: { path: 'public/brand/knot-88.png', size: 88, tile: false, inset: 0 },
+  stacked3x: { path: 'public/brand/knot-132.png', size: 132, tile: false, inset: 0 },
 })
 
 export const MASTER_PATH = 'assets/brand/knot-master.png'
@@ -251,12 +266,13 @@ export function onTile(square, size, inset, tile = TILE_RGB) {
  */
 export function deriveAll(master) {
   const square = premultiply(trimToSquare(decontaminate(master)))
-  return {
-    mark: downscale(square, DERIVATIVES.mark.size),
-    icon: onTile(square, DERIVATIVES.icon.size, DERIVATIVES.icon.inset),
-    apple: onTile(square, DERIVATIVES.apple.size, DERIVATIVES.apple.inset),
-    logo: onTile(square, DERIVATIVES.logo.size, DERIVATIVES.logo.inset),
+  const out = /** @type {Record<keyof typeof DERIVATIVES, RgbaImage>} */ ({})
+  for (const [name, spec] of Object.entries(DERIVATIVES)) {
+    out[/** @type {keyof typeof DERIVATIVES} */ (name)] = spec.tile
+      ? onTile(square, spec.size, spec.inset)
+      : downscale(square, spec.size)
   }
+  return out
 }
 
 /**

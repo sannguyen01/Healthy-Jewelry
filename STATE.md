@@ -90,6 +90,24 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
   `SHOPIFY_WEBHOOK_SECRET` are unset, all known items below. The dashboard says Node `24.x`, but
   `engines.node` (`22.x`) overrides it on Vercel (per its documentation), matching CI.
 
+**Then: three owner rulings** (ADR 048).
+- **"The background of the logo is transparent."** Two parts were already transparent: the mark
+  in the header and footer, and its file. Three things were not:
+  - the tab icon, the home-screen icon and the search logo were black tiles;
+  - the image optimiser's AVIF left alpha up to 19/255 where the mark is clear. Browsers got
+    WebP only because of the order of `images.formats`.
+
+  Now the tab icon is the bare mark, and the lockup serves lossless PNGs (1x/2x/3x) directly. In
+  the browser, on the production build: mark corners α=0, and 0–2 levels between the mark's box
+  and its surroundings. The home-screen icon and the search logo keep the tile, because iOS
+  paints clear pixels black and Google lays logos on white.
+- **"Not everything from Songmont; no need to study its typeface."** It is a reference, not a
+  template. DESIGN.md and CLAUDE.md say so, and no further typeface research is open.
+- **"The original typography for the brand name."** The logotype is Barlow Condensed again: 500 in
+  the header and 400 in the footer, in tracked capitals, as on `main` before the Songmont pass.
+  It is self-hosted, and `--font-brand` is bounded to the logotype by test. Header fit: the name
+  fits from 353px, which is the original figure.
+
 ### Still blocked, and on what
 
 - **PR #101 (owner):** close it as superseded by #103. Keeping it means:
@@ -103,6 +121,16 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
   read fine. Re-authorise the Vercel connection for that team so runtime errors can be read.
 - **Observation pending:** how GitHub's conflict editor and "Update branch" present a conflict on a
   `merge=binary` path. Record it on the first lockfile conflict after #104 merges.
+- **Tab icon legibility (owner's call).** The transparent knot reads at a median 5.6–7.4:1 on dark
+  tab strips but 1.45–1.80:1 on light ones. If that matters, the remedy that keeps the background
+  transparent is an SVG icon whose knot darkens in light mode. It changes the knot's colour, so it
+  has not been done.
+- **E2E timing under parallel load, seen once each:**
+  - `header-fit`'s mobile lockup sweep hit its 90s limit; it runs in 10–12s alone, and passed 3 of 3.
+  - `visual-assets` measured the hero photograph mid-fade at opacity 0; it passed 3 of 3 alone.
+
+  Both were seen locally while two specs ran together, not in CI. They are recorded so a recurrence
+  reads as a pattern (ADR 011).
 - **Vercel project settings (owner, cosmetic):** Node.js Version reads `24.x`; set it to `22.x` to
   match `engines`, or move both to 24 together before Node 22 leaves maintenance (2027-04-30).
 

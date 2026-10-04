@@ -6,8 +6,9 @@ import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
 /**
- * One family for every role — display, UI and body — because Songmont's identity sets
- * everything in one: the FW Tsukiji Gothic family (DESIGN.md, "Reference: Songmont"). Zen Kaku
+ * One family for every role — display, UI and body — except the brand's own name, which keeps
+ * its original face (`barlowCondensed`, below). Songmont's identity sets everything in
+ * one family, the FW Tsukiji Gothic family (DESIGN.md, "Reference: Songmont"). Zen Kaku
  * Gothic Antique is its closest openly licensed relative, an antique gothic with the same
  * classical, brush-softened strokes.
  *
@@ -29,6 +30,27 @@ const zenKakuGothicAntique = localFont({
   display: 'swap',
   variable: '--font-zk',
   fallback: ['Helvetica Neue', 'Arial', 'sans-serif'],
+})
+
+/**
+ * **The brand name keeps the typography it was given before the Songmont reference.** It is the
+ * owner's ruling (2026-10-04, ADR 048), not a lapse in "one family": Songmont is a reference
+ * for the site, not a template for the brand, and the logotype is the brand. Barlow Condensed
+ * sets the name as it did before: 500 in the header, 400 in the footer, in tracked capitals.
+ *
+ * Used by `--font-brand` and nothing else: `typography-weights.test.ts` fails if the token
+ * reaches any rule but the logotype's, so the second family cannot spread back into the
+ * site's text. Self-hosted latin slice for the same reasons as the family above; provenance,
+ * licence and hashes in `src/app/fonts/README.md`.
+ */
+const barlowCondensed = localFont({
+  src: [
+    { path: './fonts/barlow-condensed-latin-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-500.woff2', weight: '500', style: 'normal' },
+  ],
+  display: 'swap',
+  variable: '--font-bc',
+  fallback: ['Arial Narrow', 'Helvetica Neue', 'Arial', 'sans-serif'],
 })
 
 /**
@@ -113,12 +135,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={zenKakuGothicAntique.variable}
+      className={`${zenKakuGothicAntique.variable} ${barlowCondensed.variable}`}
       style={
         {
           '--font-display': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
           '--font-ui': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
           '--font-body': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
+          '--font-brand': 'var(--font-bc, "Barlow Condensed", "Arial Narrow", sans-serif)',
         } as React.CSSProperties
       }
     >

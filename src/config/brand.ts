@@ -24,15 +24,27 @@ export const SITE_NAME = 'Healthy Jewellery'
 export const LEGAL_ENTITY_NAME = 'Healthy Jewelry'
 
 /**
- * The knot mark every page renders, served from `public/`. Derived — never hand-exported —
- * from `assets/brand/knot-master.png` by `scripts/build-brand-mark.mjs`, which removes the
- * black matte the master's edges were keyed out of. See docs/adr/041.
+ * The knot mark at full size: the canonical transparent copy, served from `public/`. Derived —
+ * never hand-exported — from `assets/brand/knot-master.png` by `scripts/build-brand-mark.mjs`,
+ * which removes the black matte the master's edges were keyed out of. See docs/adr/041.
  */
 export const BRAND_MARK_PATH = '/brand/knot-silver.png'
 
 /**
- * The logo search engines show. They lay it on white, where the transparent silver mark is a
- * pale smudge (the reason the browser icons sit on a tile), so this is the same knot on the
- * `--black` tile, from the same derivation.
+ * What the lockup renders, at 1x, 2x and 3x of each variant's largest CSS size. Lossless PNG,
+ * served as is: the image optimiser's lossy re-encode left alpha where the mark is clear (up to
+ * 19/255 in AVIF), so these copies bypass it and are transparent exactly where the master is
+ * (ADR 048). Same derivation as the mark above.
+ */
+export const BRAND_MARK_SRC = {
+  inline: ['/brand/knot-30.png', '/brand/knot-60.png', '/brand/knot-90.png'],
+  stacked: ['/brand/knot-44.png', '/brand/knot-88.png', '/brand/knot-132.png'],
+} as const
+
+/**
+ * The logo search engines show. Google requires it to look as intended on a pure white
+ * background and names a grey logo as the case that does not, so this one copy keeps the
+ * knot on the `--black` tile, from the same derivation. Every copy a visitor sees on the site
+ * or in a browser tab is transparent (ADR 048).
  */
 export const BRAND_LOGO_PATH = '/brand/knot-tile.png'

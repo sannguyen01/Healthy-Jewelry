@@ -3,6 +3,8 @@
 **Date**: 2026-10-04
 **Status**: Accepted. The reference (Songmont) is the owner's choice of 2026-10-04; the face, the
 case rule and the phone logotype size are engineering decisions taken against it, each enforced.
+**Amended by [ADR 048](048-the-name-keeps-its-own-face.md):** the brand name keeps its original face (so the
+phone logotype size no longer applies), and Songmont's typeface is not studied further.
 
 ## Context
 

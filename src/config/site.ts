@@ -3,7 +3,7 @@
 import { LEGAL_ENTITY_NAME, SITE_NAME } from './brand'
 
 // The name and the marks live in a dependency-free module; see the note at the top of brand.ts.
-export { SITE_NAME, LEGAL_ENTITY_NAME, BRAND_MARK_PATH, BRAND_LOGO_PATH } from './brand'
+export { SITE_NAME, LEGAL_ENTITY_NAME, BRAND_MARK_PATH, BRAND_MARK_SRC, BRAND_LOGO_PATH } from './brand'
 
 /**
  * `||`, not `??`.

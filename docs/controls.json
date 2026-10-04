@@ -245,7 +245,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 53 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 55 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -567,6 +567,7 @@
     "protects. A decision is reasoning that is wrong out loud when violated."
   ],
   "decisionAdrs": {
+    "docs/adr/048-the-name-keeps-its-own-face.md": "The owner's rulings of 2026-10-04: the logo's background transparent wherever a platform can show it, Songmont a reference rather than a template, and the brand name in its original face. Decisions whose mechanisms are tests, not controls: brand-mark-asset (files), visual-assets (decoded bytes), typography-weights (the brand token bounded to the logotype), font-files and glyph-coverage.",
     "docs/adr/046-a-resolved-conflict-is-a-write-nobody-reviewed.md": "Records the second lockfile incident (PR #101, ed7594a, 2026-10-03: all 22 conflict hunks resolved by keeping both sides) and corrects ADR 031's account of the first, which replays as a 7-hunk conflict rather than a clean merge. Its decisions are mechanisms already classified elsewhere: the lockfile half of the manifest-integrity control (whose `adr` remains ADR 031) and `.gitattributes`, whose behaviour that control's test asserts by a real merge.",
     "docs/adr/037-a-reconciliation-at-the-wrong-grain.md": "A rule about the grain at which a reconciliation compares: a table parsed and reduced to a key before comparing has thrown away the columns it was meant to check. Its mechanism is the commerce-elimination-boundary control, which ADR 036 already classifies; this records why that control compares identifier sets rather than paths, and why a lexer that hides findings is erring in the unsafe direction.",
     "docs/adr/001-two-webhook-secrets.md": "Records which of two secrets Shopify signs with. A fact about an external system, not a mechanism that can go missing.",

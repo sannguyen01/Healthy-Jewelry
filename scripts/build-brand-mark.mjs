@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Healthy Jewellery — derive every served copy of the knot mark from the master.
 //
-//   node scripts/build-brand-mark.mjs           write the served mark, the tiled logo and the icons
+//   node scripts/build-brand-mark.mjs           write the served mark, the tab icon, the tiled logo and the home-screen icon
 //   node scripts/build-brand-mark.mjs --check   exit 1 if any committed copy differs from what
 //                                                the master derives, pixel for pixel
 //

@@ -212,6 +212,45 @@ test.describe('Homepage visual assets', () => {
     }
   })
 
+  test('the knot mark the browser draws has a transparent background, exactly', async ({ page }) => {
+    // The owner's instruction (ADR 048). Read from the bytes the browser chose and decoded,
+    // not from the file in the repository: the image optimiser re-encodes lossily, and its AVIF
+    // left alpha up to 19/255 where the mark is clear. So the mark must arrive as one of the
+    // lossless copies, and every pixel the lossless copy leaves clear must decode as clear.
+    await page.goto('/')
+    // The footer's copy is lazy: it is not fetched, and `decode()` never settles, until it is near.
+    await page.locator('footer img[data-brand-mark]').scrollIntoViewIfNeeded()
+    const report = await page.evaluate(async () => {
+      const out = []
+      for (const img of document.querySelectorAll<HTMLImageElement>('img[data-brand-mark]')) {
+        await img.decode()
+        const res = await fetch(img.currentSrc)
+        const bmp = await createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
+        const canvas = new OffscreenCanvas(bmp.width, bmp.height)
+        const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D
+        ctx.drawImage(bmp, 0, 0)
+        const alpha = ctx.getImageData(0, 0, bmp.width, bmp.height).data.filter((_, i) => i % 4 === 3)
+        const at = (x: number, y: number) => alpha[y * bmp.width + x]
+        const last = bmp.width - 1
+        out.push({
+          where: img.closest('header') ? 'header' : 'footer',
+          src: new URL(img.currentSrc).pathname,
+          type: res.headers.get('content-type'),
+          corners: [at(0, 0), at(last, 0), at(0, last), at(last, last)],
+          clearShare: alpha.filter((a) => a === 0).length / alpha.length,
+        })
+      }
+      return out
+    })
+    expect(report.map((r) => r.where).sort()).toEqual(['footer', 'header'])
+    for (const mark of report) {
+      expect(mark.src, `${mark.where}: served through the lossy optimiser`).toMatch(/^\/brand\/knot-\d+\.png$/)
+      expect(mark.type, mark.where).toBe('image/png')
+      expect(mark.corners, `${mark.where}: corners`).toEqual([0, 0, 0, 0])
+      expect(mark.clearShare, `${mark.where}: share of fully clear pixels`).toBeGreaterThan(0.3)
+    }
+  })
+
   test('collection placeholder tiles are legible, not ghosts', async ({ page }) => {
     const { placeholderTiles } = await probeHomepage(page)
     // Collections without photography still have to read as artwork.
