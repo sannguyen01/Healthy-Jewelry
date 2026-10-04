@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import { useScrolled } from '@/lib/hooks/useScrolled'
+import { mainNav } from '@/config/navigation'
 
 export function Nav() {
   const router = useRouter()
@@ -11,66 +12,70 @@ export function Nav() {
   const scrolled = useScrolled(60)
   const drawerRef = useRef<HTMLDivElement>(null)
   const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+
+  // Closing by activating a drawer control would otherwise leave focus on an element that has
+  // just become inert, which drops it to <body>. Hand it to the menu button first.
+  const closeMenu = () => {
+    setMenuOpen(false)
+    menuBtnRef.current?.focus()
+  }
 
   const state = menuOpen ? 'menu-open' : scrolled ? 'solid' : 'hero-overlay'
 
-  // Focus management
+  // Focus management. While the drawer is open the Tab cycle is every control in the header
+  // (the menu button is the visible close control and lives outside the drawer element) followed
+  // by the drawer's own controls, in DOM order.
   useEffect(() => {
-    if (menuOpen) {
-      const drawer = drawerRef.current
-      if (!drawer) return
+    if (!menuOpen) return
+    const drawer = drawerRef.current
+    const menuBtn = menuBtnRef.current
+    const header = headerRef.current
+    if (!drawer || !menuBtn || !header) return
 
-      const focusableElements = drawer.querySelectorAll<HTMLElement>(
-        'a[href], button, textarea, input[type="text"], input[type="radio"], input[type="checkbox"], select'
-      )
-      const firstElement = focusableElements[0]
-      const lastElement = focusableElements[focusableElements.length - 1]
+    const cycle = (): HTMLElement[] => [
+      ...Array.from(header.querySelectorAll<HTMLElement>('a[href], button')),
+      ...Array.from(drawer.querySelectorAll<HTMLElement>('a[href], button')),
+    ]
 
-      if (firstElement) {
-        setTimeout(() => firstElement.focus(), 50)
+    const focusTimer = window.setTimeout(
+      () => drawer.querySelector<HTMLElement>('a[href]')?.focus(),
+      50
+    )
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        menuBtn.focus()
+        return
       }
-
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          setMenuOpen(false)
-          menuBtnRef.current?.focus()
-        }
-        if (e.key === 'Tab') {
-          if (e.shiftKey) {
-            if (document.activeElement === firstElement) {
-              e.preventDefault()
-              lastElement?.focus()
-            }
-          } else {
-            if (document.activeElement === lastElement) {
-              e.preventDefault()
-              firstElement?.focus()
-            }
-          }
-        }
+      if (e.key !== 'Tab') return
+      const items = cycle()
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
       }
+    }
 
-      document.addEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = 'hidden'
-      
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown)
-        document.body.style.overflow = ''
-      }
+    document.addEventListener('keydown', handleKeyDown)
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      window.clearTimeout(focusTimer)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
     }
   }, [menuOpen])
 
-  const menuItems = [
-    { label: 'Pieces', href: '/shop' },
-    { label: 'Our metals', href: '/materials' },
-    { label: 'Our story', href: '/about' },
-    { label: 'Find us', href: '/stores' },
-    { label: 'Contact', href: '/contact' },
-  ]
-
   return (
     <>
-      <header className="hj-header" data-state={state}>
+      <header ref={headerRef} className="hj-header" data-state={state}>
         {/* Left: Menu control */}
         <div className="hj-header-left">
           <button
@@ -86,7 +91,7 @@ export function Nav() {
 
         {/* Center: Genuinely centered wordmark */}
         <div className="hj-header-center">
-          <Link href="/" aria-label="Healthy Jewelry — home" className="hj-wordmark" onClick={() => setMenuOpen(false)}>
+          <Link href="/" aria-label="Healthy Jewelry — home" className="hj-wordmark" onClick={closeMenu}>
             HEALTHY JEWELLERY
           </Link>
         </div>
@@ -96,7 +101,7 @@ export function Nav() {
           <button
             aria-label="Search"
             onClick={() => {
-              setMenuOpen(false)
+              closeMenu()
               router.push('/search')
             }}
             className="hj-icon-btn"
@@ -109,7 +114,7 @@ export function Nav() {
           </button>
           <Link
             href="/contact"
-            onClick={() => setMenuOpen(false)}
+            onClick={closeMenu}
             className="hj-icon-btn hj-desktop-text"
           >
             CONTACT
@@ -125,19 +130,30 @@ export function Nav() {
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation"
+        aria-hidden={!menuOpen}
+        inert={!menuOpen}
       >
         <div className="hj-menu-drawer-inner">
-          {menuItems.map((item) => (
+          {mainNav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setMenuOpen(false)}
+              onClick={closeMenu}
               className="hj-menu-link"
-              tabIndex={menuOpen ? 0 : -1}
             >
               {item.label}
             </Link>
           ))}
+          <button
+            type="button"
+            className="hj-menu-link hj-menu-search"
+            onClick={() => {
+              closeMenu()
+              router.push('/search')
+            }}
+          >
+            Search
+          </button>
         </div>
       </div>
     </>

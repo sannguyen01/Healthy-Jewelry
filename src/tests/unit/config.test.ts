@@ -26,8 +26,8 @@ import {
 // ── navigation.ts ──────────────────────────────────────────────────────────
 
 describe('mainNav', () => {
-  it('has 3 links', () => {
-    expect(mainNav).toHaveLength(3)
+  it('has 5 links', () => {
+    expect(mainNav).toHaveLength(5)
   })
   it('all links have label and href', () => {
     mainNav.forEach((link) => {

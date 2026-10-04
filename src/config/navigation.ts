@@ -18,8 +18,10 @@ export interface CollectionNav {
 // ── Main navigation ────────────────────────────────────────────────────────
 
 export const mainNav: NavLink[] = [
-  { label: 'Collection', href: '/shop' },
-  { label: 'Our Story', href: '/about' },
+  { label: 'Pieces', href: '/shop' },
+  { label: 'Our metals', href: '/materials' },
+  { label: 'Our story', href: '/about' },
+  { label: 'Find us', href: '/stores' },
   { label: 'Contact', href: '/contact' },
 ]
 
