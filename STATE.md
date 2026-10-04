@@ -36,6 +36,18 @@ Every test passed, because no test asked whether a mark was *there*.
   and `--graphite` carries secondary text in its dark-grey role. `DESIGN.md`, "Reference:
   Songmont", records what was verified, from which secondary source, and what was not adopted.
 
+**Later still: the typeface** (ADR 043). Songmont's identity is one family (FW Tsukiji Gothic, per
+Founder Type's case page) and names its pieces in Title Case. The site now sets every role in Zen
+Kaku Gothic Antique — its closest OFL relative — self-hosted as the 9.6 KB latin slice per weight,
+and headings and names render in the case the catalogue writes them. The switch surfaced three
+things the old faces had hidden, each now a rule:
+- 27 headings inherited the body's 300 and had rendered at 400 only because Barlow had no 300 face.
+  Written out as 400; `typography-weights` fails a display style that inherits its weight.
+- "View All →" and "Shop →" used a glyph the slice does not have. Arrows removed;
+  `e2e/glyph-coverage.spec.ts` holds every route's text to the font's own `cmap`.
+- The wider name needed 397px to clear the header controls. The phone logotype is 13px/0.08em,
+  measured to fit from 357px against the 360px breakpoint.
+
 ### Still blocked, and on what
 
 - **Counsel (WS-H):** is the registered company "Healthy Jewelry" or "Healthy Jewellery"? Until
@@ -47,11 +59,13 @@ Every test passed, because no test asked whether a mark was *there*.
   first paint is fixed: the root `loading.tsx` is gone — see below.)
 - **W6, W7:** contact delivery evidence and the production admission read-back need the owner's
   accounts; unchanged from 2026-10-03.
-- **Owner, for the Songmont pass:** this environment's network policy denies
-  `songmontofficial.com` (and every mirror tried). Allow it in the cloud environment's network
-  settings, or share screenshots of its homepage, a collection page and a product page at
-  desktop and phone width, so typefaces, header composition and image crops can be matched
-  against the real site rather than secondary descriptions.
+- **Owner, for the rest of the Songmont pass:** the typeface and case are matched from verified
+  sources; **header proportions and image crops are not**, and cannot be from here — the network
+  policy denies `songmontofficial.com`, `shop.app`, `behance.net` and `foundertype.com` (rechecked
+  2026-10-04, after the typeface work). Allow `songmontofficial.com` in the cloud environment's
+  network settings, or share screenshots of its homepage, a collection page and a product page at
+  desktop and phone width. Until then the 1:1 product crop and the current header stand, and
+  `DESIGN.md` says so rather than claiming a match.
 - **Local-only, recorded so it is not rediscovered:** with this container's Chromium (1194, older
   than the one Playwright 1.63 pins), `layout-invariants` "visible focus indicators" reads a 0px
   outline on product-card links at the instant of focus — reduced motion's 0.01ms transitions on

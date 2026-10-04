@@ -26,6 +26,8 @@ denies songmontofficial.com and every mirror tried — so each row names its sec
 | Homepage modules | A hero with "Shop Now"; a "Bestsellers" row with "View all"; "Explore" | The homepage, as indexed by search |
 | Merchandising | New Arrivals, Bestsellers, named collections, categories; founder-story and design-philosophy pages | The site's own collection and blog URLs |
 | Voice | Short product narratives drawn from nature | The site's product pages |
+| Typeface | One family for the whole identity: the FW Tsukiji Gothic family (方正FW筑紫黑家族), applied by Studio DPi for the brand's tenth anniversary | Founder Type's case page "Studio DPi & Songmont丨山下有松 Songmont 十周年", as indexed by search |
+| Case | Pieces named in Title Case: "Medium Gather Bag", "Small Gather Bag", "Medium Shan Messenger Bag"; "View all" with no arrow | The site's product pages and homepage, as indexed by search |
 
 ### What this site takes from it
 
@@ -36,6 +38,8 @@ denies songmontofficial.com and every mirror tried — so each row names its sec
 | Near-black for headings and the name | `--ink`, warm — never pure black | same |
 | Hero, then a product row with "View all", then collections, then the story | The homepage beats ([ADR 040](docs/adr/040-seven-beats-one-strip.md)) | `src/tests/unit/homepage-composition-contract.test.ts` |
 | Restraint on product imagery | Cards carry an image, a name and a material — nothing laid over the piece | `e2e/layout-invariants.spec.ts` |
+| One typeface family for every role | Zen Kaku Gothic Antique — the closest openly licensed relative of Tsukiji Gothic — for display, UI and body, self-hosted ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md)) | `src/tests/unit/typography-weights.test.ts`, `src/tests/unit/font-files.test.ts`, `e2e/glyph-coverage.spec.ts` |
+| Names in the case they are written in | Headings, product and collection names are never forced to capitals; only small labels are | `src/tests/unit/typography-weights.test.ts` |
 
 ### What it deliberately does not take
 
@@ -45,15 +49,23 @@ denies songmontofficial.com and every mirror tried — so each row names its sec
   rules out, and it would collect personal data with no system to hold it.
 - **Nature-drawn product narratives.** Copy about the metals runs through the claims registry;
   a poetic sentence about a material is a claim waiting to be made.
+- **Tsukiji Gothic itself.** It is a commercial Fontworks/Founder face with no web licence here;
+  the Latin glyphs of its antique variant are also its weakest part. The adopted family shares
+  its antique-gothic lineage and is SIL OFL.
 
 ### Not verified yet: needs the live site
 
-- The typefaces, their case and their tracking.
-- The header's composition, and the homepage's order and proportions beyond the modules above.
-- Image crops, backgrounds and aspect ratios on product cards and campaign imagery.
+- **The English site's own web font, sizes and tracking.** The identity's typeface is verified;
+  which face the US storefront serves for Latin text, and at what sizes, is not.
+- **The header's composition and the homepage's proportions** beyond the modules above.
+- **Image crops, backgrounds and aspect ratios** on product cards and campaign imagery. The one
+  thing known is the photographic direction — pieces worn with cream, beige and tan linen against
+  soft, blurred grounds — which describes photography this site does not yet have, not a crop.
 
-Until those are seen, Barlow Condensed and DM Sans, the header below and square product crops
-stand. This list is the next step, not a judgement that they already match.
+Each needs the page itself: songmontofficial.com, shop.app, Behance and Founder Type all sit
+behind the build environment's network policy (checked again 2026-10-04). Until they are seen,
+the header below, the 1:1 product crop (`--ratio-product`) and the hero photograph stand. This
+list is the next step, not a judgement that they already match.
 
 ## Surface and colour
 
@@ -68,8 +80,19 @@ stand. This list is the next step, not a judgement that they already match.
 
 ## Type
 
-- Barlow Condensed for display, DM Sans for UI and body, in the loaded weights only. Enforced by
-  `src/tests/unit/typography-weights.test.ts`.
+- **One family, three weights.** Zen Kaku Gothic Antique at 300, 400 and 500 sets every role;
+  `--font-display`, `--font-ui` and `--font-body` remain separate tokens because they name roles.
+  Only weights the loader ships are asked for. Enforced by `src/tests/unit/typography-weights.test.ts`.
+- **The files are what the loader says they are.** Each file's own `OS/2` weight class matches the
+  weight `layout.tsx` declares, under the licence shipped beside it, with the SHA-256 its README
+  records. Enforced by `src/tests/unit/font-files.test.ts`.
+- **Only characters the face draws.** The site ships the latin slice (219 characters); anything
+  outside it renders in the fallback face mid-line. Enforced over the content by
+  `src/tests/unit/font-files.test.ts` and over every route's rendered text by
+  `e2e/glyph-coverage.spec.ts`, which also checks that the face loaded and every role uses it.
+- **Headings and names are set in the case they are written in, at a declared weight.** Capitals
+  belong to small `--font-ui` labels — eyebrows, buttons, badges, the logotype. A `--font-display`
+  style never inherits its weight. Both enforced by `src/tests/unit/typography-weights.test.ts`.
 - Page titles go through `PageHeader`. See `CLAUDE.md`, Typography.
 
 ## The header and the footer

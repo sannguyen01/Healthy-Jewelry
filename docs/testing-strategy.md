@@ -542,6 +542,16 @@ the tiles that started this whole effort were present, requested successfully, a
 that the bytes arrive (`naturalWidth > 0`), that the element occupies space, and that the **effective**
 opacity — the product of the element's own and every ancestor's — clears the legibility floor.
 
+### …and a typeface is a file, not a name
+
+A `font-family` declaration says which face to *ask* for. What renders depends on the file: which
+weights it really is, which characters it draws, whether it arrived. All three fail silently — a
+missing weight is synthesised or rounded, a missing glyph comes from the fallback face, a missing
+file leaves the fallback everywhere. So `font-files.test.ts` reads each shipped file's own tables
+(`src/lib/design/fontFile.ts`), and `e2e/glyph-coverage.spec.ts` holds the rendered text of every
+route to them and asks the browser which face each role used. See
+[ADR 043](adr/043-one-family-and-the-case-it-is-written-in.md).
+
 ### …and visibility is not legibility
 
 `visual-assets.spec.ts` then passed on a mobile homepage where the hero showed only a rock wall with

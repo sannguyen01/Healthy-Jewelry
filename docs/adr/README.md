@@ -62,6 +62,7 @@ pointer; the reasoning lives here once.
 | [040](040-seven-beats-one-strip.md) | Seven beats, one strip | The redesign dropped the campaign band and two strips without a record; seven beats kept provisionally, the dark interruption moves to CareSection beside Materials, and the unit contract, e2e spec and CLAUDE.md are pinned to one sequence |
 | [041](041-a-transparent-logo-is-a-measurement.md) | A transparent logo is a measurement | The logo was in neither header nor footer, its "transparent" edges carried a black matte, and the brand was spelled two ways on one page; spans `scripts/build-brand-mark.mjs`, `BrandLockup.tsx`, `src/config/site.ts`, two unit specs and `header-fit`/`visual-assets` |
 | [042](042-a-page-measured-before-it-arrived.md) | A page measured before it arrived | Header probes measured a hidden streamed copy of the page and passed vacuously, about one cold load in forty; spans `e2e/support/viewportFit.ts` and `header-fit.spec.ts` |
+| [043](043-one-family-and-the-case-it-is-written-in.md) | One family, and the case it is written in | Songmont's identity is one typeface family and names its pieces in Title Case; the site moves to one self-hosted family whose files are read rather than trusted, headings stop forcing capitals, and three dependencies the old faces hid (inherited weights, glyph coverage, header fit) become rules; spans `layout.tsx`, `src/app/fonts/`, `fontFile.ts`, `typography-weights`, `font-files` and `glyph-coverage` |
 
 ## Format
 

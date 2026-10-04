@@ -20,7 +20,8 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 ## Tech Stack
 - Framework: Next.js 16, App Router, TypeScript (strict mode)
 - Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`)
-- Fonts: Barlow Condensed (display) + DM Sans (UI + body)
+- Fonts: Zen Kaku Gothic Antique, one family for every role, self-hosted (latin slice) from
+  `src/app/fonts/` — Barlow Condensed + DM Sans until 2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md))
 - State: **none.** This said "Zustand (cart store)" until 2026-09-20; `src/store/` and the
   dependency both went with the bag. Nothing on this site holds client state across a
   navigation, which is a property worth keeping rather than an absence to fill.
@@ -70,23 +71,39 @@ option, because "unclassified" is how `--sage` shipped as 9–13px text at 1.97:
 - `--ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00)` (sharp snap)
 
 ### Typography
-- `--font-display` → Barlow Condensed (section labels, CTAs, product names, collection numbers, nav)
-- `--font-ui` → DM Sans (nav links, metadata, labels, eyebrows, utility)
-- `--font-body` → DM Sans (body text, prices, descriptions)
+One family sets every role, as one family sets Songmont's identity (`DESIGN.md`, "Reference:
+Songmont"). The three tokens stay separate because they name **roles**, and the case rule keys on
+the role:
+- `--font-display` → headings, product and collection names, collection numbers, the menu
+  overlay's links. **Set in the case they are written in** (the catalogue writes Title Case),
+  **at a declared weight**, tracked with `--tracking-display` / `--tracking-name`.
+- `--font-ui` → nav controls, eyebrows, buttons, badges, metadata, the logotype. Small, and the
+  only role that may be set in tracked capitals.
+- `--font-body` → body text and descriptions.
 
 **Loaded weights — never request one that isn't here:**
 
 | Token | Font | Weights available |
 |-------|------|-------------------|
-| `--font-display` | Barlow Condensed | **400, 500** |
-| `--font-ui` / `--font-body` | DM Sans | **300, 400, 500** |
+| `--font-display` / `--font-ui` / `--font-body` | Zen Kaku Gothic Antique | **300, 400, 500** |
 
 A weight with no downloaded face is not ignored — the browser *synthesises* it,
 smearing the strokes of the nearest face and distorting the letterforms, so the text reads as a
 different typeface. Nine pages once asked Barlow Condensed for 700 and rendered a fake bold beside the
 homepage's real 500. Enforced by `src/tests/unit/typography-weights.test.ts`, which resolves each
 `--font-*` token back to its loader and fails on any weight that font does not ship. To use a heavier
-face, add it to the `next/font` call in `src/app/layout.tsx` first.
+face, add its file to the `localFont` call in `src/app/layout.tsx` first.
+
+The same test fails a `--font-display` style that forces capitals or that **inherits** its weight.
+The second is not pedantry: twenty-seven headings inherited the body's 300 and rendered at 400
+only because Barlow Condensed had no 300 face; the first family with a real Light turned every
+one of them Light.
+
+**The face draws 219 characters, and nothing else renders in it.** Only the latin slice ships, so
+a character outside it — an arrow, a check mark — is drawn by the fallback face mid-line. Use what
+the slice has (`src/app/fonts/README.md`), or ship the slice that has it. Enforced over
+`src/content/**` by `font-files.test.ts` (which also reads each file's own weight class, licence
+and SHA-256) and over every route's rendered text by `e2e/glyph-coverage.spec.ts`.
 
 **Page titles use `PageHeader`** (`src/components/ui/PageHeader.tsx`) — never a hand-rolled `<h1>`.
 Two variants, chosen by what the page is for: `display` for brand/marketing routes (Our Story, Contact,
@@ -124,7 +141,9 @@ What was verified about it, what was adopted and what still needs the live site 
 - **The brand gives, the controls never do.** The lockup's column can shrink
   (`.hj-header-center { min-width: 0 }`), the mark never does, and the name is shown whole or
   not at all: below 360px the name is not rendered and the knot mark stands alone, because a
-  cut-off name reads as a fault. Measured 2026-10-04, the whole name keeps the controls' own 24px spacing from 353px.
+  cut-off name reads as a fault. Measured 2026-10-04, the whole name keeps the controls' own 24px spacing from 353px
+  in Barlow Condensed; in the brand family the phone logotype is set at 13px, 0.08em to hold that,
+  and it fits from 357px (the spec bounds the gap to the breakpoint at 16px either way).
   An unreachable control is a functional loss; a hidden name is not. This is why the 768px breakpoint
   is a *composition* choice rather than a correctness dependency: get it wrong and the layout
   degrades instead of amputating.
