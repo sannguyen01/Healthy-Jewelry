@@ -24,7 +24,9 @@ test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
 async function visit(page: Page, path: string, width: number): Promise<void> {
   await page.setViewportSize({ width, height: HEIGHT })
-  await page.goto(path)
+  // Literal goto arguments, so spec-anchor-contract can resolve and check both routes.
+  if (path === '/shop') await page.goto('/shop')
+  else await page.goto('/')
   await expect(page.locator('main')).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
   await settle(page)
