@@ -127,6 +127,10 @@ homepage hero is the one exception, since it owns `--text-hero`.
   pass on a control whose centre is off-screen.
 
 ## Homepage Section Sequence
+Seven beats, decided in [ADR 040](docs/adr/040-seven-beats-one-strip.md) (the earlier eight-beat
+sequence — three strips and a campaign band — is superseded). Pinned in source order by
+`homepage-composition-contract.test.ts` and in rendered order by `e2e/homepage-composition.spec.ts`;
+change all three together.
 1. Hero — **two compositions, breakpoint at 900px**:
    - **≥901px**: full-bleed. The "Euro Summer" lifestyle photo fills the entire section
      (`object-position: right center`), and the copy sits in its own opaque `--bg` card
@@ -151,12 +155,14 @@ homepage hero is the one exception, since it owns `--text-hero`.
      larger the card gets and so none of them push back. Enforced as `max-width` and asserted as
      both a width and an occluded-area ratio. See
      [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md) before widening it.
-2. HorizontalScroll — "BESTSELLING"
-3. CampaignBand — "SCIENCE BEFORE AESTHETICS." (dark)
-4. HorizontalScroll — "NEW ARRIVALS"
+2. MaterialsSection — Grade 23 Ti / Niobium / 316L Steel
+3. CareSection — "Care & Craft", copy through the claims registry. **The page's single dark
+   interruption** (`--black` / `--on-dark` / `--mist`, all contrast-tested), placed beside the
+   materials it follows and inside the first half of the page.
+4. HorizontalScroll — "CURATED PIECES" (4–6 items, bestsellers then new arrivals, deduplicated)
 5. CollectionGrid — 5 collection paths (Charms and Earrings tiles use real photography; Rings/Necklaces/Bracelets still use the SVG placeholder pending photos)
-6. HorizontalScroll — "TITANIUM"
-7. MaterialsSection — Grade 23 Ti / Niobium / 316L Steel
+6. RealMoment — "The Moment"
+7. FollowUp — links come from `SOCIAL_LINKS`, never a generic domain
 8. Footer
 
 ## Product Detail Page — the image tile

@@ -34,12 +34,12 @@ import { test, expect, type Page } from './support/test'
 /** The documented sequence, from CLAUDE.md's "Homepage Section Sequence". */
 const EXPECTED_SEQUENCE = [
   'hero',
-  'strip:BESTSELLING',
-  'campaign-band',
-  'strip:NEW ARRIVALS',
-  'collection-grid',
-  'strip:TITANIUM',
   'materials',
+  'care-band',
+  'strip:CURATED PIECES',
+  'collection-grid',
+  'real-moment',
+  'follow-up',
 ] as const
 
 /**
@@ -54,11 +54,12 @@ async function sectionSequence(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const sections = [...document.querySelectorAll('main > section')]
     return sections.map((section) => {
-      const text = section.textContent ?? ''
       if (section.querySelector('h1')) return 'hero'
-      if (/science before aesthetics/i.test(text)) return 'campaign-band'
-      if (/built from the inside out/i.test(text)) return 'materials'
       const eyebrow = section.querySelector('.label-eyebrow')?.textContent?.trim() ?? ''
+      if (/^care\s*&\s*craft$/i.test(eyebrow)) return 'care-band'
+      if (/^the moment$/i.test(eyebrow)) return 'real-moment'
+      if (/^materials$/i.test(eyebrow)) return 'materials'
+      if (section.querySelector('a[href*="instagram"], a[href*="tiktok"]')) return 'follow-up'
       if (/^collections$/i.test(eyebrow)) return 'collection-grid'
       if (eyebrow) return `strip:${eyebrow}`
       return 'unknown'
@@ -123,7 +124,7 @@ test.describe('Homepage composition', () => {
     ).toEqual([])
   })
 
-  test('the three scroll strips show different products', async ({ page }) => {
+  test('the product strip shows each product once', async ({ page }) => {
     // The three strips are the same component with the same layout, card, reveal and
     // "View All" destination — the products are the entire difference between them. When
     // this was written the TITANIUM strip was 50% repeats: orbit-pendant-titanium (already
@@ -131,7 +132,7 @@ test.describe('Homepage composition', () => {
     // (already in NEW ARRIVALS), because the three lists were computed independently and
     // never compared. See src/lib/utils/homepageStrips.ts.
     const strips = await stripContents(page)
-    expect(strips.length, 'expected three product strips on the homepage').toBe(3)
+    expect(strips.length, 'expected one product strip on the homepage (ADR 040)').toBe(1)
 
     const places = new Map<string, string[]>()
     for (const strip of strips) {

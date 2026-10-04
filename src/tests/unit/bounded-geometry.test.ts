@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { parseSource } from '@/lib/analysis/tsAstScan'
 import {
   collectInlineSizes,
@@ -67,7 +67,7 @@ const ROOT = resolve(__dirname, '../../..')
 const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded'; why: string }> = {
   'src/components/contact/ContactForm.tsx | minHeight | 140px': {
     state: 'intrinsic',
-    why: 'A <textarea>. Its height is the user\'s to change by dragging, and the floor only stops it opening as a single line. Capping it would fight the resize handle.',
+    why: "A <textarea>. Its height is the user's to change by dragging, and the floor only stops it opening as a single line. Capping it would fight the resize handle.",
   },
   'src/app/about/page.tsx | minHeight | 260px': {
     state: 'intrinsic',
@@ -84,6 +84,22 @@ const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded';
   'src/components/home/MaterialsSection.tsx | aspectRatio | 3 / 4': {
     state: 'bounded',
     why: 'Declared alongside `width: 200px` on the same element, so the deriving axis is fixed.',
+  },
+  'src/components/home/HorizontalScroll.tsx | aspectRatio | var(--ratio-product)': {
+    state: 'intrinsic',
+    why: 'The image box fills a strip card whose own width is `clamp(200px, 68vw, 260px)`. The container caps the deriving axis at 260px, so the 1 / 1 ratio cannot grow past a 260px square.',
+  },
+  'src/components/product/ProductCard.tsx | aspectRatio | var(--ratio-product)': {
+    state: 'intrinsic',
+    why: 'The image box fills a ProductGrid cell. The grid track (`minmax(min(280px, 100%), 1fr)` inside a bounded section) sets the width, so the ratio derives height from a width that is already bounded: the safe direction of ADR 017.',
+  },
+  'src/app/globals.css | minHeight | 44px': {
+    state: 'intrinsic',
+    why: 'The WCAG 2.2 target-size floor on header controls. The header bar is a fixed 64px tall, so the row caps the axis; the floor only stops a short label or icon collapsing below a thumb.',
+  },
+  'src/app/globals.css | minWidth | 44px': {
+    state: 'intrinsic',
+    why: 'The same target-size floor on the menu and search controls, whose content is a short word or an 18px icon. The control cluster is `flex-shrink: 0` and never grows with the viewport (ADR 016), so the floor is the width, not a lower bound on a growing one.',
   },
   'src/app/globals.css | aspectRatio | 1 / 1': {
     state: 'bounded',
@@ -105,9 +121,15 @@ const elements: SizedElement[] = [
   ...[join(ROOT, 'src/components'), join(ROOT, 'src/app')]
     .flatMap(tsxFiles)
     .flatMap((file) =>
-      collectInlineSizes(parseSource(file, readFileSync(file, 'utf8')), relative(ROOT, file))
+      collectInlineSizes(
+        parseSource(file, readFileSync(file, 'utf8')),
+        relative(ROOT, file).split(sep).join('/')
+      )
     ),
-  ...collectCssSizes(readFileSync(join(ROOT, 'src/app/globals.css'), 'utf8'), 'src/app/globals.css'),
+  ...collectCssSizes(
+    readFileSync(join(ROOT, 'src/app/globals.css'), 'utf8'),
+    'src/app/globals.css'
+  ),
 ]
 
 /** The declarations that need a classification: absolute floors and every ratio. */
@@ -157,7 +179,8 @@ describe('a floor without a ceiling is classified', () => {
         // A max on the same axis is a ceiling, and needs no entry.
         const axis = property === 'aspectRatio' ? 'maxWidth' : property.replace('min', 'max')
         if (element.sizes[axis]) return false
-        if (property === 'aspectRatio' && (element.sizes.width || element.sizes.height)) return false
+        if (property === 'aspectRatio' && (element.sizes.width || element.sizes.height))
+          return false
         return !(keyOf(element, property, value) in CLASSIFIED)
       })
       .map(([property, value]) => `${keyOf(element, property, value)}  (${element.context})`)

@@ -9,7 +9,7 @@ export function MaterialsSection() {
     <section
       style={{
         backgroundColor: 'var(--bg)',
-        padding: 'clamp(64px, 8vw, 96px) var(--space-gutter, clamp(20px,4vw,64px))',
+        padding: 'var(--space-section) var(--space-gutter)',
       }}
     >
       <div

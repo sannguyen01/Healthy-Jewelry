@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { Nav } from '@/components/layout/Nav'
 
 vi.mock('next/image', () => ({
@@ -48,16 +48,9 @@ describe('Nav', () => {
       expect(screen.getByText('HEALTHY JEWELLERY')).toBeTruthy()
     })
 
-    it('renders logo image with alt text', () => {
+    it('renders the contact link in the header bar', () => {
       render(<Nav />)
-      expect(screen.getByAltText('Healthy Jewelry')).toBeTruthy()
-    })
-
-    it('renders primary navigation links', () => {
-      render(<Nav />)
-      expect(screen.getByText('Collection')).toBeTruthy()
-      expect(screen.getByText('Our Story')).toBeTruthy()
-      expect(screen.getByText('Contact')).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'CONTACT' })).toBeTruthy()
     })
 
     it('home link has correct aria-label', () => {
@@ -95,14 +88,45 @@ describe('Nav', () => {
     it('overlay shows primary nav links', () => {
       render(<Nav />)
       fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
-      const overlayLinks = screen.getAllByText('Collection')
-      expect(overlayLinks.length).toBeGreaterThanOrEqual(1)
+      const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
+      for (const label of ['Pieces', 'Our metals', 'Our story', 'Find us', 'Contact']) {
+        expect(within(dialog).getByText(label)).toBeTruthy()
+      }
     })
 
-    it('overlay shows materials tagline', () => {
+    it('hides the closed drawer from assistive technology and the tab order', () => {
+      render(<Nav />)
+      const drawer = document.querySelector('.hj-menu-drawer')
+      expect(drawer?.getAttribute('aria-hidden')).toBe('true')
+      expect(drawer?.hasAttribute('inert')).toBe(true)
+    })
+
+    it('Escape closes the open drawer and returns focus to the menu button', () => {
       render(<Nav />)
       fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
-      expect(screen.getByText('Titanium · Niobium · Surgical Steel')).toBeTruthy()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('dialog', { name: /mobile navigation/i })).toBeNull()
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /open menu/i }))
+    })
+
+    it('Tab from the last drawer link wraps to the menu button instead of leaving the dialog', () => {
+      render(<Nav />)
+      fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
+      const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
+      const controls = dialog.querySelectorAll<HTMLElement>('a[href], button')
+      controls[controls.length - 1].focus()
+      fireEvent.keyDown(document, { key: 'Tab' })
+      // Wraps to the first header control, which is the menu button, never out of the dialog.
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /close menu/i }))
+    })
+
+    it('choosing a drawer link hands focus to the menu button, not <body>', () => {
+      render(<Nav />)
+      fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
+      const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
+      fireEvent.click(dialog.querySelectorAll('a')[0])
+      expect(document.activeElement).not.toBe(document.body)
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /open menu/i }))
     })
 
     it('clicking overlay nav link closes the menu', () => {

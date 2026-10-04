@@ -18,8 +18,10 @@ export interface CollectionNav {
 // ── Main navigation ────────────────────────────────────────────────────────
 
 export const mainNav: NavLink[] = [
-  { label: 'Collection', href: '/shop' },
-  { label: 'Our Story', href: '/about' },
+  { label: 'Pieces', href: '/shop' },
+  { label: 'Our metals', href: '/materials' },
+  { label: 'Our story', href: '/about' },
+  { label: 'Find us', href: '/stores' },
   { label: 'Contact', href: '/contact' },
 ]
 
@@ -95,5 +97,36 @@ export const collectionsNav: CollectionNav[] = [
     title: 'Charms',
     description: 'Charms in titanium and steel — build your own piece',
     href: '/shop/charms',
+  },
+]
+
+// ── Footer groups ──────────────────────────────────────────────────────────
+// The footer's disclosure groups, built from the same lists the header and drawer use so a
+// destination is added or removed in one place.
+
+export interface FooterGroupSpec {
+  title: string
+  links: NavLink[]
+}
+
+/** Picks entries out of `mainNav` by destination; a href that is not there is a build-time error. */
+export const byHref = (...hrefs: string[]): NavLink[] =>
+  hrefs.map((href) => {
+    const link = mainNav.find((entry) => entry.href === href)
+    if (!link) throw new Error(`footer link ${href} is not in mainNav`)
+    return link
+  })
+
+export const footerGroups: FooterGroupSpec[] = [
+  {
+    title: 'Shop',
+    links: [
+      ...byHref('/shop'),
+      ...collectionsNav.map((collection) => ({ label: collection.title, href: collection.href })),
+    ],
+  },
+  {
+    title: 'About',
+    links: [...byHref('/materials', '/about', '/contact'), { label: 'FAQ', href: '/faq' }],
   },
 ]

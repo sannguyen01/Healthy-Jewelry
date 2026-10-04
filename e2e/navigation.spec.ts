@@ -143,15 +143,9 @@ test.describe('Navigation — mobile menu', () => {
   test('mobile overlay shows nav links', async ({ page }) => {
     await page.getByRole('button', { name: /open menu/i }).click()
     const dialog = page.getByRole('dialog', { name: /mobile navigation/i })
-    await expect(dialog.getByRole('link', { name: /collection/i })).toBeVisible()
-    await expect(dialog.getByRole('link', { name: /our story/i })).toBeVisible()
-    await expect(dialog.getByRole('link', { name: /contact/i })).toBeVisible()
-  })
-
-  test('mobile overlay shows materials tagline', async ({ page }) => {
-    await page.getByRole('button', { name: /open menu/i }).click()
-    const dialog = page.getByRole('dialog', { name: /mobile navigation/i })
-    await expect(dialog.getByText(/titanium.*niobium.*surgical steel/i)).toBeVisible()
+    await expect(dialog.getByRole('link', { name: /^pieces$/i })).toBeVisible()
+    await expect(dialog.getByRole('link', { name: /^our story$/i })).toBeVisible()
+    await expect(dialog.getByRole('link', { name: /^contact$/i })).toBeVisible()
   })
 
   test('close button dismisses mobile overlay', async ({ page }) => {

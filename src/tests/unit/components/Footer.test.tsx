@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Footer } from '@/components/layout/Footer'
 import { claimText } from '@/lib/catalog'
+import { SOCIAL_LINKS } from '@/config/site'
 
 /**
  * The tagline is the positioning line, and the positioning line is a pending claim — "Metal
@@ -51,39 +52,45 @@ describe('Footer', () => {
     })
   })
 
-  describe('shop column', () => {
-    it('shows "Shop" column heading', () => {
+  describe('about group', () => {
+    it('shows "About" group heading', () => {
       render(<Footer />)
-      expect(screen.getByText('Shop')).toBeTruthy()
+      expect(screen.getByText('About')).toBeTruthy()
     })
 
-    it('links to all 5 collection pages', () => {
+    it('links to Contact and FAQ', () => {
       render(<Footer />)
-      expect(screen.getByRole('link', { name: 'Rings' })).toBeTruthy()
-      expect(screen.getByRole('link', { name: 'Necklaces' })).toBeTruthy()
-      expect(screen.getByRole('link', { name: 'Earrings' })).toBeTruthy()
-      expect(screen.getByRole('link', { name: 'Bracelets' })).toBeTruthy()
-      expect(screen.getByRole('link', { name: 'Charms' })).toBeTruthy()
-    })
-
-    it('ring link points to /shop/rings', () => {
-      render(<Footer />)
-      const link = screen.getByRole('link', { name: 'Rings' })
-      expect(link.getAttribute('href')).toBe('/shop/rings')
+      expect(screen.getByRole('link', { name: 'Contact' }).getAttribute('href')).toBe('/contact')
+      expect(screen.getByRole('link', { name: 'FAQ' }).getAttribute('href')).toBe('/faq')
     })
   })
 
-  describe('info column', () => {
-    it('shows "Info" column heading', () => {
+  describe('find us group', () => {
+    it('links to the brand social accounts from site config', () => {
       render(<Footer />)
-      expect(screen.getByText('Info')).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'Instagram' }).getAttribute('href')).toBe(
+        SOCIAL_LINKS.instagram
+      )
+      expect(screen.getByRole('link', { name: 'TikTok' }).getAttribute('href')).toBe(
+        SOCIAL_LINKS.tiktok
+      )
     })
 
-    it('links to About, Materials, Contact', () => {
+    it('opens social links in a new tab with noopener', () => {
       render(<Footer />)
-      expect(screen.getByRole('link', { name: 'Our Story' })).toBeTruthy()
-      expect(screen.getByRole('link', { name: 'Materials' })).toBeTruthy()
-      expect(screen.getByRole('link', { name: 'Contact' })).toBeTruthy()
+      const link = screen.getByRole('link', { name: 'Instagram' })
+      expect(link.getAttribute('target')).toBe('_blank')
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+    })
+  })
+
+  describe('link integrity', () => {
+    it('renders no placeholder or unrouted destinations', () => {
+      const { container } = render(<Footer />)
+      const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
+      expect(hrefs).not.toContain('#')
+      expect(hrefs).not.toContain('/care')
+      expect(hrefs).not.toContain('/events')
     })
   })
 

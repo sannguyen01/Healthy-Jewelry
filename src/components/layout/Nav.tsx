@@ -1,274 +1,161 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useScrolled } from '@/lib/hooks/useScrolled'
-import { primaryNavLinks } from '@/config/navigation'
+import { mainNav } from '@/config/navigation'
 
 export function Nav() {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const scrolled = useScrolled(60)
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+
+  // Closing by activating a drawer control would otherwise leave focus on an element that has
+  // just become inert, which drops it to <body>. Hand it to the menu button first.
+  const closeMenu = () => {
+    setMenuOpen(false)
+    menuBtnRef.current?.focus()
+  }
+
+  const state = menuOpen ? 'menu-open' : scrolled ? 'solid' : 'hero-overlay'
+
+  // Focus management. While the drawer is open the Tab cycle is every control in the header
+  // (the menu button is the visible close control and lives outside the drawer element) followed
+  // by the drawer's own controls, in DOM order.
+  useEffect(() => {
+    if (!menuOpen) return
+    const drawer = drawerRef.current
+    const menuBtn = menuBtnRef.current
+    const header = headerRef.current
+    if (!drawer || !menuBtn || !header) return
+
+    const cycle = (): HTMLElement[] => [
+      ...Array.from(header.querySelectorAll<HTMLElement>('a[href], button')),
+      ...Array.from(drawer.querySelectorAll<HTMLElement>('a[href], button')),
+    ]
+
+    const focusTimer = window.setTimeout(
+      () => drawer.querySelector<HTMLElement>('a[href]')?.focus(),
+      50
+    )
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        menuBtn.focus()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const items = cycle()
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      window.clearTimeout(focusTimer)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [menuOpen])
 
   return (
     <>
-      {/* ── Main nav bar ─────────────────────────────────────────────── */}
-      <header
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '64px',
-          zIndex: 90,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 clamp(20px,4vw,48px)',
-          backgroundColor: scrolled ? 'rgba(247,245,241,0.94)' : 'transparent',
-          backdropFilter: scrolled ? 'blur(12px)' : 'none',
-          WebkitBackdropFilter: scrolled ? 'blur(12px)' : 'none',
-          borderBottom: scrolled ? '1px solid rgba(26,23,20,0.08)' : 'none',
-          transition:
-            'background-color 0.4s cubic-bezier(0.00,0.00,0.30,1.00), border-color 0.4s cubic-bezier(0.00,0.00,0.30,1.00)',
-        }}
-      >
-        {/* Logo + wordmark — left */}
-        <Link
-          href="/"
-          aria-label="Healthy Jewelry — home"
-          // `flex: 0 1 auto` + `minWidth: 0`, not `flexShrink: 0`. The header is a
-          // fixed-height row that must fit a 320px phone, and something has to give
-          // when it cannot. This makes the brand the thing that gives: the wordmark
-          // ellipsises, which costs a few letters, rather than the controls being
-          // pushed past the viewport edge, which costs the visitor the only route to
-          // navigation they have. See docs/adr/016.
-          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 1 auto', minWidth: 0 }}
-        >
-          <Image
-            src="/logo.png"
-            alt="Healthy Jewelry"
-            width={120}
-            height={32}
-            style={{ objectFit: 'contain', height: '28px', width: 'auto' }}
-            priority
-          />
-          <span
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 500,
-              fontSize: 'clamp(1rem, 1.4vw, 1.25rem)',
-              letterSpacing: '0.10em',
-              lineHeight: 1.1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              color: menuOpen ? 'var(--on-dark)' : 'var(--ink)',
-              transition: 'color 400ms cubic-bezier(0.00, 0.00, 0.30, 1.00)',
-            }}
-          >
-            HEALTHY JEWELLERY
-          </span>
-        </Link>
-
-        {/* Desktop center nav */}
-        <nav
-          aria-label="Primary navigation"
-          style={{
-            position: 'absolute',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: '36px',
-          }}
-          className="hj-desktop-nav"
-        >
-          {primaryNavLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: '0.68rem',
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                color: 'var(--graphite)',
-                textDecoration: 'none',
-                transition: 'color 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--ink)'
-              }}
-              onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--graphite)'
-              }}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Right controls */}
-        <div
-          style={{
-            marginLeft: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '20px',
-            // The counterpart to the brand link's `0 1 auto`: controls hold their
-            // size and the brand absorbs the difference.
-            flexShrink: 0,
-          }}
-        >
-          {/* Search icon — /search owns the input and the query string, so this
-              control only has to get the visitor there. */}
+      <header ref={headerRef} className="hj-header" data-state={state}>
+        {/* Left: Menu control */}
+        <div className="hj-header-left">
           <button
-            aria-label="Search"
-            className="hj-desktop-only"
-            onClick={() => {
-              setMenuOpen(false)
-              router.push('/search')
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px',
-              color: 'var(--ink)',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <circle cx="7.5" cy="7.5" r="5.5" stroke="currentColor" strokeWidth="1.4" />
-              <line
-                x1="12"
-                y1="12"
-                x2="17"
-                y2="17"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-
-          {/* Mobile menu toggle */}
-          <button
+            ref={menuBtnRef}
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.68rem',
-              letterSpacing: '0.16em',
-              textTransform: 'uppercase',
-              color: 'var(--ink)',
-            }}
-            className="hj-mobile-menu-btn"
+            className="hj-menu-btn"
           >
-            {menuOpen ? 'Close' : 'Menu'}
+            {menuOpen ? 'CLOSE' : 'MENU'}
           </button>
+        </div>
+
+        {/* Center: Genuinely centered wordmark */}
+        <div className="hj-header-center">
+          <Link href="/" aria-label="Healthy Jewelry — home" className="hj-wordmark" onClick={closeMenu}>
+            HEALTHY JEWELLERY
+          </Link>
+        </div>
+
+        {/* Right: Search and Contact */}
+        <div className="hj-header-right">
+          <button
+            aria-label="Search"
+            onClick={() => {
+              closeMenu()
+              router.push('/search')
+            }}
+            className="hj-icon-btn"
+          >
+            <span className="hj-desktop-text">SEARCH</span>
+            <svg className="hj-mobile-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <circle cx="7.5" cy="7.5" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+              <line x1="12" y1="12" x2="17" y2="17" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+          <Link
+            href="/contact"
+            onClick={closeMenu}
+            className="hj-icon-btn hj-desktop-text"
+          >
+            CONTACT
+          </Link>
         </div>
       </header>
 
-      {/* ── Mobile full-screen overlay ──────────────────────────────── */}
-      {menuOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Mobile navigation"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 89,
-            backgroundColor: 'var(--ink)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '40px',
-          }}
-        >
-          {primaryNavLinks.map((link) => (
+      {/* Menu Drawer */}
+      <div
+        ref={drawerRef}
+        className="hj-menu-drawer"
+        data-state={state}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile navigation"
+        aria-hidden={!menuOpen}
+        inert={!menuOpen}
+      >
+        <div className="hj-menu-drawer-inner">
+          {mainNav.map((item) => (
             <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMenuOpen(false)}
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(2.4rem,8vw,4.5rem)',
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: 'var(--bg)',
-                textDecoration: 'none',
-              }}
+              key={item.href}
+              href={item.href}
+              onClick={closeMenu}
+              className="hj-menu-link"
             >
-              {link.label}
+              {item.label}
             </Link>
           ))}
-          {/* Search is hidden from the header below 769px, so it lives here.
-              Account used to sit beside it. Both controls came into this overlay
-              because on a phone Account was reachable only through a 10.88px word
-              crammed against the edge of the viewport — see ADR 016 — and that
-              reasoning still holds for Search, which is why Search stays.
-              `e2e/header-fit.spec.ts` asserts Search is present here, so a control
-              removed from the header cannot quietly cease to exist. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginTop: '8px' }}>
-            <button
-              aria-label="Search"
-              onClick={() => {
-                setMenuOpen(false)
-                router.push('/search')
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-ui)',
-                fontSize: '0.85rem',
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                color: 'var(--titanium)',
-                padding: '10px 4px',
-              }}
-            >
-              Search
-            </button>
-          </div>
-
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.65rem',
-              letterSpacing: '0.22em',
-              textTransform: 'uppercase',
-              color: 'var(--titanium)',
-              marginTop: '12px',
+          <button
+            type="button"
+            className="hj-menu-link hj-menu-search"
+            onClick={() => {
+              closeMenu()
+              router.push('/search')
             }}
           >
-            Titanium · Niobium · Surgical Steel
-          </p>
+            Search
+          </button>
         </div>
-      )}
-
-      <style>{`
-        @media (max-width: 768px) {
-          .hj-desktop-nav { display: none !important; }
-          /* Search moves into the full-screen overlay below this width (Account
-             did too, until it was removed). Without this the header needed 435px
-             of content to lay out and every phone is narrower than that — see
-             e2e/header-fit.spec.ts, which re-measures rather than assuming. */
-          .hj-desktop-only { display: none !important; }
-        }
-        @media (min-width: 769px) {
-          .hj-mobile-menu-btn { display: none !important; }
-        }
-      `}</style>
+      </div>
     </>
   )
 }

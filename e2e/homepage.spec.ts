@@ -19,8 +19,8 @@ test.describe('Homepage', () => {
     await expect(shopLink).toBeVisible()
   })
 
-  test('campaign band shows brand tagline', async ({ page }) => {
-    await expect(page.getByText(/science before aesthetics/i)).toBeVisible()
+  test('the dark care band is present (ADR 040)', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: /care\s*&\s*craft/i })).toBeVisible()
   })
 
   /**

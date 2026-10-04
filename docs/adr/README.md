@@ -59,6 +59,7 @@ pointer; the reasoning lives here once.
 | [037](037-a-reconciliation-at-the-wrong-grain.md) | A reconciliation at the wrong grain | The commerce register compared paths while parsing identifier sets it never read, and its lexer's "safe direction" hid an absolute finding; spans the scanner, its differential test, the contract's §4 `Carries` column, `docs/controls.json` and the masterplan |
 | [038](038-what-a-control-observes-is-not-what-it-claims.md) | What a control observes is not what it claims | Five controls in PR #90 could fail, but at the wrong grain — first hop, union allowlist, unit-level claim resolution, a slice after download, `mergeable_state` alone; each falsified against the real artifact before its fix, and the experiment that falsified one was itself checked against a known-good build |
 | [039](039-a-ready-build-is-not-a-passing-build.md) | A ready build is not a passing build | Two READY production deployments were built from a `main` whose `verify` had failed (incident PR-94); one `Production admission` verdict that admits only explicit success, for the platform to wait on. Spans `ci.yml`, `scripts/lib/production-admission.mjs`, `required-checks-contract.test.ts`, `docs/controls.json` and the masterplan |
+| [040](040-seven-beats-one-strip.md) | Seven beats, one strip | The redesign dropped the campaign band and two strips without a record; seven beats kept provisionally, the dark interruption moves to CareSection beside Materials, and the unit contract, e2e spec and CLAUDE.md are pinned to one sequence |
 
 ## Format
 

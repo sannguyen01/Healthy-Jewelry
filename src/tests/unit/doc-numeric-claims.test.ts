@@ -157,14 +157,14 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**110 unit spec files**',
-    claimed: '110',
+    context: '**113 unit spec files**',
+    claimed: '113',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
     doc: CONVENTIONS,
-    context: '**17 E2E spec files**',
-    claimed: '17',
+    context: '**18 E2E spec files**',
+    claimed: '18',
     actual: () => String(countFiles('e2e', (f) => /\.spec\.ts$/.test(f))),
   },
   {
@@ -236,8 +236,14 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     doc: 'CLAUDE.md',
     context: 'breakpoint at 768px',
     claimed: '768px',
-    actual: () =>
-      `${read('src/components/layout/Nav.tsx').match(/@media \(max-width: (\d+)px\)/)?.[1]}px`,
+    // The header's composition switch lives in globals.css (`.hj-desktop-text` appears from
+    // min-width 769px), so mobile is everything at or below one pixel less.
+    actual: () => {
+      const desktopFrom = read('src/app/globals.css').match(
+        /@media \(min-width: (\d+)px\)\s*\{\s*\.hj-desktop-text/
+      )?.[1]
+      return `${desktopFrom === undefined ? undefined : Number(desktopFrom) - 1}px`
+    },
   },
   {
     doc: 'CLAUDE.md',
