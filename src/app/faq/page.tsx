@@ -3,7 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { CONTACT_EMAIL, ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
+import { CONTACT_EMAIL, ORDER_REFERENCE_HINT, SITE_NAME, SUPPORT_EMAIL } from '@/config/site'
 import { claimText } from '@/lib/catalog'
 
 /**
@@ -21,7 +21,7 @@ const SITE = { kind: 'site' } as const
 export const metadata: Metadata = {
   title: 'FAQ',
   description:
-    'Frequently asked questions about Healthy Jewelry. Materials, care, sizing, and orders.',
+    `Frequently asked questions about ${SITE_NAME}. Materials, care, sizing, and orders.`,
 }
 
 interface QAItem {
@@ -105,7 +105,7 @@ const sections = (): Section[] => [
     items: [
       {
         q: 'How do I buy something?',
-        a: `Not on this site — there is no cart and no checkout here. Pieces are arranged directly with a Healthy Jewelry ambassador, who will confirm the size, the price and the delivery address with you in writing before anything is agreed. If you do not already know an ambassador, write to ${CONTACT_EMAIL} and we will put you in touch.`,
+        a: `Not on this site — there is no cart and no checkout here. Pieces are arranged directly with a ${SITE_NAME} ambassador, who will confirm the size, the price and the delivery address with you in writing before anything is agreed. If you do not already know an ambassador, write to ${CONTACT_EMAIL} and we will put you in touch.`,
       },
       {
         q: 'Why are there no prices on the site?',

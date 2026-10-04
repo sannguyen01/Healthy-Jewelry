@@ -1,12 +1,13 @@
 import { test, expect, type Page } from './support/test'
+import { SITE_NAME } from '../src/config/site'
 
 test.describe('Contact page — layout', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/contact')
   })
 
-  test('page title includes Healthy Jewelry', async ({ page }) => {
-    await expect(page).toHaveTitle(/healthy jewelry/i)
+  test('page title includes the brand name', async ({ page }) => {
+    await expect(page).toHaveTitle(new RegExp(SITE_NAME))
   })
 
   test('page heading is visible', async ({ page }) => {

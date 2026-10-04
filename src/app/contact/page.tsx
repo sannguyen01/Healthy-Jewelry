@@ -3,12 +3,12 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ContactForm } from '@/components/contact/ContactForm'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { CONTACT_EMAIL } from '@/config/site'
+import { CONTACT_EMAIL, SITE_NAME } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Contact',
   description:
-    'Get in touch with Healthy Jewelry. Questions about materials, sizing, or arranging a piece with an ambassador — we respond within 24 hours.',
+    `Get in touch with ${SITE_NAME}. Questions about materials, sizing, or arranging a piece with an ambassador — we respond within 24 hours.`,
 }
 
 const INFO_ITEMS = [

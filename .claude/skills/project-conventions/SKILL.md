@@ -41,12 +41,16 @@ flag it if you see:
 
 ## Testing baseline
 
-The suite spans **114 unit spec files** and **18 E2E spec files**.
+The suite spans **115 unit spec files** and **18 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
 spec file disappearing fails the gate instead of quietly lowering the bar. Do not edit
 them by hand to make a check pass — re-measure, and if the number really moved, ask why.
+
+**It rose by two on 2026-10-04**: `brand-name` (one spelling of the brand, typed once) and
+`brand-mark-asset` (the served knot mark is derived from the master, with no black matte at
+its edges). See docs/adr/041.
 
 **The unit count fell from 91 to 86 on 2026-09-20, and the reason is on the record rather
 than in a diff.** The Shopify decommission deleted seven specs whose subjects no longer

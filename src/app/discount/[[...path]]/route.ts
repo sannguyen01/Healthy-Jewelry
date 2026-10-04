@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/site'
 
 /**
  * `/discount` and `/discount/*` — **410 Gone**.
@@ -23,7 +24,7 @@ import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/go
  * did anything wrong. It says where the arrangement happens now, which is with a person.
  */
 const COPY = {
-  title: 'Discount codes are not used here — Healthy Jewellery',
+  title: `Discount codes are not used here — ${SITE_NAME}`,
   heading: 'This website does not apply discount codes.',
   paragraphs: [
     'Nothing is sold on this site, so there is no price for a code to change. This is not ' +

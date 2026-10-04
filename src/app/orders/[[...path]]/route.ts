@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/site'
 
 /**
  * `/orders` and `/orders/*` — **410 Gone**.
@@ -32,10 +33,10 @@ import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/go
  * typed by hand.
  */
 const COPY = {
-  title: 'Order status is not available here — Healthy Jewellery',
+  title: `Order status is not available here — ${SITE_NAME}`,
   heading: 'This website does not hold orders.',
   paragraphs: [
-    'Healthy Jewelry has never taken an order through this website, and it no longer ' +
+    `${SITE_NAME} has never taken an order through this website, and it no longer ` +
       'operates an online store. There is nothing here to look up.',
     'If you are asking about a piece you already have, or one you would like, ' +
       AMBASSADOR_NEXT_STEP,

@@ -12,13 +12,14 @@ import {
   materialStandard,
   toMaterialHandle,
 } from '@/lib/catalog'
+import { SITE_NAME } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Materials',
   // "The science of biocompatible jewelry metals — hypoallergenic, corrosion-proof,
   // MRI-safe" until 2026-09-26: three claims and an implication in one search snippet.
   description:
-    'Grade 23 titanium (Ti-6Al-4V ELI), anodized niobium and 316L surgical steel: the three metals Healthy Jewelry works in, each named by its exact specification.',
+    `Grade 23 titanium (Ti-6Al-4V ELI), anodized niobium and 316L surgical steel: the three metals ${SITE_NAME} works in, each named by its exact specification.`,
 }
 
 /**

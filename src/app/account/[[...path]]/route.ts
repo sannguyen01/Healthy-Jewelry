@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/site'
 
 /**
  * `/account` and `/account/*` — **308 to `/contact` for browsing, 410 for anything else.**
@@ -12,7 +13,7 @@ import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, retiredRoute } from '@/lib/http
  * `src/lib/http/goneResponse.ts`.
  */
 const COPY = {
-  title: 'Accounts are not available — Healthy Jewellery',
+  title: `Accounts are not available — ${SITE_NAME}`,
   heading: 'This website does not hold accounts.',
   paragraphs: [
     'Customer accounts were never switched on here, so there is nothing to sign in to, and ' +

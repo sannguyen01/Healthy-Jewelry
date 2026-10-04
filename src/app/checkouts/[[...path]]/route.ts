@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/site'
 
 /**
  * `/checkouts` and `/checkouts/*` — **410 Gone**.
@@ -18,7 +19,7 @@ import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/go
  * QR codes or ambassador cards still points at it. See the masterplan.
  */
 const COPY = {
-  title: 'Checkout is closed — Healthy Jewellery',
+  title: `Checkout is closed — ${SITE_NAME}`,
   heading: 'This catalogue no longer accepts online orders.',
   paragraphs: [
     'The checkout this link was created for has been withdrawn, along with the online ' +

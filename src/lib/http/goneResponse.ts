@@ -34,6 +34,8 @@
  * exactly the dependency this page exists without.
  */
 
+import { SITE_NAME } from '@/config/site'
+
 /** What a retired capability says for itself. */
 export interface GoneCopy {
   /** Browser tab and `<title>`. Ends up in a search result if one was ever indexed. */
@@ -188,7 +190,7 @@ export const RETIRED_REDIRECT_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86
  * four times in four places.
  */
 export const AMBASSADOR_NEXT_STEP =
-  'Pieces are arranged with a Healthy Jewelry ambassador. ' +
+  `Pieces are arranged with a ${SITE_NAME} ambassador. ` +
   '<a href="/contact">Use the official contact channel</a> and we will put you in touch.'
 
 /** The other half: there is still a catalogue, and it is still worth looking at. */
@@ -201,10 +203,10 @@ export const BROWSE_NEXT_STEP = '<a href="/shop">Browse the catalogue</a>'
  * and a 410 page is still a page.
  */
 export const RETIRED_CATEGORY_COPY: GoneCopy = {
-  title: 'This page no longer exists — Healthy Jewellery',
+  title: `This page no longer exists — ${SITE_NAME}`,
   heading: 'This page no longer exists.',
   paragraphs: [
-    'Healthy Jewellery now makes pieces in Grade 23 titanium, niobium and 316L surgical steel ' +
+    `${SITE_NAME} now makes pieces in Grade 23 titanium, niobium and 316L surgical steel ` +
       'only. Nothing you submitted was sent or saved.',
     BROWSE_NEXT_STEP,
     AMBASSADOR_NEXT_STEP,

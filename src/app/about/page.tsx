@@ -4,11 +4,12 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { SITE_NAME } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Our Story',
   description:
-    'Why Healthy Jewelry works in three metals — Grade 23 titanium, niobium and 316L surgical steel — and names each by its exact specification.',
+    `Why ${SITE_NAME} works in three metals — Grade 23 titanium, niobium and 316L surgical steel — and names each by its exact specification.`,
 }
 
 /*
@@ -112,7 +113,7 @@ export default function AboutPage() {
               }}
             >
               We asked one question: what would jewelry look like if every piece were named by its
-              exact alloy? Healthy Jewelry is our answer — each piece described by its material
+              exact alloy? {SITE_NAME} is our answer — each piece described by its material
               specification, and nothing said about it that we cannot document.
             </p>
           </div>

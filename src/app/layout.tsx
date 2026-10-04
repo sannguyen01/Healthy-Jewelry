@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Barlow_Condensed, DM_Sans } from 'next/font/google'
 import './globals.css'
-import { SITE_DEFAULT_TITLE, SITE_DESCRIPTION, SITE_URL } from '@/config/site'
+import { SITE_DEFAULT_TITLE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/config/site'
 import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
@@ -36,7 +36,7 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: {
     default: SITE_DEFAULT_TITLE,
-    template: '%s — Healthy Jewelry',
+    template: `%s — ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
   keywords: [
@@ -50,15 +50,15 @@ export const metadata: Metadata = {
     'titanium necklaces',
     'grade 23 titanium',
   ],
-  authors: [{ name: 'Healthy Jewelry' }],
-  creator: 'Healthy Jewelry',
-  publisher: 'Healthy Jewelry',
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   metadataBase: new URL(SITE_URL),
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: SITE_URL,
-    siteName: 'Healthy Jewelry',
+    siteName: SITE_NAME,
     title: SITE_DEFAULT_TITLE,
     description: SITE_DESCRIPTION,
   },

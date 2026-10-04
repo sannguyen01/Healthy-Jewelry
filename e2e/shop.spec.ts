@@ -1,4 +1,5 @@
 import { test, expect } from './support/test'
+import { SITE_NAME } from '../src/config/site'
 
 test.describe('Shop page', () => {
   test.beforeEach(async ({ page }) => {
@@ -6,7 +7,7 @@ test.describe('Shop page', () => {
   })
 
   test('page has heading or title containing Shop', async ({ page }) => {
-    await expect(page).toHaveTitle(/healthy jewelry/i)
+    await expect(page).toHaveTitle(new RegExp(SITE_NAME))
     // Either a heading or the page renders products
     const heading = page.getByRole('heading')
     await expect(heading.first()).toBeVisible()

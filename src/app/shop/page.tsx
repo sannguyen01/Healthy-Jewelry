@@ -7,13 +7,14 @@ import { JsonLd, breadcrumbJsonLd } from '@/components/seo/JsonLd'
 import Link from 'next/link'
 import { collectionsNav } from '@/config/navigation'
 import { getAllProducts } from '@/lib/catalog'
+import { SITE_NAME } from '@/config/site'
 
 const BREADCRUMB_ITEMS = [{ label: 'Home', href: '/' }, { label: 'Shop' }]
 
 export const metadata: Metadata = {
   title: 'Shop All',
   description:
-    'Browse the full Healthy Jewelry collection: rings, necklaces, earrings, bracelets and charms in Grade 23 titanium, niobium and 316L surgical steel.',
+    `Browse the full ${SITE_NAME} collection: rings, necklaces, earrings, bracelets and charms in Grade 23 titanium, niobium and 316L surgical steel.`,
 }
 
 export default async function ShopPage() {

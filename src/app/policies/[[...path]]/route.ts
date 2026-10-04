@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/site'
 
 /**
  * `/policies/*` — **308 to `/legal` for browsing, 410 for anything else.**
@@ -18,7 +19,7 @@ import { AMBASSADOR_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
  * so a POST here is the same stray the other families get, and the same explanation.
  */
 const COPY = {
-  title: 'This page has moved — Healthy Jewellery',
+  title: `This page has moved — ${SITE_NAME}`,
   heading: 'The policies have moved.',
   paragraphs: [
     'They are on <a href="/legal">the legal page</a>. Nothing you submitted was sent or saved.',

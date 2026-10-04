@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/site'
 
 /**
  * `/collections` and `/collections/*` — **308 to `/shop` for browsing, 410 for anything else.**
@@ -19,7 +20,7 @@ import { AMBASSADOR_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
  * grid carried), so it gets the explanation rather than the shelf. See `retiredRoute()`.
  */
 const COPY = {
-  title: 'This page has moved — Healthy Jewellery',
+  title: `This page has moved — ${SITE_NAME}`,
   heading: 'This page has moved, and nothing here takes an order.',
   paragraphs: [
     'The collections are now in <a href="/shop">the catalogue</a>. Whatever this form was ' +

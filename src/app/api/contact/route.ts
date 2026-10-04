@@ -7,7 +7,7 @@ import {
   validateMessage,
   sanitizeSubject,
 } from '@/lib/utils/contactValidation'
-import { CONTACT_EMAIL, SENDER_EMAIL } from '@/config/site'
+import { CONTACT_EMAIL, SENDER_EMAIL, SITE_NAME } from '@/config/site'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { readBoundedBody } from '@/lib/http/readBoundedBody'
 
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cleanSubject = sanitizeSubject(subject)
     const resend = new Resend(apiKey)
     const { data, error } = await resend.emails.send({
-      from: `Healthy Jewelry Contact <${SENDER_EMAIL}>`,
+      from: `${SITE_NAME} Contact <${SENDER_EMAIL}>`,
       to: [CONTACT_EMAIL],
       replyTo: email,
       subject: `[Contact] ${cleanSubject} — ${name}`,

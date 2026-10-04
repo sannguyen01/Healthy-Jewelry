@@ -3,6 +3,7 @@ import path from 'node:path'
 import { ImageResponse } from 'next/og'
 import { getProductByHandle } from '@/lib/catalog'
 import { productSeo } from '@/lib/seo/productSeo'
+import { SITE_NAME } from '@/config/site'
 
 // `next/og`'s automatic font loader fetches Google Fonts per glyph range at
 // **request time**, keyed off a font-name heuristic it does not document. That
@@ -65,7 +66,7 @@ async function loadCardFonts() {
 // describes a different route.
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
-export const alt = 'Healthy Jewelry product'
+export const alt = `${SITE_NAME} product`
 
 interface Props {
   params: Promise<{ handle: string }>
@@ -120,7 +121,7 @@ export default async function Image({ params }: Props) {
           display: 'flex',
         }}
       >
-        HEALTHY JEWELRY
+        {SITE_NAME.toUpperCase()}
       </div>
       {/* Satori has no block layout: a div with more than one child must
             declare display explicitly or rendering throws at request time. */}
