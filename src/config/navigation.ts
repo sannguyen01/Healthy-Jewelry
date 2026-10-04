@@ -50,6 +50,36 @@ export const footerNavLinks: NavLink[] = [
 
 // ── Social links ───────────────────────────────────────────────────────────
 
+// ── Footer groups ──────────────────────────────────────────────────────────
+// The footer's disclosure groups, built from the same lists the header and drawer use so a
+// destination is added or removed in one place.
+
+export interface FooterGroupSpec {
+  title: string
+  links: NavLink[]
+}
+
+const byHref = (...hrefs: string[]): NavLink[] =>
+  hrefs.map((href) => {
+    const link = mainNav.find((entry) => entry.href === href)
+    if (!link) throw new Error(`footer link ${href} is not in mainNav`)
+    return link
+  })
+
+export const footerGroups: FooterGroupSpec[] = [
+  { title: 'Explore', links: byHref('/shop', '/materials', '/about') },
+  { title: 'Help', links: [...byHref('/contact'), { label: 'FAQ', href: '/faq' }] },
+  {
+    title: 'Find us',
+    links: [
+      { label: 'Instagram', href: SOCIAL_LINKS.instagram, external: true },
+      { label: 'TikTok', href: SOCIAL_LINKS.tiktok, external: true },
+      { label: 'Pinterest', href: SOCIAL_LINKS.pinterest, external: true },
+      { label: 'YouTube', href: SOCIAL_LINKS.youtube, external: true },
+    ],
+  },
+]
+
 export const socialLinks = [
   { label: 'Instagram', href: SOCIAL_LINKS.instagram, icon: 'instagram' },
   { label: 'TikTok', href: SOCIAL_LINKS.tiktok, icon: 'tiktok' },

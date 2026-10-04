@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { legalLinks } from '@/config/navigation'
-import { SOCIAL_LINKS } from '@/config/site'
+import { footerGroups, legalLinks } from '@/config/navigation'
+import { FooterGroup } from '@/components/layout/FooterGroup'
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 import { claimText } from '@/lib/catalog'
 
@@ -13,33 +13,6 @@ import { claimText } from '@/lib/catalog'
 function tagline(): string {
   return claimText('brand-positioning', { kind: 'site' })
 }
-
-const groups = [
-  {
-    title: 'Explore',
-    links: [
-      { label: 'Pieces', href: '/shop' },
-      { label: 'Metals', href: '/materials' },
-      { label: 'Our Story', href: '/about' },
-    ],
-  },
-  {
-    title: 'Help',
-    links: [
-      { label: 'Contact', href: '/contact' },
-      { label: 'FAQ', href: '/faq' },
-    ],
-  },
-  {
-    title: 'Find us',
-    links: [
-      { label: 'Instagram', href: SOCIAL_LINKS.instagram },
-      { label: 'TikTok', href: SOCIAL_LINKS.tiktok },
-      { label: 'Pinterest', href: SOCIAL_LINKS.pinterest },
-      { label: 'YouTube', href: SOCIAL_LINKS.youtube },
-    ],
-  },
-]
 
 const columnHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
@@ -119,45 +92,27 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Accordion Columns */}
-          {groups.map((group, i) => (
-            <div key={group.title} className="footer-group">
-              <input
-                type="checkbox"
-                id={`footer-group-${i}`}
-                className="footer-checkbox"
-                aria-hidden="true"
-              />
-              <label
-                htmlFor={`footer-group-${i}`}
-                className="footer-summary"
-                style={columnHeadStyle}
-              >
-                {group.title}
-                <span className="footer-icon">+</span>
-              </label>
-              <div className="footer-group-content">
-                <div className="footer-group-inner">
-                  {group.links.map((link) =>
-                    link.href.startsWith('http') ? (
-                      <a
-                        key={link.label}
-                        href={link.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={linkStyle}
-                      >
-                        {link.label}
-                      </a>
-                    ) : (
-                      <Link key={link.label} href={link.href} style={linkStyle}>
-                        {link.label}
-                      </Link>
-                    )
-                  )}
-                </div>
-              </div>
-            </div>
+          {/* Disclosure columns */}
+          {footerGroups.map((group) => (
+            <FooterGroup key={group.title} title={group.title} headStyle={columnHeadStyle}>
+              {group.links.map((link) =>
+                link.external ? (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={linkStyle}
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <Link key={link.label} href={link.href} style={linkStyle}>
+                    {link.label}
+                  </Link>
+                )
+              )}
+            </FooterGroup>
           ))}
 
           {/* Legal column */}
@@ -218,7 +173,10 @@ export function Footer() {
       </div>
 
       <style>{`
-        .footer-checkbox {
+        .footer-summary {
+          list-style: none;
+        }
+        .footer-summary::-webkit-details-marker {
           display: none;
         }
         .footer-icon {
@@ -227,7 +185,7 @@ export function Footer() {
         .footer-group-inner {
           padding-top: 16px;
         }
-        
+
         @media (min-width: 769px) {
           .footer-summary {
             margin-bottom: 16px;
@@ -263,26 +221,14 @@ export function Footer() {
             font-weight: 300;
           }
           
-          .footer-group-content {
-            display: grid;
-            grid-template-rows: 0fr;
-            transition: grid-template-rows 0.3s ease-out, opacity 0.3s ease-out;
-            opacity: 0;
-          }
           .footer-group-inner {
-            min-height: 0;
-            overflow: hidden;
             padding-top: 0;
-          }
-          
-          .footer-checkbox:checked ~ .footer-group-content {
-            grid-template-rows: 1fr;
-            opacity: 1;
-          }
-          .footer-checkbox:checked ~ .footer-group-content .footer-group-inner {
             padding-bottom: 16px;
           }
-          .footer-checkbox:checked ~ .footer-summary .footer-icon {
+          .footer-group:not([open]) .footer-group-inner {
+            display: none;
+          }
+          .footer-group[open] .footer-icon {
             transform: rotate(45deg);
           }
         }

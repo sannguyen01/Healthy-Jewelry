@@ -601,7 +601,7 @@
     display: block;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 769px) {
     .hj-desktop-text {
       display: inline-block;
     }

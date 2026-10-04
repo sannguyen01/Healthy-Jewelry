@@ -37,6 +37,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 // ── Helper: attach ref to DOM element then force the effect to re-run ─────────
@@ -49,9 +50,12 @@ afterEach(() => {
 function attachRefAndTriggerEffect(
   ref: React.RefObject<HTMLElement | null>,
   rerender: (props: { threshold: number }) => void,
-  threshold: number
+  threshold: number,
+  top = 5000
 ): void {
   const div = document.createElement('div')
+  // The hook only hides, and then observes, a section that starts below the fold.
+  div.getBoundingClientRect = () => ({ top }) as DOMRect
   ;(ref as { current: HTMLElement }).current = div
   // Changing the threshold dependency causes useEffect to re-run, this time
   // with a non-null ref so IntersectionObserver is constructed.
@@ -64,10 +68,10 @@ function attachRefAndTriggerEffect(
 
 describe('useReveal', () => {
   describe('return value shape', () => {
-    it('returns visible as false initially', () => {
+    it('returns visible as true initially, so the server HTML and no-JS visitors see it', () => {
       const { result } = renderHook(() => useReveal())
       const [, visible] = result.current
-      expect(visible).toBe(false)
+      expect(visible).toBe(true)
     })
 
     it('returns a ref object as the first element of the tuple', () => {
@@ -79,6 +83,60 @@ describe('useReveal', () => {
   })
 
   describe('intersection behaviour', () => {
+    it('hides a below-the-fold section after mount, then reveals it on intersection', () => {
+      const { result, rerender } = renderHook(
+        ({ threshold }: { threshold: number }) => useReveal(threshold),
+        { initialProps: { threshold: 0.12 } }
+      )
+
+      attachRefAndTriggerEffect(result.current[0], rerender, 0.13)
+      expect(result.current[1]).toBe(false)
+
+      act(() => {
+        observerCallback?.([{ isIntersecting: true } as IntersectionObserverEntry])
+      })
+      expect(result.current[1]).toBe(true)
+    })
+
+    it('never hides a section that is already in the viewport', () => {
+      const { result, rerender } = renderHook(
+        ({ threshold }: { threshold: number }) => useReveal(threshold),
+        { initialProps: { threshold: 0.12 } }
+      )
+
+      attachRefAndTriggerEffect(result.current[0], rerender, 0.13, 0)
+
+      expect(result.current[1]).toBe(true)
+      expect(IntersectionObserver).not.toHaveBeenCalled()
+    })
+
+    it('never hides anything for a visitor who prefers reduced motion', () => {
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query.includes('prefers-reduced-motion'),
+      }))
+      const { result, rerender } = renderHook(
+        ({ threshold }: { threshold: number }) => useReveal(threshold),
+        { initialProps: { threshold: 0.12 } }
+      )
+
+      attachRefAndTriggerEffect(result.current[0], rerender, 0.13)
+
+      expect(result.current[1]).toBe(true)
+      expect(IntersectionObserver).not.toHaveBeenCalled()
+    })
+
+    it('stays visible where IntersectionObserver does not exist', () => {
+      vi.stubGlobal('IntersectionObserver', undefined)
+      const { result, rerender } = renderHook(
+        ({ threshold }: { threshold: number }) => useReveal(threshold),
+        { initialProps: { threshold: 0.12 } }
+      )
+
+      attachRefAndTriggerEffect(result.current[0], rerender, 0.13)
+
+      expect(result.current[1]).toBe(true)
+    })
+
     it('sets visible to true when the observer fires with isIntersecting: true', () => {
       const { result, rerender } = renderHook(
         ({ threshold }: { threshold: number }) => useReveal(threshold),
@@ -106,6 +164,7 @@ describe('useReveal', () => {
         observerCallback?.([{ isIntersecting: false } as IntersectionObserverEntry])
       })
 
+      // Hidden after mount, and not revealed by a non-intersecting entry.
       expect(result.current[1]).toBe(false)
     })
 
@@ -149,6 +208,7 @@ describe('useReveal', () => {
 
       // Attach ref then rerender with 0.12 so the effect fires with that threshold
       const div = document.createElement('div')
+      div.getBoundingClientRect = () => ({ top: 5000 }) as DOMRect
       ;(result.current[0] as { current: HTMLElement }).current = div
       act(() => {
         rerender({ threshold: 0.12 })
@@ -164,6 +224,7 @@ describe('useReveal', () => {
       )
 
       const div = document.createElement('div')
+      div.getBoundingClientRect = () => ({ top: 5000 }) as DOMRect
       ;(result.current[0] as { current: HTMLElement }).current = div
       act(() => {
         rerender({ threshold: 0.5 })
