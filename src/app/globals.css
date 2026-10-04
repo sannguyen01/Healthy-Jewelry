@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /* ═══════════════════════════════════════════════════════════════
-   HEALTHY JEWELRY — T4 DESIGN SYSTEM
+   HEALTHY JEWELLERY — T4 DESIGN SYSTEM
    Barlow Condensed 500 headlines · DM Sans 300/400 UI/body
    ═══════════════════════════════════════════════════════════════ */
 
@@ -563,6 +563,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Without this the auto track's floor is the lockup's min-content — the whole name —
+       and the column cannot give way at all: the controls would be pushed instead. */
+    min-width: 0;
   }
 
   .hj-header-right {
@@ -608,9 +611,78 @@
     font-weight: 500;
     font-size: clamp(1rem, 1.4vw, 1.25rem);
     letter-spacing: 0.10em;
+  }
+
+  /* ── Brand lockup: the knot mark beside (header) or above (footer) the name ──
+     BrandLockup.tsx renders both. The mark's size is set here, not by the image:
+     the file is a 512px derivative and next/image serves 32-96px rasters of it.
+     The name is the part that gives way — never the mark, never a control
+     (ADR 016). Below 360px it is not rendered at all and the mark stands alone,
+     because a half-name ("HEALTHY JEWEL…") reads as a fault, not a choice. The
+     breakpoint is a measurement: e2e/header-fit.spec.ts sweeps the header and
+     fails if the name is ever shown cut off, and prints the narrowest width at
+     which it fits whole as its "brand lockup" annotation. See docs/adr/041. */
+  .hj-lockup {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+    /* Named, not left to the default `all`. Under reduced motion every element's transitions
+       last 0.01ms, and an element with no transition of its own animates *every* change —
+       its focus ring included, which then reads 0px wide at the moment it is focused
+       (layout-invariants.spec.ts, "visible focus indicators"). */
+    transition: color 0.3s ease-out;
+  }
+
+  .hj-lockup[data-variant="stacked"] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .hj-lockup-mark {
+    display: block;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+  }
+
+  .hj-lockup[data-variant="stacked"] .hj-lockup-mark {
+    width: 44px;
+    height: 44px;
+  }
+
+  .hj-lockup-text {
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  @media (max-width: 768px) {
+    .hj-lockup[data-variant="inline"] {
+      gap: 8px;
+    }
+    .hj-lockup[data-variant="inline"] .hj-lockup-mark {
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  @media (max-width: 359px) {
+    .hj-lockup[data-variant="inline"] {
+      min-width: 44px;
+      justify-content: center;
+    }
+    .hj-lockup[data-variant="inline"] .hj-lockup-mark {
+      width: 30px;
+      height: 30px;
+    }
+    .hj-lockup[data-variant="inline"] .hj-lockup-text {
+      display: none;
+    }
   }
 
   .hj-desktop-text {
@@ -624,6 +696,11 @@
   @media (min-width: 769px) {
     .hj-desktop-text {
       display: inline-block;
+    }
+    /* CONTACT is both a control and desktop-only text. Without this the rule above replaced
+       its flex centring with inline-block, and its label sat 10px above SEARCH beside it. */
+    .hj-icon-btn.hj-desktop-text {
+      display: flex;
     }
     .hj-mobile-icon {
       display: none;

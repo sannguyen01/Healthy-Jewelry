@@ -1,6 +1,28 @@
-// Healthy Jewelry — Site constants and SEO defaults
+// Healthy Jewellery — Site constants and SEO defaults
 
-export const SITE_NAME = 'Healthy Jewelry'
+/**
+ * The brand's name, as every surface displays it. Spelled as the domain is (see below) and as
+ * the owner confirmed on 2026-10-04. Until then the header said "Jewellery" and the footer,
+ * the page titles and the share cards said "Jewelry" — on the same page. Every display goes
+ * through this constant; `brand-name.test.ts` fails on a retyped copy of either spelling.
+ */
+export const SITE_NAME = 'Healthy Jewellery'
+
+/**
+ * The name the legal pages give the company: its registration, the copyright holder and the
+ * trademark owner. Deliberately not `SITE_NAME`. Whether the registered entity is spelled with
+ * one "l" or two is a fact about a registration, not a design choice, and it is counsel's to
+ * change (WS-H), not a styling pass's. Used by `/legal`, `/terms`, `/privacy` and the footer's
+ * copyright line.
+ */
+export const LEGAL_ENTITY_NAME = 'Healthy Jewelry'
+
+/**
+ * The knot mark every surface renders, served from `public/`. Derived — never hand-exported —
+ * from `assets/brand/knot-master.png` by `scripts/build-brand-mark.mjs`, which removes the
+ * black matte the master's edges were keyed out of. See docs/adr/041.
+ */
+export const BRAND_MARK_PATH = '/brand/knot-silver.png'
 
 /**
  * `||`, not `??`.
@@ -58,14 +80,14 @@ export const SITE_DESCRIPTION =
  * standard behind it (see the titanium materialSpec in the claims registry), and it was
  * the first thing a search result or a browser tab said about the brand.
  */
-export const SITE_DEFAULT_TITLE = 'Healthy Jewelry — Grade 23 Titanium, Niobium, 316L Steel'
+export const SITE_DEFAULT_TITLE = `${SITE_NAME} — Grade 23 Titanium, Niobium, 316L Steel`
 
 export const SITE_TAGLINE = 'Material integrity. No compromise.'
 
 // ── SEO defaults ───────────────────────────────────────────────────────────
 
 export const SEO_DEFAULTS = {
-  titleTemplate: '%s — Healthy Jewelry',
+  titleTemplate: `%s — ${SITE_NAME}`,
   defaultTitle: SITE_DEFAULT_TITLE,
   description: SITE_DESCRIPTION,
   openGraph: {
@@ -128,7 +150,7 @@ export const SENDER_EMAIL = 'contact@healthyjewellery.com'
  * reads as a fault, and a visitor who wants a piece needs the next step in the same breath.
  */
 export const BROWSE_ONLY_STATEMENT =
-  'This catalogue is for browsing. Healthy Jewelry does not take orders on this site — a ' +
+  `This catalogue is for browsing. ${SITE_NAME} does not take orders on this site — a ` +
   'piece is arranged with an ambassador, or through the contact channel below.'
 
 /**

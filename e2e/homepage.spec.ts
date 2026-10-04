@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './support/test'
+import { LEGAL_ENTITY_NAME, SITE_NAME } from '../src/config/site'
 
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
@@ -6,7 +7,7 @@ test.describe('Homepage', () => {
   })
 
   test('renders page title', async ({ page }) => {
-    await expect(page).toHaveTitle(/healthy jewelry/i)
+    await expect(page).toHaveTitle(new RegExp(SITE_NAME))
   })
 
   test('hero section is visible', async ({ page }) => {
@@ -64,7 +65,7 @@ test.describe('Homepage', () => {
   })
 
   test('footer shows copyright', async ({ page }) => {
-    await expect(page.getByText(/© 2026 Healthy Jewelry/i)).toBeVisible()
+    await expect(page.getByText(`© 2026 ${LEGAL_ENTITY_NAME}`)).toBeVisible()
   })
 
   test('horizontal scroll strip shows product cards', async ({ page }) => {

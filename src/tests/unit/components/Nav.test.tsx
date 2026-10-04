@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { Nav } from '@/components/layout/Nav'
+import { SITE_NAME } from '@/config/site'
 
 vi.mock('next/image', () => ({
   // eslint-disable-next-line @next/next/no-img-element
@@ -45,7 +46,7 @@ describe('Nav', () => {
 
     it('renders the brand wordmark', () => {
       render(<Nav />)
-      expect(screen.getByText('HEALTHY JEWELLERY')).toBeTruthy()
+      expect(screen.getByText(SITE_NAME)).toBeTruthy()
     })
 
     it('renders the contact link in the header bar', () => {
@@ -55,7 +56,7 @@ describe('Nav', () => {
 
     it('home link has correct aria-label', () => {
       render(<Nav />)
-      expect(screen.getByRole('link', { name: /healthy jewelry.*home/i })).toBeTruthy()
+      expect(screen.getByRole('link', { name: `${SITE_NAME} — home` })).toBeTruthy()
     })
   })
 

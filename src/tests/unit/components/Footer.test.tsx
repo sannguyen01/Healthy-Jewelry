@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Footer } from '@/components/layout/Footer'
 import { claimText } from '@/lib/catalog'
-import { SOCIAL_LINKS } from '@/config/site'
+import { LEGAL_ENTITY_NAME, SITE_NAME, SOCIAL_LINKS } from '@/config/site'
 
 /**
  * The tagline is the positioning line, and the positioning line is a pending claim — "Metal
@@ -38,7 +38,7 @@ describe('Footer', () => {
 
     it('renders brand name as a link', () => {
       render(<Footer />)
-      expect(screen.getByRole('link', { name: /healthy jewelry — home/i })).toBeTruthy()
+      expect(screen.getByRole('link', { name: `${SITE_NAME} — home` })).toBeTruthy()
     })
 
     it('renders brand tagline copy', () => {
@@ -119,7 +119,8 @@ describe('Footer', () => {
   describe('bottom bar', () => {
     it('shows copyright year', () => {
       render(<Footer />)
-      expect(screen.getByText(/© 2026 Healthy Jewelry/i)).toBeTruthy()
+      // The registered company, which is not necessarily the display name (see site.ts).
+      expect(screen.getByText(`© 2026 ${LEGAL_ENTITY_NAME}`)).toBeTruthy()
     })
 
     it('shows tagline in bottom bar', () => {

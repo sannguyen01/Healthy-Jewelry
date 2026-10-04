@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { footerGroups, legalLinks, socialLinks } from '@/config/navigation'
 import { FooterGroup } from '@/components/layout/FooterGroup'
+import { BrandLockup } from '@/components/layout/BrandLockup'
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 import { claimText } from '@/lib/catalog'
+import { LEGAL_ENTITY_NAME } from '@/config/site'
 
 /**
  * The positioning line, twice below. "Metal that works with your body" is a
@@ -64,23 +66,19 @@ export function Footer() {
         >
           {/* Brand column */}
           <div className="hj-brand-col">
-            <Link
-              href="/"
-              aria-label="Healthy Jewelry — home"
+            <BrandLockup
+              variant="stacked"
               style={{
-                display: 'inline-block',
                 padding: '12px 0',
                 fontFamily: 'var(--font-display)',
+                fontWeight: 500,
                 fontSize: '1.1rem',
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
                 color: 'var(--ink)',
-                textDecoration: 'none',
                 marginBottom: '4px',
               }}
-            >
-              Healthy Jewelry
-            </Link>
+            />
             <p
               style={{
                 fontFamily: 'var(--font-body)',
@@ -95,7 +93,9 @@ export function Footer() {
             </p>
             <nav
               aria-label="Social"
-              style={{ display: 'flex', flexWrap: 'wrap', gap: '0 4px', marginTop: '12px' }}
+              // -8px: each link carries 8px of side padding for its tap target, so the row is
+              // pulled back by the same amount to line its text up with the column above.
+              style={{ display: 'flex', flexWrap: 'wrap', gap: '0 4px', margin: '12px 0 0 -8px' }}
             >
               {socialLinks.map((link) => (
                 <a
@@ -164,7 +164,8 @@ export function Footer() {
               color: 'var(--titanium-text)',
             }}
           >
-            © 2026 Healthy Jewelry
+            {/* The registered company, not the display name: see LEGAL_ENTITY_NAME. */}
+            © 2026 {LEGAL_ENTITY_NAME}
           </span>
           {/*
             Withdrawing consent has to be as easy as giving it, and the prompt that gave it

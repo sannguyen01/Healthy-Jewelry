@@ -295,7 +295,7 @@ describe('positions: code, prose, and the line between them', () => {
   })
 
   it('an unknown extension has no language', () => {
-    expect(languageOf('public/logo.png')).toBe(null)
+    expect(languageOf('public/brand/knot-silver.png')).toBe(null)
     expect(languageOf('src/app/page.tsx')).toBe('c-style-jsx')
     expect(languageOf('docs/x.md')).toBe('all-prose')
   })

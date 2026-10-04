@@ -38,6 +38,8 @@ interface ImageProbe {
   height: number
   effectiveOpacity: number
   visibility: string
+  /** Where a knot mark sits (`img[data-brand-mark]`), or null for every other image. */
+  brandMark: 'header' | 'footer' | 'elsewhere' | null
 }
 
 /**
@@ -113,6 +115,13 @@ async function probeHomepage(page: Page): Promise<{
         height: Math.round(box.height),
         effectiveOpacity: effectiveOpacity(el),
         visibility: getComputedStyle(el).visibility,
+        brandMark: !el.hasAttribute('data-brand-mark')
+          ? null
+          : el.closest('header')
+            ? ('header' as const)
+            : el.closest('footer')
+              ? ('footer' as const)
+              : ('elsewhere' as const),
       }
     })
 
@@ -185,6 +194,22 @@ test.describe('Homepage visual assets', () => {
         .map((image) => `  ${describeImage(image)} → opacity ${image.effectiveOpacity}`)
         .join('\n')}`
     ).toEqual([])
+  })
+
+  test('the knot mark renders once in the header and once in the footer', async ({ page }) => {
+    // The generic checks above already hold every <img> to the three conditions, the marks
+    // included. What they cannot see is a mark that is not there: zero brand marks pass all of
+    // them. On 2026-10-04 the owner believed the logo was in the header and footer, and it was
+    // in neither — the redesign had replaced it with a text wordmark and nothing noticed.
+    const { images } = await probeHomepage(page)
+    const marks = images.filter((image) => image.brandMark !== null)
+    expect(marks.map((m) => m.brandMark).sort()).toEqual(['footer', 'header'])
+    for (const mark of marks) {
+      expect(mark.naturalWidth, `${mark.brandMark} mark never decoded`).toBeGreaterThan(0)
+      expect(mark.width * mark.height, `${mark.brandMark} mark has no box`).toBeGreaterThan(0)
+      expect(mark.effectiveOpacity, `${mark.brandMark} mark too faint`).toBeGreaterThanOrEqual(MIN_EFFECTIVE_OPACITY)
+      expect(mark.alt, 'decorative: the link around it carries the name').toBe('')
+    }
   })
 
   test('collection placeholder tiles are legible, not ghosts', async ({ page }) => {

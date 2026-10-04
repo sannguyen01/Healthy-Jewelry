@@ -122,8 +122,9 @@ describe('collectionsNav', () => {
 // ── site.ts ────────────────────────────────────────────────────────────────
 
 describe('site constants', () => {
-  it('SITE_NAME is Healthy Jewelry', () => {
-    expect(SITE_NAME).toBe('Healthy Jewelry')
+  it('SITE_NAME is Healthy Jewellery, spelled as the domain is', () => {
+    expect(SITE_NAME).toBe('Healthy Jewellery')
+    expect(SITE_URL).toContain(SITE_NAME.toLowerCase().replace(/\s+/g, ''))
   })
   it('SITE_URL contains the correct (double-L) domain', () => {
     expect(SITE_URL).toContain('healthyjewellery')
@@ -157,7 +158,7 @@ describe('site constants', () => {
 
 describe('SEO_DEFAULTS', () => {
   it('titleTemplate includes site name', () => {
-    expect(SEO_DEFAULTS.titleTemplate).toContain('Healthy Jewelry')
+    expect(SEO_DEFAULTS.titleTemplate).toBe(`%s — ${SITE_NAME}`)
   })
   it('defaultTitle is set', () => {
     expect(SEO_DEFAULTS.defaultTitle).toBeTruthy()
