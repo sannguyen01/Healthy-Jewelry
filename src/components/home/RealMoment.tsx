@@ -12,6 +12,7 @@ export function RealMoment() {
       className="hj-real-moment"
       style={{
         backgroundColor: 'var(--bg)',
+        borderBottom: '1px solid var(--ash)',
         padding: 'clamp(96px, 12vw, 160px) var(--space-gutter, clamp(20px,4vw,64px))',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',

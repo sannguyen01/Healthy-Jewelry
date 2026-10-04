@@ -74,17 +74,17 @@ export default function HomePage() {
         {/* 2. The metals */}
         <MaterialsSection />
 
-        {/* 3. A few pieces (4-6 items) */}
+        {/* 3. Reviewed care — the page's single dark interruption, beside the materials it explains */}
+        <CareSection body={claimText('materials-faq-skin', { kind: 'site' })} />
+
+        {/* 4. A few pieces (4-6 items) */}
         <HorizontalScroll label="CURATED PIECES" products={curatedPieces} />
 
-        {/* 4. Explore by type */}
+        {/* 5. Explore by type */}
         <CollectionGrid tiles={collectionTiles} />
 
-        {/* 5. The moment */}
+        {/* 6. The moment */}
         <RealMoment />
-
-        {/* 6. Reviewed care */}
-        <CareSection body={claimText('materials-faq-skin', { kind: 'site' })} />
 
         {/* 7. Continue the encounter */}
         <FollowUp />

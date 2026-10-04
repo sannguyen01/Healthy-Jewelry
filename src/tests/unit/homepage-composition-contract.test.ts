@@ -79,9 +79,8 @@ describe('homepage catalogue access', () => {
     // Catching the shape rather than only the count keeps a future variant from sneaking
     // in under a different helper name. `hjCollections` no longer exists — the pattern is
     // matched against whatever collection list is in hand.
-    const mapsToAwaitedFetch = /(?:hjCollections|getAllCollections\(\))\s*\.\s*map\s*\(\s*async/.test(
-      source
-    )
+    const mapsToAwaitedFetch =
+      /(?:hjCollections|getAllCollections\(\))\s*\.\s*map\s*\(\s*async/.test(source)
     expect(mapsToAwaitedFetch, 'collections are mapped to an async lookup again').toBe(false)
   })
 
@@ -101,24 +100,20 @@ describe('homepage catalogue access', () => {
     ).toBe(false)
   })
 
-  it('composes exactly three product strips', () => {
-    // bestsellers + newArrivals + the material strip. Pinned exactly rather than as a
-    // ceiling, in both directions on purpose: a rise means a fourth list nobody has
-    // deduplicated against the others, and a fall means a section went missing.
-    const strips =
-      callsTo(ast, 'getBestsellers').length +
-      callsTo(ast, 'getNewArrivals').length +
-      callsTo(ast, 'stripByMaterial').length
-
-    expect(strips, 'the homepage should compose exactly 3 product strips').toBe(3)
+  it('composes one curated product strip from two lists', () => {
+    // ADR 040: seven beats, one strip. The strip is built from bestsellers and new arrivals,
+    // so both reads are pinned exactly — a fall means the strip lost a source, a rise means a
+    // list nobody has deduplicated against the others. `stripByMaterial` is gone with the
+    // two material and campaign strips; its return is a composition change, not a tweak.
+    expect(callsTo(ast, 'getBestsellers').length).toBe(1)
+    expect(callsTo(ast, 'getNewArrivals').length).toBe(1)
+    expect(callsTo(ast, 'stripByMaterial').length).toBe(0)
   })
 
-  it('deduplicates the strips against each other', () => {
-    // `stripByMaterial` takes `alreadyShown`, and `dedupeInOrder` is the belt to that
-    // braces. Removing either is how `orbit-pendant-titanium` appeared twice on one page,
-    // carrying its Bestseller pill in both places.
+  it('deduplicates the two strip sources against each other', () => {
+    // `dedupeInOrder` is what stopped `orbit-pendant-titanium` appearing twice on one page,
+    // carrying its Bestseller pill in both places. One strip now, but two lists feed it.
     expect(callsTo(ast, 'dedupeInOrder').length).toBe(1)
-    expect(callsTo(ast, 'stripByMaterial').length).toBe(1)
   })
 
   it('renders the documented section sequence, in order', () => {
@@ -132,18 +127,18 @@ describe('homepage catalogue access', () => {
     // disagreeing would itself be worth knowing.
     const sequence = [
       ...source.matchAll(
-        /<(Hero|HorizontalScroll|CampaignBand|CollectionGrid|MaterialsSection)\b/g
+        /<(Hero|MaterialsSection|CareSection|HorizontalScroll|CollectionGrid|RealMoment|FollowUp)\b/g
       ),
     ].map((match) => match[1])
 
     expect(sequence, 'the homepage section sequence changed — update CLAUDE.md too').toEqual([
       'Hero',
-      'HorizontalScroll',
-      'CampaignBand',
+      'MaterialsSection',
+      'CareSection',
       'HorizontalScroll',
       'CollectionGrid',
-      'HorizontalScroll',
-      'MaterialsSection',
+      'RealMoment',
+      'FollowUp',
     ])
   })
 })

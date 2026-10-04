@@ -14,8 +14,8 @@ export function CareSection({ body }: { body: string }) {
     <section
       ref={sectionRef as React.RefObject<HTMLElement>}
       style={{
-        backgroundColor: 'var(--graphite)',
-        color: 'var(--bg)',
+        backgroundColor: 'var(--black)',
+        color: 'var(--on-dark)',
         padding: 'clamp(120px, 15vw, 200px) var(--space-gutter, clamp(20px,4vw,64px))',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
@@ -26,6 +26,7 @@ export function CareSection({ body }: { body: string }) {
       }}
     >
       <div
+        aria-hidden="true"
         style={{
           position: 'absolute',
           top: '50%',
@@ -61,7 +62,7 @@ export function CareSection({ body }: { body: string }) {
       >
         <h2
           className="label-eyebrow"
-          style={{ color: 'rgba(247,245,241,0.5)', marginBottom: '40px' }}
+          style={{ color: 'var(--mist)', marginBottom: '40px' }}
         >
           Care & Craft
         </h2>
@@ -83,7 +84,7 @@ export function CareSection({ body }: { body: string }) {
             fontFamily: 'var(--font-body)',
             fontWeight: 300,
             fontSize: 'clamp(18px, 2vw, 24px)',
-            color: 'rgba(247,245,241,0.8)',
+            color: 'var(--on-dark)',
             lineHeight: 1.6,
             maxWidth: '600px',
             margin: '0 auto',
