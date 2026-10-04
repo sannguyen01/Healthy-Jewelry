@@ -25,6 +25,17 @@ Every test passed, because no test asked whether a mark was *there*.
   `CLAUDE.md`'s header composition, nav and homepage list corrected.
 - Design canvas the owner reviewed: https://claude.ai/artifact/BXPnYW6EYBYrApdgHGfAsF
 
+**Later the same day: review fixes, and Songmont as the design reference.**
+- A `/code-review` of #104 found the root `loading.tsx` shipped the prerendered homepage inside a
+  hidden streamed segment: without JavaScript, every visitor saw only "LOADING". It is deleted,
+  and the no-JS test now checks for hidden ancestors. Fourteen further findings were fixed in
+  the same commit (legal pages render `LEGAL_ENTITY_NAME`; the 410 handlers no longer import
+  `site.ts`; a tiled logo for search engines; hue-preserving un-premultiply; DPR-3 `sizes`;
+  header-fit bounds and probes).
+- The owner set **Songmont** as the design reference. `--bg` is now its warm grey-beige ground
+  and `--graphite` carries secondary text in its dark-grey role. `DESIGN.md`, "Reference:
+  Songmont", records what was verified, from which secondary source, and what was not adopted.
+
 ### Still blocked, and on what
 
 - **Counsel (WS-H):** is the registered company "Healthy Jewelry" or "Healthy Jewellery"? Until
@@ -32,11 +43,15 @@ Every test passed, because no test asked whether a mark was *there*.
   the copyright line — the footer shows both spellings, deliberately.
 - **Claims reviewer:** `faq-continuous-wear` (pending) says "your Healthy Jewelry";
   `brand-name.test.ts` fails if it is approved unchanged.
-- **W5 (next PR from this branch):** a statically prerendered homepage still paints "LOADING" on
-  some cold loads (the root `loading.tsx` boundary, revealed ~250ms after load). Measure LCP with
-  and without it before deciding. No performance budget exists in CI yet.
+- **W5 (next PR from this branch):** no performance budget exists in CI yet. (The "LOADING"
+  first paint is fixed: the root `loading.tsx` is gone — see below.)
 - **W6, W7:** contact delivery evidence and the production admission read-back need the owner's
   accounts; unchanged from 2026-10-03.
+- **Owner, for the Songmont pass:** this environment's network policy denies
+  `songmontofficial.com` (and every mirror tried). Allow it in the cloud environment's network
+  settings, or share screenshots of its homepage, a collection page and a product page at
+  desktop and phone width, so typefaces, header composition and image crops can be matched
+  against the real site rather than secondary descriptions.
 - **Local-only, recorded so it is not rediscovered:** with this container's Chromium (1194, older
   than the one Playwright 1.63 pins), `layout-invariants` "visible focus indicators" reads a 0px
   outline on product-card links at the instant of focus — reduced motion's 0.01ms transitions on
