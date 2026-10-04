@@ -127,6 +127,17 @@ test.describe('Navigation', () => {
   })
 })
 
+test.describe('Search — a repeated query parameter', () => {
+  test('?q=ring&q=band searches for the first value instead of failing', async ({ page }) => {
+    // Next passes a repeated parameter as an array; the page called .trim() on it and
+    // rendered "Something went wrong" (found 2026-10-04 by probing the running build).
+    await page.goto('/search?q=ring&q=band')
+    await expect(page.getByText(/something went wrong/i)).toHaveCount(0)
+    await expect(page.getByText(/results? for "ring"/i)).toBeVisible()
+    await expect(page.locator('main a[href^="/products/"]').first()).toBeVisible()
+  })
+})
+
 test.describe('Navigation — mobile menu', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 

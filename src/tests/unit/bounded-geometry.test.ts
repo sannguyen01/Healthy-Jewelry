@@ -87,7 +87,15 @@ const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded';
   },
   'src/components/home/HorizontalScroll.tsx | aspectRatio | var(--ratio-product)': {
     state: 'intrinsic',
-    why: 'The image box fills a strip card whose own width is `clamp(200px, 68vw, 260px)`. The container caps the deriving axis at 260px, so the 1 / 1 ratio cannot grow past a 260px square.',
+    why: 'The image box fills a strip card whose own width is `clamp(200px, 68vw, 260px)`. The container caps the deriving axis at 260px, so the 3 / 4 listing crop (ADR 044) cannot grow past 260 x 347.',
+  },
+  'src/components/home/HorizontalScroll.tsx | minHeight | 24px': {
+    state: 'intrinsic',
+    why: 'The WCAG 2.5.8 hit area of "View All", one line of --text-xs in a `flexShrink: 0` link that never wraps. The content is the ceiling: the floor only lifts a 19-20px line of type to a 24px target (ADR 045).',
+  },
+  'src/components/ui/BrowseOnlyNotice.tsx | minHeight | 24px': {
+    state: 'intrinsic',
+    why: 'The WCAG 2.5.8 hit area of "Contact an ambassador", a single line of small capitals that measured 16px tall. Its own text caps it; the floor is the target, not a lower bound on something that grows (ADR 045).',
   },
   'src/components/product/ProductCard.tsx | aspectRatio | var(--ratio-product)': {
     state: 'intrinsic',

@@ -51,8 +51,25 @@ things the old faces had hidden, three of them now rules:
   ink, its 400 75–95%. Fifty `300` declarations and the body default became 400, and no Light
   face ships (two files, 19.4 KB).
 
+**Later: a site-wide audit** (ADR 045), at the owner's request — every API route probed with
+adversarial requests, all 14 page routes swept at 12 desktop and 5 touch widths (306
+measurements), every control exercised on both formats (71 checks), and `pnpm audit`:
+- **Critical, fixed:** Next.js 16.3.5's `next/og` RCE (GHSA-vcvr-r3jv-pc5j); now 16.3.8.
+- **High, fixed:** the contact route took a cross-site `text/plain` form as JSON (now 403 on a
+  foreign `Origin`/`Sec-Fetch-Site`); a pre-hydration or no-JS submit was a GET with the name,
+  email and message in the URL (now a POST the API answers with a page).
+- **Medium/low, fixed:** an unsanitised name in the mail subject; `/search?q=a&q=b` crashing;
+  `/search`'s button 17px off-screen at 320px; a `null` body answering 500; the strip's hidden
+  scrollbar for mice; `/about`'s rule overflowing; three sub-24px targets.
+- **Settled:** Vercel overwrites `x-forwarded-for` (its documentation, via the connector), so the
+  rate limiter's IP is not spoofable on this deployment.
+- `e2e/responsive-sweep.spec.ts` now holds the width sweep on every PR.
+
 ### Still blocked, and on what
 
+- **Two dependency upgrades, deliberately not in #104** (dev-only, each a major): Vitest to ≥4.1.11
+  for GHSA-82fw-gwwq-j7x9, and `eslint-config-next` to the 16.x line, which should drop the only
+  path to `braces` (GHSA-vfj7-8cjw-p6xm, no patched release). `pnpm audit` lists both.
 - **Counsel (WS-H):** is the registered company "Healthy Jewelry" or "Healthy Jewellery"? Until
   answered, `LEGAL_ENTITY_NAME` keeps the former on `/legal`, `/terms`, `/privacy`, `/shipping` and
   the copyright line — the footer shows both spellings, deliberately.

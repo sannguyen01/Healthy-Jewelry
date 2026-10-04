@@ -8,6 +8,7 @@ import { headers } from 'next/headers'
 import { searchFacets, searchProducts } from '@/lib/catalog'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { TrackView } from '@/components/analytics/TrackView'
+import { firstParam } from '@/lib/http/searchParam'
 
 export const metadata: Metadata = {
   title: 'Search',
@@ -15,7 +16,8 @@ export const metadata: Metadata = {
 }
 
 interface SearchPageProps {
-  searchParams: Promise<{ q?: string }>
+  // A repeated `?q=` arrives as an array; `firstParam` reduces it to one string.
+  searchParams: Promise<{ q?: string | string[] }>
 }
 
 /**
@@ -127,6 +129,9 @@ async function SearchResults({ query }: { query: string }) {
               aria-label="Search products"
               style={{
                 flex: 1,
+                // An input will not shrink below its default intrinsic width (its `size`)
+                // unless told it may: at 320px that held the SEARCH button 17px off-screen.
+                minWidth: 0,
                 padding: '14px 20px',
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
@@ -332,7 +337,7 @@ async function SearchResults({ query }: { query: string }) {
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q } = await searchParams
-  const query = q ?? ''
+  const query = firstParam(q)
 
   return (
     <>

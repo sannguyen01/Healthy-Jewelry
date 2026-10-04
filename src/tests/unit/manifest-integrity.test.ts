@@ -161,6 +161,12 @@ describe('the scanner is exact, not approximate', () => {
   })
 })
 
+// The range the real lockfile records for `next`, read from the manifest —
+// 'this repository agrees with its own lockfile' holds the two equal. It was the literal
+// `^16.3.4`, which made the upgrade to `^16.3.8` (GHSA-vcvr-r3jv-pc5j) fail two tests about
+// something else entirely.
+const lockedNext: string = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).dependencies.next
+
 describe('manifest and lockfile are compared on the effective range', () => {
   const lockfile = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8')
 
@@ -178,7 +184,7 @@ describe('manifest and lockfile are compared on the effective range', () => {
     expect(result.divergences).toContainEqual({
       name: 'next',
       manifest: '^15.5.24',
-      lockfile: '^16.3.4',
+      lockfile: lockedNext,
       overridden: false,
     })
   })
@@ -288,7 +294,7 @@ describe('the probe itself, pointed at the bytes that shipped', () => {
 
   it('names the package and both versions when the two files diverge', () => {
     const text = render(audit('{"dependencies":{"next":"^15.5.24"}}', lockfile)).join('\n')
-    expect(text).toContain('next: package.json says ^15.5.24, lockfile says ^16.3.4')
+    expect(text).toContain(`next: package.json says ^15.5.24, lockfile says ${lockedNext}`)
   })
 })
 

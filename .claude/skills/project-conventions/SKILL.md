@@ -42,7 +42,7 @@ flag it if you see:
 
 ## Testing baseline
 
-The suite spans **117 unit spec files** and **19 E2E spec files**.
+The suite spans **118 unit spec files** and **20 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
@@ -55,7 +55,10 @@ its edges). See docs/adr/041. **And by two unit and one E2E later the same day**
 to one self-hosted typeface: `font-files` (each file is the weight, licence and SHA-256 the
 loader and README say), `font-file-reader` (the WOFF2 reader those checks rely on, against
 fonts built byte by byte) and `e2e/glyph-coverage` (every character a route renders is one the
-face draws, and the face loaded). See docs/adr/043.
+face draws, and the face loaded). See docs/adr/043. **And by one of each again with the
+2026-10-04 audit**: `search-param` (a repeated query parameter becomes one string) and
+`e2e/responsive-sweep` (every page route at every width its project stands for: nothing past
+the viewport, 24px targets, no overlapping controls, no page errors). See docs/adr/045.
 
 **The unit count fell from 91 to 86 on 2026-09-20, and the reason is on the record rather
 than in a diff.** The Shopify decommission deleted seven specs whose subjects no longer

@@ -60,6 +60,10 @@ export function HorizontalScroll({
             textTransform: 'uppercase',
             color: 'var(--graphite)',
             flexShrink: 0,
+            // A 24px hit area (WCAG 2.5.8) around a line of small type that was 19-20px tall.
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: '24px',
             transition: 'color 0.2s var(--ease)',
           }}
           onMouseEnter={(e) => {

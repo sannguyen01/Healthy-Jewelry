@@ -168,7 +168,11 @@ export function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
+    // method + action are what a submit does before this component hydrates, or with scripts
+    // off: a POST to the API, which answers with a page. Without them the browser's default
+    // was a GET to this page, which put the visitor's name, email and message in the URL —
+    // and so in history and request logs — and sent nothing (found 2026-10-04).
+    <form method="post" action="/api/contact" onSubmit={handleSubmit} noValidate>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Name */}
         <div>

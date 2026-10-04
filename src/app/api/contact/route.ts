@@ -5,11 +5,13 @@ import {
   validateEmail,
   validateSubject,
   validateMessage,
+  sanitizeLine,
   sanitizeSubject,
 } from '@/lib/utils/contactValidation'
 import { CONTACT_EMAIL, SENDER_EMAIL, SITE_NAME } from '@/config/site'
 import { createRateLimiter, clientIp } from '@/lib/utils/rateLimit'
 import { readBoundedBody } from '@/lib/http/readBoundedBody'
+import { renderGonePage } from '@/lib/http/goneResponse'
 
 // Rate limiting lives in `@/lib/utils/rateLimit`, shared with every public
 // route. It used to be two hand-rolled copies; the cart proxy had none at all,
@@ -29,15 +31,90 @@ const limiter = createRateLimiter({
   onError: 'deny',
 })
 
+/**
+ * A form post that arrives without JavaScript — the visitor submitted before the page
+ * hydrated, or browses with scripts off. Its fields are percent-encoded, so the same 2,000
+ * characters can take three bytes per UTF-8 byte: 32 KB covers the worst case of every field.
+ */
+const MAX_FORM_BODY_BYTES = 32_768
+
+const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded'
+
+/**
+ * **A request from another site is refused before it costs anything.**
+ *
+ * The form is the only legitimate sender. Until 2026-10-04 this route parsed any body as JSON
+ * whatever its content type, so a form on any other site could post `enctype="text/plain"`
+ * whose body happened to be valid JSON, and every visitor's browser became a way to send this
+ * inbox mail on a third party's behalf — under the visitor's own rate-limit budget. Browsers
+ * say where a request comes from: `Sec-Fetch-Site` directly, and `Origin` on every POST. A
+ * request carrying neither is not a browser on another site (curl, a monitor), and is left to
+ * the rate limit as before. `Origin: null` is an opaque origin — a sandboxed frame, a
+ * `data:` page — and is refused with the rest.
+ */
+function isCrossSite(request: NextRequest): boolean {
+  if (request.headers.get('sec-fetch-site') === 'cross-site') return true
+  const origin = request.headers.get('origin')
+  if (origin === null) return false
+  try {
+    return new URL(origin).host !== request.headers.get('host')
+  } catch {
+    return true
+  }
+}
+
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c])
+
+/**
+ * The answer, in the form the request was made in. The scripted form reads JSON; a form
+ * posted without JavaScript is a page navigation, so it gets a page. Its error text is one of
+ * this route's own constants — nothing the visitor typed is ever echoed back into HTML.
+ */
+function replyFor(asPage: boolean) {
+  return (status: number, error?: string): NextResponse => {
+    if (!asPage) {
+      return error === undefined
+        ? NextResponse.json({ success: true })
+        : NextResponse.json({ error }, { status })
+    }
+    const sent = error === undefined
+    const html = renderGonePage({
+      title: sent ? `Message sent — ${SITE_NAME}` : `Message not sent — ${SITE_NAME}`,
+      heading: sent ? 'Message sent.' : 'Your message was not sent.',
+      paragraphs: sent
+        ? ['Thank you. We will reply to the address you gave.', '<a href="/">Return to the site</a>']
+        : [
+            escapeHtml(error),
+            'Go back to the form — your browser keeps what you typed — or email us directly.',
+            '<a href="/contact">Return to the contact page</a>',
+          ],
+    })
+    return new NextResponse(html, {
+      status,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Robots-Tag': 'noindex, nofollow',
+        'Cache-Control': 'no-store',
+      },
+    })
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const asForm = (request.headers.get('content-type') ?? '').toLowerCase().startsWith(FORM_CONTENT_TYPE)
+  const reply = replyFor(asForm)
+
+  // 0. Refuse another site's form before it reaches the limiter or the inbox.
+  if (isCrossSite(request)) {
+    return reply(403, `This form can only be sent from ${SITE_NAME}.`)
+  }
+
   // 1. Rate limit by IP
   const rateLimited = await limiter.isLimited(clientIp(request.headers))
 
   if (rateLimited) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
-      { status: 429 }
-    )
+    return reply(429, 'Too many requests. Please try again later.')
   }
 
   // 2. Parse and validate body
@@ -51,45 +128,54 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // per character in the worst case is 8,000 — plus the other three fields and
   // the JSON envelope. Generous enough never to refuse a real inquiry, small
   // enough that nothing can be buffered here at any scale worth having.
-  const raw = await readBoundedBody(request, MAX_BODY_BYTES)
+  const raw = await readBoundedBody(request, asForm ? MAX_FORM_BODY_BYTES : MAX_BODY_BYTES)
   if (!raw.ok) {
     return raw.reason === 'too-large'
-      ? NextResponse.json({ error: 'Request body too large' }, { status: 413 })
-      : NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+      ? reply(413, 'Request body too large')
+      : reply(400, 'Invalid request body')
   }
 
   let body: unknown
-  try {
-    body = JSON.parse(raw.text)
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  if (asForm) {
+    body = Object.fromEntries(new URLSearchParams(raw.text))
+  } else {
+    try {
+      body = JSON.parse(raw.text)
+    } catch {
+      return reply(400, 'Invalid request body')
+    }
   }
 
+  // JSON.parse accepts `null`, numbers and arrays as well as objects. Destructuring `null`
+  // throws, which answered a malformed request with a 500 instead of the 400 it is.
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return reply(400, 'Invalid request body')
+  }
   const { name, email, subject, message } = body as Record<string, unknown>
 
   if (typeof name !== 'string') {
-    return NextResponse.json({ error: 'Name must be 2-100 characters' }, { status: 400 })
+    return reply(400, 'Name must be 2-100 characters')
   }
   const nameError = validateName(name)
-  if (nameError) return NextResponse.json({ error: nameError }, { status: 400 })
+  if (nameError) return reply(400, nameError)
 
   if (typeof email !== 'string') {
-    return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
+    return reply(400, 'Valid email required')
   }
   const emailError = validateEmail(email)
-  if (emailError) return NextResponse.json({ error: emailError }, { status: 400 })
+  if (emailError) return reply(400, emailError)
 
   if (typeof subject !== 'string') {
-    return NextResponse.json({ error: 'Subject required' }, { status: 400 })
+    return reply(400, 'Subject required')
   }
   const subjectError = validateSubject(subject)
-  if (subjectError) return NextResponse.json({ error: subjectError }, { status: 400 })
+  if (subjectError) return reply(400, subjectError)
 
   if (typeof message !== 'string') {
-    return NextResponse.json({ error: 'Message must be 10-2000 characters' }, { status: 400 })
+    return reply(400, 'Message must be 10-2000 characters')
   }
   const messageError = validateMessage(message)
-  if (messageError) return NextResponse.json({ error: messageError }, { status: 400 })
+  if (messageError) return reply(400, messageError)
 
   // 3. Send via Resend — a missing key is a misconfiguration, not a reason to
   // tell the customer their message arrived. `{ success: true }` here used to
@@ -103,10 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error('[contact] RESEND_API_KEY not set — inquiry could not be forwarded')
     // Do NOT log PII (email/name) here: GDPR data minimisation requires
     // personal data not to appear in logs accessible to all project members.
-    return NextResponse.json(
-      { error: 'Failed to send message. Please email us directly.' },
-      { status: 503 }
-    )
+    return reply(503, 'Failed to send message. Please email us directly.')
   }
 
   // 4. Believe the provider's answer, not the absence of an exception.
@@ -134,13 +217,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // which is what an operator needs and all an operator needs.
   try {
     const cleanSubject = sanitizeSubject(subject)
+    const cleanName = sanitizeLine(name)
     const resend = new Resend(apiKey)
     const { data, error } = await resend.emails.send({
       from: `${SITE_NAME} Contact <${SENDER_EMAIL}>`,
       to: [CONTACT_EMAIL],
       replyTo: email,
-      subject: `[Contact] ${cleanSubject} — ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\nSubject: ${cleanSubject}\n\nMessage:\n${message}`,
+      subject: `[Contact] ${cleanSubject} — ${cleanName}`,
+      text: `Name: ${cleanName}\nEmail: ${email}\nSubject: ${cleanSubject}\n\nMessage:\n${message}`,
     })
 
     if (error) {
@@ -148,10 +232,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name: error.name,
         statusCode: error.statusCode,
       })
-      return NextResponse.json(
-        { error: 'Failed to send message. Please email us directly.' },
-        { status: 502 }
-      )
+      return reply(502, 'Failed to send message. Please email us directly.')
     }
 
     // Neither an error nor a message id is not a success. The SDK's types allow
@@ -163,13 +244,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name: 'missing_message_id',
         statusCode: null,
       })
-      return NextResponse.json(
-        { error: 'Failed to send message. Please email us directly.' },
-        { status: 502 }
-      )
+      return reply(502, 'Failed to send message. Please email us directly.')
     }
 
-    return NextResponse.json({ success: true })
+    return reply(200)
   } catch (err) {
     // The error's class name only. A thrown error's message and stack are free
     // text from code we do not own, and this is the one route whose inputs are a
@@ -177,9 +255,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error('[contact] Resend threw', {
       name: err instanceof Error ? err.name : typeof err,
     })
-    return NextResponse.json(
-      { error: 'Failed to send message. Please email us directly.' },
-      { status: 500 }
-    )
+    return reply(500, 'Failed to send message. Please email us directly.')
   }
 }

@@ -323,6 +323,11 @@ Full detail in **`docs/testing-strategy.md`**. In short:
   screen when `page.goto` resolves, with the real page in a hidden streamed segment; a probe that
   measured then saw zero-sized boxes and passed. `settle()` waits for the reveal, and a probe
   root with no box throws. See [ADR 042](docs/adr/042-a-page-measured-before-it-arrived.md).
+- **And every page is measured, not only the ones a spec was written for.**
+  `e2e/responsive-sweep.spec.ts` visits all 14 page routes at every width its project stands
+  for and fails on anything past the viewport, a control under 24px, overlapping controls, or a
+  page error. Its first run found `/search`'s button off-screen at 320px — a page no geometric
+  spec had visited. See [ADR 045](docs/adr/045-a-form-is-a-request-from-anywhere.md).
 - **And visibility is not reachability.** `toBeVisible()` returns true for a control whose centre
   is outside the viewport, and `.click()` deliberately aims at an in-viewport point instead, so
   both pass on a button a thumb cannot hit. `e2e/support/viewportFit.ts` measures geometry

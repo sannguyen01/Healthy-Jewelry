@@ -158,15 +158,29 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**117 unit spec files**',
-    claimed: '117',
+    context: '**118 unit spec files**',
+    claimed: '118',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
     doc: CONVENTIONS,
-    context: '**19 E2E spec files**',
-    claimed: '19',
+    context: '**20 E2E spec files**',
+    claimed: '20',
     actual: () => String(countFiles('e2e', (f) => /\.spec\.ts$/.test(f))),
+  },
+  {
+    // The same floor, as CLAUDE.md's testing notes state it.
+    doc: 'CLAUDE.md',
+    context: 'a control under 24px',
+    claimed: '24px',
+    actual: () => `${read('e2e/responsive-sweep.spec.ts').match(/MIN_TARGET_PX = (\d+)/)?.[1]}px`,
+  },
+  {
+    // The target floor the responsive sweep enforces on every page route.
+    doc: CONVENTIONS,
+    context: 'the viewport, 24px targets',
+    claimed: '24px',
+    actual: () => `${read('e2e/responsive-sweep.spec.ts').match(/MIN_TARGET_PX = (\d+)/)?.[1]}px`,
   },
   {
     doc: CONVENTIONS,
@@ -360,6 +374,7 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   // its `brand lockup` annotation, printed on every run.
   { doc: 'CLAUDE.md', context: 'Measured 2026-10-04, the whole name keeps' },
   { doc: 'CLAUDE.md', context: 'and it fits from 357px' },
+  { doc: 'CLAUDE.md', context: "button off-screen at 320px" },
   { doc: 'CLAUDE.md', context: 'sweeps 320–1440px' },
   { doc: 'CLAUDE.md', context: '**≥901px**' },
   { doc: 'CLAUDE.md', context: 'at `right: -120px`' },

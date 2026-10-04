@@ -57,7 +57,11 @@ export function BrowseOnlyNotice() {
           margin: 0,
         }}
       >
-        <Link href="/contact" style={{ color: 'var(--titanium-text)' }}>
+        <Link
+          href="/contact"
+          // A 24px hit area (WCAG 2.5.8): the line of small capitals alone was 16px tall.
+          style={{ color: 'var(--titanium-text)', display: 'inline-flex', alignItems: 'center', minHeight: '24px' }}
+        >
           Contact an ambassador
         </Link>
       </p>

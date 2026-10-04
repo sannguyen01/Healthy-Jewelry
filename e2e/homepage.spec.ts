@@ -85,6 +85,27 @@ test.describe('Homepage', () => {
     await expect(await productLinks.count()).toBeGreaterThan(1)
   })
 
+  test('the strip offers a mouse a scrollbar, and leaves touch without one', async ({ page }, testInfo) => {
+    // A plain wheel scrolls vertically only. With the bar hidden everywhere, the cards past
+    // the strip's edge (2 of 6 at 1280px) were reachable by mouse only with Shift+wheel
+    // (found 2026-10-04). Fine pointers get a hairline bar; touch scrolls sideways natively.
+    //
+    // Asserted on the computed `scrollbar-width`, not on the bar's box: Playwright launches
+    // headless Chromium with --hide-scrollbars, so no scrollbar ever takes layout space here
+    // and `offsetHeight - clientHeight` reads 0 whatever the stylesheet says.
+    const strip = page.locator('.hj3-noscroll').first()
+    await expect(strip).toBeVisible()
+    const m = await strip.evaluate((el: HTMLElement) => ({
+      fine: matchMedia('(hover: hover) and (pointer: fine)').matches,
+      overflow: el.scrollWidth - el.clientWidth,
+      scrollbar: getComputedStyle(el).scrollbarWidth,
+    }))
+    // Each project must exercise the branch it is here for, or this proves nothing.
+    expect(m.fine, `pointer media in ${testInfo.project.name}`).toBe(testInfo.project.name !== 'mobile')
+    expect(m.overflow, 'the strip no longer overflows, so this checks nothing').toBeGreaterThan(0)
+    expect(m.scrollbar).toBe(m.fine ? 'thin' : 'none')
+  })
+
   test('the homepage quotes no prices', async ({ page }) => {
     // The other half, asserted deliberately rather than left as the absence that broke
     // the test above. `src/tests/unit/price-absence-contract.test.tsx` owns this at the

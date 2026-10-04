@@ -67,7 +67,10 @@ const committed = {
 }
 
 describe('the served knot mark', () => {
-  it('is exactly what the master derives, pixel for pixel', () => {
+  // Its own budget: deriving four images from a 2560-pixel master is ~2.5s of arithmetic,
+  // and on a loaded machine it ran 5.7s against the 5s default (measured 2026-10-04). The cost
+  // is computation, not a wait that can hang, so the budget grows instead of the check shrinking.
+  it('is exactly what the master derives, pixel for pixel', { timeout: 30_000 }, () => {
     // So no derivative can be re-exported by hand: an image editor's file differs from the
     // pipeline's in every anti-aliased pixel. Fix: `node scripts/build-brand-mark.mjs`.
     const derived = deriveAll(master)
