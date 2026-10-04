@@ -3,7 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
+import { LEGAL_ENTITY_NAME, ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Shipping & Returns',
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     // A search snippet, so it says what the page is for rather than restating the terms as
     // an offer: "Free shipping on all … orders worldwide" read as an online store in search
     // results, on a site that takes no orders. The terms themselves are unchanged below.
-    'How a piece arranged with a Healthy Jewelry ambassador is delivered, returned or exchanged.',
+    `How a piece arranged with a ${LEGAL_ENTITY_NAME} ambassador is delivered, returned or exchanged.`,
 }
 
 const sectionHeadStyle: React.CSSProperties = {

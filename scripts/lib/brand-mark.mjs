@@ -24,6 +24,8 @@
 // is reproducible to the pixel, which `brand-mark-asset.test.ts` relies on: it re-runs this
 // pipeline from the master and compares the committed files pixel for pixel.
 
+import pngjs from 'pngjs'
+
 /**
  * @typedef {object} RgbaImage
  * @property {number} width
@@ -41,13 +43,23 @@ export const DERIVATIVES = /** @type {const} */ ({
   mark: { path: 'public/brand/knot-silver.png', size: 512, tile: false, inset: 0 },
   icon: { path: 'src/app/icon.png', size: 32, tile: true, inset: 3 },
   apple: { path: 'src/app/apple-icon.png', size: 180, tile: true, inset: 25 },
+  // What search engines show as the Organization logo. They lay it on white, where the bare
+  // silver mark is a pale smudge, so it sits on the same tile as the icons.
+  logo: { path: 'public/brand/knot-tile.png', size: 512, tile: true, inset: 72 },
 })
 
 export const MASTER_PATH = 'assets/brand/knot-master.png'
 
 /**
- * Un-premultiply every partially transparent pixel against black: F = min(255, round(C·255/α)).
+ * Un-premultiply every partially transparent pixel against black: F = C·255/α.
  * Fully opaque and fully transparent pixels are untouched.
+ *
+ * Not every edge pixel was premultiplied exactly: 5,814 of the master's 146,669 have a channel
+ * *brighter* than their alpha (α 9–50), so C·255/α exceeds 255 for them. Clamping each channel
+ * on its own, as the first version did, flattens the brightest channel while the others keep
+ * scaling, which shifts the pixel's hue — by up to 74 levels in one channel on this master. So
+ * when the brightest channel would overflow, all three are scaled by the same factor instead:
+ * the pixel keeps its hue and is as bright as it can be.
  * @param {RgbaImage} img
  * @returns {RgbaImage}
  */
@@ -56,7 +68,9 @@ export function decontaminate(img) {
   for (let i = 0; i < data.length; i += 4) {
     const a = data[i + 3]
     if (a === 0 || a === 255) continue
-    for (let k = 0; k < 3; k++) data[i + k] = Math.min(255, Math.round((data[i + k] * 255) / a))
+    const f = [0, 1, 2].map((k) => (data[i + k] * 255) / a)
+    const scale = Math.max(...f) > 255 ? 255 / Math.max(...f) : 1
+    for (let k = 0; k < 3; k++) data[i + k] = Math.round(f[k] * scale)
   }
   return { width: img.width, height: img.height, data }
 }
@@ -129,27 +143,42 @@ function coverage(from, to) {
 }
 
 /**
+ * @typedef {object} Premultiplied
+ * @property {number} side      the square's side
+ * @property {Float64Array} px  [A·R/255, A·G/255, A·B/255, A] per pixel
+ */
+
+/**
+ * The square image in premultiplied form, computed once and shared by every derivative: at the
+ * master's 2053² that is ~135 MB, and the first version rebuilt it for each output.
+ * @param {RgbaImage} img
+ * @returns {Premultiplied}
+ */
+export function premultiply(img) {
+  if (img.width !== img.height) throw new Error('premultiply: expects a square image')
+  const n = img.width
+  const px = new Float64Array(n * n * 4)
+  for (let i = 0; i < n * n; i++) {
+    const a = img.data[i * 4 + 3]
+    px[i * 4] = (img.data[i * 4] * a) / 255
+    px[i * 4 + 1] = (img.data[i * 4 + 1] * a) / 255
+    px[i * 4 + 2] = (img.data[i * 4 + 2] * a) / 255
+    px[i * 4 + 3] = a
+  }
+  return { side: n, px }
+}
+
+/**
  * Area-average downscale of a square image to `size`², in premultiplied space so transparent
  * pixels contribute no colour. Separable: rows, then columns.
- * @param {RgbaImage} img
+ * @param {RgbaImage | Premultiplied} source
  * @param {number} size
  * @returns {RgbaImage}
  */
-export function downscale(img, size) {
-  if (img.width !== img.height) throw new Error('downscale: expects a square image')
-  if (size > img.width) throw new Error(`downscale: ${size} is larger than ${img.width}`)
-  const n = img.width
+export function downscale(source, size) {
+  const { side: n, px: pre } = 'px' in source ? source : premultiply(source)
+  if (size > n) throw new Error(`downscale: ${size} is larger than ${n}`)
   const taps = coverage(n, size)
-
-  // Premultiplied: [A·R/255, A·G/255, A·B/255, A].
-  const pre = new Float64Array(n * n * 4)
-  for (let i = 0; i < n * n; i++) {
-    const a = img.data[i * 4 + 3]
-    pre[i * 4] = (img.data[i * 4] * a) / 255
-    pre[i * 4 + 1] = (img.data[i * 4 + 1] * a) / 255
-    pre[i * 4 + 2] = (img.data[i * 4 + 2] * a) / 255
-    pre[i * 4 + 3] = a
-  }
 
   const rows = new Float64Array(n * size * 4) // n rows × size columns
   for (let y = 0; y < n; y++) {
@@ -190,7 +219,7 @@ export function downscale(img, size) {
 
 /**
  * The mark, downscaled to `size - 2·inset` and laid centred on an opaque tile.
- * @param {RgbaImage} square  the trimmed, decontaminated master
+ * @param {RgbaImage | Premultiplied} square  the trimmed, decontaminated master
  * @param {number} size
  * @param {number} inset
  * @param {readonly [number, number, number]} [tile]
@@ -221,12 +250,34 @@ export function onTile(square, size, inset, tile = TILE_RGB) {
  * @returns {Record<keyof typeof DERIVATIVES, RgbaImage>}
  */
 export function deriveAll(master) {
-  const square = trimToSquare(decontaminate(master))
+  const square = premultiply(trimToSquare(decontaminate(master)))
   return {
     mark: downscale(square, DERIVATIVES.mark.size),
     icon: onTile(square, DERIVATIVES.icon.size, DERIVATIVES.icon.inset),
     apple: onTile(square, DERIVATIVES.apple.size, DERIVATIVES.apple.inset),
+    logo: onTile(square, DERIVATIVES.logo.size, DERIVATIVES.logo.inset),
   }
+}
+
+/**
+ * Decode a PNG to straight-alpha RGBA.
+ * @param {Uint8Array} bytes
+ * @returns {RgbaImage}
+ */
+export function decodePng(bytes) {
+  const png = pngjs.PNG.sync.read(Buffer.from(bytes))
+  return { width: png.width, height: png.height, data: new Uint8Array(png.data) }
+}
+
+/**
+ * Encode straight-alpha RGBA as a PNG, at the strongest compression.
+ * @param {RgbaImage} img
+ * @returns {Buffer}
+ */
+export function encodePng(img) {
+  const png = new pngjs.PNG({ width: img.width, height: img.height })
+  png.data = Buffer.from(img.data)
+  return pngjs.PNG.sync.write(png, { colorType: 6, deflateLevel: 9 })
 }
 
 /**

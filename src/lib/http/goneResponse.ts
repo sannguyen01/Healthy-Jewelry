@@ -34,7 +34,7 @@
  * exactly the dependency this page exists without.
  */
 
-import { SITE_NAME } from '@/config/site'
+import { SITE_NAME } from '@/config/brand'
 
 /** What a retired capability says for itself. */
 export interface GoneCopy {

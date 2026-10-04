@@ -3,7 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { CONTACT_EMAIL, ORDER_REFERENCE_HINT, SITE_DOMAIN } from '@/config/site'
+import { CONTACT_EMAIL, LEGAL_ENTITY_NAME, ORDER_REFERENCE_HINT, SITE_DOMAIN } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     // A search snippet, so it says what the page is for. "Lifetime warranty against
     // corrosion. Free returns within 30 days." read as an online store's promise in search
     // results, on a site that takes no orders. The terms themselves are unchanged below.
-    'The terms that govern use of this website, and pieces arranged with a Healthy Jewelry ambassador.',
+    `The terms that govern use of this website, and pieces arranged with a ${LEGAL_ENTITY_NAME} ambassador.`,
 }
 
 const sectionHeadStyle: React.CSSProperties = {
@@ -86,7 +86,7 @@ export default function TermsPage() {
           <div>
             <h2 style={sectionHeadStyle}>Acceptance of Terms</h2>
             <p style={bodyStyle}>
-              By accessing or using the Healthy Jewelry website ({SITE_DOMAIN}), you agree to be
+              By accessing or using the {LEGAL_ENTITY_NAME} website ({SITE_DOMAIN}), you agree to be
               bound by these Terms of Service. If you do not agree, please do not use our site or
               services.
             </p>
@@ -146,7 +146,7 @@ export default function TermsPage() {
             */}
             <p style={bodyStyle}>
               Browsing this catalogue creates no obligation on either side. An arrangement
-              exists only once it has been confirmed directly with a Healthy Jewelry
+              exists only once it has been confirmed directly with a {LEGAL_ENTITY_NAME}{' '}
               ambassador, in writing, including the piece, the size, the price and the
               delivery address.
             </p>
@@ -180,7 +180,7 @@ export default function TermsPage() {
             <p style={bodyStyle}>
               Payment for a piece is arranged directly with your ambassador, who will tell
               you which methods are available and issue a receipt. Anyone asking you to pay
-              through a form on this domain is not acting for Healthy Jewelry — please
+              through a form on this domain is not acting for {LEGAL_ENTITY_NAME} — please
               report it to{' '}
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
@@ -215,7 +215,7 @@ export default function TermsPage() {
                 surgical steel do not corrode under normal wear conditions" was a claim about
                 the metals, not a term, and was removed on 2026-09-26.
               */}
-              All Healthy Jewelry pieces carry a lifetime warranty against corrosion, tarnishing,
+              All {LEGAL_ENTITY_NAME} pieces carry a lifetime warranty against corrosion, tarnishing,
               and metal degradation.
             </p>
             <p style={bodyStyle}>
@@ -236,7 +236,7 @@ export default function TermsPage() {
           <div>
             <h2 style={sectionHeadStyle}>Limitation of Liability</h2>
             <p style={bodyStyle}>
-              To the fullest extent permitted by applicable law, Healthy Jewelry shall not be liable
+              To the fullest extent permitted by applicable law, {LEGAL_ENTITY_NAME} shall not be liable
               for any indirect, incidental, special, consequential, or punitive damages arising from
               your use of our products or services. Our total liability shall not exceed the amount
               you paid for the specific product or service that is the subject of the claim.
@@ -279,7 +279,7 @@ export default function TermsPage() {
                 {CONTACT_EMAIL}
               </a>
               <br />
-              <strong>Address:</strong> Healthy Jewelry
+              <strong>Address:</strong> {LEGAL_ENTITY_NAME}
             </p>
           </div>
         </section>

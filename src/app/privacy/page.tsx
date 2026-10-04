@@ -2,13 +2,13 @@ import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { CONTACT_EMAIL, PRIVACY_EMAIL } from '@/config/site'
+import { CONTACT_EMAIL, LEGAL_ENTITY_NAME, PRIVACY_EMAIL } from '@/config/site'
 import { CONSENT_STORAGE_KEY } from '@/lib/analytics/consent'
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'How Healthy Jewelry collects, uses, and protects your personal data.',
+  description: `How ${LEGAL_ENTITY_NAME} collects, uses, and protects your personal data.`,
 }
 
 const sectionHeadStyle: React.CSSProperties = {
@@ -160,7 +160,7 @@ export default function PrivacyPage() {
             </p>
             <p style={bodyStyle}>
               <strong>Separately, when you arrange a piece with an ambassador</strong>,
-              Healthy Jewelry holds what that arrangement requires: your name, the piece, the
+              {' '}{LEGAL_ENTITY_NAME} holds what that arrangement requires: your name, the piece, the
               amount agreed, a delivery address, and the method of payment — never full card
               numbers, which are handled by the payment provider and never reach us.
             </p>
@@ -317,7 +317,7 @@ export default function PrivacyPage() {
                 {PRIVACY_EMAIL}
               </a>
               <br />
-              <strong>Address:</strong> Healthy Jewelry
+              <strong>Address:</strong> {LEGAL_ENTITY_NAME}
             </p>
           </div>
         </section>

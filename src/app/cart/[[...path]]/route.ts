@@ -1,5 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
-import { SITE_NAME } from '@/config/site'
+import { SITE_NAME } from '@/config/brand'
 
 /**
  * `/cart` and `/cart/*` — **308 to `/shop` for browsing, 410 for anything else.**

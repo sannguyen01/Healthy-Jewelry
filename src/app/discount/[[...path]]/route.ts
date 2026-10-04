@@ -1,5 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/goneResponse'
-import { SITE_NAME } from '@/config/site'
+import { SITE_NAME } from '@/config/brand'
 
 /**
  * `/discount` and `/discount/*` — **410 Gone**.

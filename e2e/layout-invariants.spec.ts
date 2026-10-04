@@ -607,12 +607,31 @@ test.describe('JavaScript disabled', () => {
         // disabled under viewport emulation, which collapses the hero and everything after it
         // in the measurement without any visitor ever seeing that.
         text: (el.textContent ?? '').trim().length,
+        // Opacity, visibility and text all read normally inside a `[hidden]` ancestor, which is
+        // how this test passed while the whole page shipped in `<div hidden id="S:0">` behind
+        // the root loading.tsx fallback, and a visitor without JavaScript saw only "LOADING"
+        // (found in review, 2026-10-04; the fallback is gone). So ask the question directly.
+        hiddenAncestor: el.closest('[hidden]') !== null,
       }))
     )
     expect(sections.length, 'no sections rendered without JS').toBeGreaterThanOrEqual(7)
     expect(
-      sections.filter((s) => s.opacity !== 1 || s.visibility !== 'visible' || s.text === 0),
+      sections.filter((s) => s.opacity !== 1 || s.visibility !== 'visible' || s.text === 0 || s.hiddenAncestor),
       'a section is hidden or collapsed without JavaScript'
     ).toEqual([])
+
+    const page_ = await page.evaluate(() => ({
+      headerHidden: document.querySelector('header')?.closest('[hidden]') !== null,
+      // A loading placeholder that is actually on screen: rendered, and not inside [hidden].
+      loadingShown: [...document.querySelectorAll('body *')].some(
+        (el) =>
+          el.children.length === 0 &&
+          /^loading$/i.test((el.textContent ?? '').trim()) &&
+          el.closest('[hidden]') === null &&
+          getComputedStyle(el).display !== 'none'
+      ),
+    }))
+    expect(page_.headerHidden, 'the header is inside a hidden streamed segment without JavaScript').toBe(false)
+    expect(page_.loadingShown, 'a "Loading" placeholder is what a visitor without JavaScript sees').toBe(false)
   })
 })

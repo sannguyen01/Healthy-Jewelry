@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { nameShownFromPx } from '@/lib/design/lockupBreakpoint'
 
 /**
  * The design system's consistency decisions, read out of source.
@@ -138,10 +139,7 @@ describe('DESIGN.md agrees with the code', () => {
   it('states each pixel figure as the stylesheet does', () => {
     const fromCss: Record<string, string | undefined> = {
       // "below 360px the mark stands alone": the name is display:none up to 359px.
-      '360px': (() => {
-        const m = css.match(/@media \(max-width: (\d+)px\)\s*\{[^@]*?\.hj-lockup-text\s*\{\s*display:\s*none/)
-        return m ? `${Number(m[1]) + 1}px` : undefined
-      })(),
+      '360px': `${nameShownFromPx(css)}px`,
       // "at least 44px": the shared header-control rule.
       '44px': css
         .slice(css.indexOf('.hj-menu-btn, .hj-icon-btn, .hj-wordmark {'))
@@ -154,5 +152,17 @@ describe('DESIGN.md agrees with the code', () => {
       Object.keys(fromCss).sort()
     )
     for (const [figure, actual] of Object.entries(fromCss)) expect(actual, figure).toBe(figure)
+  })
+})
+
+describe('nameShownFromPx', () => {
+  it('reads the width from which the name is shown', () => {
+    const css = '@media (max-width: 359px) {\n  .hj-lockup[data-variant="inline"] .hj-lockup-text {\n    display: none;\n  }\n}'
+    expect(nameShownFromPx(css)).toBe(360)
+  })
+
+  it('returns undefined, not a default, when the rule is gone', () => {
+    expect(nameShownFromPx('.hj-lockup-text { display: none; }')).toBeUndefined()
+    expect(nameShownFromPx('')).toBeUndefined()
   })
 })

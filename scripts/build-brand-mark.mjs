@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Healthy Jewellery — derive every served copy of the knot mark from the master.
 //
-//   node scripts/build-brand-mark.mjs           write public/brand/knot-silver.png and the icons
+//   node scripts/build-brand-mark.mjs           write the served mark, the tiled logo and the icons
 //   node scripts/build-brand-mark.mjs --check   exit 1 if any committed copy differs from what
 //                                                the master derives, pixel for pixel
 //
@@ -12,24 +12,12 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import pngjs from 'pngjs'
-import { DERIVATIVES, MASTER_PATH, deriveAll } from './lib/brand-mark.mjs'
+import { DERIVATIVES, MASTER_PATH, decodePng, deriveAll, encodePng } from './lib/brand-mark.mjs'
 
-const { PNG } = pngjs
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** @param {string} rel */
-function decode(rel) {
-  const png = PNG.sync.read(readFileSync(join(ROOT, rel)))
-  return { width: png.width, height: png.height, data: new Uint8Array(png.data) }
-}
-
-/** @param {{ width: number, height: number, data: Uint8Array }} img */
-function encode(img) {
-  const png = new PNG({ width: img.width, height: img.height })
-  png.data = Buffer.from(img.data)
-  return PNG.sync.write(png, { colorType: 6, deflateLevel: 9 })
-}
+const decode = (rel) => decodePng(readFileSync(join(ROOT, rel)))
 
 const check = process.argv.includes('--check')
 const derived = deriveAll(decode(MASTER_PATH))
@@ -48,7 +36,7 @@ for (const [name, spec] of Object.entries(DERIVATIVES)) {
     if (!same) stale++
     continue
   }
-  const bytes = encode(img)
+  const bytes = encodePng(img)
   mkdirSync(dirname(join(ROOT, spec.path)), { recursive: true })
   writeFileSync(join(ROOT, spec.path), bytes)
   console.log(`wrote ${spec.path} (${img.width}×${img.height}, ${bytes.length} bytes)`)

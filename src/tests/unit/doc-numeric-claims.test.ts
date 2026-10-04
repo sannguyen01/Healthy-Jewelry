@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { contrastRatio } from '@/lib/utils/contrast'
+import { nameShownFromPx } from '@/lib/design/lockupBreakpoint'
 
 import { ROOT, agentFacingDocuments, missingAgentDocuments } from '../support/agentDocs'
 
@@ -251,12 +252,7 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     doc: 'CLAUDE.md',
     context: 'below 360px the name is not rendered',
     claimed: '360px',
-    actual: () => {
-      const hiddenTo = read('src/app/globals.css').match(
-        /@media \(max-width: (\d+)px\)\s*\{[^@]*?\.hj-lockup-text\s*\{\s*display:\s*none/
-      )?.[1]
-      return `${hiddenTo === undefined ? undefined : Number(hiddenTo) + 1}px`
-    },
+    actual: () => `${nameShownFromPx(read('src/app/globals.css'))}px`,
   },
   {
     doc: 'CLAUDE.md',

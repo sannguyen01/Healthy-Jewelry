@@ -101,7 +101,10 @@ const LEGAL_EXEMPTIONS: ReadonlyArray<{ file: string; route: string; span: strin
   {
     file: 'src/app/legal/page.tsx',
     route: '/legal',
-    span: 'The tagline “Metal that works with your body” is the proprietary brand copy of Healthy Jewelry.',
+    // Ends before the company: the page renders that name from LEGAL_ENTITY_NAME, and in source an
+    // expression splits the sentence, so a span carrying the name could match the rendered page
+    // and never the file. What is exempted is the quoted tagline, not who owns it.
+    span: 'The tagline “Metal that works with your body” is the proprietary brand copy of',
     reason:
       'A trademark notice names the mark; it does not assert what the mark says. The line itself is a ' +
       'pending claim and no longer renders anywhere else.',

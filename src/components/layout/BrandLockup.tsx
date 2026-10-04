@@ -11,10 +11,11 @@ import { BRAND_MARK_PATH, SITE_NAME } from '@/config/site'
  *   and an image alt would make a screen reader say the brand twice. The visible name sits
  *   inside the label ("Healthy Jewellery — home"), which is what WCAG 2.5.3 asks of a
  *   control whose name differs from its text.
- * - Its size lives in CSS (`--hj-mark-size` on `.hj-lockup-mark` in `globals.css`), because
- *   the header changes it at two breakpoints. `width`/`height` here only tell next/image which
- *   rasters to put in the srcset — the largest box this variant is ever drawn at, so the 2x
- *   candidate stays sharp and nothing larger is fetched.
+ * - Its size lives in CSS (`.hj-lockup-mark` in `globals.css`), because the header changes it
+ *   at two breakpoints. `width`/`height` give the intrinsic box (no layout shift); `sizes`
+ *   states the rendered size per breakpoint, which is what makes next/image emit a full `w`
+ *   srcset instead of only 1x/2x — without it a DPR-3 phone upscaled the 2x raster and blurred
+ *   the edges the matte removal exists to keep clean.
  * - In the header the name is the part that gives way. Below the breakpoint in `globals.css` it
  *   is not rendered at all and the mark carries the brand alone: ADR 016's rule, "the brand
  *   gives, the controls never do", taken one step further than an ellipsis. A cut-off name
@@ -32,6 +33,12 @@ export interface BrandLockupProps {
 /** The largest CSS size each variant renders the mark at, in px. Mirrors `globals.css`. */
 const MARK_BOX = { inline: 30, stacked: 44 } as const
 
+/** The rendered size at each breakpoint, as `globals.css` sets it on `.hj-lockup-mark`. */
+const MARK_SIZES = {
+  inline: '(max-width: 359px) 30px, (max-width: 768px) 24px, 28px',
+  stacked: '44px',
+} as const
+
 export function BrandLockup({ variant, className, style, onClick, eager = false }: BrandLockupProps) {
   return (
     <Link
@@ -47,6 +54,7 @@ export function BrandLockup({ variant, className, style, onClick, eager = false 
         alt=""
         width={MARK_BOX[variant]}
         height={MARK_BOX[variant]}
+        sizes={MARK_SIZES[variant]}
         loading={eager ? 'eager' : 'lazy'}
         className="hj-lockup-mark"
         data-brand-mark=""

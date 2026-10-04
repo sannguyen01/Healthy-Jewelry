@@ -1,5 +1,8 @@
 import { test, expect, type Page } from './support/test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { mainNav } from '../src/config/navigation'
+import { nameShownFromPx } from '../src/lib/design/lockupBreakpoint'
 import {
   describeOffenders,
   minimumFittingWidth,
@@ -56,11 +59,24 @@ const DEVICE_WIDTHS = [320, 360, 375, 390, 412, 414, 768, 769, 1024, 1440]
 const headerFits: FitProbe = (page) => offendersPastViewport(page, 'header')
 
 /**
- * Below this the header shows the knot mark without the name. Mirrors
- * `@media (max-width: 359px)` on `.hj-lockup-text` in `src/app/globals.css`; the sweep fails at
- * every width where the two disagree, so neither can move alone.
+ * Below this the header shows the knot mark without the name. Read out of `globals.css` by the
+ * same function the unit tests use, so the stylesheet is the one place it is decided; this spec
+ * checks that the browser renders what the stylesheet says, at the breakpoint's own two pixels
+ * as well as across the sweep (whose 8px step would otherwise straddle a small drift).
  */
-const NAME_SHOWN_FROM_PX = 360
+const NAME_SHOWN_FROM_PX = (() => {
+  const px = nameShownFromPx(readFileSync(join(__dirname, '../src/app/globals.css'), 'utf8'))
+  if (px === undefined) throw new Error('the lockup breakpoint rule is missing from globals.css')
+  return px
+})()
+
+/**
+ * How far above the measured fit the breakpoint may sit. The measurement bounds it from below
+ * (never show a name that crowds a control); this bounds it from above, so hiding the name on
+ * phones where it fits comfortably — a breakpoint raised to 700px, say — fails too. 16px is two
+ * sweep steps: room for font-rendering variance, not for a different decision.
+ */
+const BREAKPOINT_HEADROOM_MAX_PX = 16
 
 /** The header mark's rendered width: 30px alone, 24px beside the name on phones, 28px on desktop. */
 const MARK_PX = { min: 24, max: 30 }
@@ -101,6 +117,11 @@ async function lockupState(page: Page): Promise<LockupState> {
     if (!menu) return 'header .hj-menu-btn'
     if (!rightCluster) return 'header .hj-header-right'
     if (!firstRight) return 'a visible control in .hj-header-right'
+    // `gap` is how the cluster spaces its controls. If that ever moves to margins, columnGap
+    // reads "normal", parses as NaN, and `clearance < NaN` is false for every width: the check
+    // would pass having compared nothing. So a NaN is reported as a missing part.
+    if (Number.isNaN(Number.parseFloat(getComputedStyle(rightCluster).columnGap)))
+      return 'a numeric column-gap on .hj-header-right'
     return {
       viewport: window.innerWidth,
       shown,
@@ -235,7 +256,7 @@ test.describe('Header fit', () => {
     await page.goto('/')
     await expect(page.locator('header')).toBeVisible()
 
-    const findings = await sweep(page, SWEEP, async (p) => {
+    const judge = async (p: Page): Promise<Offender[]> => {
       const state = await lockupState(p)
       const out: Offender[] = []
       if (state.shown && state.cutPx > 0)
@@ -254,8 +275,13 @@ test.describe('Header fit', () => {
       if (state.mark.right > state.viewport)
         out.push({ label: 'the knot mark', overhangPx: state.mark.right - state.viewport, edge: 'right' })
       return out
-    })
+    }
+    const findings = await sweep(page, SWEEP, judge)
     expect(findings.length).toBe(Math.floor((SWEEP.to - SWEEP.from) / SWEEP.step) + 1)
+    // The breakpoint's own two pixels: the last width without the name and the first with it.
+    for (const width of [NAME_SHOWN_FROM_PX - 1, NAME_SHOWN_FROM_PX]) {
+      findings.push(...(await sweep(page, { from: width, to: width, step: 1 }, judge)))
+    }
 
     const failures = findings.filter((f) => f.offenders.length > 0)
     expect(
@@ -264,7 +290,9 @@ test.describe('Header fit', () => {
     ).toEqual([])
   })
 
-  test('the name is hidden only where it would not fit whole, with room around it', async ({ page }) => {
+  test('the name is shown only where it fits whole with room around it, and hidden only just below that', async ({
+    page,
+  }) => {
     // The breakpoint is a measurement, not a guess: force the name visible, find the narrowest
     // width at which it is uncut, pushes no control off-screen, and keeps at least the gap the
     // controls keep between themselves on both sides — then require the breakpoint to sit at or
@@ -301,7 +329,11 @@ test.describe('Header fit', () => {
         (fitsFrom === null ? '' : `; ${NAME_SHOWN_FROM_PX - fitsFrom}px of headroom`),
     })
     expect(fitsFrom, `the whole name never fits in ${mobile.label}`).not.toBeNull()
-    expect(fitsFrom as number).toBeLessThanOrEqual(NAME_SHOWN_FROM_PX)
+    expect(fitsFrom as number, 'the name is shown where it crowds a control').toBeLessThanOrEqual(NAME_SHOWN_FROM_PX)
+    expect(
+      NAME_SHOWN_FROM_PX - (fitsFrom as number),
+      `the name is hidden on ${NAME_SHOWN_FROM_PX - (fitsFrom as number)}px of widths where it fits`
+    ).toBeLessThanOrEqual(BREAKPOINT_HEADROOM_MAX_PX)
   })
 
   test('the mobile overlay carries everything the header sheds', async ({ page }) => {

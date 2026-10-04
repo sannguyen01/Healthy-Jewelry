@@ -25,28 +25,23 @@ const { splitPositions, languageOf } = await import('../../../scripts/lib/commer
  * Test files are not scanned: they quote retired copy as fixtures on purpose.
  */
 
-const OLD = /healthy[\s-]+jewelry/i
-const NEW = /healthy[\s-]+jewellery/i
+// Global, and matched against a whole file at once: a name reflowed across a line break by the
+// formatter is still the name.
+const OLD = /healthy[\s-]+jewelry/gi
+const NEW = /healthy[\s-]+jewellery/gi
 
 /**
  * Where the old spelling stays, each for a stated reason. A file listed here that no longer
  * contains it fails too: an allowance that outlives its subject is a hole with a label on it.
  */
 const OLD_SPELLING_ALLOWED: Record<string, string> = {
-  'src/config/site.ts':
-    'LEGAL_ENTITY_NAME: the registered company. Whether it has one "l" or two is a fact about a registration, and counsel\'s to change (WS-H).',
-  'src/app/legal/page.tsx':
-    'A legal instrument naming the company, its address and its trademarks. Held for WS-H, not restyled.',
-  'src/app/terms/page.tsx':
-    'The contracting party in the terms of use, warranty and liability text. Held for WS-H.',
-  'src/app/privacy/page.tsx': 'The data controller in a data-protection notice owned by WS-G.',
-  'src/app/shipping/page.tsx':
-    'A held page in the legal-review inventory (legal-review-inventory.test.tsx). Its wording moves with the adviser, not with a rename.',
+  'src/config/brand.ts':
+    'LEGAL_ENTITY_NAME: the registered company. Whether it has one "l" or two is a fact about a registration, and counsel\'s to change (WS-H). The legal pages render it from here.',
 }
 
 /** Where the new spelling may be typed: the constant itself, and nowhere else. */
 const NEW_SPELLING_ALLOWED: Record<string, string> = {
-  'src/config/site.ts': 'SITE_NAME is defined here.',
+  'src/config/brand.ts': 'SITE_NAME is defined here.',
 }
 
 /**
@@ -60,10 +55,24 @@ const PENDING_CLAIMS_ALLOWED: Record<string, string> = {
 
 const SOURCES = filesUnder(['src', 'e2e'], /\.(tsx?|mjs|css)$/).filter((f) => !f.startsWith('src/tests/'))
 
-/** Every line of code (not comment) in `file` that matches `pattern`. */
+/**
+ * Every match of `pattern` in the code (not the comments) of `file`, reported by line.
+ *
+ * The code positions are rejoined into one string so a match can span a line break, and the
+ * ways JSX writes a space without a space — `&nbsp;`, `{' '}`, `{" "}`, a non-breaking space —
+ * are replaced by spaces of the same length first, so line numbers stay exact. Matching line by
+ * line, as the first version did, passed `…a Healthy` / `Jewelry ambassador…` the moment the
+ * formatter reflowed a paragraph.
+ */
 function codeHits(file: string, source: string, pattern: RegExp): string[] {
   const { code } = splitPositions(source, languageOf(file)) as { code: string[] }
-  return code.flatMap((line, i) => (pattern.test(line) ? [`${file}:${i + 1}: ${line.trim()}`] : []))
+  const text = code
+    .join('\n')
+    .replace(/&nbsp;|\{\s*(['"])\s\1\s*\}|\u00a0/g, (m) => ' '.repeat(m.length))
+  return [...text.matchAll(pattern)].map((m) => {
+    const line = text.slice(0, m.index).split('\n').length
+    return `${file}:${line}: ${m[0].replace(/\s+/g, ' ')}`
+  })
 }
 
 function sweep(pattern: RegExp, allowed: Record<string, string>) {
@@ -128,6 +137,17 @@ describe('the sweep can fail (ADR 024)', () => {
       '/* Healthy Jewelry in a block comment */',
     ].join('\n')
     expect(codeHits('src/x.tsx', source, OLD).map((h) => h.split(':')[1])).toEqual(['2', '3', '4'])
+  })
+
+  it('flags the name across a reflowed line, an entity and a JSX space', () => {
+    const source = [
+      'const a = <p>arranged with a Healthy',
+      '  Jewelry ambassador</p>',
+      'const b = <p>Healthy&nbsp;Jewelry</p>',
+      "const c = <p>Healthy{' '}Jewelry</p>",
+      'const d = <p>Healthy\u00a0Jewelry</p>',
+    ].join('\n')
+    expect(codeHits('src/x.tsx', source, OLD).map((h) => h.split(':')[1])).toEqual(['1', '3', '4', '5'])
   })
 
   it('tells the two spellings apart', () => {

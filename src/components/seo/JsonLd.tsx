@@ -8,7 +8,7 @@ import {
   CONTACT_EMAIL,
   SOCIAL_LINKS,
   SITE_DESCRIPTION,
-  BRAND_MARK_PATH,
+  BRAND_LOGO_PATH,
 } from '@/config/site'
 import { productSeo } from '@/lib/seo/productSeo'
 import type { BreadcrumbItem } from './Breadcrumbs'
@@ -80,10 +80,11 @@ export function organizationJsonLd(): Record<string, unknown> {
     '@type': 'Organization',
     name: SITE_NAME,
     url: SITE_URL,
-    // A 512px raster of the knot: search engines want a logo of at least 112px in a raster
-    // format. This pointed at /favicon.svg until 2026-10-04 — a placeholder double circle that
-    // was not the brand's mark and that no page even linked as its icon.
-    logo: `${SITE_URL}${BRAND_MARK_PATH}`,
+    // A 512px raster of the knot on its `--black` tile: search engines want at least 112px in a
+    // raster format, and they show it on white, where the bare silver mark is a pale smudge.
+    // This pointed at /favicon.svg until 2026-10-04 — a placeholder double circle that was not
+    // the brand's mark and that no page even linked as its icon.
+    logo: `${SITE_URL}${BRAND_LOGO_PATH}`,
     // The site description, not a copy of it. This carried its own "Hypoallergenic,
     // corrosion-proof" sentence until 2026-09-26 — structured data is read by machines that
     // quote it, so a claim here is a claim in every rich result.
