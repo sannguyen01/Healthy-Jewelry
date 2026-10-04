@@ -140,7 +140,7 @@ describe('T4 design tokens', () => {
     // Guards the whole file: a parser that silently matches nothing would make
     // every assertion below vacuous.
     expect(Object.keys(tokens).length).toBeGreaterThanOrEqual(11)
-    expect(tokens.bg).toBe('#F7F5F1')
+    expect(tokens.bg).toBe('#F3F2EC')
     expect(tokens.ink).toBe('#1A1714')
   })
 

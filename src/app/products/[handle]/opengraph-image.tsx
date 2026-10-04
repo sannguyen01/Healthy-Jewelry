@@ -90,7 +90,7 @@ export default async function Image({ params }: Props) {
   return new ImageResponse(
     <div
       style={{
-        background: '#F7F5F1',
+        background: '#F3F2EC',
         width: '100%',
         height: '100%',
         display: 'flex',
@@ -150,7 +150,7 @@ export default async function Image({ params }: Props) {
                 padding: '8px 16px',
                 fontSize: 12,
                 letterSpacing: '0.12em',
-                color: '#6B6762',
+                color: '#4A4744',
                 display: 'flex',
               }}
             >

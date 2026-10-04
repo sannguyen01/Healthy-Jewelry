@@ -28,7 +28,7 @@ export default function Image() {
     (
       <div
         style={{
-          background: '#F7F5F1',
+          background: '#F3F2EC',
           width: '100%',
           height: '100%',
           display: 'flex',
@@ -47,13 +47,13 @@ export default function Image() {
           <span style={{ fontSize: 88, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 0.95, display: 'flex' }}>GRADE 23</span>
           <span style={{ fontSize: 88, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 0.95, display: 'flex' }}>TITANIUM</span>
         </div>
-        <div style={{ marginTop: 36, fontSize: 22, color: '#6B6762', letterSpacing: '0.04em', display: 'flex' }}>
+        <div style={{ marginTop: 36, fontSize: 22, color: '#4A4744', letterSpacing: '0.04em', display: 'flex' }}>
           {/* The positioning line is a pending claim; the card renders what the page does. */}
           {claimText('brand-positioning', { kind: 'site' })}
         </div>
         <div style={{ position: 'absolute', bottom: 64, right: 80, display: 'flex', gap: 12 }}>
           {['GRADE 23 TITANIUM', 'NIOBIUM', '316L SURGICAL STEEL'].map((mat) => (
-            <div key={mat} style={{ border: '1px solid #D8D3CB', padding: '8px 16px', fontSize: 11, letterSpacing: '0.12em', color: '#6B6762', display: 'flex' }}>
+            <div key={mat} style={{ border: '1px solid #D8D3CB', padding: '8px 16px', fontSize: 11, letterSpacing: '0.12em', color: '#4A4744', display: 'flex' }}>
               {mat}
             </div>
           ))}

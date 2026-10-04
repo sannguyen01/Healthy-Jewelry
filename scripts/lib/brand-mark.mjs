@@ -6,7 +6,7 @@
 // its pixels are α=0. It is still not transparent where it matters. Its 146,669 edge pixels
 // (0 < α < 255) were keyed out of a black backdrop, so their colour is *premultiplied against
 // black*: stored luminance rises linearly with alpha (≈31 at α=10%, ≈161 at α=90%) instead of
-// staying near the metal's own grey. On black that is invisible. On `--bg` (#F7F5F1) every edge
+// staying near the metal's own grey. On black that is invisible. On `--bg` every edge
 // composites to a darker ring — a grey hairline around the whole knot, visible in the owner's own
 // screenshot. "The corners are transparent" was true and was not the question; the question is
 // whether the *edges* are, and they were not.
@@ -286,10 +286,10 @@ export function encodePng(img) {
  * - `faintEdgeLum`: mean 8-bit luminance, (R+G+B)/3, of the pixels with 0 < α < 128. A matte
  *   drags these toward black because their colour was multiplied by their own small alpha; a
  *   clean edge keeps the metal's grey. Measured 2026-10-04: 27.8 on the master itself; on the
- *   512px derivative, 48.4 if the matte is left in and 157.6 once it is removed.
+ *   512px derivative, 48.4 if the matte is left in and 157.5 once it is removed.
  * - `rimOnBg`: mean luminance of every partially transparent pixel composited onto `bg` — what
- *   the visitor actually sees at the edge. On the 512px derivative: 189.3 with the matte, 202.0
- *   without, against 244.3 for `--bg` itself.
+ *   the visitor actually sees at the edge. On the 512px derivative over the Pampas `--bg`:
+ *   187.4 with the matte, 200.1 without, against 240.3 for the ground itself.
  *
  * The matte's cost grows with the size the mark is drawn at. At the header's 30px raster the
  * same comparison is 157 against 172 — real, but a hairline; at 512px it is a ring. So the

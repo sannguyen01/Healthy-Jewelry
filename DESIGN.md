@@ -7,9 +7,57 @@ so it cannot drift from them. It replaces a draft (0fd2f40) that prescribed fros
 header and rounded, shadowed cards — both of which the tests below forbid — and generator
 settings ("density", "variance") that described no decision anyone could check.
 
+## Reference: Songmont
+
+The design reference is Songmont (songmontofficial.com), the owner's choice on 2026-10-04; it
+was Gentle Monster before. A reference is a design *language* to align with, not an identity to
+copy: none of Songmont's marks, names, photographs or copy appear here.
+
+### What is verified, and where it comes from
+
+The live site was not reachable from the environment this was built in — its network policy
+denies songmontofficial.com and every mirror tried — so each row names its secondary source.
+
+| Dimension | Songmont | Source |
+|---|---|---|
+| Palette | Three colours: black, a warm grey-beige ground (Pampas) and a dark grey (Tundora); described as a "zen-inspired beige-gray" | Brandfetch's extraction of songmontofficial.com; the Songmont brand book on Behance |
+| Form and mood | Minimalist, rounded edges, tonal palettes, tactile materials; "quiet luxury" | Style Encyclopedia; press coverage |
+| Space | Natural forms softened into "softness, warmth, and brightness"; frames that capture views | ARCHSTUDIO's Songmont store projects |
+| Homepage modules | A hero with "Shop Now"; a "Bestsellers" row with "View all"; "Explore" | The homepage, as indexed by search |
+| Merchandising | New Arrivals, Bestsellers, named collections, categories; founder-story and design-philosophy pages | The site's own collection and blog URLs |
+| Voice | Short product narratives drawn from nature | The site's product pages |
+
+### What this site takes from it
+
+| Songmont | Here | Enforced by |
+|---|---|---|
+| The warm grey-beige ground | `--bg` | `src/tests/unit/design-tokens-contrast.test.ts` |
+| A dark grey for secondary text, not a mid grey | `--graphite`, in the Tundora role | same |
+| Near-black for headings and the name | `--ink`, warm — never pure black | same |
+| Hero, then a product row with "View all", then collections, then the story | The homepage beats ([ADR 040](docs/adr/040-seven-beats-one-strip.md)) | `src/tests/unit/homepage-composition-contract.test.ts` |
+| Restraint on product imagery | Cards carry an image, a name and a material — nothing laid over the piece | `e2e/layout-invariants.spec.ts` |
+
+### What it deliberately does not take
+
+- **Prices, a cart, a purchase path.** This site sells nothing; see "No prices, anywhere" in
+  `CLAUDE.md`. "Shop" here means browse.
+- **The "SIGN UP AND SAVE" newsletter.** It is a discount hook, which the engineering doctrine
+  rules out, and it would collect personal data with no system to hold it.
+- **Nature-drawn product narratives.** Copy about the metals runs through the claims registry;
+  a poetic sentence about a material is a claim waiting to be made.
+
+### Not verified yet: needs the live site
+
+- The typefaces, their case and their tracking.
+- The header's composition, and the homepage's order and proportions beyond the modules above.
+- Image crops, backgrounds and aspect ratios on product cards and campaign imagery.
+
+Until those are seen, Barlow Condensed and DM Sans, the header below and square product crops
+stand. This list is the next step, not a judgement that they already match.
+
 ## Surface and colour
 
-- **Void-white is the page.** `--bg` everywhere; `--nacre` for tiles; one dark interruption per
+- **The Pampas ground is the page.** `--bg` everywhere; `--nacre` for tiles; one dark interruption per
   homepage, the Care band (`--black`, `--on-dark`, `--mist`). Enforced by
   `e2e/homepage-composition.spec.ts` (one dark section, first half of the page) and
   [ADR 040](docs/adr/040-seven-beats-one-strip.md).

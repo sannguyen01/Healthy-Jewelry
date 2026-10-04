@@ -13,15 +13,18 @@
     --font-body:    'DM Sans', sans-serif;
 
     /* ── T4 Color Tokens ── */
-    --bg:        #F7F5F1;  /* void-white — dominant background */
+    /* The ground and the secondary text follow Songmont's palette (DESIGN.md, Reference): a
+       warm grey-beige page, Pampas in Brandfetch's naming, and a dark grey carrying the
+       secondary text where Tundora does. Until 2026-10-04 these were #F7F5F1 and #6B6762. */
+    --bg:        #F3F2EC;  /* Pampas ground — dominant background */
     --nacre:     #EDEAE4;  /* card tile background */
     --ash:       #D8D3CB;  /* borders, dividers */
-    --graphite:  #6B6762;  /* secondary text */
+    --graphite:  #4A4744;  /* secondary text — the Tundora role, 8.23:1 on --bg */
     --ink:       #1A1714;  /* primary text, logo */
     --titanium:  #9DA7AF;  /* accent — borders, tints, fills. NOT text on --bg */
     /* Titanium darkened to carry small text on light backgrounds. --titanium
-       itself is 2.25:1 on --bg, well under the 4.5:1 WCAG AA floor for body
-       text; this is 5.64:1 on --bg and 5.11:1 on --nacre. Same cool grey-blue
+       itself is 2.18:1 on --bg, well under the 4.5:1 WCAG AA floor for body
+       text; this is 5.47:1 on --bg and 5.11:1 on --nacre. Same cool grey-blue
        character, legible at 9-12px.
        Chosen against the *worst* surface it lands on, not the lightest: the
        bestseller badge tints --nacre with 12% titanium first (composited
@@ -29,10 +32,10 @@
        Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
     --titanium-text: #59636B; /* titanium-toned text on light backgrounds */
     --sage:      #8CA89A;  /* accent — borders, tints, fills. NOT text on --bg */
-    /* Sage darkened to carry text on light backgrounds. --sage itself is 2.36:1
-       on --bg — worse than --titanium's 2.25:1, the ratio that made
+    /* Sage darkened to carry text on light backgrounds. --sage itself is 2.29:1
+       on --bg — worse than --titanium's 2.18:1, the ratio that made
        --titanium-text necessary — and it shipped as 9-13px text in four places
-       for want of a row in design-tokens-contrast.test.ts. This is 6.02:1 on
+       for want of a row in design-tokens-contrast.test.ts. This is 5.84:1 on
        --bg, 5.46:1 on --nacre, 5.03:1 on the badge's 12% sage tint.
        Chosen against the *worst* surface, and with margin: the minimum passing
        value (#57685F) clears the current 12% tint at 4.54:1 but fails the moment

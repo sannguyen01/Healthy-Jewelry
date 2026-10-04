@@ -28,14 +28,14 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Deployment: Vercel (auto-deploy on push to `main`)
 - Testing: Vitest + Testing Library (80%+ coverage required)
 
-## Design System — T4 (Void-White Dominant)
+## Design System — T4 (Pampas ground dominant)
 
 | Token | Hex | Use |
 |-------|-----|-----|
-| `--bg` | #F7F5F1 | Void-white — dominant background |
+| `--bg` | #F3F2EC | Pampas ground (warm grey-beige) — dominant background |
 | `--nacre` | #EDEAE4 | Card tile background |
 | `--ash` | #D8D3CB | Borders, dividers |
-| `--graphite` | #6B6762 | Secondary text |
+| `--graphite` | #4A4744 | Secondary text (the Tundora role) |
 | `--ink` | #1A1714 | Primary text, logo |
 | `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
 | `--titanium-text` | #59636B | Titanium-toned **text** on light backgrounds |
@@ -47,8 +47,8 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--mid` | #2C2926 | Dark hover states |
 
 **Contrast rule**: the two chromatic accents are both below the WCAG AA 4.5:1 floor on `--bg` —
-`--titanium` at 2.25:1 and `--sage` at 2.36:1 — so each has a darkened sibling for text. Use
-`--titanium-text` (5.64:1) and `--sage-text` (6.02:1) for any accent-toned copy on a light surface;
+`--titanium` at 2.18:1 and `--sage` at 2.29:1 — so each has a darkened sibling for text. Use
+`--titanium-text` (5.47:1) and `--sage-text` (5.84:1) for any accent-toned copy on a light surface;
 the raw accents are fine for borders, tints, and (for `--titanium`) text on `--ink`/`--black`.
 Neither `-text` token is a general-purpose text colour: both fail on dark surfaces, where
 `--on-dark` and `--mist` apply.
@@ -93,13 +93,18 @@ Two variants, chosen by what the page is for: `display` for brand/marketing rout
 Materials, Stores) and `compact` for utility/legal routes (FAQ, Shipping, Terms, Privacy, Legal). The
 homepage hero is the one exception, since it owns `--text-hero`.
 
-### Architecture (Gentle Monster style)
-- Horizontal scroll strips on homepage (no product grids)
-- Void-white (#F7F5F1) everywhere
-- Single dark interruption: campaign band (#0A0A0A)
+### Architecture — quiet editorial, referenced to Songmont
+The design reference is Songmont (the owner's choice, 2026-10-04; it was Gentle Monster before).
+What was verified about it, what was adopted and what still needs the live site is in
+`DESIGN.md`, "Reference: Songmont" — read that before changing a token, a section or a card.
+- Horizontal scroll strips on homepage (no product grids), each with a "View All" link
+- The Pampas ground (`--bg`) everywhere, with `--graphite` carrying secondary text in the
+  Tundora role
+- Single dark interruption: the Care band (`CareSection`, ADR 040). The campaign band it
+  replaced is gone
 - Nav: transparent over the hero → solid `--bg` with a hairline (scrollY > 60). Flat: no blur,
   no shadow (`design-consistency.test.ts`). It said "frosted glass" until 2026-10-04.
-- Cards: image + name + price only (minimal)
+- Cards: image + name + material — never a price (see "No prices, anywhere")
 
 ### Header composition — two layouts, breakpoint at 768px
 - **≥769px**: MENU · centred brand lockup (knot mark + name) · SEARCH · CONTACT.
@@ -271,7 +276,9 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - Named + default exports on all components
 - Run `pnpm lint && pnpm build` before every commit
 - Run `pnpm test` — maintain 80%+ coverage
-- Commit format: `feat|fix|style|content|test|chore: description`
+- Commit format: `feat|fix|docs|style|content|test|refactor|perf|chore: description` — the same
+  types `.github/PULL_REQUEST_TEMPLATE.md` lists (the two disagreed about `docs`, `refactor`
+  and `perf` until 2026-10-04)
 
 ## Testing & CI
 Full detail in **`docs/testing-strategy.md`**. In short:
@@ -312,5 +319,5 @@ Full detail in **`docs/testing-strategy.md`**. In short:
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand
 - ~~Healing, mystical, spiritual copy~~
 - ~~"HealingBadge", "StoneCard"~~ — use Badge, ProductCard
-- ~~Dark background as default~~ — void-white is dominant
+- ~~Dark background as default~~ — the Pampas ground (`--bg`) is dominant
 - ~~Product grids on homepage~~ — horizontal scroll strips only

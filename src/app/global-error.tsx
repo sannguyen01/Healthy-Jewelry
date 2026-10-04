@@ -10,7 +10,7 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
     <html lang="en">
       <body
         style={{
-          backgroundColor: '#F7F5F1',
+          backgroundColor: '#F3F2EC',
           color: '#1A1714',
           margin: 0,
           fontFamily: 'DM Sans, sans-serif',
@@ -24,7 +24,7 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
           padding: '40px',
         }}
       >
-        <p style={{ fontSize: '0.65rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#6B6762', margin: 0 }}>
+        <p style={{ fontSize: '0.65rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#4A4744', margin: 0 }}>
           Critical error
         </p>
         <h1 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '2.5rem', letterSpacing: '0.04em', textTransform: 'uppercase', margin: 0 }}>

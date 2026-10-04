@@ -48,8 +48,8 @@ const decode = (rel: string): Rgba => decodePng(readFileSync(join(ROOT, rel)))
 const alphaAt = (img: Rgba, x: number, y: number) => img.data[(y * img.width + x) * 4 + 3]
 
 /** Thresholds sit between the clean and the contaminated 512px file (see edgeMetrics). */
-const FAINT_EDGE_FLOOR = 120 // clean 157.6, matte 48.4
-const RIM_ON_BG_FLOOR = 196 // clean 202.0, matte 189.3
+const FAINT_EDGE_FLOOR = 120 // clean 157.5, matte 48.4
+const RIM_ON_BG_FLOOR = 196 // on the Pampas --bg: clean 200.1, matte 187.4
 
 /**
  * Bytes. The 512px file reaches a browser only through next/image, which serves a 32–96px

@@ -16,7 +16,7 @@ export default function Error({ error, reset }: ErrorProps) {
   return (
     <main
       style={{
-        backgroundColor: 'var(--bg, #F7F5F1)',
+        backgroundColor: 'var(--bg, #F3F2EC)',
         color: 'var(--ink, #1A1714)',
         minHeight: '100vh',
         display: 'flex',
@@ -34,7 +34,7 @@ export default function Error({ error, reset }: ErrorProps) {
           fontSize: '0.65rem',
           letterSpacing: '0.22em',
           textTransform: 'uppercase',
-          color: 'var(--graphite, #6B6762)',
+          color: 'var(--graphite, #4A4744)',
         }}
       >
         Something went wrong
@@ -57,7 +57,7 @@ export default function Error({ error, reset }: ErrorProps) {
           fontFamily: 'var(--font-body, DM Sans, sans-serif)',
           fontWeight: 300,
           fontSize: '1rem',
-          color: 'var(--graphite, #6B6762)',
+          color: 'var(--graphite, #4A4744)',
           maxWidth: '400px',
           lineHeight: 1.6,
           margin: 0,
@@ -87,7 +87,7 @@ export default function Error({ error, reset }: ErrorProps) {
           style={{
             padding: '12px 28px',
             backgroundColor: 'var(--ink, #1A1714)',
-            color: 'var(--bg, #F7F5F1)',
+            color: 'var(--bg, #F3F2EC)',
             fontFamily: 'var(--font-ui, DM Sans, sans-serif)',
             fontSize: '0.65rem',
             letterSpacing: '0.16em',

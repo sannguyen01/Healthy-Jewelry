@@ -20,7 +20,7 @@ import { test, expect, type Page } from './support/test'
  */
 
 /**
- * Below this, artwork over `--bg` (#F7F5F1) reads as a smudge rather than an
+ * Below this, artwork over `--bg` reads as a smudge rather than an
  * image. The ghost tiles shipped at 0.12; the deliberate placeholder treatment
  * is 0.45. 0.30 sits between them, so it catches a regression toward invisible
  * without forbidding intentionally soft treatments.
