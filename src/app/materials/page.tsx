@@ -173,6 +173,7 @@ export default function MaterialsPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: '5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
@@ -186,9 +187,9 @@ export default function MaterialsPage() {
                 <h2
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: 'var(--text-2xl)',
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-display)',
                     color: 'var(--ink)',
                     margin: '0 0 8px',
                     lineHeight: 1.1,
@@ -380,8 +381,7 @@ export default function MaterialsPage() {
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontSize: 'var(--text-lg)',
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-display)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
                     fontWeight: 400,

@@ -30,8 +30,7 @@ export function CampaignBand({
             fontSize: 'var(--text-display)',
             fontWeight: 500,
             color: 'var(--bg)',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-display)',
             margin: '0 0 28px',
             lineHeight: 1,
           }}

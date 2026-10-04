@@ -8,9 +8,9 @@ import path from 'node:path'
  * When a weight has no downloaded face, browsers do not fall back gracefully —
  * they *synthesise* one, algorithmically thickening the nearest face. Faux bold
  * distorts stroke contrast and letterform proportions, so the text reads as a
- * different typeface. That is exactly what shipped: `layout.tsx` loads Barlow
- * Condensed at 400 and 500, while eleven headings asked for 700 or 600 and one
- * asked for 300. The same `<h1>` rendered at four different effective weights
+ * different typeface. That is exactly what shipped: `layout.tsx` loaded the
+ * display family (Barlow Condensed, until 2026-10-04) at 400 and 500, while
+ * eleven headings asked for 700 or 600 and one asked for 300. The same `<h1>` rendered at four different effective weights
  * across the site, and only the homepage was using a real face.
  *
  * Nothing catches this at runtime. It is not a type error, not a lint error,
@@ -39,20 +39,25 @@ const EXEMPT = ['opengraph-image.tsx', 'global-error.tsx']
  * Weights per font, resolved through to the semantic token a component names.
  *
  * Checking against the union of all loaded weights is not enough, and the gap
- * is not hypothetical: DM Sans loads 300, so a union check waves through
- * `--font-display` at 300 — which is the Materials heading, rendering with no
- * Barlow Condensed 300 face and silently falling back to 400.
+ * was not hypothetical: when display and body were two families, the body's
+ * 300 made a union check wave through `--font-display` at 300 — the Materials
+ * heading, rendering with no display face at 300 and silently falling back to
+ * 400. Since 2026-10-04 one family serves all three tokens, so today the sets
+ * are equal; the per-token resolution stays so a second family cannot
+ * reintroduce the gap unseen.
  *
  * layout.tsx declares this in two hops — a loader owns a CSS variable
- * (`--font-bc`), and the `<html>` style maps a semantic token onto it
- * (`--font-display: var(--font-bc)`). Both are parsed so the weights follow the
- * name a component actually writes.
+ * (`--font-zk`), and the `<html>` style maps a semantic token onto it
+ * (`--font-display: var(--font-zk)`). Both are parsed so the weights follow the
+ * name a component actually writes. A loader is either `next/font/google`
+ * (`weight: ['400', '500'] … variable:`) or `next/font/local` (one
+ * `{ path, weight: '400' }` entry per file in `src`, then `variable:`).
  */
 function loadedWeightsByToken(): Map<string, Set<number>> {
   const source = readFileSync(LAYOUT, 'utf8')
 
-  // `weight: ['400', '500'] … variable: '--font-bc'` within one loader call.
   const byVariable = new Map<string, Set<number>>()
+  // next/font/google: `weight: ['400', '500'] … variable: '--font-bc'` within one loader call.
   for (const call of source.matchAll(/weight:\s*\[([^\]]+)\][\s\S]{0,240}?variable:\s*'([^']+)'/g)) {
     const weights = new Set<number>()
     for (const raw of call[1].split(',')) {
@@ -60,6 +65,13 @@ function loadedWeightsByToken(): Map<string, Set<number>> {
       if (!Number.isNaN(value)) weights.add(value)
     }
     byVariable.set(call[2], weights)
+  }
+  // next/font/local: `src: [{ path, weight: '300' }, …], … variable: '--font-zk'`.
+  for (const call of source.matchAll(/localFont\(\{\s*src:\s*\[([\s\S]*?)\]([\s\S]*?)\}\)/g)) {
+    const variable = call[2].match(/variable:\s*'([^']+)'/)?.[1]
+    if (!variable) continue
+    const weights = new Set([...call[1].matchAll(/weight:\s*'(\d{3})'/g)].map((m) => Number(m[1])))
+    byVariable.set(variable, weights)
   }
 
   // `'--font-display': 'var(--font-bc, …)'` in the <html> style object.
@@ -218,5 +230,105 @@ describe('no font weight is synthesised', () => {
         `use a weight the font actually loads, or add the weight to the next/font ` +
         `loader in src/app/layout.tsx.`
     ).toEqual([])
+  })
+})
+
+/**
+ * Each `--font-display` style object in a TSX file: the object literal that names the token,
+ * from the line that opens it to the line that closes it. Inline styles here are flat, so the
+ * nearest `{` above and `}` below bound the object exactly — which matters, because a label
+ * sitting under a heading must not be read as the heading's.
+ */
+function displayStyleObjects(): { at: string; body: string }[] {
+  const objects: { at: string; body: string }[] = []
+  for (const file of tsxFiles(SRC)) {
+    const lines = readFileSync(file, 'utf8').split('\n')
+    lines.forEach((text, index) => {
+      if (!/fontFamily:\s*'var\(--font-display\)/.test(text)) return
+      let open = index
+      while (open > 0 && !/\{\s*$/.test(lines[open])) open -= 1
+      let close = index
+      while (close < lines.length - 1 && !/^\s*\}/.test(lines[close])) close += 1
+      objects.push({ at: `${path.relative(SRC, file)}:${index + 1}`, body: lines.slice(open, close + 1).join('\n') })
+    })
+  }
+  return objects
+}
+
+/**
+ * `globals.css` declarations per selector, merged in source order across every rule that
+ * names the selector. Per *selector*, not per rule: `.hj-wordmark` takes its capitals from a
+ * rule it shares with two controls and its family from a rule of its own, and only the merge
+ * shows both. Media blocks merge in too, which errs toward flagging.
+ */
+function cssBySelector(): Map<string, Map<string, string>> {
+  const merged = new Map<string, Map<string, string>>()
+  const css = readFileSync(GLOBALS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+  for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const declarations = [...rule[2].matchAll(/([\w-]+)\s*:\s*([^;]+);?/g)].map((d) => [d[1], d[2].trim()] as const)
+    for (const selector of rule[1].split(',').map((s) => s.trim())) {
+      const props = merged.get(selector) ?? new Map<string, string>()
+      for (const [prop, value] of declarations) props.set(prop, value)
+      merged.set(selector, props)
+    }
+  }
+  return merged
+}
+
+const displaySelectors = [...cssBySelector()].filter(([, props]) => props.get('font-family') === 'var(--font-display)')
+
+/**
+ * **A heading or a name is set in the case it is written in.**
+ *
+ * Until 2026-10-04 every `--font-display` element was forced to capitals: condensed uppercase
+ * was the Gentle Monster idiom the site was first drawn in. Songmont, the reference since,
+ * sets everything in one gothic family and lists its pieces in Title Case ("Medium Gather
+ * Bag"), and the catalogue already writes names that way — the capitals were a stylesheet
+ * overriding the content. So the rule is by role: `--font-display` (headings, product and
+ * collection names) never carries `text-transform: uppercase`; small `--font-ui` labels may.
+ * The logotype is not an exception to this — it is set as a `--font-ui` label, in the header
+ * and the footer alike.
+ */
+describe('headings and names are set in their own case', () => {
+  it('no --font-display style forces capitals', () => {
+    const offenders = [
+      ...displayStyleObjects()
+        .filter((o) => /textTransform:\s*'uppercase'/.test(o.body))
+        .map((o) => o.at),
+      ...displaySelectors.filter(([, props]) => props.get('text-transform') === 'uppercase').map(([s]) => `globals.css ${s}`),
+    ]
+    expect(
+      offenders,
+      'These --font-display styles force uppercase. Headings and names render in the case ' +
+        'they are written in; capitals belong to small --font-ui labels (DESIGN.md, Type).'
+    ).toEqual([])
+  })
+
+  it('sees the styles it judges, so neither scan is blind', () => {
+    expect(displayStyleObjects().length).toBeGreaterThan(20)
+    expect(displaySelectors.map(([s]) => s)).toContain('.hj-menu-link')
+    // And the labels keep their capitals: if this reads zero, the CSS patterns stopped matching.
+    expect([...cssBySelector().values()].filter((p) => p.get('text-transform') === 'uppercase').length).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * **A display style states its weight; it never inherits one.**
+ *
+ * Twenty-seven headings and names declared no weight and inherited the body's 300. Under
+ * Barlow Condensed, which had no 300 face, the browser rounded that up to 400 — so they
+ * rendered at 400 by accident, and nobody had chosen it. One family with a real Light face
+ * turned every one of them Light overnight (measured 2026-10-04: all 27 computed 300). The
+ * weight a heading renders at must not depend on which faces happen to be loaded.
+ */
+describe('display weights are declared', () => {
+  it('every --font-display style declares its weight', () => {
+    const offenders = [
+      ...displayStyleObjects()
+        .filter((o) => !/fontWeight:/.test(o.body))
+        .map((o) => o.at),
+      ...displaySelectors.filter(([, props]) => !props.has('font-weight')).map(([s]) => `globals.css ${s}`),
+    ]
+    expect(offenders, 'These --font-display styles inherit their weight from the body.').toEqual([])
   })
 })

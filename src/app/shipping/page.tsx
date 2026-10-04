@@ -16,9 +16,9 @@ export const metadata: Metadata = {
 
 const sectionHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-display)',
+  fontWeight: 400,
   fontSize: 'var(--text-xl, 1.4rem)',
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase' as const,
+  letterSpacing: 'var(--tracking-display)',
   color: 'var(--ink)',
   margin: '0 0 16px',
 }
@@ -88,9 +88,9 @@ export default function ShippingPage() {
           <p
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-xl, 1.3rem)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--titanium-text)',
               margin: 0,
             }}

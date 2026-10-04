@@ -86,9 +86,9 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: '0 0 20px',
               }}
@@ -141,9 +141,9 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: '0 0 20px',
               }}
@@ -212,9 +212,9 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: 0,
               }}

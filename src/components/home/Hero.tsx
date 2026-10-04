@@ -129,8 +129,7 @@ export function Hero({ headlineLines }: HeroProps) {
               fontWeight: 500,
               color: 'var(--ink)',
               lineHeight: 0.9,
-              letterSpacing: '-0.01em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               margin: '0 0 28px',
             }}
           >

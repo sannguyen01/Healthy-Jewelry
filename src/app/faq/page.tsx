@@ -197,8 +197,7 @@ export default function FAQPage() {
                       style={{
                         fontFamily: 'var(--font-display)',
                         fontSize: 'var(--text-lg, 1.1rem)',
-                        letterSpacing: '0.04em',
-                        textTransform: 'uppercase',
+                        letterSpacing: 'var(--tracking-display)',
                         color: 'var(--ink)',
                         margin: '0 0 14px',
                         fontWeight: 500,
@@ -234,9 +233,9 @@ export default function FAQPage() {
             <p
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-xl, 1.3rem)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: '0 0 12px',
               }}

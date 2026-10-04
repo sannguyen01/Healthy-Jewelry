@@ -22,10 +22,12 @@ import { SITE_NAME } from '@/config/site'
 // symptom. `opengraph-bundled-font.test.tsx` exercises the real rasteriser
 // against the characters the card actually renders today.
 //
-// Noto Sans, not the brand's DM Sans, is a leftover of the original fix — it
-// was chosen for pan-Unicode currency coverage. Switching to DM Sans would put
-// the share card in the brand's own typeface and is a deliberate change with
-// its own glyph-coverage question, not a tidy-up to fold into a decommission.
+// Noto Sans, not the brand's Zen Kaku Gothic Antique, is a leftover of the
+// original fix — it was chosen for pan-Unicode currency coverage. The brand face
+// cannot simply be swapped in: Satori reads TTF/OTF/WOFF but not the WOFF2 the
+// site ships, and the family's full TTF is a CJK font of several megabytes per
+// weight. Putting the share card in the brand face means a Latin-subset TTF built
+// for it — a deliberate change with its own glyph-coverage question.
 const FONT_FILES = {
   regular: path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf'),
   bold: path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf'),

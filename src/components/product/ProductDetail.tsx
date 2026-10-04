@@ -144,8 +144,9 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-display)',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
               lineHeight: 1.05,
             }}

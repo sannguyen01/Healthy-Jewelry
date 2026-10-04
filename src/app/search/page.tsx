@@ -193,9 +193,9 @@ async function SearchResults({ query }: { query: string }) {
               <p
                 style={{
                   fontFamily: 'var(--font-display)',
+                  fontWeight: 400,
                   fontSize: 'var(--text-xl)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
+                  letterSpacing: 'var(--tracking-display)',
                   color: 'var(--graphite)',
                   margin: '0 0 24px',
                 }}
@@ -233,9 +233,9 @@ async function SearchResults({ query }: { query: string }) {
               <p
                 style={{
                   fontFamily: 'var(--font-display)',
+                  fontWeight: 400,
                   fontSize: 'var(--text-xl)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
+                  letterSpacing: 'var(--tracking-display)',
                   color: 'var(--ink)',
                   margin: '0 0 16px',
                 }}
@@ -265,9 +265,9 @@ async function SearchResults({ query }: { query: string }) {
               <p
                 style={{
                   fontFamily: 'var(--font-display)',
+                  fontWeight: 400,
                   fontSize: 'var(--text-xl)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
+                  letterSpacing: 'var(--tracking-display)',
                   color: 'var(--ink)',
                   margin: '0 0 16px',
                 }}

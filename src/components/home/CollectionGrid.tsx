@@ -146,8 +146,7 @@ export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
                     fontFamily: 'var(--font-display)',
                     fontSize: '1.1rem',
                     fontWeight: 500,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-name)',
                     color: 'var(--ink)',
                     margin: '0 0 4px',
                   }}
@@ -164,7 +163,8 @@ export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
                     color: 'var(--graphite)',
                   }}
                 >
-                  Shop →
+                  {/* No arrow glyph — see "View All" in HorizontalScroll.tsx. */}
+                  Shop
                 </span>
               </div>
             </Link>

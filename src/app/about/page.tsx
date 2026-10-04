@@ -76,9 +76,9 @@ export default function AboutPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: '0 0 24px',
               }}
@@ -184,6 +184,7 @@ export default function AboutPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: '3.5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
@@ -197,9 +198,9 @@ export default function AboutPage() {
                 <h3
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: 'var(--text-xl)',
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-display)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
                   }}
@@ -240,9 +241,9 @@ export default function AboutPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-2xl)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
               margin: 0,
             }}
@@ -288,9 +289,9 @@ export default function AboutPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-display)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--bg)',
               margin: 0,
             }}

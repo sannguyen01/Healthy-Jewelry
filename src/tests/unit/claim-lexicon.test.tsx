@@ -76,15 +76,14 @@ vi.mock('next/navigation', () => ({
 }))
 
 /**
- * `layout.tsx` calls the font loaders at module scope, and outside the Next compiler they are
- * not functions. Only its `metadata` export is read here — the keywords and default
+ * `layout.tsx` calls the font loader at module scope, and outside the Next compiler it is
+ * not a function. Only its `metadata` export is read here — the keywords and default
  * description are the widest-reaching claim surface the site has — so a face with no
  * letterforms is enough.
  */
-vi.mock('next/font/google', () => {
-  const face = () => ({ className: '', variable: '', style: { fontFamily: '' } })
-  return { Barlow_Condensed: face, DM_Sans: face }
-})
+vi.mock('next/font/local', () => ({
+  default: () => ({ className: '', variable: '', style: { fontFamily: '' } }),
+}))
 
 // ── The allowance ──────────────────────────────────────────────────────────
 

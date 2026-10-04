@@ -120,6 +120,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               bottom: '-0.1em',
               right: 'var(--space-gutter)',
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'clamp(8rem, 20vw, 18rem)',
               letterSpacing: '-0.02em',
               color: 'var(--ash)',
@@ -137,9 +138,9 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-display)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
               lineHeight: 1.02,
               margin: 0,

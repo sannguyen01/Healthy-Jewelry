@@ -122,9 +122,9 @@ export default function ContactPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-2xl)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--on-dark)',
               margin: 0,
               lineHeight: 1.1,

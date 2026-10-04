@@ -2,15 +2,20 @@
 
 /* ═══════════════════════════════════════════════════════════════
    HEALTHY JEWELLERY — T4 DESIGN SYSTEM
-   Barlow Condensed 500 headlines · DM Sans 300/400 UI/body
+   One family, Zen Kaku Gothic Antique: 500 headings and names · 300/400 UI and body
    ═══════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
     /* ── Font Families ── */
-    --font-display: 'Barlow Condensed', sans-serif;
-    --font-ui:      'DM Sans', sans-serif;
-    --font-body:    'DM Sans', sans-serif;
+    /* Three roles, one family (layout.tsx loads it and overrides these on <html>). The tokens
+       stay separate because they name *roles*, which the case rule below keys on: a
+       --font-display element is a heading or a name and is set in the case it is written in;
+       uppercase belongs to small --font-ui labels. These literals are only the fallback for a
+       page rendered without the root layout. */
+    --font-display: 'Zen Kaku Gothic Antique', sans-serif;
+    --font-ui:      'Zen Kaku Gothic Antique', sans-serif;
+    --font-body:    'Zen Kaku Gothic Antique', sans-serif;
 
     /* ── T4 Color Tokens ── */
     /* The ground and the secondary text follow Songmont's palette (DESIGN.md, Reference): a
@@ -110,7 +115,11 @@
     --space-page-top: clamp(96px, 10vw, 128px);
     --ratio-product: 1 / 1;
     --tracking-label: 0.14em;
-    --tracking-display: 0.04em;
+    /* Mixed-case tracking. Headings close up a hair, because a wide gothic at display sizes
+       reads loose at its default spacing; names keep a hair of air at card sizes. The
+       0.04–0.12em these replaced belonged to condensed capitals, and spread mixed case apart. */
+    --tracking-display: -0.01em;
+    --tracking-name: 0.01em;
     /* A hairline instead of a shadow: the page stays flat and quiet. */
     --line: rgba(26, 23, 20, 0.08);
 
@@ -609,8 +618,9 @@
     justify-content: center;
   }
 
+  /* The logotype is a --font-ui label in tracked capitals (the shared rule above), in the
+     header and the footer alike: --font-display is for text set in its own case. */
   .hj-wordmark {
-    font-family: var(--font-display);
     font-weight: 500;
     font-size: clamp(1rem, 1.4vw, 1.25rem);
     letter-spacing: 0.10em;
@@ -671,6 +681,16 @@
     .hj-lockup[data-variant="inline"] .hj-lockup-mark {
       width: 24px;
       height: 24px;
+    }
+    /* The phone logotype is sized to a measurement, not a taste. The brand face is a wide
+       gothic: at the desktop clamp's 16px floor and 0.10em tracking the whole name needed
+       397px to clear the controls by 24px, which would have hidden it on every 390px phone —
+       far past the owner's "logo only at the narrowest widths". 13px with 0.08em brings the
+       measured fit back under the 360px breakpoint; e2e/header-fit.spec.ts holds it between
+       the breakpoint and 16px below it, and prints the figure. */
+    .hj-lockup[data-variant="inline"] .hj-lockup-text {
+      font-size: 0.8125rem;
+      letter-spacing: 0.08em;
     }
   }
 
@@ -745,9 +765,9 @@
 
   .hj-menu-link {
     font-family: var(--font-display);
+    font-weight: 400;
     font-size: clamp(2.4rem, 8vw, 4.5rem);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
     color: var(--bg);
     text-decoration: none;
     transition: color 0.3s ease-out, transform 0.3s ease-out;

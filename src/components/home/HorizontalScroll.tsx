@@ -69,7 +69,10 @@ export function HorizontalScroll({
             ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--graphite)'
           }}
         >
-          View All →
+          {/* No arrow glyph: U+2192 is outside the latin slice the brand face ships, so it
+              rendered in the fallback face mid-label (e2e/glyph-coverage.spec.ts). Songmont's
+              own "View all" carries none either. */}
+          View All
         </Link>
       </div>
 
@@ -146,8 +149,7 @@ export function HorizontalScroll({
                   fontFamily: 'var(--font-display)',
                   fontWeight: 500,
                   fontSize: '0.9rem',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
+                  letterSpacing: 'var(--tracking-name)',
                   color: 'var(--ink)',
                   margin: '0 0 4px',
                 }}

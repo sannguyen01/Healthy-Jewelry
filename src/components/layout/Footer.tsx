@@ -70,7 +70,9 @@ export function Footer() {
               variant="stacked"
               style={{
                 padding: '12px 0',
-                fontFamily: 'var(--font-display)',
+                // A logotype, not a heading: set like the header's, as a --font-ui label in
+                // tracked capitals. --font-display is for text set in its own case.
+                fontFamily: 'var(--font-ui)',
                 fontWeight: 500,
                 fontSize: '1.1rem',
                 letterSpacing: '0.12em',

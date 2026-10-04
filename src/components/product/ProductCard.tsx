@@ -92,9 +92,9 @@ export function ProductCard({ product, className }: ProductCardProps) {
           <p
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: '0.95rem',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-name)',
               color: 'var(--ink)',
               marginBottom: '4px',
             }}

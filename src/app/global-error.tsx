@@ -13,7 +13,7 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
           backgroundColor: '#F3F2EC',
           color: '#1A1714',
           margin: 0,
-          fontFamily: 'DM Sans, sans-serif',
+          fontFamily: '"Zen Kaku Gothic Antique", sans-serif',
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
@@ -27,7 +27,7 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
         <p style={{ fontSize: '0.65rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#4A4744', margin: 0 }}>
           Critical error
         </p>
-        <h1 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: '2.5rem', letterSpacing: '0.04em', textTransform: 'uppercase', margin: 0 }}>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 500, letterSpacing: '-0.01em', margin: 0 }}>
           Something went wrong
         </h1>
         <button
