@@ -59,7 +59,8 @@ export interface FooterGroupSpec {
   links: NavLink[]
 }
 
-const byHref = (...hrefs: string[]): NavLink[] =>
+/** Picks entries out of `mainNav` by destination; a href that is not there is a build-time error. */
+export const byHref = (...hrefs: string[]): NavLink[] =>
   hrefs.map((href) => {
     const link = mainNav.find((entry) => entry.href === href)
     if (!link) throw new Error(`footer link ${href} is not in mainNav`)

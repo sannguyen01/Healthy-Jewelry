@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { mainNav, footerGroups, legalLinks, type NavLink } from '@/config/navigation'
+import { mainNav, footerGroups, legalLinks, byHref, type NavLink } from '@/config/navigation'
 
 /**
  * Every internal destination the header, drawer and footer render has to be a real route.
@@ -52,5 +52,13 @@ describe('navigation destinations', () => {
 
   it('the existence check can fail', () => {
     expect(routeExists('/events')).toBe(false)
+  })
+
+  it('byHref returns the matching mainNav entries in the order asked', () => {
+    expect(byHref('/contact', '/shop').map((link) => link.href)).toEqual(['/contact', '/shop'])
+  })
+
+  it('byHref refuses a destination that is not in mainNav', () => {
+    expect(() => byHref('/events')).toThrow(/not in mainNav/)
   })
 })
