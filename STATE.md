@@ -1,7 +1,47 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-10-03
+Last refreshed by hand: 2026-10-04
+
+## Session note — 2026-10-04
+
+**The redesign (W0–W4, #103) is on `main`; this session added the logo it had lost.** The owner
+believed the knot logo was in the header and footer. It was in neither: the redesign had replaced
+the pre-redesign `<Image src="/logo.png">` with a text wordmark, and the footer never had one.
+Every test passed, because no test asked whether a mark was *there*.
+
+- **The logo, made actually transparent** (ADR 041). The master's background was already α=0;
+  its edge pixels were premultiplied against black and drew a grey ring on `--bg`.
+  `scripts/build-brand-mark.mjs` derives every served copy without it; the 1.1 MB master left
+  `public/`. Header (inline, mark-only below 360px) and footer (stacked), from one `BrandLockup`.
+  The tab and home-screen icons are the knot on a `--black` tile; the Organization JSON-LD logo
+  is the real mark, not the placeholder double circle.
+- **One spelling.** `SITE_NAME` = "Healthy Jewellery" (owner, 2026-10-04), typed once.
+  `LEGAL_ENTITY_NAME` = "Healthy Jewelry" stays on the held legal pages and the copyright line.
+- **A harness gap closed** (ADR 042). About one cold load in forty, `page.goto` resolves while the
+  root `loading.tsx` fallback is still on screen; header probes measured the hidden streamed copy
+  and passed on zero-sized boxes. `settle()` now waits for the reveal.
+- **`DESIGN.md` rewritten** to what the code does, held to it by `design-consistency.test.ts`;
+  `CLAUDE.md`'s header composition, nav and homepage list corrected.
+- Design canvas the owner reviewed: https://claude.ai/artifact/BXPnYW6EYBYrApdgHGfAsF
+
+### Still blocked, and on what
+
+- **Counsel (WS-H):** is the registered company "Healthy Jewelry" or "Healthy Jewellery"? Until
+  answered, `LEGAL_ENTITY_NAME` keeps the former on `/legal`, `/terms`, `/privacy`, `/shipping` and
+  the copyright line — the footer shows both spellings, deliberately.
+- **Claims reviewer:** `faq-continuous-wear` (pending) says "your Healthy Jewelry";
+  `brand-name.test.ts` fails if it is approved unchanged.
+- **W5 (next PR from this branch):** a statically prerendered homepage still paints "LOADING" on
+  some cold loads (the root `loading.tsx` boundary, revealed ~250ms after load). Measure LCP with
+  and without it before deciding. No performance budget exists in CI yet.
+- **W6, W7:** contact delivery evidence and the production admission read-back need the owner's
+  accounts; unchanged from 2026-10-03.
+- **Local-only, recorded so it is not rediscovered:** with this container's Chromium (1194, older
+  than the one Playwright 1.63 pins), `layout-invariants` "visible focus indicators" reads a 0px
+  outline on product-card links at the instant of focus — reduced motion's 0.01ms transitions on
+  elements with no transition of their own. It fails identically on unmodified `main` locally and
+  passes in CI. The brand lockup names its transition, so it is not exposed to it.
 
 ## Session note — 2026-10-03
 
