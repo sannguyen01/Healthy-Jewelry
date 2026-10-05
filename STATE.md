@@ -153,6 +153,11 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
     The diagnostic now also re-requests each stuck image, and `/robots.txt`, with Playwright's own
     HTTP client while the server is still up. That separates a server that never answers that URL
     from a request only the browser stalled on. Read that line first on the next failure.
+  - **Then it passed, with the same runtime code.** `56cbe4e` differs from the red `531b6eb` only in
+    the diagnostic's wait cap and in docs, and its E2E passed in full, so the stall is intermittent in CI,
+    not a deterministic failure of this Next version. On this Next version, two runs failed
+    (`434c3c9`, `531b6eb`) and one passed (`56cbe4e`). It is **not fixed and not explained**: the next
+    red run's re-request lines are the evidence to read, and a green run proves nothing about it.
 - **Production admission is not configured, so a merge to `main` deploys whether or not CI is green.**
   Nothing about this branch should be merged while its E2E is red.
 - **Vercel project settings (owner, cosmetic):** Node.js Version reads `24.x`; set it to `22.x` to
