@@ -135,12 +135,24 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
     running, which reads under the floor on a loaded machine. Reproduced locally beside other specs;
     the sample now waits for finite transitions and animations to finish, and the assertion still
     judges the settled value.
-  - **Twelve tests stalled at `networkidle` or at `load`, and the cause is not known.** The CI server
-    logged no errors, the trace artifact could not be downloaded from here (the network policy blocks
-    its host), and it does not reproduce locally. One hypothesis was tested and refuted: aborted
-    image-optimizer requests do not wedge a variant. `e2e/support/networkQuiet.ts` now fails these
-    waits in 20s naming the unfinished images, fonts and requests, so the next occurrence is a
-    root cause rather than a guess. If it recurs, that message is the first thing to read.
+  - **Twelve tests stall, and CI's second run named what stalls (still unexplained why).** On
+    `531b6eb` the same 12 phone tests failed with the new diagnostic: two `/_next/image` requests,
+    for `charms.jpg` and `earrings.jpg` at `w=640`, were still unfinished after 20s, while the
+    server logged nothing. Facts, in order of weight:
+    - every CI run on this branch through round 5 was green; the first red is the commit that moved
+      Next 16.3.5 → 16.3.8, and that release rewrote the image optimizer, response cache and
+      incremental cache (a route-ownership refactor and a new upstream-fetch path);
+    - **no newer 16.3.x exists** (checked on the registry), and rolling back would reintroduce the
+      critical `next/og` RCE this bump fixed, so the version stays;
+    - it does not reproduce locally: aborted or concurrent requests for cold variants of both photographs,
+      at 12 widths, all answered 200 in under 1.7s on the same build;
+    - **what this does not tell us is whether Vercel's own image service is affected.** CI serves
+      `/_next/image` from `next start`; Vercel production uses its platform optimizer. That is an
+      inference, not a measurement, so do not read "CI-only" as proven.
+
+    The diagnostic now also re-requests each stuck image, and `/robots.txt`, with Playwright's own
+    HTTP client while the server is still up. That separates a server that never answers that URL
+    from a request only the browser stalled on. Read that line first on the next failure.
 - **Production admission is not configured, so a merge to `main` deploys whether or not CI is green.**
   Nothing about this branch should be merged while its E2E is red.
 - **Vercel project settings (owner, cosmetic):** Node.js Version reads `24.x`; set it to `22.x` to

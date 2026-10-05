@@ -17,7 +17,10 @@ import type { Page } from '@playwright/test'
  */
 
 /** Below the 30s default test timeout, so the failure is this message and not a bare timeout. */
-const DEFAULT_CAP_MS = 20_000
+const DEFAULT_CAP_MS = 12_000
+
+/** Per independent re-request. Cap plus this stays under the 30s default test timeout. */
+const PROBE_MS = 6_000
 
 export async function networkQuiet(page: Page, capMs: number = DEFAULT_CAP_MS): Promise<void> {
   const inFlight = new Map<object, { url: string; type: string; since: number }>()
@@ -46,6 +49,32 @@ export async function networkQuiet(page: Page, capMs: number = DEFAULT_CAP_MS): 
         images: [] as string[],
         fonts: [] as string[],
       }))
+    // Is the server wedged for everyone, or only for this browser? Ask it again, independently
+    // (Playwright's own HTTP client: no browser cache, no connection reuse, no abort from a closed
+    // page) for each unfinished request and for a trivial route, while the server is still up.
+    // A timeout here means the server never answers that URL at all; a 200 means it was this
+    // page's request that stalled.
+    const probe = async (url: string): Promise<string> => {
+      const started = Date.now()
+      try {
+        const response = await page.request.get(url, {
+          timeout: PROBE_MS,
+          headers: { accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8' },
+        })
+        return `${response.status()} in ${((Date.now() - started) / 1000).toFixed(1)}s`
+      } catch {
+        return `NO ANSWER within ${PROBE_MS / 1000}s`
+      }
+    }
+    const origin = new URL(page.url()).origin
+    const stuck = [...inFlight.values()].filter((r) => r.type === 'image').slice(0, 3)
+    const reasked = await Promise.all([
+      ...stuck.map(
+        async (r) =>
+          `${r.url.replace(/^https?:\/\/[^/]+/, '').slice(0, 110)} → ${await probe(r.url)}`
+      ),
+      probe(`${origin}/robots.txt`).then((verdict) => `server liveness /robots.txt → ${verdict}`),
+    ])
     const pending = [...inFlight.values()].map(
       (r) =>
         `${r.type} ${r.url.replace(/^https?:\/\/[^/]+/, '').slice(0, 140)} (${Math.round((Date.now() - r.since) / 1000)}s)`
@@ -57,6 +86,7 @@ export async function networkQuiet(page: Page, capMs: number = DEFAULT_CAP_MS): 
         `images not finished (${known.images.length}): ${known.images.slice(0, 6).join(' | ') || 'none'}`,
         `fonts still loading: ${known.fonts.join(', ') || 'none'}`,
         `requests started during the wait and unfinished (${pending.length}): ${pending.slice(0, 8).join(' | ') || 'none'}`,
+        `independent re-request of each unfinished image, and of a trivial route:\n  ${reasked.join('\n  ')}`,
         `(original: ${error instanceof Error ? error.message.split('\n')[0] : String(error)})`,
       ].join('\n')
     )
