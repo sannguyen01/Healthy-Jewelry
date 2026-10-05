@@ -125,12 +125,24 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
   tab strips but 1.45–1.80:1 on light ones. If that matters, the remedy that keeps the background
   transparent is an SVG icon whose knot darkens in light mode. It changes the knot's colour, so it
   has not been done.
-- **E2E timing under parallel load, seen once each:**
-  - `header-fit`'s mobile lockup sweep hit its 90s limit; it runs in 10–12s alone, and passed 3 of 3.
-  - `visual-assets` measured the hero photograph mid-fade at opacity 0; it passed 3 of 3 alone.
-
-  Both were seen locally while two specs ran together, not in CI. They are recorded so a recurrence
-  reads as a pattern (ADR 011).
+- **CI's first red E2E, and what is and is not known (round 6, `434c3c9`).** Thirteen tests failed,
+  all on the phone project; every earlier run on this branch was green, including E2E. Three causes:
+  - `/shipping` overflowed the viewport at 320px by one pixel in CI's newer Chromium (it fit in this
+    container's older one). Fixed: the table's side padding shrinks with the viewport and the table
+    scrolls in a wrapper instead of overflowing, measured at 38px of padding saved against the 25px
+    that CI overflowed by.
+  - `visual-assets` sampled an image's opacity while `RealMoment`'s reveal transition (0.7s) was still
+    running, which reads under the floor on a loaded machine. Reproduced locally beside other specs;
+    the sample now waits for finite transitions and animations to finish, and the assertion still
+    judges the settled value.
+  - **Twelve tests stalled at `networkidle` or at `load`, and the cause is not known.** The CI server
+    logged no errors, the trace artifact could not be downloaded from here (the network policy blocks
+    its host), and it does not reproduce locally. One hypothesis was tested and refuted: aborted
+    image-optimizer requests do not wedge a variant. `e2e/support/networkQuiet.ts` now fails these
+    waits in 20s naming the unfinished images, fonts and requests, so the next occurrence is a
+    root cause rather than a guess. If it recurs, that message is the first thing to read.
+- **Production admission is not configured, so a merge to `main` deploys whether or not CI is green.**
+  Nothing about this branch should be merged while its E2E is red.
 - **Vercel project settings (owner, cosmetic):** Node.js Version reads `24.x`; set it to `22.x` to
   match `engines`, or move both to 24 together before Node 22 leaves maintenance (2027-04-30).
 

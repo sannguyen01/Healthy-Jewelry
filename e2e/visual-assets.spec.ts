@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './support/test'
+import { networkQuiet } from './support/networkQuiet'
 
 /**
  * Visual-asset visibility.
@@ -77,7 +78,7 @@ async function probeHomepage(page: Page): Promise<{
   }
   await page.evaluate(() => window.scrollTo(0, 0))
 
-  await page.waitForLoadState('networkidle')
+  await networkQuiet(page)
   // `networkidle` only means the bytes arrived. `next/image` serves AVIF/WebP
   // that the browser still has to decode, and an image mid-decode reports
   // naturalWidth 0 — indistinguishable from a broken source. Waiting for decode
@@ -88,6 +89,28 @@ async function probeHomepage(page: Page): Promise<{
     .waitForFunction(() => [...document.images].every((image) => image.complete), null, {
       timeout: 20_000,
     })
+    .catch(() => undefined)
+
+  // Sections reveal on scroll: `RealMoment` shows `hero-banner.jpg` at opacity 0 and eases it to
+  // 1 over 0.7s once its IntersectionObserver fires, and the hero copy does the same. Sampling
+  // before that transition ends reads an in-flight value, which on a loaded machine is under the
+  // floor — a race in the sample, not a faint image (seen 2026-10-04: the w=1200 hero reading
+  // opacity 0 when this ran beside other specs). So wait for every finite transition and
+  // animation to finish; the assertion below still judges the settled value. A looping
+  // animation is excluded, and the wait is capped so a stuck one still reaches the assertions.
+  await page
+    .waitForFunction(
+      () =>
+        document
+          .getAnimations()
+          .every(
+            (animation) =>
+              animation.playState !== 'running' ||
+              animation.effect?.getComputedTiming().iterations === Infinity
+          ),
+      null,
+      { timeout: 5_000 }
+    )
     .catch(() => undefined)
 
   const { images, placeholderTiles } = await page.evaluate((): {
