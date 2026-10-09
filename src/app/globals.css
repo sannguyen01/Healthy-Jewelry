@@ -27,42 +27,57 @@
     --font-ui:      'Barlow Condensed', 'Arial Narrow', sans-serif;
     --font-brand:   'Barlow Condensed', 'Arial Narrow', sans-serif;
 
-    /* ── T4 Color Tokens ── */
-    /* The ground and the secondary text follow Songmont's palette (DESIGN.md, Reference): a
-       warm grey-beige page, Pampas in Brandfetch's naming, and a dark grey carrying the
-       secondary text where Tundora does. Until 2026-10-04 these were #F7F5F1 and #6B6762. */
-    --bg:        #F3F2EC;  /* Pampas ground — dominant background */
-    --nacre:     #EDEAE4;  /* card tile background */
-    --ash:       #D8D3CB;  /* borders, dividers */
-    --graphite:  #4A4744;  /* secondary text — the Tundora role, 8.23:1 on --bg */
-    --ink:       #1A1714;  /* primary text, logo */
+    /* ── T4 Color Tokens, Quiet Archive values (ADR 051) ── */
+    /* A gallery ground, hairline structure and one accent. Every pairing below is measured against
+       WCAG 2.2 in design-tokens-contrast.test.ts, which reads these values out of this file. The
+       names are the repository's; the roles are the Quiet Archive board's:
+         --bg        Ground      the page
+         --subtle    Subtle      an alternate band
+         --nacre     Travertine  a tile or a panel
+         --bone      Bone        a chip
+         --ash       Hairline    a divider, and nothing else: 1.32:1 on --bg, so never a control edge
+         --outline   Outline     a control edge: 3.48:1 on --bg, past the 3:1 floor for the
+                                 boundary of a control (WCAG 1.4.11)
+         --ink-2     Ink 2       secondary text: captions, spec rows
+         --graphite  Graphite    running text, and the dark hover of a button
+         --ink       Ink         text, the primary button, the dark band
+       Until 2026-10-09 the ground was #F3F2EC and --graphite, a lighter grey, carried secondary
+       text; the board splits that role in two, so --ink-2 is new and --graphite is the darker. */
+    --bg:        #FAF9F5;  /* Ground — dominant background */
+    --subtle:    #F5F3ED;  /* alternate band */
+    --nacre:     #ECE8E1;  /* Travertine — card tile and panel background */
+    --bone:      #E4DFD5;  /* chip */
+    --ash:       #DFDACF;  /* Hairline — dividers; never a control edge */
+    --outline:   #8A857D;  /* control edge, 3.48:1 on --bg */
+    --ink-2:     #5F5B55;  /* secondary text, 6.40:1 on --bg and 5.08:1 on --bone */
+    --graphite:  #3D3935;  /* running text and dark hover, 10.86:1 on --bg */
+    --ink:       #1A1918;  /* primary text, logo, the primary button */
     --titanium:  #9DA7AF;  /* accent — borders, tints, fills. NOT text on --bg */
     /* Titanium darkened to carry small text on light backgrounds. --titanium
-       itself is 2.18:1 on --bg, well under the 4.5:1 WCAG AA floor for body
-       text; this is 5.47:1 on --bg and 5.11:1 on --nacre. Same cool grey-blue
+       itself is 2.32:1 on --bg, well under the 4.5:1 WCAG AA floor for body
+       text; this is 5.83:1 on --bg and 5.03:1 on --nacre. Same cool grey-blue
        character, legible at 9-12px.
        Chosen against the *worst* surface it lands on, not the lightest: the
-       bestseller badge tints --nacre with 12% titanium first (composited
-       #E3E2DE), where an earlier #5E6870 measured 4.39:1 and quietly failed AA.
+       bestseller badge tints --nacre with 12% titanium first, where an earlier
+       #5E6870 measured 4.39:1 on the composite and quietly failed AA. This is
+       4.66:1 on it, and 4.62:1 on --bone.
        Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
     --titanium-text: #59636B; /* titanium-toned text on light backgrounds */
     --sage:      #8CA89A;  /* accent — borders, tints, fills. NOT text on --bg */
-    /* Sage darkened to carry text on light backgrounds. --sage itself is 2.29:1
-       on --bg — worse than --titanium's 2.18:1, the ratio that made
+    /* Sage darkened to carry text on light backgrounds. --sage itself is 2.44:1
+       on --bg — worse than --titanium's 2.32:1, the ratio that made
        --titanium-text necessary — and it shipped as 9-13px text in four places
-       for want of a row in design-tokens-contrast.test.ts. This is 5.84:1 on
-       --bg, 5.46:1 on --nacre, 5.03:1 on the badge's 12% sage tint.
-       Chosen against the *worst* surface, and with margin: the minimum passing
-       value (#57685F) clears the current 12% tint at 4.54:1 but fails the moment
-       that alpha rises — 4.44:1 at 15%, 4.30:1 at 20%. This holds AA from 10%
-       through 25%, so retuning the tint cannot silently reintroduce the defect.
-       Light surfaces only: 2.72:1 on --ink, asserted as a negative.
+       for want of a row in design-tokens-contrast.test.ts. This is 6.22:1 on
+       --bg, 5.37:1 on --nacre, 4.94:1 on the badge's 12% sage tint over --nacre.
+       Chosen against the *worst* surface, and with margin: it holds AA from a
+       10% through a 25% tint (4.53:1 at 25% over --nacre), so retuning the
+       tint cannot silently reintroduce the defect.
+       Light surfaces only: 2.68:1 on --ink, asserted as a negative.
        Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
     --sage-text: #516159; /* sage-toned text on light backgrounds */
     --mist:      #A8A49E;  /* muted text — on dark backgrounds only */
     --on-dark:   #F0EDE8;  /* text on dark backgrounds */
     --black:     #0A0A0A;  /* campaign band dark */
-    --mid:       #2C2926;  /* dark hover */
 
     /* ── Ease Tokens ── */
     --ease:       cubic-bezier(0.16, 1, 0.3, 1);
@@ -139,7 +154,11 @@
     --tracking-title: -0.01em;
     --tracking-name: 0;
     /* A hairline instead of a shadow: the page stays flat and quiet. */
-    --line: rgba(26, 23, 20, 0.08);
+    --line: rgba(26, 25, 24, 0.08);
+    /* Two radii, the board's: a control and a frame (a card, a tile, a panel). Everything else
+       stays square. */
+    --radius-control: 4px;
+    --radius-frame: 6px;
 
     /* ── Duration ── */
     --duration-fast: 240ms;
@@ -469,7 +488,7 @@
     align-items: center;
     gap: 8px;
     padding: 13px 28px;
-    border: 1px solid var(--ash);
+    border: 1px solid var(--outline);
     background: transparent;
     color: var(--ink);
     font-family: var(--font-ui);
@@ -494,7 +513,7 @@
     align-items: center;
     gap: 8px;
     padding: 13px 28px;
-    border: 1px solid rgba(240, 237, 232, 0.28);
+    border: 1px solid rgba(240, 237, 232, 0.5);
     background: transparent;
     color: var(--on-dark);
     font-family: var(--font-ui);

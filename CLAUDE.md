@@ -19,7 +19,7 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 
 ## Tech Stack
 - Framework: Next.js 16, App Router, TypeScript (strict mode)
-- Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`)
+- Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`, Quiet Archive values)
 - Fonts: Zen Kaku Gothic Antique for every role of the site's text, and Barlow Condensed for the
   brand name alone, both self-hosted (latin slice) from `src/app/fonts/`. Barlow Condensed + DM
   Sans set everything until 2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md));
@@ -31,15 +31,19 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Deployment: Vercel (auto-deploy on push to `main`)
 - Testing: Vitest + Testing Library (80%+ coverage required)
 
-## Design System — T4 (Pampas ground dominant)
+## Design System — T4, Quiet Archive values (alabaster ground dominant)
 
 | Token | Hex | Use |
 |-------|-----|-----|
-| `--bg` | #F3F2EC | Pampas ground (warm grey-beige) — dominant background |
-| `--nacre` | #EDEAE4 | Card tile background |
-| `--ash` | #D8D3CB | Borders, dividers |
-| `--graphite` | #4A4744 | Secondary text (the Tundora role) |
-| `--ink` | #1A1714 | Primary text, logo |
+| `--bg` | #FAF9F5 | Ground (warm alabaster) — dominant background |
+| `--subtle` | #F5F3ED | Alternate band |
+| `--nacre` | #ECE8E1 | Travertine: card tile and panel background |
+| `--bone` | #E4DFD5 | Chip |
+| `--ash` | #DFDACF | Hairline: dividers only, never a control edge |
+| `--outline` | #8A857D | Control edge (the WCAG floor for the boundary of a control) |
+| `--ink-2` | #5F5B55 | Secondary text: captions, spec rows |
+| `--graphite` | #3D3935 | Running text, and the dark hover of a button |
+| `--ink` | #1A1918 | Primary text, logo, the primary button |
 | `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
 | `--titanium-text` | #59636B | Titanium-toned **text** on light backgrounds |
 | `--sage` | #8CA89A | Green accent — borders, tints, fills. **Not text** |
@@ -47,14 +51,14 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--mist` | #A8A49E | Muted text — dark backgrounds only |
 | `--on-dark` | #F0EDE8 | Text on dark backgrounds |
 | `--black` | #0A0A0A | Campaign band dark |
-| `--mid` | #2C2926 | Dark hover states |
 
 **Contrast rule**: the two chromatic accents are both below the WCAG AA 4.5:1 floor on `--bg` —
-`--titanium` at 2.18:1 and `--sage` at 2.29:1 — so each has a darkened sibling for text. Use
-`--titanium-text` (5.47:1) and `--sage-text` (5.84:1) for any accent-toned copy on a light surface;
+`--titanium` at 2.32:1 and `--sage` at 2.44:1 — so each has a darkened sibling for text. Use
+`--titanium-text` (5.83:1) and `--sage-text` (6.22:1) for any accent-toned copy on a light surface;
 the raw accents are fine for borders, tints, and (for `--titanium`) text on `--ink`/`--black`.
 Neither `-text` token is a general-purpose text colour: both fail on dark surfaces, where
-`--on-dark` and `--mist` apply.
+`--on-dark` and `--mist` apply. `--ash` is a divider at 1.32:1 and can never be the edge of a
+control; `--outline` is, at 3.48:1.
 
 This table is enforced too, not just the pairings: `design-tokens-contrast.test.ts` reads every
 hex above and every ratio in the paragraph above back out of this file and compares them against

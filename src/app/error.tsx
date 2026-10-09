@@ -16,8 +16,8 @@ export default function Error({ error, reset }: ErrorProps) {
   return (
     <main
       style={{
-        backgroundColor: 'var(--bg, #F3F2EC)',
-        color: 'var(--ink, #1A1714)',
+        backgroundColor: 'var(--bg, #FAF9F5)',
+        color: 'var(--ink, #1A1918)',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -34,7 +34,7 @@ export default function Error({ error, reset }: ErrorProps) {
           fontSize: 'var(--text-xs)',
           letterSpacing: '0.22em',
           textTransform: 'uppercase',
-          color: 'var(--graphite, #4A4744)',
+          color: 'var(--ink-2, #5F5B55)',
         }}
       >
         Something went wrong
@@ -56,7 +56,7 @@ export default function Error({ error, reset }: ErrorProps) {
           fontFamily: 'var(--font-body)',
           fontWeight: 400,
           fontSize: '1rem',
-          color: 'var(--graphite, #4A4744)',
+          color: 'var(--graphite, #3D3935)',
           maxWidth: '400px',
           lineHeight: 1.6,
           margin: 0,
@@ -69,14 +69,14 @@ export default function Error({ error, reset }: ErrorProps) {
           onClick={reset}
           style={{
             padding: '12px 28px',
-            border: '1px solid var(--ink, #1A1714)',
+            border: '1px solid var(--ink, #1A1918)',
             backgroundColor: 'transparent',
             fontFamily: 'var(--font-ui)',
             fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             cursor: 'pointer',
-            color: 'var(--ink, #1A1714)',
+            color: 'var(--ink, #1A1918)',
           }}
         >
           Try again
@@ -85,8 +85,8 @@ export default function Error({ error, reset }: ErrorProps) {
           href="/"
           style={{
             padding: '12px 28px',
-            backgroundColor: 'var(--ink, #1A1714)',
-            color: 'var(--bg, #F3F2EC)',
+            backgroundColor: 'var(--ink, #1A1918)',
+            color: 'var(--bg, #FAF9F5)',
             fontFamily: 'var(--font-ui)',
             fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',

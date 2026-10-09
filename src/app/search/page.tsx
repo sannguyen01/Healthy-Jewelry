@@ -137,7 +137,7 @@ async function SearchResults({ query }: { query: string }) {
                 fontSize: 'var(--text-base)',
                 color: 'var(--ink)',
                 backgroundColor: 'var(--nacre)',
-                border: '1px solid var(--ash)',
+                border: '1px solid var(--outline)',
                 borderRight: 'none',
                 outline: 'none',
                 fontWeight: 400,

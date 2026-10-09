@@ -74,7 +74,7 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
                   onClick={() => setActiveCollection(value)}
                   style={{
                     padding: '7px 16px',
-                    border: '1px solid var(--ash)',
+                    border: '1px solid var(--outline)',
                     backgroundColor: isActive ? 'var(--ink)' : 'transparent',
                     color: isActive ? 'var(--bg)' : 'var(--ink)',
                     fontFamily: 'var(--font-ui)',
@@ -95,7 +95,7 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
                   onMouseLeave={(e) => {
                     if (!isActive) {
                       const btn = e.currentTarget as HTMLButtonElement
-                      btn.style.borderColor = 'var(--ash)'
+                      btn.style.borderColor = 'var(--outline)'
                     }
                   }}
                   aria-pressed={isActive}
@@ -112,7 +112,7 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
             onChange={(e) => setSortBy(e.target.value as SortKey)}
             style={{
               padding: '7px 12px',
-              border: '1px solid var(--ash)',
+              border: '1px solid var(--outline)',
               backgroundColor: 'transparent',
               color: 'var(--ink)',
               fontFamily: 'var(--font-ui)',

@@ -97,7 +97,7 @@ export default async function Image({ params }: Props) {
   return new ImageResponse(
     <div
       style={{
-        background: '#F3F2EC',
+        background: '#FAF9F5',
         width: '100%',
         height: '100%',
         display: 'flex',
@@ -140,7 +140,7 @@ export default async function Image({ params }: Props) {
             fontSize: 84,
             fontWeight: 400,
             letterSpacing: '-0.02em',
-            color: '#1A1714',
+            color: '#1A1918',
             lineHeight: 1.05,
             marginBottom: 28,
             display: 'flex',
@@ -154,11 +154,11 @@ export default async function Image({ params }: Props) {
           {material !== '' && (
             <div
               style={{
-                border: '1px solid #D8D3CB',
+                border: '1px solid #DFDACF',
                 padding: '8px 16px',
                 fontSize: 18,
                 letterSpacing: '0.12em',
-                color: '#4A4744',
+                color: '#5F5B55',
                 display: 'flex',
               }}
             >

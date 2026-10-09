@@ -41,7 +41,7 @@ export function SizePicker({ collection, onSelect, selected }: SizePickerProps) 
                 style={{
                   width: '40px',
                   height: '40px',
-                  border: `1px solid ${selected === size ? 'var(--ink)' : 'var(--ash)'}`,
+                  border: `1px solid ${selected === size ? 'var(--ink)' : 'var(--outline)'}`,
                   backgroundColor: selected === size ? 'var(--ink)' : 'transparent',
                   color: selected === size ? 'var(--bg)' : 'var(--ink)',
                   fontFamily: 'var(--font-ui)',
@@ -59,7 +59,7 @@ export function SizePicker({ collection, onSelect, selected }: SizePickerProps) 
                 }}
                 onMouseLeave={(e) => {
                   if (selected !== size) {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--ash)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--outline)'
                   }
                 }}
                 aria-pressed={selected === size}
@@ -74,7 +74,7 @@ export function SizePicker({ collection, onSelect, selected }: SizePickerProps) 
                 onClick={() => onSelect(value)}
                 style={{
                   padding: '8px 14px',
-                  border: `1px solid ${selected === value ? 'var(--ink)' : 'var(--ash)'}`,
+                  border: `1px solid ${selected === value ? 'var(--ink)' : 'var(--outline)'}`,
                   backgroundColor: selected === value ? 'var(--ink)' : 'transparent',
                   color: selected === value ? 'var(--bg)' : 'var(--ink)',
                   fontFamily: 'var(--font-ui)',
@@ -92,7 +92,7 @@ export function SizePicker({ collection, onSelect, selected }: SizePickerProps) 
                 }}
                 onMouseLeave={(e) => {
                   if (selected !== value) {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--ash)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--outline)'
                   }
                 }}
                 aria-pressed={selected === value}

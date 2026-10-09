@@ -245,7 +245,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 59 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 60 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
