@@ -118,6 +118,20 @@ the slice has (`src/app/fonts/README.md`), or ship the slice that has it. Enforc
 `src/content/**` by `font-files.test.ts` (which also reads each file's own weight class, licence
 and SHA-256) and over every route's rendered text by `e2e/glyph-coverage.spec.ts`.
 
+**The browser draws only what the site shipped, and the same tier is the same weight everywhere**
+([ADR 050](docs/adr/050-one-face-means-no-borrowed-ones.md)). Measured 2026-10-09 by asking Chrome
+which face drew every text node on 48 page states: the faces were right, but the *requests* were not.
+`<strong>` and `<th>` asked for 700 (faked bold), the footer tagline was italic on every page (a
+sheared upright gothic), the 410 page was set in `system-ui`, and one heading tier had two weights.
+So: `font-synthesis: none` on `<html>`; `strong, b, th` are 500 and `em, i, …` are upright; **nothing is
+italic**; **h1 is 500, display text at `--text-lg` or smaller is 500, larger display text is 400**
+(by size *token*, not computed size, because the tokens are `clamp()`s); a piece's name is
+`.hj-card-name`; **nothing is declared below `--text-xs`'s minimum** (0.7rem), so use the token; and a
+document outside the layout (the 410 page, `global-error.tsx`) declares the face itself from
+`src/lib/design/siteFace.ts`, whose two files in `public/fonts/` are the loader's, byte for byte.
+Enforced by `type-system-floor.test.ts`, the tier rule in `typography-weights.test.ts`, and
+`e2e/rendered-fonts.spec.ts`, which reads Chrome's own report of the face, weight, style and size used.
+
 **Page titles use `PageHeader`** (`src/components/ui/PageHeader.tsx`) — never a hand-rolled `<h1>`.
 Two variants, chosen by what the page is for: `display` for brand/marketing routes (Our Story, Contact,
 Materials, Stores) and `compact` for utility/legal routes (FAQ, Shipping, Terms, Privacy, Legal). The

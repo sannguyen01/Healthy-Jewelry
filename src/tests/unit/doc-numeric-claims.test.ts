@@ -158,14 +158,14 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**120 unit spec files**',
-    claimed: '120',
+    context: '**121 unit spec files**',
+    claimed: '121',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
     doc: CONVENTIONS,
-    context: '**20 E2E spec files**',
-    claimed: '20',
+    context: '**21 E2E spec files**',
+    claimed: '21',
     actual: () => String(countFiles('e2e', (f) => /\.spec\.ts$/.test(f))),
   },
   {

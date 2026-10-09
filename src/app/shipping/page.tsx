@@ -64,7 +64,8 @@ const tableWrapStyle: React.CSSProperties = {
 
 const thStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
-  fontSize: '0.7rem',
+  fontSize: 'var(--text-xs)',
+  fontWeight: 500,
   letterSpacing: '0.16em',
   textTransform: 'uppercase',
   color: 'var(--graphite)',

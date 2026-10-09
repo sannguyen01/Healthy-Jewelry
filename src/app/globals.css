@@ -151,6 +151,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* The browser never draws a face the site did not ship. Only 400 and 500 are loaded, so a
+       request for 700 (a <strong>, a <th>) or for italic used to be *synthesised*: the strokes of
+       the 500 smeared, or an upright gothic sheared into a slant, which reads as a different
+       typeface. With synthesis off an unshipped request is drawn in the nearest real face. The
+       rules below also ask for the real one, so nothing relies on that fallback (ADR 050). */
+    font-synthesis: none;
     overflow-x: hidden;
   }
 
@@ -172,6 +178,16 @@
   h1, h2, h3, h4, h5, h6 {
     line-height: 1.1;
     font-weight: inherit;
+  }
+
+  /* The browser's own defaults ask for 700 and for italic, neither of which the site ships.
+     Emphasis is the 500 face, and nothing on the site is slanted (ADR 050). */
+  strong, b, th {
+    font-weight: 500;
+  }
+
+  em, i, cite, dfn, address, var {
+    font-style: normal;
   }
 
   img, video {
@@ -485,6 +501,18 @@
     border-color: var(--on-dark);
   }
 
+  /* ── Piece name, on every card ──
+     The strip on the homepage and the grid on /shop and /search each styled the name on
+     their own: 0.9rem at 500 in one, 0.95rem at 400 in the other. One role, one definition.
+     500 because below 24px a name competes with body text in the same family (ADR 050). */
+  .hj-card-name {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 0.95rem;
+    letter-spacing: var(--tracking-name);
+    color: var(--ink);
+  }
+
   /* ── Section Label (eyebrow) ── */
   .label-eyebrow {
     display: block;
@@ -511,7 +539,7 @@
     display: inline-block;
     padding: 3px 9px;
     font-family: var(--font-ui);
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 500;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -625,7 +653,7 @@
 
   .hj-menu-btn, .hj-icon-btn, .hj-wordmark {
     font-family: var(--font-ui);
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: inherit;

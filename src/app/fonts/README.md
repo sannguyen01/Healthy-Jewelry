@@ -33,6 +33,16 @@ the one slice a Latin page uses. The latin slice is 9.7 KB per weight: 19.4 KB f
 against the 66.3 KB of preloaded latin faces they replace (Barlow Condensed 400 and 500 at
 14.7 KB each, and DM Sans as one 37.0 KB variable file), measured from the 2026-10-04 builds.
 
+## The two copies in `public/fonts/`
+
+`next/font` content-hashes the files it serves, so a document that is not rendered inside the layout
+cannot name them: the 410 page a retired URL answers with (a plain `Response`) and
+`global-error.tsx` (which replaces the root layout). Both used to name a stack the visitor's machine
+decides. They now declare the face themselves, from `public/fonts/zen-kaku-gothic-antique-latin-400.woff2`
+and `-500.woff2`, **the files above byte for byte** (same SHA-256), through `src/lib/design/siteFace.ts`.
+`src/tests/unit/type-system-floor.test.ts` compares each copy with its source, so a replaced file
+must be replaced in both places in the same commit. ([ADR 050](../../../docs/adr/050-one-face-means-no-borrowed-ones.md).)
+
 ## Why 400 and 500, and no 300
 
 Weight numbers do not carry between families. The site set its body copy and small labels in

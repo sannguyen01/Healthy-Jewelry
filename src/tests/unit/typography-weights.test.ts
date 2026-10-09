@@ -348,6 +348,85 @@ describe('headings and names are set in their own case', () => {
 })
 
 /**
+ * **Display weight is chosen by role, not by whoever wrote the page** ([ADR 050](../../../docs/adr/050-one-face-means-no-borrowed-ones.md)).
+ *
+ * Measured across the routes on 2026-10-09, the same tier was set at two weights depending on the
+ * page: the 88px page title was 400 on `/shop`, the collections and the piece pages and 500 on
+ * About, Materials and Contact; the homepage's section heading was 500 and About's equivalent
+ * 400; a question heading was 500 in the FAQ and 400 in Materials; a piece's name was 400 in the
+ * grid and 500 in the strip. With one family, weight is the only thing that separates a heading
+ * from the body at small sizes, so it has to mean one thing:
+ *
+ * - **h1 is 500**, always (the page title and the hero);
+ * - **display text at `--text-lg` or smaller is 500**: below about 24px it competes with body
+ *   copy in the same family (names, question headings, small headings);
+ * - **display text above `--text-lg` is 400**: large type needs no help.
+ *
+ * Keyed to the size *token*, not the computed size, because the tokens are `clamp()`s: a heading
+ * is 35px on a desktop and 23px on a phone, and a weight that flipped across that boundary would
+ * be a different design on each. Decorative watermarks (`aria-hidden`, `pointer-events: none`)
+ * are exempt by listing, not by pattern.
+ */
+describe('display weight follows the size tier', () => {
+  const DECORATIVE = ['components/home/CareSection.tsx']
+  const SMALL_TOKENS = new Set(['--text-lg', '--text-base', '--text-sm', '--text-xs'])
+
+  /** 'small' when the size is the label/body/lg tokens or a literal under 1.5rem; else 'large'. */
+  function tier(fontSize: string): 'small' | 'large' | null {
+    const token = fontSize.match(/var\((--text-[\w]+)/)?.[1]
+    if (token) return SMALL_TOKENS.has(token) ? 'small' : 'large'
+    const literal = fontSize.match(/'(?:clamp\()?\s*([\d.]+)(rem|px)/)
+    if (!literal) return null
+    return Number(literal[1]) * (literal[2] === 'rem' ? 16 : 1) < 24 ? 'small' : 'large'
+  }
+
+  const judged = displayStyleObjects()
+    .filter((o) => !DECORATIVE.some((d) => o.at.startsWith(d)))
+    .map((o) => ({
+      at: o.at,
+      weight: Number(o.body.match(/fontWeight:\s*(\d+)/)?.[1]),
+      size: tier(o.body.match(/fontSize:\s*([^\n]+)/)?.[1] ?? ''),
+    }))
+
+  it('sees the styles it judges', () => {
+    expect(judged.length).toBeGreaterThan(20)
+    expect(judged.filter((j) => j.size === 'small').length).toBeGreaterThan(3)
+    expect(judged.filter((j) => j.size === 'large').length).toBeGreaterThan(8)
+  })
+
+  it('sets every small display style at 500 and every large one at 400, bar the h1', () => {
+    const lines = new Map<string, string[]>()
+    const isH1 = (at: string): boolean => {
+      const [file, line] = at.split(':')
+      const source = lines.get(file) ?? readFileSync(path.join(SRC, file), 'utf8').split('\n')
+      lines.set(file, source)
+      for (let i = Number(line) - 1; i >= Math.max(0, Number(line) - 6); i -= 1) {
+        if (/<h1\b/.test(source[i])) return true
+        if (/<(h[2-6]|p|span|div|a|li|button)\b/.test(source[i])) return false
+      }
+      return false
+    }
+    const offenders = judged
+      .filter((j) => j.size !== null)
+      .filter((j) => {
+        if (isH1(j.at)) return j.weight !== 500
+        return j.weight !== (j.size === 'small' ? 500 : 400)
+      })
+      .map((j) => `${j.at}  weight ${j.weight} on a ${j.size} display style`)
+    expect(
+      offenders,
+      'One tier, one weight (ADR 050): h1 500; display text at --text-lg or smaller 500; larger 400.'
+    ).toEqual([])
+  })
+
+  it('has no display class in globals.css at a weight outside the same rule', () => {
+    const names = displaySelectors.filter(([s]) => s === '.hj-card-name')
+    expect(names).toHaveLength(1)
+    expect(names[0][1].get('font-weight')).toBe('500')
+  })
+})
+
+/**
  * **A display style states its weight; it never inherits one.**
  *
  * Twenty-seven headings and names declared no weight and inherited the body's 300. Under

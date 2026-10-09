@@ -338,6 +338,19 @@ place.
 
 Neither is a crash. Both are the kind of defect that quietly costs conversions.
 
+### What the browser drew is not what the CSS asked for
+
+`e2e/glyph-coverage.spec.ts` asks whether every *character* is in the face and whether the face
+loaded. `e2e/rendered-fonts.spec.ts` asks what Chrome *used*, node by node, through
+`CSS.getPlatformFontsForNode` (the call behind the inspector's Rendered Fonts pane), and compares it
+with what the CSS requested. That is the only place a faked bold, a sheared italic or a system font
+shows, because in each the computed `font-family` is correct. It covers 16 routes (the 404 and the 410
+included) and the open menu, in both projects, and fails on a face that is not ours, a weight outside
+400 and 500, a non-normal style, or text under 11px. Placeholders are not text nodes, so form controls
+are held to inheriting the page's family instead. Its two races, both found writing it, are the phone
+footer collapsing after hydration and a page measured before it arrived (ADR 042). See
+[ADR 050](adr/050-one-face-means-no-borrowed-ones.md).
+
 ### The image optimiser is warmed before the suite, and a wait names what it waits for
 
 `e2e/global-setup.ts` runs once after the server is up and asks it for every `/_next/image` variant

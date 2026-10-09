@@ -188,7 +188,6 @@ export function Footer() {
               letterSpacing: 'var(--tracking-label)',
               textTransform: 'uppercase',
               color: 'var(--titanium-text)',
-              fontStyle: 'italic',
             }}
           >
             {tagline()}

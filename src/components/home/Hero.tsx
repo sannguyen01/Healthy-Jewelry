@@ -209,7 +209,7 @@ export function Hero({ headlineLines }: HeroProps) {
             <span
               style={{
                 fontFamily: 'var(--font-ui)',
-                fontSize: '0.58rem',
+                fontSize: 'var(--text-xs)',
                 letterSpacing: '0.28em',
                 textTransform: 'uppercase',
                 color: 'var(--graphite)',

@@ -38,7 +38,7 @@ export function MaterialsSection() {
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-2xl)',
-              fontWeight: 500,
+              fontWeight: 400,
               color: 'var(--ink)',
               margin: 0,
               lineHeight: 1.1,

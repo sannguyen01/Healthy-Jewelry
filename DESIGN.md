@@ -119,6 +119,17 @@ photograph stands until the owner replaces it; no filter is laid over it to imit
 - **Headings and names are set in the case they are written in, at a declared weight.** Capitals
   belong to small `--font-ui` labels — eyebrows, buttons, badges — and to the logotype. A `--font-display`
   style never inherits its weight. Both enforced by `src/tests/unit/typography-weights.test.ts`.
+- **The browser draws only what the site shipped** ([ADR 050](docs/adr/050-one-face-means-no-borrowed-ones.md)).
+  `font-synthesis: none` on the root; `strong`, `b` and `th` are the 500 face rather than the
+  browser's 700; nothing is italic, because the face has none to draw. A document that is not
+  rendered inside the layout (the 410 page, the root error boundary) declares the face itself from
+  two byte-identical files in `public/fonts/`, never a system stack. Enforced by
+  `src/tests/unit/type-system-floor.test.ts` and, in the browser, by `e2e/rendered-fonts.spec.ts`.
+- **One tier, one weight.** h1 is 500; display text at `--text-lg` or smaller is 500 (below about 24px
+  it competes with body copy in the same family); larger display text is 400. Keyed to the size
+  token, because the tokens are `clamp()`s. A piece's name is `.hj-card-name`. Enforced by
+  `src/tests/unit/typography-weights.test.ts`.
+- **The label token is the floor.** Nothing is declared smaller than `--text-xs`'s minimum (0.7rem).
 - Page titles go through `PageHeader`. See `CLAUDE.md`, Typography.
 
 ## The header and the footer

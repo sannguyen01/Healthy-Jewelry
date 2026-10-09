@@ -148,16 +148,7 @@ export function HorizontalScroll({
 
             {/* Card info */}
             <div style={{ padding: '14px 0 0' }}>
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 500,
-                  fontSize: '0.9rem',
-                  letterSpacing: 'var(--tracking-name)',
-                  color: 'var(--ink)',
-                  margin: '0 0 4px',
-                }}
-              >
+              <p className="hj-card-name" style={{ margin: '0 0 4px' }}>
                 {product.title}
               </p>
               <p

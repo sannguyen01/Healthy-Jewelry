@@ -40,7 +40,7 @@ export function Badge({ variant, className }: BadgeProps) {
       className={cn('inline-block', className)}
       style={{
         fontFamily: 'var(--font-ui)',
-        fontSize: '9px',
+        fontSize: 'var(--text-xs)',
         letterSpacing: '0.15em',
         textTransform: 'uppercase',
         padding: '3px 7px',

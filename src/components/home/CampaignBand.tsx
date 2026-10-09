@@ -28,7 +28,7 @@ export function CampaignBand({
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'var(--text-display)',
-            fontWeight: 500,
+            fontWeight: 400,
             color: 'var(--bg)',
             letterSpacing: 'var(--tracking-display)',
             margin: '0 0 28px',

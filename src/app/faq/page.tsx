@@ -168,7 +168,7 @@ export default function FAQPage() {
               <p
                 style={{
                   fontFamily: 'var(--font-ui)',
-                  fontSize: '0.62rem',
+                  fontSize: 'var(--text-xs)',
                   letterSpacing: '0.22em',
                   textTransform: 'uppercase',
                   color: 'var(--titanium-text)',

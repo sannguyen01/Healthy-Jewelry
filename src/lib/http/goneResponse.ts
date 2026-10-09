@@ -35,6 +35,7 @@
  */
 
 import { SITE_NAME } from '@/config/brand'
+import { SITE_FACE_FONT_FACE_CSS, SITE_FACE_STACK } from '@/lib/design/siteFace'
 
 /** What a retired capability says for itself. */
 export interface GoneCopy {
@@ -69,11 +70,12 @@ export function renderGonePage(copy: GoneCopy): string {
 <meta name="robots" content="noindex, nofollow">
 <title>${copy.title}</title>
 <style>
-  :root { color-scheme: light dark; }
+  ${SITE_FACE_FONT_FACE_CSS}
+  :root { color-scheme: light dark; font-synthesis: none; }
   body {
     margin: 0; min-height: 100vh; display: grid; place-items: center;
     background: #F3F2EC; color: #1A1714;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: ${SITE_FACE_STACK};
     line-height: 1.6; padding: 24px;
   }
   main { max-width: 34rem; }

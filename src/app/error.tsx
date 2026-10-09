@@ -31,7 +31,7 @@ export default function Error({ error, reset }: ErrorProps) {
       <p
         style={{
           fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
-          fontSize: '0.65rem',
+          fontSize: 'var(--text-xs)',
           letterSpacing: '0.22em',
           textTransform: 'uppercase',
           color: 'var(--graphite, #4A4744)',
@@ -72,7 +72,7 @@ export default function Error({ error, reset }: ErrorProps) {
             border: '1px solid var(--ink, #1A1714)',
             backgroundColor: 'transparent',
             fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
-            fontSize: '0.65rem',
+            fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             cursor: 'pointer',
@@ -88,7 +88,7 @@ export default function Error({ error, reset }: ErrorProps) {
             backgroundColor: 'var(--ink, #1A1714)',
             color: 'var(--bg, #F3F2EC)',
             fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
-            fontSize: '0.65rem',
+            fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             textDecoration: 'none',

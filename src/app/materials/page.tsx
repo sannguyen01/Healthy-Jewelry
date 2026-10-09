@@ -384,7 +384,7 @@ export default function MaterialsPage() {
                     letterSpacing: 'var(--tracking-display)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
-                    fontWeight: 400,
+                    fontWeight: 500,
                   }}
                 >
                   {item.q}

@@ -171,6 +171,18 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
     or concurrent first optimisation is the trigger (not proof, nothing about Vercel); **red at the
     primer** is the first direct measurement and the failing URL is the upstream report. Remove it
     when a Next release fixes the hang and three runs are green without it.
+  - **Round 9b (typography, [ADR 050](docs/adr/050-one-face-means-no-borrowed-ones.md)).** The owner
+    asked that all typography be aligned across every page with no face outside the design
+    principles. Chrome was asked which face drew every text node on 48 page states (2,928
+    elements): the faces were right (no system or fallback face drew any text node), but the
+    requests were not. Fixed: `<strong>` and `<th>` asked for a faked 700; the footer tagline was
+    italic on every page; the 410 page was set in `system-ui` and the root error boundary named an
+    undefined family; one heading tier had two weights; nine label sizes sat below the label token.
+    New guards: `type-system-floor.test.ts`, the weight-tier rule in `typography-weights.test.ts`,
+    `e2e/rendered-fonts.spec.ts` (proven red on the three original defects). **Not done:** the share
+    cards are still Noto Sans (Satori reads TTF, not WOFF2), and the size ladder (about 40 sizes) is
+    unchanged. The Quiet Archive's type (Bodoni Moda, DM Sans, Barlow Condensed) is the next system and
+    its own PR after #104 merges; these guards key to tokens and files so they will hold it too.
   - **Local runs need `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium`.** This container's
     Chromium is build 1194 and Playwright 1.63 wants 1243; without it every test dies at
     `browserType.launch`, which looks like a wall of failures and tests nothing.
