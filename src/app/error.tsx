@@ -33,7 +33,7 @@ export default function Error({ error, reset }: ErrorProps) {
           fontFamily: 'var(--font-ui)',
           fontWeight: 500,
           fontSize: 'var(--text-xs)',
-          letterSpacing: '0.22em',
+          letterSpacing: 'var(--tracking-label)',
           textTransform: 'uppercase',
           color: 'var(--ink-2, #5F5B55)',
         }}
@@ -76,7 +76,7 @@ export default function Error({ error, reset }: ErrorProps) {
             fontFamily: 'var(--font-ui)',
             fontWeight: 500,
             fontSize: 'var(--text-xs)',
-            letterSpacing: '0.16em',
+            letterSpacing: 'var(--tracking-label)',
             textTransform: 'uppercase',
             cursor: 'pointer',
             color: 'var(--ink, #1A1918)',
@@ -93,7 +93,7 @@ export default function Error({ error, reset }: ErrorProps) {
             fontFamily: 'var(--font-ui)',
             fontWeight: 500,
             fontSize: 'var(--text-xs)',
-            letterSpacing: '0.16em',
+            letterSpacing: 'var(--tracking-label)',
             textTransform: 'uppercase',
             textDecoration: 'none',
           }}

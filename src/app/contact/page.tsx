@@ -75,7 +75,7 @@ export default function ContactPage() {
                     fontFamily: 'var(--font-ui)',
                     fontWeight: 500,
                     fontSize: 'var(--text-xs)',
-                    letterSpacing: '0.18em',
+                    letterSpacing: 'var(--tracking-label)',
                     textTransform: 'uppercase',
                     color: 'var(--graphite)',
                     margin: '0 0 8px',

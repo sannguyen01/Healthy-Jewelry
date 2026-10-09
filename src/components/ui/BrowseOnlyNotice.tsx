@@ -53,7 +53,7 @@ export function BrowseOnlyNotice() {
           fontFamily: 'var(--font-ui)',
           fontWeight: 500,
           fontSize: 'var(--text-xs)',
-          letterSpacing: '0.12em',
+          letterSpacing: 'var(--tracking-label)',
           textTransform: 'uppercase',
           margin: 0,
         }}

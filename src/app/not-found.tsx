@@ -24,7 +24,7 @@ export default function NotFound() {
           color: 'var(--ash)',
           lineHeight: 1,
           margin: '0 0 16px',
-          letterSpacing: '0.02em',
+          letterSpacing: 'var(--tracking-display)',
         }}
         aria-hidden="true"
       >
@@ -66,7 +66,7 @@ export default function NotFound() {
           fontFamily: 'var(--font-ui)',
           fontWeight: 500,
           fontSize: '0.72rem',
-          letterSpacing: '0.18em',
+          letterSpacing: 'var(--tracking-label)',
           textTransform: 'uppercase',
           textDecoration: 'none',
           transition: 'background-color 0.25s ease',

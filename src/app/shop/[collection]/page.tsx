@@ -123,7 +123,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               textTransform: 'uppercase',
               fontWeight: 500,
               fontSize: 'clamp(8rem, 20vw, 18rem)',
-              letterSpacing: '-0.02em',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--ash)',
               opacity: 0.35,
               lineHeight: 1,
@@ -184,7 +184,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               fontFamily: 'var(--font-ui)',
               fontWeight: 500,
               fontSize: 'var(--text-xs)',
-              letterSpacing: '0.14em',
+              letterSpacing: 'var(--tracking-label)',
               textTransform: 'uppercase',
               color: 'var(--graphite)',
             }}

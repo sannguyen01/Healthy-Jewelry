@@ -48,7 +48,7 @@ const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
   fontWeight: 500,
   fontSize: 'var(--text-xs)',
-  letterSpacing: '0.14em',
+  letterSpacing: 'var(--tracking-label)',
   textTransform: 'uppercase',
   color: 'var(--graphite)',
   marginBottom: '8px',

@@ -128,6 +128,11 @@ photograph stands until the owner replaces it; no filter is laid over it to imit
   `src/tests/unit/type-system-floor.test.ts` and, in the browser, by `e2e/rendered-fonts.spec.ts`.
 - **One role, one weight.** Display and label styles are 500, running text 300, declared on every
   style. A piece's name is `.hj-card-name`. Enforced by `src/tests/unit/typography-weights.test.ts`.
+- **One tracking scale.** Capitals are tracked and nothing else is: the label voice takes
+  `--tracking-meta` or `--tracking-label`, a heading takes `--tracking-display`, `--tracking-title` or
+  `--tracking-name`, running text takes none, and a typed number is a failure. Enforced by
+  `src/tests/unit/typography-tracking.test.ts` and, on what Chrome drew, by `e2e/rendered-fonts.spec.ts`
+  ([ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md), "One tracking scale").
 - **The label token is the floor.** Nothing is declared smaller than `--text-xs`'s minimum (0.7rem).
 - Page titles go through `PageHeader`. See `CLAUDE.md`, Typography.
 

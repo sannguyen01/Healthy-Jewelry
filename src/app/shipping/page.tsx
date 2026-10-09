@@ -67,7 +67,7 @@ const thStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
   fontSize: 'var(--text-xs)',
   fontWeight: 500,
-  letterSpacing: '0.16em',
+  letterSpacing: 'var(--tracking-label)',
   textTransform: 'uppercase',
   color: 'var(--graphite)',
   textAlign: 'left' as const,

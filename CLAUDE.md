@@ -87,7 +87,10 @@ Two families, four tokens. The tokens name **roles**, and the case and weight ru
   names, collection numbers, the menu's links. **Tracked capitals, at a declared weight**, tracked
   with `--tracking-display` / `--tracking-title` / `--tracking-name` (looser as it gets smaller).
 - `--font-ui` → DM Sans 500: nav controls, eyebrows, buttons, badges, metadata. Small, and tracked
-  capitals too.
+  capitals too, in two steps: `--tracking-meta` for a datum beside a name (a specification, a tag, a
+  breadcrumb) and `--tracking-label` for everything read or pressed as a label. **Only capitals are
+  tracked**, and a `letter-spacing` is a token or nothing (`typography-tracking.test.ts`; the browser
+  half is in `e2e/rendered-fonts.spec.ts`).
 - `--font-body` → DM Sans 300: body text and descriptions. Emphasis (`strong`, `b`, `th`) is the 500
   of the same family. Never capitals.
 - `--font-brand` → **the brand name, and nothing else**: the logotype in the header and the

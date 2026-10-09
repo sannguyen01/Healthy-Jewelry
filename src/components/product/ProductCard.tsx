@@ -51,20 +51,19 @@ export function ProductCard({ product, className }: ProductCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
 
-          {/* Spec overlay — revealed on hover */}
+          {/* Spec overlay — revealed on hover. The same datum the detail page prints under the
+              name, so the same voice (`.hj-spec`: label capitals, meta tracking) rather than
+              a tracked mixed-case line of body text. */}
           <p
             data-spec
+            className="hj-spec"
             style={{
               position: 'absolute',
               bottom: '10px',
               left: 0,
               right: 0,
               textAlign: 'center',
-              fontFamily: 'var(--font-body)',
-              fontWeight: 300,
-              fontSize: 'var(--text-xs)',
               color: 'var(--graphite)',
-              letterSpacing: '0.08em',
               opacity: 0,
               transition: `opacity var(--duration-fast) var(--ease)`,
               pointerEvents: 'none',

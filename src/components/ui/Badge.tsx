@@ -42,7 +42,7 @@ export function Badge({ variant, className }: BadgeProps) {
         fontFamily: 'var(--font-ui)',
         fontWeight: 500,
         fontSize: 'var(--text-xs)',
-        letterSpacing: '0.15em',
+        letterSpacing: 'var(--tracking-label)',
         textTransform: 'uppercase',
         padding: '3px 7px',
         ...variantStyles[variant],

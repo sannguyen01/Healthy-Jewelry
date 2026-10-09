@@ -191,7 +191,7 @@ export default function AboutPage() {
                     color: 'var(--ash)',
                     lineHeight: 1,
                     margin: '0 0 20px',
-                    letterSpacing: '0.02em',
+                    letterSpacing: 'var(--tracking-display)',
                   }}
                 >
                   {card.num}

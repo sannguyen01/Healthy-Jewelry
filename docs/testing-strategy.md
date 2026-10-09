@@ -346,7 +346,8 @@ loaded. `e2e/rendered-fonts.spec.ts` asks what Chrome *used*, node by node, thro
 with what the CSS requested. That is the only place a faked bold, a sheared italic or a system font
 shows, because in each the computed `font-family` is correct. It covers 16 routes (the 404 and the 410
 included) and the open menu, in both projects, and fails on a face that is not ours, a weight outside
-400 and 500, a non-normal style, or text below the label floor. Placeholders are not text nodes, so form controls
+400 and 500, a non-normal style, text below the label floor, a label (DM Sans 500) that is not in
+capitals, or running text (DM Sans 300) that is tracked. Placeholders are not text nodes, so form controls
 are held to inheriting the page's family instead. Its two races, both found writing it, are the phone
 footer collapsing after hydration and a page measured before it arrived (ADR 042). See
 [ADR 050](adr/050-one-face-means-no-borrowed-ones.md).

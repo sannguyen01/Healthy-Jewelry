@@ -56,9 +56,11 @@ Two families, four tokens. The tokens name **roles**, and the weight and case ru
   typeface, so the case is part of the voice and is declared, never inherited. Running text is never
   capitals.
 - **The sizes, the palette and the layout are the Quiet Archive's, unchanged.** Only the faces, weights,
-  case and tracking moved. Three styles that were `--font-ui` but are sentences (a field's error, the
-  consent banner's current answer, a card's hover specification) became `--font-body`, because the label
-  voice is capitals and a sentence is not.
+  case and tracking moved. Two styles that were `--font-ui` but are sentences (a field's error, the
+  consent banner's current answer) became `--font-body`, because the label voice is capitals and a
+  sentence is not. (A third, a card's hover specification, went the same way and came back a day later:
+  it is a datum, not a sentence, and the piece page prints the same string as a label. See "One tracking
+  scale", below.)
 - **`--font-title` and `--font-body-medium` are gone.** There is one display cut now, and the 500 of DM
   Sans is the same file as the label voice, reached by the same loader.
 
@@ -72,8 +74,9 @@ Two families, four tokens. The tokens name **roles**, and the weight and case ru
 | `font-files.test.ts` | nine files across three families | the four loader files and the three card TTFs, each pinned by SHA-256, weight class, copyright and licence |
 | `type-system-floor.test.ts` | one face per voice for the out-of-layout documents | a display, a body and a label face, public copies byte-identical |
 | `opengraph-bundled-font.test.tsx` | Bodoni, DM Sans 400 and Barlow cards | Barlow 500, DM Sans 300 and 500, rasterised through the real Satori |
-| `rendered-fonts.spec.ts` | each role drawn in its voice; no 96pt cut under 36px | each role drawn in its family **and in capitals where it is set in them**, as Chrome reports it |
+| `rendered-fonts.spec.ts` | each role drawn in its voice; no 96pt cut under 36px | each role drawn in its family **and in capitals where it is set in them**, as Chrome reports it; **any** DM Sans 500 is capitals (but `strong` and `b`), and DM Sans 300 is never tracked past 0.02em |
 | `glyph-coverage.spec.ts` | six files' common characters; display, title, body and label faces loaded | four files; Barlow 400 and 500 and DM Sans 300 and 500 loaded |
+| `typography-tracking.test.ts` (new, 2026-10-09) | — | every `letter-spacing` is one of five tokens or nothing; a voice takes its own tokens; running text takes none |
 | sentinels | `cut-follows-size` | `body-weight-light`; `display-case` now holds capitals, `display-weight-declared` and the weight and file sentinels re-anchored |
 
 **A guard added on the way.** The first menu measured (the dark overlay of ADR 051's predecessor)
@@ -89,6 +92,38 @@ six flakes, all the documented local-only `visible focus indicators` probe (a 0p
 instant of focus), which passed on retry and passes on CI. The 219-character claim in `CLAUDE.md`
 no longer states a count: the safe set is the intersection of two families' slices, and it is read out
 of the files by `font-files.test.ts`.
+
+## One tracking scale (added 2026-10-09, after a census of the rendered routes)
+
+The owner asked for the original typography "adjusted" everywhere. The faces, weights and case were
+already the original's; what was left was **how the text is spaced and in which voice**. Every text
+node on fifteen routes was read back from Chrome (family, weight, case, tracking, size), grouped, and
+the outliers listed. The faces were right everywhere. Three things were not:
+
+| Found | Where | Why it is a defect | Now |
+|---|---|---|---|
+| The label voice tracked at seven values (0.1, 0.12, 0.14, 0.15, 0.16, 0.18, 0.22em) | buttons, badges, table heads, eyebrows, form labels, the collection links | the same role carried two values on two routes: the section eyebrow was 0.14em on `/about` and 0.22em on `/stores` and `/faq` | **two steps**: `--tracking-meta` 0.1em for a datum beside a name (a specification, a tag, a breadcrumb, a row name) and `--tracking-label` 0.14em for everything read or pressed as a label |
+| Breadcrumbs: DM Sans **500, `capitalize`**, tracked 0.1em | every page below the home page | mixed case at the label weight is no voice of this site, and a trail of Title Case piece names sat above a heading and a card name set in capitals | the label voice: capitals, `--tracking-meta` |
+| **Tracked mixed case**: a card's hover specification (300, 0.08em) and the piece page's material designation (500, 0.16em, capitals switched off) | `/shop`, the collections, search, the home strip, `/products/*` | only capitals are tracked; the designation is case-sensitive (`Ti-6Al-4V`, not `TI-6AL-4V`), so it cannot be a label | the hover specification is `.hj-spec`, the same voice as the specification the piece page prints; the designation is **running text** (body voice, 300, untracked) and sits at the column's left edge instead of centred under it |
+
+**Decisions.**
+- **Two label steps, not three.** The widest values (0.18 and 0.22em) belonged to the same roles as 0.14em
+  elsewhere (an eyebrow, a field label, a link set as a label), so the scale lost them rather than gaining a
+  step for them. The brand name keeps its own values (0.10em in the header, 0.12em in the footer and the
+  seal, ADR 048): it is the one thing that is neither a label nor a heading.
+- **The decorative numerals are display text.** The ordinals on `/about` and `/materials`, the 404 and the
+  collection page's ghost numeral were typed at 0.02 and -0.02em; they take `--tracking-display`, like the
+  page titles beside them.
+- **Units in capitals.** A specification in the label voice reads `14 MM DIAMETER · 1.2 MM WIRE`, as the
+  piece page already did. It is the datum's voice rather than a typesetting claim about the unit.
+- **Not touched:** the share cards (Satori has no custom properties) and the root error boundary (no layout,
+  so no tokens; it declares its own face, `src/lib/design/siteFace.ts`).
+
+**Guards.** `typography-tracking.test.ts` reads the app's source: five `--tracking-*` tokens exist, a
+`letter-spacing` that is a typed number fails (it was shown to fail on the previous tree, on every one of
+the typed values), a voice may only use its own tokens, and running text takes none. The same line is held
+on what Chrome drew by two new rules in `rendered-fonts.spec.ts`. Neither was a rule before, because every
+existing guard asked which face drew the text and none asked how it was set.
 
 ## What this does not do
 

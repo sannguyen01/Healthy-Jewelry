@@ -170,7 +170,7 @@ export default function FAQPage() {
                   fontFamily: 'var(--font-ui)',
                   fontWeight: 500,
                   fontSize: 'var(--text-xs)',
-                  letterSpacing: '0.22em',
+                  letterSpacing: 'var(--tracking-label)',
                   textTransform: 'uppercase',
                   color: 'var(--titanium-text)',
                   marginBottom: '32px',

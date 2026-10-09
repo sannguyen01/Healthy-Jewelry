@@ -61,7 +61,7 @@ export default async function ShopPage() {
                   fontFamily: 'var(--font-ui)',
                   fontWeight: 500,
                   fontSize: '0.75rem',
-                  letterSpacing: '0.18em',
+                  letterSpacing: 'var(--tracking-label)',
                   textTransform: 'uppercase',
                   color: 'var(--ink)',
                   textDecoration: 'none',

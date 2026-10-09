@@ -19,6 +19,12 @@ palette and the typography through the shared tokens, and nothing else of the bo
   on eight of twelve real screens (first link under the header, last link past the viewport, a drawer
   that could not scroll). The archive menu does not have the defect; `e2e/header-fit.spec.ts` now holds
   it to that on twelve screens.
+- **A census of every rendered route, and what it found** (ADR 052, "One tracking scale"). The faces were
+  right everywhere; the spacing was not: the label voice was tracked at seven values and the same role
+  carried two on two routes, breadcrumbs were 500 and `capitalize`, and two lines of running text were
+  tracked. Now two label steps and three display steps as tokens, the breadcrumbs and a card's hover
+  specification in the label voice, a material's designation as running text, and a guard in the fast gate
+  (`typography-tracking.test.ts`, shown to fail on the previous tree) plus two rules on what Chrome drew.
 - **Verified locally**: unit suite green; full Playwright suite 838 passed, none failed (six flakes, all
   the documented local-only `visible focus indicators` probe). CI on the pushed head is the arbiter.
 - **Not done**: B5 (catalogue and piece pages), B6 (`DESIGN.md`'s rewrite). Owner actions open: merge

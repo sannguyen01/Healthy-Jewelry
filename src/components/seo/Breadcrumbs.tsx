@@ -12,6 +12,12 @@ interface BreadcrumbsProps {
   items: BreadcrumbItem[]
 }
 
+/**
+ * The trail is the label voice: DM Sans 500 in tracked capitals, like every other small datum on
+ * a page (a specification, a tag). It was `capitalize` on the links and the current page inside a
+ * nav that said `uppercase` — mixed case at 500, which no voice of this site is — and a trail of
+ * piece names in Title Case sat above a heading and a card name set in capitals (ADR 052).
+ */
 export function Breadcrumbs({ items }: BreadcrumbsProps) {
   return (
     <>
@@ -31,7 +37,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
           fontWeight: 500,
           fontSize: 'var(--text-xs)',
           color: 'var(--graphite)',
-          letterSpacing: '0.1em',
+          letterSpacing: 'var(--tracking-meta)',
           textTransform: 'uppercase',
         }}
       >
@@ -46,19 +52,12 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
               {isLast || !item.href ? (
                 <span
                   aria-current={isLast ? 'page' : undefined}
-                  style={{
-                    color: isLast ? 'var(--ink)' : 'var(--graphite)',
-                    textTransform: 'capitalize',
-                  }}
+                  style={{ color: isLast ? 'var(--ink)' : 'var(--graphite)' }}
                 >
                   {item.label}
                 </span>
               ) : (
-                <Link
-                  href={item.href}
-                  className="hj-bc-link"
-                  style={{ textTransform: 'capitalize' }}
-                >
+                <Link href={item.href} className="hj-bc-link">
                   {item.label}
                 </Link>
               )}

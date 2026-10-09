@@ -255,6 +255,10 @@ export function Footer() {
             font-size: 1.2rem;
             transition: transform 0.3s ease-out;
             font-weight: 300;
+            /* A symbol is not tracked. It inherited the summary's label tracking as a length, which
+               made the glyph "running text, tracked" and left a gap after it that pulled the plus
+               off the right edge and off the centre it rotates about. */
+            letter-spacing: 0;
           }
           
           .footer-group-inner {

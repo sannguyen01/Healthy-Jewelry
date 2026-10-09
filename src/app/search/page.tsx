@@ -152,7 +152,7 @@ async function SearchResults({ query }: { query: string }) {
                 fontFamily: 'var(--font-ui)',
                 fontWeight: 500,
                 fontSize: 'var(--text-xs)',
-                letterSpacing: '0.16em',
+                letterSpacing: 'var(--tracking-label)',
                 textTransform: 'uppercase',
                 border: 'none',
                 cursor: 'pointer',
@@ -368,7 +368,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 fontFamily: 'var(--font-ui)',
                 fontWeight: 500,
                 fontSize: 'var(--text-xs)',
-                letterSpacing: '0.16em',
+                letterSpacing: 'var(--tracking-label)',
                 textTransform: 'uppercase',
                 color: 'var(--graphite)',
               }}

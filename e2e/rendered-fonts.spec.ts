@@ -71,6 +71,8 @@ interface Drawn {
   style: string
   size: number
   transform: string
+  /** letter-spacing in em (0 when `normal`). */
+  tracking: number
   fonts: { familyName: string; isCustomFont: boolean }[]
 }
 
@@ -109,6 +111,7 @@ async function drawn(page: Page): Promise<Drawn[]> {
         style: cs.fontStyle,
         size: Number.parseFloat(cs.fontSize),
         transform: cs.textTransform,
+        tracking: Math.round((Number.parseFloat(cs.letterSpacing) / Number.parseFloat(cs.fontSize) || 0) * 100) / 100,
       })
     }
     return out
@@ -187,6 +190,16 @@ function judge(rows: Drawn[]): string[] {
       if (voice.match(r) && voice.capitals && r.transform !== 'uppercase')
         findings.push(`${where}: ${voice.role} is set in capitals, drawn with text-transform ${r.transform}`)
     }
+    // The two halves of the case rule, read off whatever was drawn rather than off the roles above, so
+    // a style no role names is held to it too (a breadcrumb that was 500 and `capitalize`, a spec line
+    // that was 300 and tracked 0.08em: both passed every rule above, and both were mixed case with a
+    // capital's tracking or weight, which is no voice of this site).
+    const label = r.fonts.some((f) => family(f.familyName) === 'DM Sans') && r.weight === 500
+    if (label && r.transform !== 'uppercase' && !['strong', 'b'].includes(r.tag))
+      findings.push(`${where}: DM Sans 500 is the label voice and the label voice is capitals, drawn with text-transform ${r.transform}`)
+    const running = r.fonts.some((f) => family(f.familyName) === 'DM Sans') && r.weight === 300
+    if (running && r.tracking > 0.02)
+      findings.push(`${where}: running text (DM Sans 300) is tracked ${r.tracking}em; only capitals are tracked`)
     if (r.style !== 'normal') findings.push(`${where}: asks for font-style ${r.style}; the site ships no italic`)
     if (r.size < FLOOR_PX) findings.push(`${where}: ${r.size}px, below the ${FLOOR_PX}px label floor`)
   }
