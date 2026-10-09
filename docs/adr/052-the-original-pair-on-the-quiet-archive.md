@@ -77,6 +77,7 @@ Two families, four tokens. The tokens name **roles**, and the weight and case ru
 | `rendered-fonts.spec.ts` | each role drawn in its voice; no 96pt cut under 36px | each role drawn in its family **and in capitals where it is set in them**, as Chrome reports it; **any** DM Sans 500 is capitals (but `strong` and `b`), and DM Sans 300 is never tracked past 0.02em |
 | `glyph-coverage.spec.ts` | six files' common characters; display, title, body and label faces loaded | four files; Barlow 400 and 500 and DM Sans 300 and 500 loaded |
 | `typography-tracking.test.ts` (new, 2026-10-09) | — | every `letter-spacing` is one of five tokens or nothing; a voice takes its own tokens; running text takes none |
+| `typography-scale.test.ts` (new, 2026-10-09) | — | every `line-height` is one of four leading tokens (or `1`); every `font-size` is a `--text-*` token or a named exception; no token has a fallback; a heading does not take a paragraph's leading |
 | sentinels | `cut-follows-size` | `body-weight-light`; `display-case` now holds capitals, `display-weight-declared` and the weight and file sentinels re-anchored |
 
 **A guard added on the way.** The first menu measured (the dark overlay of ADR 051's predecessor)
@@ -124,6 +125,44 @@ the outliers listed. The faces were right everywhere. Three things were not:
 the typed values), a voice may only use its own tokens, and running text takes none. The same line is held
 on what Chrome drew by two new rules in `rendered-fonts.spec.ts`. Neither was a rule before, because every
 existing guard asked which face drew the text and none asked how it was set.
+
+## One leading scale, sizes on the scale, and the controls that were hand-rolled (added 2026-10-09)
+
+The owner asked, again, for the fonts rectified and every touch refined with care. The second census
+read **size and line-height** off every text node of fourteen routes, at 1440px and at 390px, and the
+form controls and the buttons beside them. The faces, weights, case and tracking held; the rest did not.
+
+| Found | Where | Now |
+|---|---|---|
+| running text at five leadings (1.5, 1.6, 1.65, 1.7, 1.75) and display text at eight (1.0 to 1.3); fifteen spellings in source | everywhere | **four tokens**: `--leading-display` 1.1 (a heading), `--leading-snug` 1.25 (a name, a row, a one-line label), `--leading-text` 1.65 (running text), `--leading-long` 1.75 (long-form reading); `1` stays for a single numeral |
+| three display-voice lines at a heading's size on a paragraph's leading, so a multi-line heading was set loose | the FAQ's closing card, the free-shipping line on `/shipping`, the warranty line on `/terms` | display leading |
+| sizes typed in rem beside the `--text-*` scale, and token fallbacks that disagreed with the token (`var(--text-xl, 1.4rem)` in four files, `1.3rem` in two) | the footer's fine print, the shop's collection links, the menu's explore rows and its foot line, the 404 and error pages, the legal pages' headings | tokens, with no fallback |
+| a field's text 14px | the menu's search | `--text-base`, 16px at the smallest |
+| the sort control 11 to 12.5px | `/shop` and the collection pages | a label on a desktop; under 768px a field, like the contact form's select (body voice, 300, as written, `--text-base`): `.hj-sort` |
+| two hand-rolled buttons per failure page: square, an ink edge, 11.5 and 12px type, no radius | `not-found.tsx` and `error.tsx` | `.btn-primary` and `.btn-ghost`, the Quiet Archive's two controls |
+| bulleted lists with no bullets: the reset removed the markers and left a 24px indent, so three items read as a stray block | `/terms`, `/privacy`, `/shipping` | discs |
+
+**Why 16px.** iOS Safari zooms the page when a form control under 16px takes focus, and does not zoom back.
+Every field on the site was already `--text-base` (16px at the smallest) except the menu's search, so that
+was the defect. The sort control is the one control set at a label's size; 16px of tracked capitals beside
+12px filter chips read as a mistake (measured, then looked at), so under the breakpoint it takes a field's
+voice instead, as the contact form's select has, and the label scale is not raised for everyone.
+
+**Decisions.**
+- **1.7 became 1.75 and 1.5 and 1.6 became 1.65.** The pairs differed by a few hundredths of an em, which no
+  reader sees and every maintainer has to choose between; the two that remain are the body's own and a step
+  more for what is read at length.
+- **A single-line label keeps the box its padding gives it.** Badges, tags and the bar's controls inherit the
+  body's leading as the height of their box, and changing that would resize controls to fix a number nobody
+  sees. They are not held to a leading; running text and display text are.
+- **What may set its own size is named, with its reason, in `typography-scale.test.ts`:** the brand name, the
+  decorative numerals (`aria-hidden`), a piece's name and the menu's two display sizes. A new one is a
+  decision for this ADR.
+
+**Guards.** `typography-scale.test.ts` reads the source (shown to fail on the previous tree on every typed
+leading, size and fallback). `rendered-fonts.spec.ts` gains two rules on what Chrome drew, which also see
+a style that arrives through a spread (the three display lines did), and a test that every form control is
+16px or larger on a phone. The scan helpers the two source guards share are in `src/tests/support/styleScan.ts`.
 
 ## What this does not do
 

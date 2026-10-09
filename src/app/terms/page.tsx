@@ -18,7 +18,7 @@ const sectionHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-display)',
   textTransform: 'uppercase',
   fontWeight: 500,
-  fontSize: 'var(--text-xl, 1.4rem)',
+  fontSize: 'var(--text-xl)',
   letterSpacing: 'var(--tracking-title)',
   color: 'var(--ink)',
   margin: '0 0 16px',
@@ -28,7 +28,7 @@ const bodyStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  lineHeight: 1.75,
+  lineHeight: 'var(--leading-long)',
   fontWeight: 300,
   margin: '0 0 16px',
 }
@@ -37,10 +37,13 @@ const listStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  lineHeight: 1.75,
+  lineHeight: 'var(--leading-long)',
   fontWeight: 300,
   margin: '0 0 16px',
   paddingLeft: '24px',
+  // The stylesheet's reset removes list markers; an indented block of lines with none reads as
+  // a stray paragraph, not as the list it is.
+  listStyleType: 'disc',
 }
 
 export default function TermsPage() {
@@ -201,7 +204,8 @@ export default function TermsPage() {
                 ...bodyStyle,
                 fontFamily: 'var(--font-display)',
                 textTransform: 'uppercase',
-                fontSize: 'var(--text-lg, 1.1rem)',
+                fontSize: 'var(--text-lg)',
+                lineHeight: 'var(--leading-display)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 fontWeight: 500,

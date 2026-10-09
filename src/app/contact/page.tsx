@@ -39,7 +39,7 @@ export default function ContactPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               fontWeight: 300,
               maxWidth: '520px',
               margin: 0,
@@ -131,7 +131,7 @@ export default function ContactPage() {
               letterSpacing: 'var(--tracking-title)',
               color: 'var(--on-dark)',
               margin: 0,
-              lineHeight: 1.1,
+              lineHeight: 'var(--leading-display)',
             }}
           >
             Questions about our metals?
@@ -142,7 +142,7 @@ export default function ContactPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-base)',
               color: 'var(--on-dark)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               fontWeight: 300,
               maxWidth: '460px',
               margin: 0,

@@ -91,6 +91,11 @@ Two families, four tokens. The tokens name **roles**, and the case and weight ru
   breadcrumb) and `--tracking-label` for everything read or pressed as a label. **Only capitals are
   tracked**, and a `letter-spacing` is a token or nothing (`typography-tracking.test.ts`; the browser
   half is in `e2e/rendered-fonts.spec.ts`).
+- **Size and leading are scales too.** A `font-size` is a `--text-*` token (what may set its own is named
+  in `typography-scale.test.ts`: the brand name, decorative numerals, a piece's name), never with a
+  fallback; a `line-height` is `--leading-display` (headings), `--leading-snug` (a name or one-line
+  label), `--leading-text` (running text) or `--leading-long` (long-form reading), and a heading does
+  not take a paragraph's. A form control is never set smaller than the base text size on a phone, or iOS zooms the page on focus.
 - `--font-body` → DM Sans 300: body text and descriptions. Emphasis (`strong`, `b`, `th`) is the 500
   of the same family. Never capitals.
 - `--font-brand` → **the brand name, and nothing else**: the logotype in the header and the

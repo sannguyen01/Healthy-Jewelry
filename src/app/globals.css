@@ -173,6 +173,15 @@
     --tracking-display: 0.01em;
     --tracking-title: 0.04em;
     --tracking-name: 0.06em;
+    /* Leading, in four steps by what the text is (ADR 052, "One leading scale"): display text is set close
+       (capitals have no descenders to clear), a name or a one-line label a little looser, running text at
+       the body's own, and long-form reading (the legal pages, the FAQ, the content pages) a step more.
+       It was spelled fifteen ways between 1.0 and 1.75, and a heading could take a paragraph's. The one
+       other value is `1`, for a single glyph set as a numeral. */
+    --leading-display: 1.1;
+    --leading-snug: 1.25;
+    --leading-text: 1.65;
+    --leading-long: 1.75;
     /* A hairline (--ash) instead of a shadow: the page stays flat and quiet. Two radii, the board's:
        a control and a frame (a card, a tile, a panel). Everything else stays square. */
     --radius-control: 4px;
@@ -213,13 +222,13 @@
        file for 400 is not shipped, and only the weights shipped are drawn (font-synthesis above). */
     font-weight: 300;
     font-size: var(--text-base);
-    line-height: 1.65;
+    line-height: var(--leading-text);
     overflow-x: hidden;
   }
 
   /* ── Typography Resets ── */
   h1, h2, h3, h4, h5, h6 {
-    line-height: 1.1;
+    line-height: var(--leading-display);
     font-weight: inherit;
   }
 
@@ -478,7 +487,7 @@
     font-family: var(--font-ui);
     font-size: var(--text-label);
     font-weight: 500;
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     text-decoration: none;
@@ -505,7 +514,7 @@
     font-family: var(--font-ui);
     font-size: var(--text-label);
     font-weight: 500;
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     text-decoration: none;
@@ -527,7 +536,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: clamp(1.125rem, 1rem + 0.4vw, 1.25rem);
-    line-height: 1.3;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-name);
     color: var(--ink);
   }
@@ -538,7 +547,7 @@
     font-family: var(--font-ui);
     font-size: var(--text-label);
     font-weight: 500;
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     color: var(--ink-2);
@@ -897,7 +906,7 @@
     font-family: var(--font-ui);
     font-weight: 500;
     font-size: var(--text-label);
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
   }
@@ -906,7 +915,7 @@
     font-family: var(--font-ui);
     font-weight: 500;
     font-size: var(--text-xs);
-    line-height: 1.3;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-meta);
     text-transform: uppercase;
   }
@@ -960,7 +969,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: clamp(1.5rem, 1.2rem + 1vw, 1.875rem);
-    line-height: 1.27;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-title);
   }
 
@@ -990,7 +999,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
-    line-height: 1.33;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-title);
   }
 
@@ -1002,7 +1011,7 @@
 
   .hj-archive-explore-row {
     font-family: var(--font-body);
-    font-size: 0.9375rem;
+    font-size: var(--text-sm);
   }
 
   .hj-archive-note {
@@ -1021,7 +1030,7 @@
 
   .hj-archive-note p {
     font-size: var(--text-sm);
-    line-height: 1.6;
+    line-height: var(--leading-text);
     color: var(--graphite);
   }
 
@@ -1051,8 +1060,8 @@
     margin-top: clamp(32px, 5vw, 56px);
     padding-top: 20px;
     border-top: 1px solid var(--ash);
-    font-size: 0.75rem;
-    line-height: 1.5;
+    font-size: var(--text-xs);
+    line-height: var(--leading-text);
     color: var(--ink-2);
   }
 
@@ -1074,7 +1083,8 @@
     border: 1px solid var(--outline);
     border-radius: var(--radius-control);
     font-family: var(--font-body);
-    font-size: 0.875rem;
+    /* 16px or more: a field set smaller makes iOS zoom the page on focus and not zoom back. */
+    font-size: var(--text-base);
     color: var(--ink);
     transition: border-color 0.2s var(--ease-sharp);
   }
@@ -1097,7 +1107,7 @@
     font-family: var(--font-ui);
     font-weight: 500;
     font-size: var(--text-label);
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     text-decoration: none;
@@ -1107,6 +1117,28 @@
 
   .btn-primary:hover {
     background-color: var(--graphite);
+  }
+
+  /* The sort control. On a desktop it is a label, like the filter chips beside it. On a phone it is a
+     field, like the contact form's own select: a form control set under the base size makes iOS zoom the
+     page on focus and not zoom back, and 16px of tracked capitals beside 12px chips reads as a mistake,
+     so below the breakpoint it takes the field's voice (body, 300, as written) at the field's size. */
+  .hj-sort {
+    font-family: var(--font-ui);
+    font-weight: 500;
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 768px) {
+    .hj-sort {
+      font-family: var(--font-body);
+      font-weight: 300;
+      font-size: var(--text-base);
+      letter-spacing: 0;
+      text-transform: none;
+    }
   }
 
   .hj-metal-dot {
@@ -1177,7 +1209,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: var(--text-section);
-    line-height: 1.2;
+    line-height: var(--leading-display);
     letter-spacing: var(--tracking-title);
     color: var(--ink);
   }
@@ -1191,7 +1223,7 @@
     font-family: var(--font-body);
     font-weight: 300;
     font-size: var(--text-base);
-    line-height: 1.65;
+    line-height: var(--leading-text);
     color: var(--graphite);
   }
 
@@ -1209,7 +1241,7 @@
     font-family: var(--font-ui);
     font-weight: 500;
     font-size: var(--text-label);
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     text-decoration: none;
@@ -1240,7 +1272,7 @@
     font-family: var(--font-ui);
     font-weight: 500;
     font-size: var(--text-label);
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
   }
@@ -1293,7 +1325,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: var(--text-xl);
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-title);
     color: var(--ink);
   }
@@ -1308,7 +1340,7 @@
     font-family: var(--font-body);
     font-weight: 300;
     font-size: var(--text-sm);
-    line-height: 1.65;
+    line-height: var(--leading-text);
     color: var(--graphite);
   }
 
@@ -1498,7 +1530,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: var(--text-xl);
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-title);
     color: var(--ink);
   }
@@ -1537,7 +1569,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: var(--text-xl);
-    line-height: 1.25;
+    line-height: var(--leading-snug);
     letter-spacing: var(--tracking-title);
   }
 
@@ -1585,7 +1617,7 @@
     text-transform: uppercase;
     font-weight: 500;
     font-size: var(--text-2xl);
-    line-height: 1.12;
+    line-height: var(--leading-display);
     letter-spacing: var(--tracking-display);
     color: var(--ink);
   }

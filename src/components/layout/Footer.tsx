@@ -91,7 +91,7 @@ export function Footer() {
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
                 maxWidth: '280px',
-                lineHeight: 1.7,
+                lineHeight: 'var(--leading-long)',
               }}
             >
               {tagline()} Grade 23 titanium, niobium and 316L surgical steel.
@@ -164,8 +164,8 @@ export function Footer() {
           <span
             style={{
               fontFamily: 'var(--font-body)',
-              fontSize: '0.75rem',
-              lineHeight: 1.5,
+              fontSize: 'var(--text-xs)',
+              lineHeight: 'var(--leading-text)',
               color: 'var(--ink-2)',
             }}
           >
@@ -183,8 +183,8 @@ export function Footer() {
           <MeasurementPreferences
             style={{
               ...linkStyle,
-              fontSize: '0.75rem',
-              lineHeight: 1.5,
+              fontSize: 'var(--text-xs)',
+              lineHeight: 'var(--leading-text)',
               // 12px of type on a 1.5 line is 18px: 13px above and below clears the 44px target.
               padding: '13px 0',
               color: 'var(--ink-2)',
@@ -252,7 +252,7 @@ export function Footer() {
           }
           .footer-icon {
             display: inline-block;
-            font-size: 1.2rem;
+            font-size: var(--text-lg);
             transition: transform 0.3s ease-out;
             font-weight: 300;
             /* A symbol is not tracked. It inherited the summary's label tracking as a length, which

@@ -111,16 +111,13 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortKey)}
+            // The type is `.hj-sort`'s: a label's on a desktop, a field's on a phone (globals.css says why).
+            className="hj-sort"
             style={{
               padding: '7px 12px',
               border: '1px solid var(--outline)',
               backgroundColor: 'transparent',
               color: 'var(--ink)',
-              fontFamily: 'var(--font-ui)',
-              fontWeight: 500,
-              fontSize: 'var(--text-xs)',
-              textTransform: 'uppercase',
-              letterSpacing: 'var(--tracking-label)',
               cursor: 'pointer',
               appearance: 'none',
               WebkitAppearance: 'none',

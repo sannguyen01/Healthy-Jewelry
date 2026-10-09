@@ -138,7 +138,7 @@ export default function MaterialsPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               fontWeight: 300,
               maxWidth: '580px',
             }}
@@ -194,7 +194,7 @@ export default function MaterialsPage() {
                     letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 8px',
-                    lineHeight: 1.1,
+                    lineHeight: 'var(--leading-display)',
                   }}
                 >
                   {material.title}
@@ -222,7 +222,7 @@ export default function MaterialsPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
-                    lineHeight: 1.75,
+                    lineHeight: 'var(--leading-long)',
                     fontWeight: 300,
                     margin: '0 0 28px',
                   }}
@@ -398,7 +398,7 @@ export default function MaterialsPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
-                    lineHeight: 1.75,
+                    lineHeight: 'var(--leading-long)',
                     fontWeight: 300,
                     margin: 0,
                   }}

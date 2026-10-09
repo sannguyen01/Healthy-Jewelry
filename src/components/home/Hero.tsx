@@ -144,7 +144,7 @@ export function Hero({ headlineLines }: HeroProps) {
               color: 'var(--ink)',
               // 0.9 until the hero moved from 136px to 60px: a didone's ascenders and descenders
               // clear each other at 1.1, and at this size the leading is what the eye reads.
-              lineHeight: 1.1,
+              lineHeight: 'var(--leading-display)',
               letterSpacing: 'var(--tracking-display)',
               margin: '0 0 24px',
             }}
@@ -166,7 +166,7 @@ export function Hero({ headlineLines }: HeroProps) {
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               margin: '0 0 40px',
-              lineHeight: 1.65,
+              lineHeight: 'var(--leading-text)',
               maxWidth: '400px',
             }}
           >

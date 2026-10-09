@@ -45,7 +45,7 @@ export default function AboutPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               maxWidth: '620px',
               fontWeight: 300,
             }}
@@ -94,7 +94,7 @@ export default function AboutPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
                 margin: '0 0 20px',
               }}
@@ -109,7 +109,7 @@ export default function AboutPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
               }}
             >
@@ -216,7 +216,7 @@ export default function AboutPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
-                    lineHeight: 1.7,
+                    lineHeight: 'var(--leading-long)',
                     fontWeight: 300,
                     margin: 0,
                   }}
@@ -264,7 +264,7 @@ export default function AboutPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
-              lineHeight: 1.75,
+              lineHeight: 'var(--leading-long)',
               fontWeight: 300,
               margin: 0,
             }}
@@ -309,7 +309,7 @@ export default function AboutPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--on-dark)',
-              lineHeight: 1.6,
+              lineHeight: 'var(--leading-text)',
               fontWeight: 300,
               maxWidth: '480px',
               margin: 0,

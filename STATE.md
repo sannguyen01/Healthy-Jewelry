@@ -25,6 +25,12 @@ palette and the typography through the shared tokens, and nothing else of the bo
   tracked. Now two label steps and three display steps as tokens, the breadcrumbs and a card's hover
   specification in the label voice, a material's designation as running text, and a guard in the fast gate
   (`typography-tracking.test.ts`, shown to fail on the previous tree) plus two rules on what Chrome drew.
+- **A second census, of size and line-height** (ADR 052, "One leading scale"). Running text was set at five
+  leadings and display text at eight, three display lines took a paragraph's, a field's text was 14px
+  (iOS zooms the page for any control under 16px), the sort control was 11px on a phone, the 404 and error
+  pages carried hand-rolled square buttons, and three legal pages had lists with no bullets. Now four
+  leading tokens, sizes on the `--text-*` scale with no fallbacks, 16px controls, the site's two buttons,
+  and `typography-scale.test.ts` (shown to fail on the previous tree) plus rendered-text rules.
 - **Verified locally**: unit suite green; full Playwright suite 838 passed, none failed (six flakes, all
   the documented local-only `visible focus indicators` probe). CI on the pushed head is the arbiter.
 - **Not done**: B5 (catalogue and piece pages), B6 (`DESIGN.md`'s rewrite). Owner actions open: merge

@@ -44,7 +44,7 @@ const VARIANT_STYLES: Record<PageHeaderVariant, CSSProperties> = {
     fontWeight: 500,
     fontSize: 'var(--text-display)',
     letterSpacing: 'var(--tracking-display)',
-    lineHeight: 1.05,
+    lineHeight: 'var(--leading-display)',
     marginBottom: '32px',
   },
   compact: {
@@ -53,7 +53,7 @@ const VARIANT_STYLES: Record<PageHeaderVariant, CSSProperties> = {
     fontWeight: 500,
     fontSize: 'var(--text-2xl)',
     letterSpacing: 'var(--tracking-title)',
-    lineHeight: 1.1,
+    lineHeight: 'var(--leading-display)',
     marginBottom: '24px',
   },
 }

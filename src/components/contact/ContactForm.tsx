@@ -159,7 +159,7 @@ export function ContactForm() {
             fontFamily: 'var(--font-body)',
             fontSize: 'var(--text-base)',
             color: 'var(--graphite)',
-            lineHeight: 1.7,
+            lineHeight: 'var(--leading-long)',
             fontWeight: 300,
             margin: 0,
           }}

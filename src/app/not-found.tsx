@@ -35,7 +35,7 @@ export default function NotFound() {
           fontFamily: 'var(--font-display)',
           textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-title)',
-          fontSize: 'clamp(1.4rem, 3vw, 2rem)',
+          fontSize: 'var(--text-xl)',
           color: 'var(--ink)',
           margin: '0 0 12px',
           fontWeight: 500,
@@ -47,31 +47,15 @@ export default function NotFound() {
         style={{
           fontFamily: 'var(--font-body)',
           fontWeight: 300,
-          fontSize: '0.9rem',
+          fontSize: 'var(--text-sm)',
+          lineHeight: 'var(--leading-text)',
           color: 'var(--graphite)',
           margin: '0 0 40px',
         }}
       >
         The page you&apos;re looking for has moved or never existed.
       </p>
-      <Link
-        href="/"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '14px 32px',
-          backgroundColor: 'var(--ink)',
-          color: 'var(--bg)',
-          fontFamily: 'var(--font-ui)',
-          fontWeight: 500,
-          fontSize: '0.72rem',
-          letterSpacing: 'var(--tracking-label)',
-          textTransform: 'uppercase',
-          textDecoration: 'none',
-          transition: 'background-color 0.25s ease',
-        }}
-      >
+      <Link href="/" className="btn-primary">
         Back to Home
       </Link>
     </main>

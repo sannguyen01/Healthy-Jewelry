@@ -121,7 +121,7 @@ export function ConsentBanner() {
           fontFamily: 'var(--font-body)',
           fontWeight: 300,
           fontSize: 'var(--text-sm)',
-          lineHeight: 1.65,
+          lineHeight: 'var(--leading-text)',
           color: 'var(--ink)',
           margin: 0,
         }}
@@ -154,7 +154,7 @@ export function ConsentBanner() {
           style={{
             fontFamily: 'var(--font-body)',
             fontWeight: 300,
-            fontSize: 'var(--text-xs, 0.75rem)',
+            fontSize: 'var(--text-xs)',
             color: 'var(--graphite)',
             margin: 0,
           }}

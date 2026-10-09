@@ -198,7 +198,7 @@ export default function FAQPage() {
                       style={{
                         fontFamily: 'var(--font-display)',
                         textTransform: 'uppercase',
-                        fontSize: 'var(--text-lg, 1.1rem)',
+                        fontSize: 'var(--text-lg)',
                         letterSpacing: 'var(--tracking-title)',
                         color: 'var(--ink)',
                         margin: '0 0 14px',
@@ -212,7 +212,7 @@ export default function FAQPage() {
                         fontFamily: 'var(--font-body)',
                         fontSize: 'var(--text-base)',
                         color: 'var(--graphite)',
-                        lineHeight: 1.75,
+                        lineHeight: 'var(--leading-long)',
                         fontWeight: 300,
                         margin: 0,
                       }}
@@ -237,7 +237,8 @@ export default function FAQPage() {
                 fontFamily: 'var(--font-display)',
                 textTransform: 'uppercase',
                 fontWeight: 500,
-                fontSize: 'var(--text-xl, 1.3rem)',
+                fontSize: 'var(--text-xl)',
+                lineHeight: 'var(--leading-display)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: '0 0 12px',
@@ -250,7 +251,7 @@ export default function FAQPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.7,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
                 margin: '0 0 20px',
               }}

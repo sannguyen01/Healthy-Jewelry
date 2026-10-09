@@ -131,6 +131,15 @@ describe('a document outside the layout names no system face', () => {
     expect(html).not.toMatch(SYSTEM)
   })
 
+  it('sets the 410 page\'s leading on the site\'s leading scale, as literals (it has no stylesheet)', () => {
+    const html = renderGonePage({ title: 'Gone', heading: 'This page is gone.', paragraphs: ['x'] })
+    const scale = new Set([...GLOBALS.matchAll(/--leading-[a-z]+:\s*([\d.]+);/g)].map((m) => m[1]))
+    const used = [...html.matchAll(/line-height:\s*([\d.]+)/g)].map((m) => m[1])
+    expect(scale.size, 'globals.css defines the leading tokens').toBe(4)
+    expect(used.length, 'the page sets a leading for its body and its heading').toBe(2)
+    expect(used.filter((v) => !scale.has(v)), 'a leading that is not one of the four').toEqual([])
+  })
+
   it('sets the root error boundary in the site faces, with a button that names the label voice', () => {
     const html = renderToStaticMarkup(createElement(GlobalError, { error: new Error('x'), reset: () => {} }))
     expect(html).toContain('@font-face')
@@ -197,7 +206,10 @@ describe('the label size is a floor', () => {
 
   it('sees the sizes it judges, so the floor is not checked against nothing', () => {
     const sizes = literalSizes()
-    expect(sizes.length).toBeGreaterThan(20)
+    // Fewer than it once read: `typography-scale.test.ts` now holds literals to a short named list (the
+    // brand name, the decorative numerals, a piece's name, the share cards' own pixels), so the number
+    // seen here fell from dozens to a dozen. It is a check that the reader still finds some.
+    expect(sizes.length).toBeGreaterThan(8)
     expect(Math.max(...sizes.map((s) => s.px))).toBeGreaterThan(100)
   })
 

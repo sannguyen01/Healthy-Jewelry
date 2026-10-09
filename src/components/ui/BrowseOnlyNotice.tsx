@@ -41,7 +41,7 @@ export function BrowseOnlyNotice() {
           fontFamily: 'var(--font-body)',
           fontWeight: 300,
           fontSize: 'var(--text-base)',
-          lineHeight: 1.7,
+          lineHeight: 'var(--leading-long)',
           color: 'var(--ink)',
           margin: '0 0 12px',
         }}

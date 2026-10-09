@@ -347,7 +347,9 @@ with what the CSS requested. That is the only place a faked bold, a sheared ital
 shows, because in each the computed `font-family` is correct. It covers 16 routes (the 404 and the 410
 included) and the open menu, in both projects, and fails on a face that is not ours, a weight outside
 400 and 500, a non-normal style, text below the label floor, a label (DM Sans 500) that is not in
-capitals, or running text (DM Sans 300) that is tracked. Placeholders are not text nodes, so form controls
+capitals, running text (DM Sans 300) that is tracked or set at a leading other than the two reading ones,
+display text (Barlow Condensed) set at a leading other than the three close ones, or a form control set
+smaller than the base text size on a phone. Placeholders are not text nodes, so form controls
 are held to inheriting the page's family instead. Its two races, both found writing it, are the phone
 footer collapsing after hydration and a page measured before it arrived (ADR 042). See
 [ADR 050](adr/050-one-face-means-no-borrowed-ones.md).

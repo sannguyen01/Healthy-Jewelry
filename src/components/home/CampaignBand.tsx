@@ -44,7 +44,7 @@ export function CampaignBand({
             fontWeight: 300,
             fontSize: 'var(--text-lg)',
             color: 'rgba(247,245,241,0.6)',
-            lineHeight: 1.65,
+            lineHeight: 'var(--leading-text)',
             margin: '0 0 36px',
             maxWidth: '520px',
           }}

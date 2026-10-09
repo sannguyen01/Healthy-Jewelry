@@ -73,6 +73,8 @@ interface Drawn {
   transform: string
   /** letter-spacing in em (0 when `normal`). */
   tracking: number
+  /** line-height as a multiple of the font size (0 when `normal`). */
+  leading: number
   fonts: { familyName: string; isCustomFont: boolean }[]
 }
 
@@ -112,6 +114,7 @@ async function drawn(page: Page): Promise<Drawn[]> {
         size: Number.parseFloat(cs.fontSize),
         transform: cs.textTransform,
         tracking: Math.round((Number.parseFloat(cs.letterSpacing) / Number.parseFloat(cs.fontSize) || 0) * 100) / 100,
+        leading: Math.round((Number.parseFloat(cs.lineHeight) / Number.parseFloat(cs.fontSize) || 0) * 100) / 100,
       })
     }
     return out
@@ -200,6 +203,16 @@ function judge(rows: Drawn[]): string[] {
     const running = r.fonts.some((f) => family(f.familyName) === 'DM Sans') && r.weight === 300
     if (running && r.tracking > 0.02)
       findings.push(`${where}: running text (DM Sans 300) is tracked ${r.tracking}em; only capitals are tracked`)
+    // Leading, the same way: read off what was drawn, so it also catches a style that arrives through a
+    // spread (three display lines took a paragraph's leading that way, and no source rule can see it).
+    // Running text sits on one of the two reading leadings and display text on one of the three close
+    // ones; the brand name keeps its own box, and a label (DM Sans 500) is a single line whose height
+    // is its padding's business.
+    if (running && r.leading > 0 && ![1.65, 1.75].includes(r.leading))
+      findings.push(`${where}: running text is set at leading ${r.leading}; the site reads at 1.65 or 1.75`)
+    const display = r.fonts.some((f) => family(f.familyName) === 'Barlow Condensed') && r.cls !== 'hj-lockup-text'
+    if (display && r.leading > 0 && ![1, 1.1, 1.25].includes(r.leading))
+      findings.push(`${where}: display text is set at leading ${r.leading}; headings are 1.1, names and rows 1.25, a numeral 1`)
     if (r.style !== 'normal') findings.push(`${where}: asks for font-style ${r.style}; the site ships no italic`)
     if (r.size < FLOOR_PX) findings.push(`${where}: ${r.size}px, below the ${FLOOR_PX}px label floor`)
   }
@@ -233,6 +246,37 @@ test.describe('rendered fonts', () => {
     const rows = await drawn(page)
     expect(rows.some((r) => r.cls === 'hj-menu-link'), 'the overlay\'s links were measured').toBe(true)
     expect(judge(rows), EXPLAIN).toEqual([])
+  })
+
+  test('every form control is 16px or larger on a phone, so iOS does not zoom the page on focus', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const controls: { where: string; size: number }[] = []
+    const measure = async (where: string) => {
+      const rows = await page.evaluate(() =>
+        [...document.querySelectorAll('input, select, textarea')]
+          .filter((el) => el.getClientRects().length > 0 && !(el instanceof HTMLInputElement && ['hidden', 'checkbox', 'radio'].includes(el.type)))
+          .map((el) => ({
+            name: el.getAttribute('name') ?? el.getAttribute('aria-label') ?? el.tagName.toLowerCase(),
+            size: Number.parseFloat(getComputedStyle(el).fontSize),
+          }))
+      )
+      for (const row of rows) controls.push({ where: `${where} ${row.name}`, size: row.size })
+    }
+    for (const path of ['/contact', '/search', '/shop']) {
+      await page.goto(path)
+      await settle(page)
+      await measure(path)
+    }
+    // The menu's own field is only in the DOM's layout while the menu is open.
+    await page.goto('/')
+    await page.getByRole('button', { name: /menu/i }).first().click()
+    await expect(page.locator('.hj-menu-link').first()).toBeVisible()
+    await measure('the open menu')
+    expect(controls.length, 'the sweep found the controls (contact has four, search one, shop one, the menu one)').toBeGreaterThanOrEqual(7)
+    expect(
+      controls.filter((c) => c.size < 16).map((c) => `${c.where}: ${c.size}px`),
+      'A form control set under 16px makes iOS Safari zoom the page on focus, and it does not zoom back.'
+    ).toEqual([])
   })
 
   test('form controls draw in one of the site\'s faces, not the browser\'s', async ({ page }) => {

@@ -33,7 +33,7 @@ export default function StoresPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               fontWeight: 300,
               maxWidth: '560px',
               margin: 0,
@@ -104,7 +104,7 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
                 margin: '0 0 16px',
               }}
@@ -118,7 +118,7 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
                 margin: 0,
               }}
@@ -161,7 +161,7 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
                 margin: '0 0 16px',
               }}
@@ -174,7 +174,7 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
                 margin: 0,
               }}
@@ -232,7 +232,7 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
+                lineHeight: 'var(--leading-long)',
                 fontWeight: 300,
                 margin: 0,
               }}

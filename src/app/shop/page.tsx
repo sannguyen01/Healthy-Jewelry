@@ -44,7 +44,7 @@ export default async function ShopPage() {
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
-              lineHeight: 1.05,
+              lineHeight: 'var(--leading-display)',
             }}
           >
             The Collection
@@ -60,7 +60,7 @@ export default async function ShopPage() {
                 style={{
                   fontFamily: 'var(--font-ui)',
                   fontWeight: 500,
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--text-xs)',
                   letterSpacing: 'var(--tracking-label)',
                   textTransform: 'uppercase',
                   color: 'var(--ink)',

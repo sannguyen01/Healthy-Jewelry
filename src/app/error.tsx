@@ -45,9 +45,9 @@ export default function Error({ error, reset }: ErrorProps) {
           fontFamily: 'var(--font-display)',
           textTransform: 'uppercase',
           fontWeight: 500,
-          fontSize: 'clamp(2.4rem, 5vw, 4rem)',
+          fontSize: 'var(--text-2xl)',
           letterSpacing: 'var(--tracking-display)',
-          lineHeight: 1.1,
+          lineHeight: 'var(--leading-display)',
           margin: 0,
         }}
       >
@@ -57,47 +57,20 @@ export default function Error({ error, reset }: ErrorProps) {
         style={{
           fontFamily: 'var(--font-body)',
           fontWeight: 300,
-          fontSize: '1rem',
+          fontSize: 'var(--text-base)',
           color: 'var(--graphite, #3D3935)',
           maxWidth: '400px',
-          lineHeight: 1.6,
+          lineHeight: 'var(--leading-text)',
           margin: 0,
         }}
       >
         We&apos;re sorry — something didn&apos;t work as expected. You can try again or return home.
       </p>
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button
-          onClick={reset}
-          style={{
-            padding: '12px 28px',
-            border: '1px solid var(--ink, #1A1918)',
-            backgroundColor: 'transparent',
-            fontFamily: 'var(--font-ui)',
-            fontWeight: 500,
-            fontSize: 'var(--text-xs)',
-            letterSpacing: 'var(--tracking-label)',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            color: 'var(--ink, #1A1918)',
-          }}
-        >
+        <button type="button" onClick={reset} className="btn-ghost">
           Try again
         </button>
-        <Link
-          href="/"
-          style={{
-            padding: '12px 28px',
-            backgroundColor: 'var(--ink, #1A1918)',
-            color: 'var(--bg, #FAF9F5)',
-            fontFamily: 'var(--font-ui)',
-            fontWeight: 500,
-            fontSize: 'var(--text-xs)',
-            letterSpacing: 'var(--tracking-label)',
-            textTransform: 'uppercase',
-            textDecoration: 'none',
-          }}
-        >
+        <Link href="/" className="btn-primary">
           Return home
         </Link>
       </div>

@@ -149,7 +149,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
-              lineHeight: 1.05,
+              lineHeight: 'var(--leading-display)',
             }}
           >
             {product.title}
@@ -186,7 +186,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
               fontWeight: 300,
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               marginTop: '16px',
             }}
           >

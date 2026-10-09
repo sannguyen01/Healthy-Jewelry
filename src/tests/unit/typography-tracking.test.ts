@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import {
+  SRC,
+  cssRules,
+  enclosingObject,
+  lineOf,
+  sourceFiles,
+  stylesheet,
+  voiceOf,
+  type Voice,
+} from '../support/styleScan'
 
 /**
  * Tracking is a scale with a place for every voice, not a number typed where it is needed
@@ -19,17 +29,6 @@ import path from 'node:path'
  * Chrome drew.
  */
 
-const SRC = path.resolve(__dirname, '../..')
-const GLOBALS = path.join(SRC, 'app/globals.css')
-
-/**
- * Documents that sit outside the stylesheet's tokens, each for a reason:
- * - `opengraph-image.tsx` is rasterised by Satori, which has no custom properties.
- * - `global-error.tsx` replaces the root layout when React fails to mount, so the tokens are not
- *   defined there (it declares its own faces for the same reason, `src/lib/design/siteFace.ts`).
- */
-const OUT_OF_LAYOUT = ['opengraph-image.tsx', 'global-error.tsx']
-
 /**
  * The brand name's own tracking (ADR 048): the logotype keeps the values it had before the
  * Songmont reference — 0.10em in the header, 0.12em in the footer and the seal — and it is the one
@@ -41,27 +40,12 @@ const BRAND_NAME_SELECTORS = new Set(['.hj-wordmark', '.hj-seal .hj-lockup-text'
 
 const NONE = new Set(['0', 'normal', 'inherit', 'initial', 'unset'])
 
-type Voice = 'ui' | 'display' | 'body' | 'brand'
-
 /** Which tokens a voice may use. The body voice has none: running text is never tracked. */
 const TOKENS_BY_VOICE: Record<Voice, string[]> = {
   ui: ['meta', 'label'],
   display: ['display', 'title', 'name'],
   body: [],
   brand: [],
-}
-
-function sourceFiles(dir: string, found: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    const full = path.join(dir, entry)
-    if (statSync(full).isDirectory()) {
-      if (entry === 'node_modules' || entry === '.next' || entry === 'tests') continue
-      sourceFiles(full, found)
-    } else if (entry.endsWith('.tsx') && !OUT_OF_LAYOUT.includes(entry)) {
-      found.push(full)
-    }
-  }
-  return found
 }
 
 interface Use {
@@ -72,42 +56,6 @@ interface Use {
   /** The selector, for a CSS rule. */
   selector?: string
   file?: string
-}
-
-const lineOf = (text: string, index: number) => text.slice(0, index).split('\n').length
-
-function voiceOf(body: string): Voice | null {
-  const m = body.match(/(?:fontFamily:\s*'|font-family:\s*)var\(--font-(ui|display|body|brand)\b/)
-  return (m?.[1] as Voice | undefined) ?? null
-}
-
-/** The `{ … }` a position sits inside, by brace matching: an inline style object. */
-function enclosingObject(text: string, at: number): string {
-  let depth = 0
-  let start = at
-  for (let i = at; i >= 0; i -= 1) {
-    if (text[i] === '}') depth += 1
-    if (text[i] === '{') {
-      if (depth === 0) {
-        start = i
-        break
-      }
-      depth -= 1
-    }
-  }
-  depth = 0
-  let end = at
-  for (let i = start + 1; i < text.length; i += 1) {
-    if (text[i] === '{') depth += 1
-    if (text[i] === '}') {
-      if (depth === 0) {
-        end = i
-        break
-      }
-      depth -= 1
-    }
-  }
-  return text.slice(start, end + 1)
 }
 
 function inlineUses(): Use[] {
@@ -127,28 +75,19 @@ function inlineUses(): Use[] {
   return uses
 }
 
-function stylesheet(): string {
-  return readFileSync(GLOBALS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
-}
-
 function cssUses(): Use[] {
-  const css = stylesheet()
-  const uses: Use[] = []
-  // A leaf rule: a selector, then a body with no braces in it. @layer and @media blocks are not
-  // leaves, so they are walked through rather than matched.
-  for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const body = rule[2]
-    const spacing = body.match(/(?:^|[;\s])letter-spacing:\s*([^;]+);/)
-    if (!spacing) continue
-    const selector = rule[1].replace(/\s+/g, ' ').trim()
-    uses.push({
-      where: `globals.css:${lineOf(css, (rule.index ?? 0) + rule[0].indexOf('letter-spacing'))} ${selector}`,
-      value: spacing[1].trim(),
-      voice: voiceOf(body),
-      selector,
-    })
-  }
-  return uses
+  return cssRules(stylesheet()).flatMap((rule) => {
+    const spacing = rule.body.match(/(?:^|[;\s])letter-spacing:\s*([^;]+);/)
+    if (!spacing) return []
+    return [
+      {
+        where: `globals.css:${rule.line} ${rule.selector}`,
+        value: spacing[1].trim(),
+        voice: voiceOf(rule.body),
+        selector: rule.selector,
+      },
+    ]
+  })
 }
 
 const tokenName = (value: string) => value.match(/^var\(--tracking-([a-z]+)\)$/)?.[1] ?? null
