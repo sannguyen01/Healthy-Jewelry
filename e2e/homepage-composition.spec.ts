@@ -36,7 +36,7 @@ const EXPECTED_SEQUENCE = [
   'hero',
   'materials',
   'care-band',
-  'strip:CURATED PIECES',
+  'strip:The pieces',
   'collection-grid',
   'real-moment',
   'follow-up',

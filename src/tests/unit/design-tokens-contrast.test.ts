@@ -145,6 +145,12 @@ const TEXT_PAIRINGS: Array<{
     minimum: 4.5,
   },
   {
+    label: 'mist on ink (the care band and the contact band: their eyebrow label)',
+    foreground: 'mist',
+    background: 'ink',
+    minimum: 4.5,
+  },
+  {
     label: 'titanium on ink (mobile nav tagline)',
     foreground: 'titanium',
     background: 'ink',
@@ -301,8 +307,12 @@ describe('every colour token is classified', () => {
  *   - `--titanium` is legitimate text on `--ink` (the mobile nav tagline), so a
  *     blanket ban would be wrong and a surface-aware version needs to know each
  *     usage's background — which this cannot see.
- *   - `--ash` carries the decorative `01/02/03` ordinals in MaterialsSection,
- *     exempt under WCAG 1.4.3 and already excluded by selector in a11y.spec.ts.
+ *   - `--ash` carries the large decorative numerals on /about, /materials and /404 and the
+ *     collection header's watermark, exempt under WCAG 1.4.3 as pure decoration. (The homepage's
+ *     own ordinals stopped being one in ADR 051, B4: they are `--ink-2` text now, and nothing on
+ *     the homepage is excluded from axe.) A check that banned `--ash` as text would be right to,
+ *     and would fail on those four until each is classified as decoration in markup; that is
+ *     the next audit's work and not this one's.
  *
  * `--sage` has no such case: it is a border and tint colour with no legitimate
  * text use at any size, on any background in this palette.

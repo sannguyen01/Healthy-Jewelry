@@ -139,7 +139,10 @@ test.describe('images match their containers', () => {
       for (const width of WIDTHS) {
         await visit(page, path, width)
         const rows = await page.evaluate(() =>
-          [...document.querySelectorAll('main img')].map((img) => {
+          // Not a brand mark: the care band's seal is an image beside the name in one container, a
+          // lockup rather than a photograph filling a frame, so its container's shape is not its own.
+          // visual-assets.spec.ts holds the mark to decoded, boxed, visible and transparent.
+          [...document.querySelectorAll('main img:not([data-brand-mark])')].map((img) => {
             const a = img.getBoundingClientRect()
             const c = (img.parentElement as HTMLElement).getBoundingClientRect()
             return {
@@ -600,10 +603,14 @@ test.describe('heading structure', () => {
  * Band, derived from the section TSX (not measured):
  *   gap(prev -> next) = padBottom(prev) + padTop(next) + borderBottom(prev) + borderTop(next)
  * with vertical padding per section (clamp(min, vw%, max), identical top and bottom):
- *   standard (materials, strip, collection-grid, follow-up) = --space-section 56/8vw/96
+ *   standard (materials, strip, collection-grid, follow-up) = --space-section 56/8vw/120
  *   editorial (care-band, real-moment) = --space-section-lg 96/12vw/160
- * Borders are read from computed style (strip bottom 1px, real-moment bottom 1px, follow-up
- * top 1px). Band = [sum - 1, sum + 1 + 2*INNER_SLACK_PX]. Lower edge: leaf content cannot sit
+ * Borders are read from computed style (every band but the dark one and the last draws a 1px
+ * hairline under it; ADR 051).
+ * A ruled row is content: the registry and the collection index close on a hairline, and the rule
+ * is as much of the section as the words above it, so an element's own painted top and bottom
+ * borders extend the content block (they used to be absent from the homepage, which had no ruled
+ * lists). Band = [sum - 1, sum + 1 + 2*INNER_SLACK_PX]. Lower edge: leaf content cannot sit
  * closer than the padding. Upper slack: the content block is measured from in-flow leaf
  * elements, and an inline leaf (e.g. .material-tag span) has a rect shorter than its line box,
  * so each side may add a few px. 8px per side is a guess to be tuned once, from the first run;
@@ -612,13 +619,13 @@ test.describe('heading structure', () => {
  * (RealMoment media: 40px) are neutralised in-page so layout, not animation, is measured.
  */
 const PAD_CLAMP: Record<string, [number, number, number]> = {
-  // --space-section: clamp(56px, 8vw, 96px); --space-section-lg: clamp(96px, 12vw, 160px)
-  materials: [56, 8, 96],
+  // --space-section: clamp(56px, 8vw, 120px); --space-section-lg: clamp(96px, 12vw, 160px)
+  materials: [56, 8, 120],
   'care-band': [96, 12, 160],
-  collection: [56, 8, 96],
-  strip: [56, 8, 96],
+  collection: [56, 8, 120],
+  strip: [56, 8, 120],
   'real-moment': [96, 12, 160],
-  'follow-up': [56, 8, 96],
+  'follow-up': [56, 8, 120],
 }
 const INNER_SLACK_PX = 8
 
@@ -661,6 +668,18 @@ test.describe('homepage vertical rhythm', () => {
               if (!inFlow(p)) skip = true
             }
             if (skip) continue
+            // A painted rule is content (see the band note above): a ruled row's closing hairline
+            // sits below its last word, and the section really does end there.
+            const own = getComputedStyle(e)
+            const ownBox = e.getBoundingClientRect()
+            if (own.display !== 'none' && own.visibility !== 'hidden' && ownBox.height > 0 && ownBox.width > 0) {
+              if (own.borderTopStyle !== 'none' && parseFloat(own.borderTopWidth) > 0) {
+                top = Math.min(top, ownBox.top + window.scrollY)
+              }
+              if (own.borderBottomStyle !== 'none' && parseFloat(own.borderBottomWidth) > 0) {
+                bottom = Math.max(bottom, ownBox.bottom + window.scrollY)
+              }
+            }
             const isLeaf =
               e.tagName.toLowerCase() === 'svg' || ![...e.children].some((c) => inFlow(c))
             if (!isLeaf) continue

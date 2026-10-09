@@ -33,11 +33,23 @@ describe('design consistency', () => {
   it('every homepage section takes its vertical padding from a rhythm token', () => {
     const offenders = SECTIONS.filter((file) => /padding:\s*'clamp\(/.test(read(file)))
     expect(offenders, 'a section hard-codes a clamp() padding again').toEqual([])
+    // Since ADR 051 (B4) a section takes its rhythm by being a `.hj-band`, and the band is where the
+    // token is read: one rule for the standard rhythm and one for the editorial one. So each section
+    // must be a band, and the band must read the tokens, which is the same guarantee one level up.
     for (const file of SECTIONS) {
-      expect(read(file), `${file} does not use --space-section[-lg]`).toMatch(
-        /var\(--space-section(-lg)?\)/
+      expect(read(file), `${file} is not a .hj-band, so it takes no rhythm token`).toMatch(
+        /className="hj-band[" ]|var\(--space-section(-lg)?\)/
       )
     }
+    const css = read('src/app/globals.css')
+    const band = css.slice(css.indexOf('  .hj-band {'))
+    expect(band.slice(0, band.indexOf('}')), '.hj-band lost the standard rhythm').toMatch(
+      /padding:\s*var\(--space-section\)/
+    )
+    const large = css.slice(css.indexOf('.hj-band[data-space="lg"]'))
+    expect(large.slice(0, large.indexOf('}')), '.hj-band[data-space="lg"] lost the editorial rhythm').toMatch(
+      /var\(--space-section-lg\)/
+    )
   })
 
   it('there is one horizontal gutter and no fallback literal that disagrees with it', () => {
@@ -56,17 +68,20 @@ describe('design consistency', () => {
     }
   })
 
-  it('the homepage has one listing crop: product cards, collection tiles and material tiles agree', () => {
-    // ADR 044. The strip of product cards sat square between two rows of 3:4 tiles; the
-    // token and the two literal crops are held to one value so that cannot recur unnoticed.
-    const token = read('src/app/globals.css').match(/--ratio-product:\s*([\d.]+\s*\/\s*[\d.]+);/)?.[1]
+  it('the homepage has one listing crop: product cards and collection tiles agree', () => {
+    // ADR 044. The strip of product cards sat square between two rows of 3:4 tiles; the token and
+    // the collection photograph's crop are held to one value so that cannot recur unnoticed. The
+    // materials section had a third 3:4 tile until ADR 051 (B4) turned it into a registry.
+    const css = read('src/app/globals.css')
+    const token = css.match(/--ratio-product:\s*([\d.]+\s*\/\s*[\d.]+);/)?.[1]
     expect(token, '--ratio-product is not a ratio in globals.css').toBeDefined()
     const normalise = (ratio: string) => ratio.replace(/\s+/g, '')
-    for (const file of ['src/components/home/CollectionGrid.tsx', 'src/components/home/MaterialsSection.tsx']) {
-      const crop = read(file).match(/aspectRatio:\s*'([^']+)'/)?.[1]
-      expect(crop, `${file} has no aspectRatio`).toBeDefined()
-      expect(normalise(crop as string), `${file} crops differently from --ratio-product`).toBe(normalise(token as string))
-    }
+    const photo = css.slice(css.indexOf('.hj-coll-photo {'))
+    const crop = photo.slice(0, photo.indexOf('}')).match(/aspect-ratio:\s*([^;]+);/)?.[1]
+    expect(crop, '.hj-coll-photo has no aspect-ratio').toBeDefined()
+    expect(normalise(crop as string), '.hj-coll-photo crops differently from --ratio-product').toBe(
+      normalise(token as string)
+    )
   })
 
   it('cards do not lift on hover', () => {

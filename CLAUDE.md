@@ -217,7 +217,8 @@ change all three together.
 1. Hero — **two compositions, breakpoint at 900px**:
    - **≥901px**: full-bleed. The "Euro Summer" lifestyle photo fills the entire section
      (`object-position: right center`), and the copy sits in its own opaque `--bg` card
-     (`.hj-hero-scrim`) sized to wrap the text plus padding — not a section-spanning rectangle.
+     (`.hj-hero-scrim`, a hairline and the frame radius, at the foot of the photograph) sized to wrap
+     the text plus padding — not a section-spanning rectangle.
      Because the card wraps its own content instead of being measured/positioned independently,
      there is no separate width to keep in sync with the text column, which is what caused the
      scrim-drift regressions in commits a4cfb9c/b1e5178/c55962a. The card is opaque rather than
@@ -233,19 +234,28 @@ change all three together.
      shrinking the same composition.
    - Enforced across seven widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
      photograph without the card behind it.
-   - The card is also **bounded**: `--hj-hero-card-max-ratio` (0.60) caps it at a fraction of the
+   - The card is also **bounded**: `--hj-hero-card-max-ratio` (0.55) caps it at a fraction of the
      photograph's own rendered box, because every other guardrail here is satisfied better the
      larger the card gets and so none of them push back. Enforced as `max-width` and asserted as
      both a width and an occluded-area ratio. See
      [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md) before widening it.
-2. MaterialsSection — Grade 23 Ti / Niobium / 316L Steel
-3. CareSection — "Care & Craft", copy through the claims registry. **The page's single dark
-   interruption** (`--black` / `--on-dark` / `--mist`, all contrast-tested), placed beside the
-   materials it follows and inside the first half of the page.
-4. HorizontalScroll — "CURATED PIECES" (4–6 items, bestsellers then new arrivals, deduplicated)
-5. CollectionGrid — 5 collection paths (Charms and Earrings tiles use real photography; Rings/Necklaces/Bracelets still use the SVG placeholder pending photos)
+2. MaterialsSection — a **registry** of the three metals (Grade 23 Ti / Niobium / 316L Steel): a left
+   column with a link to `/materials`, and on the right one ruled row per metal (ordinal and
+   provenance dot, name and designation, description and specification chips, all from `hjMaterials`).
+3. CareSection — "Care & Craft", copy through the claims registry, then "Ask an ambassador". **The
+   page's single dark interruption** (`--ink` / `--on-dark` / `--mist`, all contrast-tested), with the
+   knot and the name as its seal (`BrandSeal`), placed beside the materials it follows and inside the
+   first half of the page.
+4. HorizontalScroll — "The pieces" / "Curated pieces" (4–6 items, bestsellers then new arrivals,
+   deduplicated)
+5. CollectionGrid — **two photographs and an index**: the collections that have a photograph
+   (earrings and charms) are the two features, and the index lists all five collection paths in the
+   menu's own order, so a collection without a photograph is a row, not a placeholder.
 6. RealMoment — "The Moment"
 7. FollowUp — links come from `SOCIAL_LINKS`, never a generic domain
+
+Every beat is a `.hj-band` (a ground, the section rhythm and a hairline under it) laid on the
+twelve-column `.hj-grid`; the dark band and the last band draw no hairline.
 
 Then the Footer, which is site chrome rather than a beat (it was numbered 8 under "seven beats").
 

@@ -158,8 +158,8 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**121 unit spec files**',
-    claimed: '121',
+    context: '**122 unit spec files**',
+    claimed: '122',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
@@ -234,17 +234,17 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     actual: () => cssValue('hj-product-tile-max'),
   },
   {
-    // The only check on this number. The card measures at most 0.514 of the photograph, so
-    // 0.60 never binds, and the hero spec reads its ceiling from this same token: raised to
+    // The only check on this number. The card measures at most 0.467 of the photograph, so
+    // 0.55 never binds, and the hero spec reads its ceiling from this same token: raised to
     // 0.98, nothing rendered moves and the spec's ceiling moves with it — 48 passed, measured
     // 2026-10-02. NUMERIC skips it too (no unit). Every declaration in src is read, not the
     // first one in globals.css: a media query or a scoped rule that redeclared it would raise
-    // the computed cap the spec measures against while the first match still read 0.60. And
+    // the computed cap the spec measures against while the first match still read 0.55. And
     // because a context must state its own claimed value, a wider card edits CLAUDE.md as
     // well as this line — the reviewed change ADR 013 asks for.
     doc: 'CLAUDE.md',
-    context: '`--hj-hero-card-max-ratio` (0.60)',
-    claimed: '0.60',
+    context: '`--hj-hero-card-max-ratio` (0.55)',
+    claimed: '0.55',
     actual: () => declarationsOf('hj-hero-card-max-ratio').join(', '),
   },
   {
@@ -389,7 +389,6 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   { doc: 'docs/testing-strategy.md', context: 'desktop + mobile | ~3-5 min' },
   { doc: 'docs/testing-strategy.md', context: 'used as 10-12px body copy' },
   { doc: 'docs/testing-strategy.md', context: '| E2E wall time | 24.2 min | ~3-5 min |' },
-  { doc: 'docs/testing-strategy.md', context: '(1.36:1 on `--bg`)' },
   { doc: 'docs/testing-strategy.md', context: 'text on dark surfaces (7.29:1' },
   { doc: 'docs/testing-strategy.md', context: 'it was simply the wrong 25% of the frame' },
   { doc: 'docs/testing-strategy.md', context: 'correct above ~866px' },

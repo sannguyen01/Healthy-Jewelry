@@ -167,11 +167,99 @@ text roles, and the badge tints over them); `--outline` is held to 3:1 by name a
   craft." against the site's headline): copy is the owner's, and a design reference does not
   rewrite it.
 
+## The homepage (B4)
+
+The seven beats keep their order, their copy and every contract (ADR 040; no prices; claims through
+`claimText()`); what changes is how each is drawn. Every beat is a **`.hj-band`**: a ground, the
+section rhythm and a hairline under it, laid on a twelve-column `.hj-grid` (a 40px gap and a 1296px
+ceiling, the board's) that collapses to one column at the 900px the hero already stacks at. The dark
+band and the last band draw no hairline, because the change of ground and the footer's own rule are
+their edges.
+
+| Beat | Before | Now |
+|---|---|---|
+| Hero | 136px-at-most headline in a card centred on the photograph; a scroll cue | the board's 36 to 60px headline at 1.1 leading, the card at the photograph's foot with a hairline and the frame radius, `.btn-primary` and `.btn-ghost`, titanium dot at the head of the eyebrow; no scroll cue (the board has none). Stacked below 900px with the buttons full-width |
+| Materials | three flex columns, ash ordinals at 3rem, a 200px photograph | a **registry**: intro and a link to `/materials` on the left, one ruled row per metal on the right (ordinal and provenance dot, name and designation, body and bone chips). The ordinals are `--ink-2` text now, so nothing on the homepage needs an axe exclusion |
+| Care | `--black`, a "316L Ti Nb" watermark | `--ink`, a heading that is still "Care & Craft", the neutral claim copy, an "Ask an ambassador" button to `/stores`, and the knot and the name as a seal (`BrandSeal`) beside it |
+| Strip | 260px cards, a bare view-all | 320px cards on a frame (`.card-tile` is now travertine, a hairline and the 6px radius everywhere), a label over a display title ("The pieces" / "Curated pieces"), spec-voice material line |
+| Collections | five tiles across, three of them a drawn placeholder | **two photographs and an index**: the photographed collections (earrings, charms) as features, and every collection as a 64px row of the index, in the menu's own order. A collection without a photograph is a row, not an apology |
+| The Moment | `hero-banner.jpg`, the hero's own photograph a few screens up | `philosophy-waterproof.jpg`, which the materials section no longer uses |
+| Follow-up | a boxed link and a bare one | `.btn-ghost` and an underlined 44px link; the band draws no hairline of its own |
+
+**Decisions made on the way**
+
+- **The hero headline is smaller, and the card cap was recalibrated by its own rule.** 51 to 136px was a
+  size chosen for a gothic; a didone that large reads as a poster, and the board's is 36 to 60px. The
+  card then measured 0.467 of the photograph at the 901px floor (it was 0.514) and plateaus at 465px, so
+  `--hj-hero-card-max-ratio` moved from 0.60 to 0.55, by the rule ADR 013 gives (today's maximum, rounded
+  up, one step of headroom). The amendment is in ADR 013; the token, `CLAUDE.md`, the
+  `doc-numeric-claims` row and the `hero-card-bound` sentinel moved together.
+- **The hero's inset is the page's gutter.** `--hj-hero-pad-x` was a clamp of its own, a few pixels
+  narrower, so the hero's words stood off the left edge every other band keeps.
+- **Section padding tops out at 120px, not 96px** (`--space-section`), the board's rhythm; the editorial
+  bands keep their own token. `layout-invariants.spec.ts` carries the new maximum.
+- **`--text-section`** (28 to 42px) is the band title, between the names and the statement; like both it is
+  set in the title cut.
+- **Buttons are one family.** `.btn-primary`, `.btn-ghost` and `.btn-ghost-dark` share a 44px minimum, the
+  4px radius, the label size and `--outline` / `--mist` edges. The ghost no longer fills on hover: the
+  primary is the filled one, and a second filled state made the two read as the same control. The dark
+  ghost's edge is `--mist` (the board's), not a 50% tint.
+- **One dark.** The care band and the contact page's band are `--ink`. `--black` remains for the
+  `CampaignBand` component (unused, and held by a sentinel) and as the ground of the two icons whose
+  platform cannot show transparency; nothing a visitor sees on the site is `--black` any more.
+- **The knot's seal has a 2x copy of its own.** The mark is drawn at 132px once, in the care band; its 1x
+  is the stacked variant's largest copy and its 2x is a new 264px derivative (73 KB, lossless, lazy,
+  below the fold), so a 2x screen is not sent an upscaled 1x. A 3x copy would be about 100 KB for an image
+  that is ornament; a 264px copy at 3x density is only a little soft. `brand-mark-asset.test.ts`
+  holds it to the same transparency, byte budget and derive-from-the-master checks as every other copy,
+  and `visual-assets.spec.ts` now expects three marks on the homepage: header, footer and seal.
+- **The collection tiles carry no illustration**, so the page reads the collection list and not the
+  product list for them; `homepage-composition-contract.test.ts` says so (it used to require one product
+  read).
+
+**What was found on the way, and the guard it bought**
+
+| Found | By | Fixed by |
+|---|---|---|
+| The strip stopped scrolling: its `overflow-x: auto` moved into a class in the components layer, and `.hj3-noscroll`'s `overflow: hidden` is in the utilities layer, which outranks an earlier layer whatever the specificity. Cards sat at x 258 to 475 in a 320px viewport | the interactive-controls probe (cards inside the viewport), not a test written for the strip | the declaration is inline again, with the reason in a comment |
+| The Moment's photograph was 0 wide on phones: a filled image has no width of its own, and a column that centres its items gave the box none. The same bug the old component's comment records | `visual-assets.spec.ts`, "every image occupies a non-zero box", mobile project | `align-items: stretch` below 900px |
+| The hero legibility probe read the card behind the label as the label's backdrop at every width from 390px up on the mobile project: the button's 4px radius is 10.5 device pixels at 2.625x, and the probe's inset landed on the arc, where the page's `--bg` is exactly the label's colour (1.00:1) | `hero-legibility.spec.ts` | the inset also clears the corner arc, `r * dpr * (1 - 1/sqrt2)` plus the rim; the probe's note says what it measured and where |
+| The eyebrow measured 2.60:1: the box under test included the 6px titanium dot | the same spec | the words are in an element of their own |
+| The strip's section gap was 24px over the rhythm: the row's padding under the cards, which keeps the scrollbar off the captions, is above the band's | `layout-invariants.spec.ts`, rhythm | the band gives up the same 24px |
+| The rhythm probe measured a ruled list as ending at its last word, short of its closing hairline | writing the registry | a painted top or bottom border now extends the content block |
+| The care band's heading test wanted "Care & Craft" as a heading; the first draft made it a paragraph above the title | `homepage.spec.ts` | `h2` for the name and `h3` for the title, styled by class, not by tag |
+| `--ash` as a text colour on /about (body copy on the dark band) | adding `--ash` to the never-as-text list as an experiment | that one use became `--on-dark`; four more are decorative numerals on /about, /materials, /404 and the collection header, left for the audit that classifies them, and the list stays `--sage` alone |
+
+**Guards that moved with it**
+
+`homepage-composition.spec.ts` (the strip's name is now "The pieces"), `homepage-composition-contract.test.ts`
+(tiles from the collection list alone), `design-consistency.test.ts` (a section takes its rhythm by being a
+band, and the band reads the tokens; the one listing crop is read from the stylesheet),
+`bounded-geometry.test.ts` (five classifications moved or added), `visual-assets.spec.ts` (the seal, and the
+collection layout rewritten: the index lists every collection, two features side by side, the 3:4 crop
+holds, the index drops below on a phone), `layout-invariants.spec.ts` (rhythm maximum and painted rules; a
+brand mark is not a photograph for the aspect probe), `hero-legibility.spec.ts` (the corner arc),
+`a11y.spec.ts` (the `data-decorative` exclusion deleted, with the paragraph in `testing-strategy.md`),
+`design-tokens-contrast.test.ts` (`--mist` on `--ink`), `brand-mark-asset.test.ts` (the seal copy), and the
+`glyph-coverage` sentinel (re-anchored to the strip's view-all link).
+
+**Measured, on the production build**
+
+| Hero card against its photograph | 901px | 1024px | 1440px | 2560px |
+|---|---|---|---|---|
+| width ratio | 0.467 | 0.426 | 0.323 | 0.182 |
+| occluded-area ratio | 0.208 | 0.199 | 0.173 | 0.097 |
+| card width | 421px | 436px | 465px | 465px |
+
+The full Playwright suite on the finished band: 836 passed, 8 skipped, one failure and five flakes. Five of
+those six are `visible focus indicators` (the documented local-only artefact, a 0px outline at the
+instant of focus, which passes on CI); the sixth is a `header-fit` timeout under load that passes alone.
+
 ## What this does not do
 
-- It does not retune the size ladder (about 40 sizes, unchanged since ADR 050); the palette
-  (workstream B2), the chrome (B3), the homepage (B4) and the catalogue and piece pages (B5) follow
-  in this pull request, each its own commit.
+- It does not retune the size ladder (about 40 sizes, unchanged since ADR 050) beyond the two sizes
+  the homepage needed; the palette (workstream B2), the chrome (B3) and the homepage (B4) are in this
+  pull request, and the catalogue and piece pages (B5) follow, each its own commit.
 - The share cards keep the old hex colours until the palette changes; the cards' layout is
   otherwise unchanged apart from case (Title Case, not forced capitals) and size.
 - Whether a hero set in the 96pt cut is as legible over the photograph as the gothic was is held

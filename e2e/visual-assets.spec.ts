@@ -40,7 +40,7 @@ interface ImageProbe {
   effectiveOpacity: number
   visibility: string
   /** Where a knot mark sits (`img[data-brand-mark]`), or null for every other image. */
-  brandMark: 'header' | 'footer' | 'elsewhere' | null
+  brandMark: 'header' | 'footer' | 'seal' | 'elsewhere' | null
 }
 
 /**
@@ -51,7 +51,6 @@ interface ImageProbe {
  */
 async function probeHomepage(page: Page): Promise<{
   images: ImageProbe[]
-  placeholderTiles: Array<{ width: number; height: number; effectiveOpacity: number }>
   failedRequests: Array<{ url: string; status: number }>
 }> {
   const failedRequests: Array<{ url: string; status: number }> = []
@@ -91,7 +90,7 @@ async function probeHomepage(page: Page): Promise<{
     })
     .catch(() => undefined)
 
-  // Sections reveal on scroll: `RealMoment` shows `hero-banner.jpg` at opacity 0 and eases it to
+  // Sections reveal on scroll: `RealMoment` shows its photograph at opacity 0 and eases it to
   // 1 over 0.7s once its IntersectionObserver fires, and the hero copy does the same. Sampling
   // before that transition ends reads an in-flight value, which on a loaded machine is under the
   // floor — a race in the sample, not a faint image (seen 2026-10-04: the w=1200 hero reading
@@ -113,10 +112,9 @@ async function probeHomepage(page: Page): Promise<{
     )
     .catch(() => undefined)
 
-  const { images, placeholderTiles } = await page.evaluate((): {
+  const { images } = await page.evaluate((): {
     images: ImageProbe[]
-    placeholderTiles: Array<{ width: number; height: number; effectiveOpacity: number }>
-  } => {
+    } => {
     const effectiveOpacity = (start: Element): number => {
       let opacity = 1
       let node: Element | null = start
@@ -144,25 +142,16 @@ async function probeHomepage(page: Page): Promise<{
             ? ('header' as const)
             : el.closest('footer')
               ? ('footer' as const)
-              : ('elsewhere' as const),
+              : el.closest('.hj-seal')
+                ? ('seal' as const)
+                : ('elsewhere' as const),
       }
     })
 
-    // Collections without photography fall back to an inline JewelrySVG. Those
-    // are the exact nodes that shipped as ghosts.
-    const placeholderTiles = [...document.querySelectorAll('.hj-coll-tile svg')].map((el) => {
-      const box = el.getBoundingClientRect()
-      return {
-        width: Math.round(box.width),
-        height: Math.round(box.height),
-        effectiveOpacity: effectiveOpacity(el),
-      }
-    })
-
-    return { images, placeholderTiles }
+    return { images }
   })
 
-  return { images, placeholderTiles, failedRequests }
+  return { images, failedRequests }
 }
 
 const describeImage = (image: ImageProbe): string =>
@@ -219,14 +208,14 @@ test.describe('Homepage visual assets', () => {
     ).toEqual([])
   })
 
-  test('the knot mark renders once in the header and once in the footer', async ({ page }) => {
+  test('the knot mark renders once in the header, once in the footer and once as the care band\'s seal', async ({ page }) => {
     // The generic checks above already hold every <img> to the three conditions, the marks
     // included. What they cannot see is a mark that is not there: zero brand marks pass all of
     // them. On 2026-10-04 the owner believed the logo was in the header and footer, and it was
     // in neither — the redesign had replaced it with a text wordmark and nothing noticed.
     const { images } = await probeHomepage(page)
     const marks = images.filter((image) => image.brandMark !== null)
-    expect(marks.map((m) => m.brandMark).sort()).toEqual(['footer', 'header'])
+    expect(marks.map((m) => m.brandMark).sort()).toEqual(['footer', 'header', 'seal'])
     for (const mark of marks) {
       expect(mark.naturalWidth, `${mark.brandMark} mark never decoded`).toBeGreaterThan(0)
       expect(mark.width * mark.height, `${mark.brandMark} mark has no box`).toBeGreaterThan(0)
@@ -241,7 +230,9 @@ test.describe('Homepage visual assets', () => {
     // left alpha up to 19/255 where the mark is clear. So the mark must arrive as one of the
     // lossless copies, and every pixel the lossless copy leaves clear must decode as clear.
     await page.goto('/')
-    // The footer's copy is lazy: it is not fetched, and `decode()` never settles, until it is near.
+    // The footer's copy and the seal's are lazy: neither is fetched, and `decode()` never settles,
+    // until it is near.
+    await page.locator('.hj-seal img[data-brand-mark]').scrollIntoViewIfNeeded()
     await page.locator('footer img[data-brand-mark]').scrollIntoViewIfNeeded()
     const report = await page.evaluate(async () => {
       const out = []
@@ -256,7 +247,7 @@ test.describe('Homepage visual assets', () => {
         const at = (x: number, y: number) => alpha[y * bmp.width + x]
         const last = bmp.width - 1
         out.push({
-          where: img.closest('header') ? 'header' : 'footer',
+          where: img.closest('header') ? 'header' : img.closest('footer') ? 'footer' : 'seal',
           src: new URL(img.currentSrc).pathname,
           type: res.headers.get('content-type'),
           corners: [at(0, 0), at(last, 0), at(0, last), at(last, last)],
@@ -265,7 +256,7 @@ test.describe('Homepage visual assets', () => {
       }
       return out
     })
-    expect(report.map((r) => r.where).sort()).toEqual(['footer', 'header'])
+    expect(report.map((r) => r.where).sort()).toEqual(['footer', 'header', 'seal'])
     for (const mark of report) {
       expect(mark.src, `${mark.where}: served through the lossy optimiser`).toMatch(/^\/brand\/knot-\d+\.png$/)
       expect(mark.type, mark.where).toBe('image/png')
@@ -273,69 +264,79 @@ test.describe('Homepage visual assets', () => {
       expect(mark.clearShare, `${mark.where}: share of fully clear pixels`).toBeGreaterThan(0.3)
     }
   })
-
-  test('collection placeholder tiles are legible, not ghosts', async ({ page }) => {
-    const { placeholderTiles } = await probeHomepage(page)
-    // Collections without photography still have to read as artwork.
-    expect(placeholderTiles.length).toBeGreaterThan(0)
-    const ghosts = placeholderTiles.filter(
-      (tile) => tile.effectiveOpacity < MIN_EFFECTIVE_OPACITY || tile.width === 0 || tile.height === 0
-    )
-    expect(
-      ghosts,
-      `Placeholder tiles rendered as ghosts:\n${ghosts
-        .map((tile) => `  ${tile.width}x${tile.height} at opacity ${tile.effectiveOpacity}`)
-        .join('\n')}`
-    ).toEqual([])
-  })
 })
 
-test.describe('Collection row layout', () => {
-  /** Distinct `top` offsets among the collection tiles = number of rendered rows. */
-  async function tileRows(page: Page): Promise<{ tiles: number; rows: number }> {
+test.describe('Collection layout: two photographs and an index', () => {
+  // Viewports are set explicitly rather than inherited from the project, so the breakpoint under
+  // test is unambiguous in both the chromium and mobile runs.
+  type Box = { x: number; y: number; width: number; height: number }
+
+  async function layout(page: Page): Promise<{ tiles: Box[]; index: Box; links: string[] }> {
     return page.evaluate(() => {
-      const tiles = [...document.querySelectorAll('.hj-coll-tile')]
-      const tops = tiles.map((tile) => Math.round(tile.getBoundingClientRect().top))
-      return { tiles: tiles.length, rows: new Set(tops).size }
+      const box = (el: Element) => {
+        const r = el.getBoundingClientRect()
+        return { x: r.left, y: r.top + window.scrollY, width: r.width, height: r.height }
+      }
+      const index = document.querySelector('nav[aria-label="All collections"]') as Element
+      return {
+        tiles: [...document.querySelectorAll('.hj-coll-tile .hj-coll-photo')].map(box),
+        index: box(index),
+        links: [...index.querySelectorAll('a')].map((a) => a.getAttribute('href') ?? ''),
+      }
     })
   }
 
-  // Viewports are set explicitly rather than inherited from the project, so the
-  // breakpoint under test is unambiguous in both the chromium and mobile runs.
-  test('all collections sit on a single row at desktop width', async ({ page }) => {
+  test('the index lists every collection, so none depends on having a photograph', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/')
     await expect(page.locator('.hj-coll-tile').first()).toBeVisible()
 
-    const { tiles, rows } = await tileRows(page)
-    expect(tiles).toBeGreaterThan(0)
-    // The original bug: a fixed 4-column grid orphaned the 5th collection onto
-    // its own row. This fails the moment a new collection outgrows the layout.
-    expect(rows, `${tiles} collection tiles wrapped onto ${rows} rows at 1440px`).toBe(1)
+    const { links } = await layout(page)
+    // The rows of the index are the whole catalogue of collections, in the site's own order. A sixth
+    // collection is a sixth row; one without a photograph is a row and nothing else.
+    expect(links).toEqual([
+      '/shop/rings',
+      '/shop/necklaces',
+      '/shop/earrings',
+      '/shop/bracelets',
+      '/shop/charms',
+    ])
   })
 
-  test('collections stack one per row at mobile width', async ({ page }) => {
+  test('two photographs sit side by side with the index beside them at desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    await expect(page.locator('.hj-coll-tile').first()).toBeVisible()
+
+    const { tiles, index } = await layout(page)
+    expect(tiles, 'the photographed collections').toHaveLength(2)
+    // Left to right, none overlapping: photograph, photograph, index.
+    expect(tiles[0].x + tiles[0].width, 'photographs overlap').toBeLessThanOrEqual(tiles[1].x + 1)
+    expect(tiles[1].x + tiles[1].width, 'a photograph runs into the index').toBeLessThanOrEqual(index.x + 1)
+  })
+
+  test('both photographs keep the 3:4 listing crop (ADR 044)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    await expect(page.locator('.hj-coll-tile').first()).toBeVisible()
+
+    const { tiles } = await layout(page)
+    for (const tile of tiles) {
+      expect(tile.width / tile.height, `a collection photograph is ${tile.width}x${tile.height}`).toBeCloseTo(3 / 4, 1)
+    }
+  })
+
+  test('the index drops below the photographs at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     await expect(page.locator('.hj-coll-tile').first()).toBeVisible()
 
-    const { tiles, rows } = await tileRows(page)
-    expect(rows).toBe(tiles)
-  })
-
-  test('collection tiles are evenly sized at desktop width', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/')
-    await expect(page.locator('.hj-coll-tile').first()).toBeVisible()
-
-    const widths = await page.evaluate(() =>
-      [...document.querySelectorAll('.hj-coll-tile')].map((tile) =>
-        Math.round(tile.getBoundingClientRect().width)
-      )
-    )
-    // A tile reading as "oversized" next to its neighbours was half the original
-    // report; flex-grow should hand every tile the same width.
-    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(2)
+    const { tiles, index } = await layout(page)
+    expect(tiles).toHaveLength(2)
+    for (const tile of tiles) {
+      expect(index.y, 'the index starts above a photograph').toBeGreaterThanOrEqual(tile.y + tile.height - 1)
+      expect(tile.x + tile.width, 'a photograph runs past the viewport').toBeLessThanOrEqual(390 + 1)
+    }
   })
 })
 

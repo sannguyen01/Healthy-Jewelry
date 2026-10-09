@@ -125,7 +125,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </section>
 
         {/* Related products */}
-        {related.length > 0 && <HorizontalScroll label="YOU MAY ALSO LIKE" products={related} />}
+        {related.length > 0 && <HorizontalScroll label="You may also like" products={related} />}
       </main>
       <Footer />
     </>

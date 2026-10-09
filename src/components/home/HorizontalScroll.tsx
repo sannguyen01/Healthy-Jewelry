@@ -4,16 +4,24 @@ import Link from 'next/link'
 import type { CatalogProduct } from '@/lib/catalog'
 import { ProductImage } from '@/components/product/ProductImage'
 import { Badge } from '@/components/ui/Badge'
+import { ArrowIcon } from '@/components/ui/ArrowIcon'
 import { useReveal } from '@/lib/hooks/useReveal'
 
 interface HorizontalScrollProps {
+  /**
+   * The strip's name. With a `title` it is the label above it (the board's "The pieces"); on its
+   * own it is the strip's heading, set in the label voice ("You may also like" on a piece's page).
+   */
   label: string
+  /** The strip's title, in the display voice. Optional: a strip that is only a list needs no title. */
+  title?: string
   products: readonly CatalogProduct[]
   viewAllHref?: string
 }
 
 export function HorizontalScroll({
   label,
+  title,
   products,
   viewAllHref = '/shop',
 }: HorizontalScrollProps) {
@@ -22,119 +30,66 @@ export function HorizontalScroll({
   return (
     <section
       ref={sectionRef as React.RefObject<HTMLElement>}
+      className="hj-band hj-band-strip"
       style={{
-        backgroundColor: 'var(--bg)',
-        padding: 'var(--space-section) 0',
-        borderBottom: '1px solid var(--ash)',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
         transition: 'opacity 0.7s var(--ease), transform 0.7s var(--ease)',
       }}
     >
-      {/* Section header */}
-      <div
-        style={{
-          padding: '0 var(--space-gutter)',
-          marginBottom: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '20px',
-        }}
-      >
-        {/* An h2, not a span. This is the section's title — it is what tells a reader
-            which strip they are in — and until now the three strips contributed no heading
-            at all, so a screen-reader outline of the homepage went hero → campaign band →
-            collection tiles → materials and never mentioned the products. `margin: 0`
-            inline because .label-eyebrow was written for spans and carries no margin reset;
-            everything visual still comes from the class, so this renders identically. */}
-        <h2 className="label-eyebrow" style={{ margin: 0 }}>
-          {label}
-        </h2>
-        <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
-        <Link
-          href={viewAllHref}
-          style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-xs)',
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: 'var(--graphite)',
-            flexShrink: 0,
-            // A 24px hit area (WCAG 2.5.8) around a line of small type that was 19-20px tall.
-            display: 'inline-flex',
-            alignItems: 'center',
-            minHeight: '24px',
-            transition: 'color 0.2s var(--ease)',
-          }}
-          onMouseEnter={(e) => {
-            ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--ink)'
-          }}
-          onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--graphite)'
-          }}
-        >
-          {/* No arrow glyph: U+2192 is outside the latin slice the brand face ships, so it
-              rendered in the fallback face mid-label (e2e/glyph-coverage.spec.ts). Songmont's
-              own "View all" carries none either. */}
-          View All
+      <div className="hj-strip-head">
+        <div>
+          {/* The heading is the title when there is one, and the label otherwise: this is what
+              tells a reader which strip they are in, and until 2026-08 the strips contributed no
+              heading at all, so a screen-reader outline of the homepage never mentioned the
+              products. `margin: 0` because .label-eyebrow carries none and an h2 brings its own. */}
+          {title ? (
+            <>
+              <p className="label-eyebrow">{label}</p>
+              <h2 className="hj-h2">{title}</h2>
+            </>
+          ) : (
+            <h2 className="label-eyebrow" style={{ margin: 0 }}>
+              {label}
+            </h2>
+          )}
+        </div>
+        <Link href={viewAllHref} className="hj-link" style={{ flexShrink: 0 }}>
+          View all
+          <ArrowIcon />
         </Link>
       </div>
 
-      {/* Scrollable row */}
-      <div
-        className="hj3-noscroll"
-        style={{
-          display: 'flex',
-          overflowX: 'auto',
-          gap: '2px',
-          paddingLeft: 'var(--space-gutter)',
-          paddingRight: 'var(--space-gutter)',
-          paddingBottom: '4px',
-        }}
-      >
+      {/* Scrollable row. `overflowX` is inline on purpose: `.hj3-noscroll` (which hides the bar on
+          touch) sets `overflow: hidden` in the utilities layer, and a layer outranks any rule in an
+          earlier one whatever its specificity, so the same declaration in `.hj-strip-row` lost to it
+          and the strip stopped scrolling on the first build of this band. */}
+      <div className="hj3-noscroll hj-strip-row" style={{ overflowX: 'auto' }}>
         {products.map((product) => (
           <Link
             key={product.handle}
             href={`/products/${product.handle}`}
-            style={{
-              display: 'block',
-              // `clamp(220px, 260px, 280px)` until 2026-08-28 — three arguments that
-              // described a fluid card and produced a fixed 260px one, because the
-              // middle argument is what a clamp interpolates and a constant there pins
-              // the result. The bounds either side never applied at any viewport.
-              //
-              // The ceiling is 260px, not 280px, so every width at or above 383px
-              // renders exactly what it rendered before. Below that the card now
-              // shrinks instead of eating the screen: at 320px it was 260px, 81% of the
-              // viewport, leaving almost no sight of the next card in a strip whose
-              // whole affordance is that you can see there is a next card.
-              width: 'clamp(200px, 68vw, 260px)',
-              flexShrink: 0,
-              textDecoration: 'none',
-            }}
+            className="hj-strip-card"
           >
             {/* Card image area */}
             <div
               className="card-tile"
               style={{
                 aspectRatio: 'var(--ratio-product)',
-                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                overflow: 'hidden',
               }}
             >
               <ProductImage
                 product={product}
                 svgScale="60%"
-                // The card is now genuinely fluid — `clamp(200px, 68vw, 260px)` — so the
-                // hint follows the same shape. 260px is the ceiling and therefore the
-                // widest this ever renders; below 383px the viewport term governs.
-                sizes="(max-width: 383px) 68vw, 260px"
+                // The card is fluid — `clamp(200px, 68vw, 320px)` — so the hint follows the same
+                // shape: 320px is the ceiling, and the viewport term governs below 471px.
+                sizes="(max-width: 470px) 68vw, 320px"
               />
               {product.badge && (
-                <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
+                <div style={{ position: 'absolute', top: '16px', left: '16px' }}>
                   {/*
                     The badge value *is* the variant now — both are handles. The old
                     three-way ternary mapped display strings ('Bestseller') onto variants
@@ -147,20 +102,11 @@ export function HorizontalScroll({
             </div>
 
             {/* Card info */}
-            <div style={{ padding: '14px 0 0' }}>
-              <p className="hj-card-name" style={{ margin: '0 0 4px' }}>
+            <div className="hj-strip-caption">
+              <p className="hj-card-name" style={{ margin: 0 }}>
                 {product.title}
               </p>
-              <p
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-xs)',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: 'var(--graphite)',
-                  margin: '0 0 6px',
-                }}
-              >
+              <p className="hj-spec">
                 {/*
                   The published label off the record. This was a three-way ternary on
                   `product.material` whose final arm was an unguarded `: 'Grade 23

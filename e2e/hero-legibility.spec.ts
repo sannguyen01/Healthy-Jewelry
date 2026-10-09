@@ -130,7 +130,23 @@ async function sampleBackdrop(page: Page, locator: Locator): Promise<Rgb[]> {
   // anti-aliased rim of whatever sits just outside the element, and for a CTA
   // with its own dark fill that rim is page background — the exact colour of
   // the button's label, which would read as a perfect 1.00:1 failure.
-  const inset = Math.min(SAMPLE_INSET_PX, Math.floor(Math.min(png.width, png.height) / 4))
+  //
+  // The same is true of a rounded corner (ADR 051 gave the buttons a 4px radius): outside the arc, and
+  // inside the element's box, is whatever sits under it, which for the filled CTA is the card's
+  // `--bg`, the exact colour of its label. A corner pixel is not what the label is read against, so
+  // the inset also clears the arc: r * dpr * (1 - 1/sqrt2) along the diagonal, a pixel for the rim
+  // and a pixel for the rounding of the screenshot's box. Found on the mobile project only, where
+  // the 2.625 device pixel ratio makes the 4px radius 10.5 device pixels and the default inset of 4
+  // lands on the arc (1.00:1 at every width from 390px up).
+  const { radius, dpr } = await locator.evaluate((el) => ({
+    radius: Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0,
+    dpr: window.devicePixelRatio,
+  }))
+  const cornerInset = Math.ceil(radius * dpr * (1 - Math.SQRT1_2)) + 2
+  const inset = Math.min(
+    Math.max(SAMPLE_INSET_PX, cornerInset),
+    Math.floor(Math.min(png.width, png.height) / 4)
+  )
   const pixels: Rgb[] = []
   // Every 3rd pixel in each axis: ~9x fewer samples, and a contrast failure over
   // a photograph is never a single isolated pixel.

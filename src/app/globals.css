@@ -88,9 +88,15 @@
     --ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00);
 
     /* ── Fluid Type Scale ── */
-    --text-hero:    clamp(3.2rem, 1rem + 8.5vw, 8.5rem);
+    /* The hero headline, at the board's 36px on a phone and 60px from about 1280px (ADR 051, B4).
+       It was 51-136px: a size chosen for a gothic that is wide and even, which a didone at that scale
+       turns into a poster. */
+    --text-hero:    clamp(2.25rem, 1.4rem + 2.6vw, 3.75rem);
     --text-display: clamp(2.4rem, 1.2rem + 5vw, 5.5rem);
     --text-2xl:     clamp(1.8rem, 1rem + 3vw, 3.2rem);
+    /* A band's title: the board's 28px on a phone, 42px on a desktop. Sits between --text-xl and
+       --text-2xl, which are the names and the statement; set in the title cut like both. */
+    --text-section: clamp(1.75rem, 1.1rem + 2.2vw, 2.625rem);
     --text-xl:      clamp(1.4rem, 1rem + 1.8vw, 2.2rem);
     --text-lg:      clamp(1.1rem, 0.95rem + 0.6vw, 1.35rem);
     --text-base:    clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
@@ -111,20 +117,23 @@
        replaced could not say that — 848px is a third of a 2560px photo and 94%
        of a 901px one.
        Read as its complement: at least 40% of the picture stays unobstructed.
-       Measured maxima on 2026-08-24, tightest at the 901px split-layout floor
-       and decaying as the viewport grows (the card plateaus at 682px once
-       --text-hero caps):
-         901px 0.514 · 1024px 0.503 · 1440px 0.474 · 2560px 0.266
-       So 0.60 is today's 0.514 rounded up with one step of headroom, not a
+       Measured maxima on 2026-10-09, tightest at the 901px split-layout floor
+       and decaying as the viewport grows (the card plateaus at 465px once
+       --text-hero caps; it was 0.514 at 901px and plateaued at 682px before
+       the headline went from 136px to 60px, ADR 051):
+         901px 0.467 · 1024px 0.426 · 1440px 0.323 · 2560px 0.182
+       So 0.55 is today's 0.467 rounded up with one step of headroom, not a
        number picked to fit. Enforced as `max-width` on .hj-hero-scrim and
        asserted in e2e/hero-legibility.spec.ts, which reads this same property
        so the two cannot drift. */
-    --hj-hero-card-max-ratio: 0.60;
+    --hj-hero-card-max-ratio: 0.55;
 
     /* Shared horizontal inset for the hero copy. One definition, two consumers:
        the card's side margin in the split layout and the band's side padding in
-       the stacked one. It was the same literal written out in both places. */
-    --hj-hero-pad-x: clamp(20px, 4vw, 64px);
+       the stacked one. It is the page's own gutter (ADR 051, B4): it was a clamp of its
+       own, a few pixels narrower, so the hero's words stood off the left edge every
+       other band keeps. */
+    --hj-hero-pad-x: var(--space-gutter);
 
     /* ── Product detail tile ── */
     /* The tile is square and bounded above. `min-height` + `aspect-ratio` was not a
@@ -138,7 +147,7 @@
     --hj-product-tile-max: 560px;
 
     /* ── Spacing ── */
-    --space-section: clamp(56px, 8vw, 96px);
+    --space-section: clamp(56px, 8vw, 120px);
     --space-gutter:  clamp(24px, 5vw, 72px);
     /* The one editorial band per page (dark care band, the moment) breathes more than a
        standard section; everything else uses --space-section. */
@@ -387,14 +396,7 @@
   }
 
   /* ── Responsive Grids ── */
-  /* Flex, not CSS grid: with 5 collections, a fixed 4-col grid orphans the
-     5th tile alone on row 2, left-anchored, reading as oversized/imbalanced.
-     Flex-basis lets the trailing tile center on its own row instead. */
-  .hj-coll-grid {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+  /* The homepage's collection index and bands are in the components layer (ADR 051, B4). */
 
   /* Stated once. ProductDetail's `sizes` hint carries 767px — this minus one —
      and the two described different widths (768 vs 900) until they were joined up. */
@@ -422,19 +424,6 @@
     justify-content: center;
   }
 
-  .hj-coll-tile {
-    /* basis shaved below the even 20% split so the row-gap total (4 * 2px)
-       can't push the line-breaking calc over 100% and force a false wrap;
-       flex-grow fills the slack back out to a visually even 20% each */
-    flex: 1 1 calc(20% - 8px);
-    max-width: 20%;
-  }
-
-  .hj-mat-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-  }
-
   .hj-story-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -451,15 +440,6 @@
   }
 
   @media (max-width: 900px) {
-    .hj-coll-tile {
-      flex-basis: calc(50% - 2px) !important;
-      max-width: 50% !important;
-    }
-
-    .hj-mat-grid {
-      grid-template-columns: 1fr 1fr !important;
-    }
-
     .hj-values-grid {
       grid-template-columns: 1fr !important;
     }
@@ -474,59 +454,59 @@
       grid-template-columns: 1fr !important;
     }
   }
-
-  @media (max-width: 480px) {
-    .hj-coll-tile {
-      flex-basis: 100% !important;
-      max-width: 100% !important;
-    }
-
-    .hj-mat-grid {
-      grid-template-columns: 1fr !important;
-    }
-  }
 }
 
 @layer components {
   /* ── Ghost Button — light bg variant ── */
+  /* The secondary button of the Quiet Archive (ADR 051): the same 44px control as .btn-primary, on
+     the ground, with --outline for its edge (3.48:1, the floor for a control's boundary) and --ink
+     when it is hovered. It no longer fills on hover: the primary is the filled one, and a second
+     filled state would make the two read as the same thing. */
   .btn-ghost {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 13px 28px;
+    justify-content: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 12px 24px;
     border: 1px solid var(--outline);
+    border-radius: var(--radius-control);
     background: transparent;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--text-xs);
+    font-size: var(--text-label);
     font-weight: 500;
-    letter-spacing: 0.14em;
+    line-height: 1.25;
+    letter-spacing: var(--tracking-label);
     text-transform: uppercase;
-    transition: border-color var(--duration-fast) var(--ease-sharp),
-                background-color var(--duration-fast) var(--ease-sharp);
+    text-decoration: none;
+    transition: border-color var(--duration-fast) var(--ease-sharp);
     cursor: pointer;
   }
 
   .btn-ghost:hover {
     border-color: var(--ink);
-    background-color: var(--ink);
-    color: var(--bg);
   }
 
   /* ── Ghost Button — dark bg variant ── */
   .btn-ghost-dark {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 13px 28px;
-    border: 1px solid rgba(240, 237, 232, 0.5);
+    justify-content: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 12px 24px;
+    border: 1px solid var(--mist);
+    border-radius: var(--radius-control);
     background: transparent;
     color: var(--on-dark);
     font-family: var(--font-ui);
-    font-size: var(--text-xs);
+    font-size: var(--text-label);
     font-weight: 500;
-    letter-spacing: 0.14em;
+    line-height: 1.25;
+    letter-spacing: var(--tracking-label);
     text-transform: uppercase;
+    text-decoration: none;
     transition: border-color var(--duration-fast) var(--ease-sharp);
     cursor: pointer;
   }
@@ -553,11 +533,12 @@
   .label-eyebrow {
     display: block;
     font-family: var(--font-ui);
-    font-size: var(--text-xs);
-    font-weight: 400;
-    letter-spacing: 0.22em;
+    font-size: var(--text-label);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: var(--tracking-label);
     text-transform: uppercase;
-    color: var(--graphite);
+    color: var(--ink-2);
   }
 
   /* ── Horizontal Rule ── */
@@ -604,8 +585,12 @@
   }
 
   /* ── Card Tile ── */
+  /* A frame (ADR 051): travertine, a hairline and the 6px radius. One definition for the strip, the
+     listing cards and the piece's tile; the radius clips the photograph or the illustration to it. */
   .card-tile {
     background-color: var(--nacre);
+    border: 1px solid var(--ash);
+    border-radius: var(--radius-frame);
     position: relative;
     overflow: hidden;
   }
@@ -1132,4 +1117,516 @@
 
   .hj-metal-dot[data-metal="niobium"] { background-color: var(--metal-niobium); }
   .hj-metal-dot[data-metal="surgical-steel"] { background-color: var(--metal-steel); }
+
+  /* ══ The homepage's bands (ADR 051, B4) ══════════════════════════════════════════════════════
+     One band is a ground, the section rhythm and a hairline under it; the hairline is the seam, and
+     e2e/homepage-composition.spec.ts holds every light-to-light seam to it. The dark band draws none:
+     its edge is the change of ground. The last band draws none either, because the footer's own
+     hairline is the seam below it. A band is laid on a twelve-column grid whose gap and ceiling are
+     the board's (40px, 1296px), which collapses to one column at the same 900px the hero stacks at. */
+  .hj-band {
+    background-color: var(--bg);
+    padding: var(--space-section) var(--space-gutter);
+    border-bottom: 1px solid var(--ash);
+  }
+
+  .hj-band[data-space="lg"] {
+    padding-block: var(--space-section-lg);
+  }
+
+  .hj-band[data-tone="subtle"] {
+    background-color: var(--subtle);
+  }
+
+  .hj-band[data-tone="dark"] {
+    background-color: var(--ink);
+    color: var(--on-dark);
+    border-bottom: 0;
+  }
+
+  .hj-band[data-last] {
+    border-bottom: 0;
+  }
+
+  .hj-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: clamp(24px, 3vw, 40px);
+    max-width: 1296px;
+    margin-inline: auto;
+  }
+
+  @media (max-width: 900px) {
+    .hj-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+  }
+
+  /* A band's title: the title cut at --text-section, tracked tight as a didone is (the board's -0.015em
+     is --tracking-title's -0.01em at this size). The label above it is the .label-eyebrow. */
+  .hj-h2 {
+    margin: 0;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: var(--text-section);
+    line-height: 1.2;
+    letter-spacing: var(--tracking-title);
+    color: var(--ink);
+  }
+
+  .label-eyebrow + .hj-h2 {
+    margin-top: 20px;
+  }
+
+  .hj-lede {
+    margin: 0;
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: var(--text-base);
+    line-height: 1.65;
+    color: var(--graphite);
+  }
+
+  /* A text link that is a destination rather than a button: the label voice, underlined to the
+     width of its text and arrow. The arrow is an inline SVG, never a glyph: U+2192 is outside the
+     latin slice (e2e/glyph-coverage.spec.ts). 24px is the floor for a target (WCAG 2.5.8). */
+  .hj-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 24px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid currentColor;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-weight: 500;
+    font-size: var(--text-label);
+    line-height: 1.25;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: color 0.2s var(--ease-sharp);
+  }
+
+  .hj-link:hover {
+    color: var(--graphite);
+  }
+
+  .hj-link svg {
+    flex: none;
+  }
+
+  /* The same link where the target must be 44px (a phone, a row on its own): the box is the target,
+     the underline stays under the words. */
+  .hj-tap {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .hj-tap > span {
+    padding-bottom: 2px;
+    border-bottom: 1px solid currentColor;
+    font-family: var(--font-ui);
+    font-weight: 500;
+    font-size: var(--text-label);
+    line-height: 1.25;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .hj-tap:hover {
+    color: var(--graphite);
+  }
+
+  /* ── Materials: a registry of three metals ── */
+  .hj-registry-intro {
+    grid-column: 1 / span 4;
+  }
+
+  .hj-registry-intro .hj-lede {
+    max-width: 320px;
+    margin: 24px 0 32px;
+  }
+
+  .hj-registry {
+    grid-column: 5 / span 8;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-bottom: 1px solid var(--ash);
+  }
+
+  .hj-registry-row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1.25fr);
+    column-gap: 32px;
+    padding: 40px 0;
+    border-top: 1px solid var(--ash);
+  }
+
+  .hj-registry-ordinal {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding-top: 10px;
+    color: var(--ink-2);
+  }
+
+  .hj-registry-ordinal .hj-metal-dot {
+    margin-top: 4px;
+  }
+
+  .hj-registry-name {
+    margin: 0;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: var(--text-xl);
+    line-height: 1.25;
+    letter-spacing: var(--tracking-title);
+    color: var(--ink);
+  }
+
+  .hj-registry-designation {
+    margin: 8px 0 0;
+    color: var(--ink-2);
+  }
+
+  .hj-registry-body {
+    margin: 0;
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    color: var(--graphite);
+  }
+
+  .hj-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .hj-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border: 1px solid var(--ash);
+    border-radius: var(--radius-control);
+    background-color: var(--bone);
+    color: var(--ink);
+  }
+
+  @media (max-width: 900px) {
+    .hj-registry-row {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 16px;
+      padding: 32px 0;
+    }
+    .hj-registry-ordinal {
+      padding-top: 0;
+    }
+  }
+
+  /* ── Care & craft: the page's one dark band ── */
+  .hj-care-grid {
+    align-items: stretch;
+  }
+
+  .hj-care-copy {
+    grid-column: 1 / span 7;
+    padding-right: 40px;
+  }
+
+  .hj-care-copy .hj-h2 {
+    margin-bottom: 28px;
+    color: var(--on-dark);
+  }
+
+  .hj-care-copy .hj-lede {
+    max-width: 600px;
+    margin-bottom: 36px;
+    color: var(--on-dark);
+  }
+
+  .hj-care-aside {
+    grid-column: 8 / span 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--graphite);
+  }
+
+  @media (max-width: 900px) {
+    .hj-care-copy {
+      padding-right: 0;
+    }
+    .hj-care-aside {
+      padding-top: 40px;
+      border-left: 0;
+      border-top: 1px solid var(--graphite);
+    }
+  }
+
+  /* The seal (BrandSeal.tsx): the knot and the name, stacked. The face comes from .hj-lockup-text. */
+  .hj-seal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .hj-seal-mark {
+    display: block;
+    width: 132px;
+    height: 132px;
+  }
+
+  .hj-seal .hj-lockup-text {
+    font-weight: 400;
+    font-size: 1.1rem;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    color: var(--on-dark);
+  }
+
+  /* ── The strip: a head, then cards in a row that scrolls sideways ── */
+  /* The cards run to the viewport's edge, so the gutter is the strip's to supply (the head and the
+     row each carry it), not the band's. The row's own 24px of padding below the cards keeps the
+     scrollbar off the captions, so the band gives up the same 24px: the space under the last word
+     is then the section rhythm exactly, which e2e/layout-invariants.spec.ts measures. */
+  .hj-band-strip {
+    padding-inline: 0;
+    padding-bottom: calc(var(--space-section) - 24px);
+  }
+
+  .hj-strip-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 48px;
+    padding-inline: var(--space-gutter);
+  }
+
+  .hj-strip-row {
+    display: flex;
+    gap: 24px;
+    padding: 0 var(--space-gutter) 24px;
+  }
+
+  .hj-strip-card {
+    display: block;
+    flex: 0 0 clamp(200px, 68vw, 320px);
+    text-decoration: none;
+  }
+
+  .hj-strip-caption {
+    padding: 20px 2px 0;
+  }
+
+  .hj-strip-caption .hj-spec {
+    margin: 8px 0 0;
+    color: var(--ink-2);
+  }
+
+  @media (max-width: 768px) {
+    .hj-strip-head {
+      margin-bottom: 32px;
+    }
+    .hj-strip-row {
+      gap: 16px;
+    }
+  }
+
+  /* ── Collections: two photographs and an index ── */
+  .hj-coll-head {
+    max-width: 1296px;
+    margin: 0 auto 56px;
+  }
+
+  .hj-coll-grid {
+    align-items: start;
+  }
+
+  .hj-coll-tile {
+    display: block;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .hj-coll-tile:nth-child(1) {
+    grid-column: 1 / span 5;
+  }
+
+  .hj-coll-tile:nth-child(2) {
+    grid-column: 6 / span 4;
+    margin-top: 96px;
+  }
+
+  .hj-coll-photo {
+    position: relative;
+    aspect-ratio: 3 / 4;
+  }
+
+  .hj-coll-caption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+    padding-top: 20px;
+  }
+
+  .hj-coll-name {
+    margin: 0;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: var(--text-xl);
+    line-height: 1.25;
+    letter-spacing: var(--tracking-title);
+    color: var(--ink);
+  }
+
+  .hj-coll-caption .hj-spec {
+    color: var(--ink-2);
+  }
+
+  .hj-coll-index {
+    grid-column: 10 / span 3;
+    margin-top: 40px;
+  }
+
+  .hj-coll-index-head {
+    padding-bottom: 16px;
+    color: var(--ink-2);
+  }
+
+  .hj-coll-index-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-bottom: 1px solid var(--ash);
+  }
+
+  .hj-coll-index-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 64px;
+    border-top: 1px solid var(--ash);
+    color: var(--ink);
+    text-decoration: none;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: var(--text-xl);
+    line-height: 1.25;
+    letter-spacing: var(--tracking-title);
+  }
+
+  .hj-coll-index-row svg {
+    flex: none;
+  }
+
+  .hj-coll-index-row:hover {
+    color: var(--graphite);
+  }
+
+  @media (max-width: 900px) {
+    .hj-coll-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .hj-coll-tile:nth-child(1),
+    .hj-coll-tile:nth-child(2),
+    .hj-coll-index {
+      grid-column: auto;
+      margin-top: 0;
+    }
+    .hj-coll-index {
+      grid-column: 1 / -1;
+      margin-top: 16px;
+    }
+    .hj-coll-head {
+      margin-bottom: 40px;
+    }
+  }
+
+  /* ── The moment ── */
+  .hj-moment-grid {
+    align-items: center;
+  }
+
+  .hj-moment-copy {
+    grid-column: 1 / span 5;
+  }
+
+  .hj-moment-line {
+    margin: 40px 0 32px;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: var(--text-2xl);
+    line-height: 1.12;
+    letter-spacing: var(--tracking-display);
+    color: var(--ink);
+  }
+
+  .hj-moment-copy .hj-lede {
+    max-width: 360px;
+  }
+
+  .hj-moment-side {
+    grid-column: 7 / span 6;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .hj-moment-media {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    aspect-ratio: 4 / 5;
+    transform: translateY(40px);
+  }
+
+  @media (max-width: 900px) {
+    /* Stretch, not centre: a photograph filled into a box has no width of its own, and in a column
+       that centres its items the box collapsed to nothing (it did, on the first build of this band). */
+    .hj-moment-grid {
+      align-items: stretch;
+    }
+    .hj-moment-line {
+      margin-top: 24px;
+    }
+    .hj-moment-side {
+      justify-content: flex-start;
+    }
+    .hj-moment-media {
+      transform: none;
+    }
+  }
+
+  /* ── The hero's buttons: side by side, and a column of two full-width controls on a phone ── */
+  .hj-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .hj-hero-actions {
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+    }
+  }
 }

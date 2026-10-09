@@ -520,18 +520,18 @@ export const SENTINELS = [
 
   {
     // A vitest sentinel since 2026-10-02, and dead for the five weeks it was a Playwright one.
-    // The card measures at most 0.514 of the photograph, so a 0.60 cap never binds, and the hero
+    // The card measures at most 0.467 of the photograph, so a 0.55 cap never binds, and the hero
     // spec reads its ceiling from this token: raised to 0.98, nothing rendered moved and the
     // spec's ceiling moved with it (48 passed). No rendered measurement can see a raise, so the
-    // number is pinned to CLAUDE.md's stated 0.60, and `hero-card-measured` below proves the
+    // number is pinned to CLAUDE.md's stated 0.55, and `hero-card-measured` below proves the
     // measurement itself fires.
     id: 'hero-card-bound',
     runner: 'vitest',
     file: 'src/app/globals.css',
-    find: '--hj-hero-card-max-ratio: 0.60;',
+    find: '--hj-hero-card-max-ratio: 0.55;',
     replace: '--hj-hero-card-max-ratio: 0.98;',
     specs: ['src/tests/unit/doc-numeric-claims.test.ts'],
-    invariant: 'the hero copy card never covers more than 60% of the photograph',
+    invariant: 'the hero copy card never covers more than 55% of the photograph',
     scar: 'Every guardrail on the hero was satisfied better the larger the card grew, so the codified pressure pointed one way and the end state is a photograph behind a floating memo — ADR 013.',
   },
   {
@@ -646,11 +646,11 @@ export const SENTINELS = [
     id: 'glyph-coverage',
     runner: 'playwright',
     file: 'src/components/home/HorizontalScroll.tsx',
-    find: '          View All\n',
-    replace: '          View All →\n',
+    find: '          View all\n',
+    replace: '          View all →\n',
     specs: ['e2e/glyph-coverage.spec.ts'],
     invariant: 'every character a route renders is one the self-hosted brand face draws',
-    scar: 'The site ships only the latin slice of a Japanese family. "View All →" used U+2192, which the slice lacks, so the arrow rendered in the fallback face mid-label and no check could see it.',
+    scar: 'The site ships only the latin slice of its faces. "View All →" used U+2192, which the slice lacks, so the arrow rendered in the fallback face mid-label and no check could see it.',
   },
   {
     id: 'hero-card-measured',

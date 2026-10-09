@@ -106,7 +106,9 @@ export default function ContactPage() {
         {/* ── Dark CTA band ─────────────────────────────────────────── */}
         <section
           style={{
-            backgroundColor: 'var(--black)',
+            // --ink, the Quiet Archive's one dark (ADR 051): this band and the homepage's care band
+            // are the same ground, so the site has one dark rather than two nearly alike.
+            backgroundColor: 'var(--ink)',
             padding: 'clamp(56px, 7vw, 96px) clamp(24px, 6vw, 120px)',
             display: 'flex',
             flexDirection: 'column',
@@ -137,7 +139,7 @@ export default function ContactPage() {
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-base)',
-              color: 'var(--ash)',
+              color: 'var(--on-dark)',
               lineHeight: 1.7,
               fontWeight: 400,
               maxWidth: '460px',

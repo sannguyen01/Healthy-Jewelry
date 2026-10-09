@@ -528,16 +528,12 @@ pnpm exec playwright test -g "search"       # one test by name
 
 ## Recorded exceptions
 
-**Decorative ordinals are excluded from the axe contrast check.**
-`src/components/home/MaterialsSection.tsx` renders oversized `01 / 02 / 03` numerals in `--ash`
-(1.36:1 on `--bg`). They are deliberately faint, `aria-hidden="true"`, and convey nothing the adjacent
-material heading does not. WCAG 1.4.3 exempts pure decoration from the contrast minimum.
-
-axe cannot infer intent, so those nodes carry `data-decorative` and `e2e/a11y.spec.ts` excludes that
-selector — a narrow attribute match, never a blanket `[aria-hidden="true"]` exclusion, which would also
-hide genuine failures inside hidden subtrees.
-
-This is written down so it stays a decision someone made, rather than a permanently red check.
+**There are no axe exclusions.** Until ADR 051 (B4) the homepage's oversized `01 / 02 / 03` ordinals
+were `--ash` on `--bg`, well under the text-contrast floor, `aria-hidden`, and excluded by a narrow
+`[data-decorative]` selector under WCAG 1.4.3's exemption for pure decoration. They are now `--ink-2`
+text in the label voice, which clears the floor like any other text, so the selector and the attribute
+were deleted rather than left as an escape hatch nothing needs. A new exemption is a decision: write it here, with the element, the criterion and who
+decided, before it is added to `e2e/a11y.spec.ts`.
 
 ---
 

@@ -49,7 +49,7 @@ describe('homepage catalogue access', () => {
     // A parse that silently produced nothing would make every assertion below vacuously
     // pass — the same failure `secret-exposure.test.ts` guards by asserting non-emptiness.
     expect(source.length).toBeGreaterThan(0)
-    expect(callsTo(ast, 'getAllProducts').length).toBeGreaterThan(0)
+    expect(callsTo(ast, 'getAllCollections').length).toBeGreaterThan(0)
   })
 
   it('issues at most one per-collection lookup', () => {
@@ -70,8 +70,14 @@ describe('homepage catalogue access', () => {
     ).toBeLessThanOrEqual(1)
   })
 
-  it('reads the whole catalogue exactly once for the tiles', () => {
-    expect(callsTo(ast, 'getAllProducts').length).toBe(1)
+  it('builds the collection tiles from the collection list alone', () => {
+    // The tiles used to carry an illustration, found by scanning every product for the first one in
+    // each collection, so the page read the whole catalogue once for them. They carry a handle, a
+    // title and the catalogue's line now (ADR 051, B4): a collection without a photograph is a row in
+    // the index, not a drawn placeholder. So the page reads the collection list once and the product
+    // list not at all for them; a product read coming back is the illustration coming back.
+    expect(callsTo(ast, 'getAllCollections').length).toBe(1)
+    expect(callsTo(ast, 'getAllProducts').length).toBe(0)
   })
 
   it('does not map collections onto an async lookup', () => {

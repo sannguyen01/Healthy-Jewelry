@@ -69,6 +69,9 @@ const BYTE_BUDGET = {
   stacked1x: 6_000,
   stacked2x: 18_000,
   stacked3x: 32_000,
+  // The Care band's seal, lazy and below the fold (ADR 051): measured 73 KB, the largest copy a
+  // visitor can be sent, and only to a 2x screen that has scrolled near it.
+  seal2x: 80_000,
 } as const
 
 type Name = keyof typeof DERIVATIVES
@@ -133,6 +136,13 @@ describe('the served knot mark', () => {
       DERIVATIVES.stacked2x.path,
       DERIVATIVES.stacked3x.path,
     ])
+    // The Care band's seal draws the mark at 132 CSS px: its 1x is the stacked variant's largest
+    // copy and its 2x is a copy of its own, so a 2x screen is not sent an upscaled 1x.
+    expect(BRAND_MARK_SRC.seal.map((src) => `public${src}`)).toEqual([
+      DERIVATIVES.stacked3x.path,
+      DERIVATIVES.seal2x.path,
+    ])
+    expect([DERIVATIVES.stacked3x.size, DERIVATIVES.seal2x.size], 'the seal at 1x and 2x').toEqual([132, 264])
     expect([DERIVATIVES.inline1x.size, DERIVATIVES.stacked1x.size], 'the CSS sizes BrandLockup reserves').toEqual([30, 44])
     expect(`public${BRAND_LOGO_PATH}`).toBe(DERIVATIVES.logo.path)
     expect(MASTER_PATH.startsWith('public/')).toBe(false)
@@ -162,7 +172,7 @@ describe('every copy a visitor sees is transparent', () => {
   })
 
   it('covers the copies the site renders, so this list cannot quietly shrink', () => {
-    expect(TRANSPARENT).toEqual(['mark', 'icon', 'inline1x', 'inline2x', 'inline3x', 'stacked1x', 'stacked2x', 'stacked3x'])
+    expect(TRANSPARENT).toEqual(['mark', 'icon', 'inline1x', 'inline2x', 'inline3x', 'stacked1x', 'stacked2x', 'stacked3x', 'seal2x'])
   })
 })
 

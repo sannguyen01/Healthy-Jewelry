@@ -2,20 +2,12 @@ import { test, expect, type Page } from './support/test'
 import AxeBuilder from '@axe-core/playwright'
 
 /**
- * Elements carrying `data-decorative` are pure ornament — currently the oversized
- * ordinal numerals in MaterialsSection. They are `aria-hidden`, convey nothing the
- * adjacent heading does not, and are deliberately faint against `--bg`.
- *
- * WCAG 1.4.3 exempts pure decoration from the contrast minimum, so they are
- * excluded here rather than darkened. axe cannot infer intent, so the exemption
- * is declared in one place and applied to every scan below — a recorded,
- * reviewable decision instead of a permanently red check nobody reads.
- *
- * This is deliberately a narrow attribute selector, not a blanket
- * `[aria-hidden="true"]` exclusion: hiding a whole subtree from axe would also
- * hide genuine failures inside it.
+ * No element is excluded from these scans. Until ADR 051 (B4) the homepage's oversized `01 / 02 / 03`
+ * ordinals were `--ash` on `--bg` (1.36:1), exempt from WCAG 1.4.3 as decoration, and carried
+ * `data-decorative` so this file could exclude them by a narrow attribute match. They are text at
+ * `--ink-2` in the label voice now, beside a metal's provenance dot, and clear 4.5:1 like everything
+ * else, so the exemption went with them. An escape hatch nothing uses is one a failure can hide in.
  */
-const DECORATIVE = '[data-decorative]'
 
 const CORE_PAGES = [
   { name: 'Homepage', path: '/' },
@@ -66,8 +58,7 @@ test.describe('Accessibility — critical violations', () => {
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .exclude(DECORATIVE)
-        .analyze()
+          .analyze()
 
       const critical = results.violations.filter((v) => v.impact === 'critical')
       expect(
@@ -86,7 +77,6 @@ test.describe('Accessibility — serious violations', () => {
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
-      .exclude(DECORATIVE)
       .analyze()
 
     const serious = results.violations.filter((v) => v.impact === 'serious')

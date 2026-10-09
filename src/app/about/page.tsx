@@ -303,7 +303,7 @@ export default function AboutPage() {
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
-              color: 'var(--ash)',
+              color: 'var(--on-dark)',
               lineHeight: 1.6,
               fontWeight: 400,
               maxWidth: '480px',

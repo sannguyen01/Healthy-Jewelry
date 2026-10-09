@@ -1,7 +1,7 @@
-import type { HJSvgType } from '@/lib/svg/types'
 import type { Metadata } from 'next'
 import Nav from '@/components/layout/Nav'
 import Footer from '@/components/layout/Footer'
+import { BrandSeal } from '@/components/layout/BrandSeal'
 import {
   Hero,
   HorizontalScroll,
@@ -17,11 +17,11 @@ import {
   claimText,
   getBestsellers,
   getNewArrivals,
-  getAllProducts,
   getAllCollections,
 } from '@/lib/catalog'
 import { SITE_DEFAULT_TITLE, SITE_NAME } from '@/config/site'
 import { dedupeInOrder } from '@/lib/utils/homepageStrips'
+import { collectionsNav } from '@/config/navigation'
 
 const SITE = { kind: 'site' } as const
 
@@ -43,26 +43,24 @@ export function generateMetadata(): Metadata {
 export default function HomePage() {
   const bestsellersRaw = getBestsellers()
   const newArrivalsRaw = getNewArrivals()
-  const allProducts = getAllProducts()
 
   // 1. The metals. (MaterialsSection)
   // 2. A few pieces. Four to six reviewed items.
   const [bestsellers, newArrivals] = dedupeInOrder([bestsellersRaw, newArrivalsRaw])
   const curatedPieces = [...bestsellers, ...newArrivals].slice(0, 6)
 
-  // 3. Explore by type. 5 clear category tiles.
-  const collectionTiles: CollectionTile[] = getAllCollections().map((collection) => ({
-    handle: collection.handle,
-    title: collection.title,
-    svgType: (() => {
-      const illustrated = allProducts.find(
-        (p) => p.collection === collection.handle && p.media.kind === 'illustration'
-      )
-      return illustrated?.media.kind === 'illustration'
-        ? (illustrated.media.svgType as HJSvgType)
-        : null
-    })(),
-  }))
+  // 3. Explore by type. Every collection, from the one list the catalogue keeps; the grid decides
+  // which have a photograph to show (ADR 051, B4).
+  // In the site's own order of collections (the menu's and the footer's), not the order the
+  // catalogue's files happen to be read in, which is alphabetical.
+  const collectionOrder = collectionsNav.map((collection) => collection.handle)
+  const collectionTiles: CollectionTile[] = getAllCollections()
+    .map((collection) => ({
+      handle: collection.handle,
+      title: collection.title,
+      description: collection.description,
+    }))
+    .sort((a, b) => collectionOrder.indexOf(a.handle) - collectionOrder.indexOf(b.handle))
 
   return (
     <>
@@ -75,10 +73,13 @@ export default function HomePage() {
         <MaterialsSection />
 
         {/* 3. Reviewed care — the page's single dark interruption, beside the materials it explains */}
-        <CareSection body={claimText('materials-faq-skin', { kind: 'site' })} />
+        <CareSection
+          body={claimText('materials-faq-skin', { kind: 'site' })}
+          seal={<BrandSeal />}
+        />
 
         {/* 4. A few pieces (4-6 items) */}
-        <HorizontalScroll label="CURATED PIECES" products={curatedPieces} />
+        <HorizontalScroll label="The pieces" title="Curated pieces" products={curatedPieces} />
 
         {/* 5. Explore by type */}
         <CollectionGrid tiles={collectionTiles} />
