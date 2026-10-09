@@ -125,7 +125,7 @@ photograph stands until the owner replaces it; no filter is laid over it to imit
   rendered inside the layout (the 410 page, the root error boundary) declares the face itself from
   two byte-identical files in `public/fonts/`, never a system stack. Enforced by
   `src/tests/unit/type-system-floor.test.ts` and, in the browser, by `e2e/rendered-fonts.spec.ts`.
-- **One tier, one weight.** h1 is 500; display text at `--text-lg` or smaller is 500 (below about 24px
+- **One tier, one weight.** h1 is 500; display text at `--text-lg` or smaller is 500 (at that size
   it competes with body copy in the same family); larger display text is 400. Keyed to the size
   token, because the tokens are `clamp()`s. A piece's name is `.hj-card-name`. Enforced by
   `src/tests/unit/typography-weights.test.ts`.
