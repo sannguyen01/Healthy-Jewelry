@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { compositeOver, contrastRatio } from '@/lib/utils/contrast'
+import { contrastRatio } from '@/lib/utils/contrast'
 
 /**
  * WCAG 2.1 contrast enforcement for the T4 palette.
@@ -67,25 +67,31 @@ const TEXT_PAIRINGS: Array<{
   background: string
   minimum: number
 }> = [
-  // Light surfaces
+  // Light surfaces. The Quiet Archive's four light grounds, each with the text roles that sit on it
+  // (ADR 051): ink for headings and the primary button, graphite for running text, ink-2 for
+  // captions and spec rows, the two accent-toned texts for eyebrows, badges and the footer.
   { label: 'ink on bg (primary text)', foreground: 'ink', background: 'bg', minimum: 4.5 },
+  { label: 'ink on subtle (alternate band)', foreground: 'ink', background: 'subtle', minimum: 4.5 },
   { label: 'ink on nacre (card text)', foreground: 'ink', background: 'nacre', minimum: 4.5 },
-  {
-    label: 'graphite on bg (secondary text)',
-    foreground: 'graphite',
-    background: 'bg',
-    minimum: 4.5,
-  },
-  {
-    label: 'graphite on nacre (secondary text on cards)',
-    foreground: 'graphite',
-    background: 'nacre',
-    minimum: 4.5,
-  },
+  { label: 'ink on bone (chip)', foreground: 'ink', background: 'bone', minimum: 4.5 },
+  { label: 'graphite on bg (running text)', foreground: 'graphite', background: 'bg', minimum: 4.5 },
+  { label: 'graphite on subtle', foreground: 'graphite', background: 'subtle', minimum: 4.5 },
+  { label: 'graphite on nacre (running text on cards)', foreground: 'graphite', background: 'nacre', minimum: 4.5 },
+  { label: 'graphite on bone', foreground: 'graphite', background: 'bone', minimum: 4.5 },
+  { label: 'ink-2 on bg (secondary text)', foreground: 'ink-2', background: 'bg', minimum: 4.5 },
+  { label: 'ink-2 on subtle', foreground: 'ink-2', background: 'subtle', minimum: 4.5 },
+  { label: 'ink-2 on nacre (captions on cards)', foreground: 'ink-2', background: 'nacre', minimum: 4.5 },
+  { label: 'ink-2 on bone (the thinnest margin, chip text)', foreground: 'ink-2', background: 'bone', minimum: 4.5 },
   {
     label: 'titanium-text on bg (metadata, eyebrows, footer)',
     foreground: 'titanium-text',
     background: 'bg',
+    minimum: 4.5,
+  },
+  {
+    label: 'titanium-text on subtle',
+    foreground: 'titanium-text',
+    background: 'subtle',
     minimum: 4.5,
   },
   {
@@ -95,7 +101,13 @@ const TEXT_PAIRINGS: Array<{
     minimum: 4.5,
   },
   {
-    label: 'sage-text on bg (cart "Free", contact success, .badge-new on the PDP)',
+    label: 'titanium-text on bone',
+    foreground: 'titanium-text',
+    background: 'bone',
+    minimum: 4.5,
+  },
+  {
+    label: 'sage-text on bg (contact success, .badge-new on the PDP)',
     foreground: 'sage-text',
     background: 'bg',
     minimum: 4.5,
@@ -103,6 +115,25 @@ const TEXT_PAIRINGS: Array<{
   {
     label: 'sage-text on nacre (.badge-new over a card tile)',
     foreground: 'sage-text',
+    background: 'nacre',
+    minimum: 4.5,
+  },
+
+  {
+    label: 'error-text on bg (a field\'s message, a failed submit)',
+    foreground: 'error-text',
+    background: 'bg',
+    minimum: 4.5,
+  },
+  {
+    label: 'error-text on subtle',
+    foreground: 'error-text',
+    background: 'subtle',
+    minimum: 4.5,
+  },
+  {
+    label: 'error-text on nacre',
+    foreground: 'error-text',
     background: 'nacre',
     minimum: 4.5,
   },
@@ -120,11 +151,22 @@ const TEXT_PAIRINGS: Array<{
     background: 'ink',
     minimum: 4.5,
   },
-  { label: 'on-dark on mid (dark hover)', foreground: 'on-dark', background: 'mid', minimum: 4.5 },
+  {
+    label: 'on-dark on graphite (the primary button on hover)',
+    foreground: 'on-dark',
+    background: 'graphite',
+    minimum: 4.5,
+  },
   {
     label: 'mist on black (muted text on dark)',
     foreground: 'mist',
     background: 'black',
+    minimum: 4.5,
+  },
+  {
+    label: 'mist on ink (the care band and the contact band: their eyebrow label)',
+    foreground: 'mist',
+    background: 'ink',
     minimum: 4.5,
   },
   {
@@ -140,8 +182,8 @@ describe('T4 design tokens', () => {
     // Guards the whole file: a parser that silently matches nothing would make
     // every assertion below vacuous.
     expect(Object.keys(tokens).length).toBeGreaterThanOrEqual(11)
-    expect(tokens.bg).toBe('#F3F2EC')
-    expect(tokens.ink).toBe('#1A1714')
+    expect(tokens.bg).toBe('#FAF9F5')
+    expect(tokens.ink).toBe('#1A1918')
   })
 
   it('defines a text-safe titanium distinct from the titanium accent', () => {
@@ -172,6 +214,22 @@ describe('T4 design tokens', () => {
     // --ink. --on-dark and --mist are the dark-surface tokens.
     expect(contrastRatio(token('sage-text'), token('ink'))).toBeLessThan(4.5)
   })
+
+  it('keeps the control edge past the 3:1 floor on every light surface a control sits on', () => {
+    // WCAG 1.4.11: the boundary of a control must be 3:1 against what is next to it. --outline is
+    // the token for that; the board measures it at 3.48:1 on the ground.
+    for (const surface of ['bg', 'subtle'] as const) {
+      const ratio = contrastRatio(token('outline'), token(surface))
+      expect(ratio, `--outline on --${surface} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('keeps the hairline out of the control-edge role', () => {
+    // Documents *why* --outline exists. --ash is 1.32:1 on --bg: right for a divider, invisible as
+    // the edge of a button. e2e/layout-invariants.spec.ts ("control edges") measures which one each
+    // control in the browser actually uses; this is the token-level half of the same fact.
+    expect(contrastRatio(token('ash'), token('bg'))).toBeLessThan(3)
+  })
 })
 
 /**
@@ -180,8 +238,11 @@ describe('T4 design tokens', () => {
  * listed here nor covered by a pairing.
  */
 const ACCENT_ONLY = new Set([
-  'sage', // 2.36:1 on --bg — borders and tints only. See --sage-text.
-  'ash', // borders, dividers, and the decorative ordinals (WCAG 1.4.3 exempt).
+  'sage', // 2.44:1 on --bg — borders and tints only. See --sage-text.
+  'ash', // the hairline: dividers, and the decorative ordinals, which are generated content and so not text. Never a control edge.
+  'metal-niobium', // a six-pixel provenance dot beside a metal's name (MetalDot); carries no text.
+  'metal-steel', // as above.
+  'outline', // the edge of a control: held to 3:1 by name, below (WCAG 1.4.11), not to 4.5:1 as text.
 ])
 // Everything else in the palette is already named by TEXT_PAIRINGS, as a
 // foreground or as a surface, so listing it here too would be noise.
@@ -265,8 +326,12 @@ describe('every colour token is classified', () => {
  *   - `--titanium` is legitimate text on `--ink` (the mobile nav tagline), so a
  *     blanket ban would be wrong and a surface-aware version needs to know each
  *     usage's background — which this cannot see.
- *   - `--ash` carries the decorative `01/02/03` ordinals in MaterialsSection,
- *     exempt under WCAG 1.4.3 and already excluded by selector in a11y.spec.ts.
+ *   - `--ash` carries the large decorative numerals on /about, /materials and /404 and the
+ *     collection header's watermark, exempt under WCAG 1.4.3 as pure decoration. (The homepage's
+ *     own ordinals stopped being one in ADR 051, B4: they are `--ink-2` text now, and nothing on
+ *     the homepage is excluded from axe.) A check that banned `--ash` as text would be right to,
+ *     and would fail on those four until each is classified as decoration in markup; that is
+ *     the next audit's work and not this one's.
  *
  * `--sage` has no such case: it is a border and tint colour with no legitimate
  * text use at any size, on any background in this palette.
@@ -338,42 +403,31 @@ describe('T4 text contrast meets WCAG 2.1 AA', () => {
 })
 
 /**
- * Surfaces built by layering a translucent tint over a token. Checking the text
- * against the underlying token is not enough — and is how the bestseller badge
- * shipped at 4.39:1 while measuring 4.74:1 against bare --nacre.
+ * The badge is one opaque chip (`.badge` in globals.css): its label is checked against the chip's own
+ * ground, which is `--bg`, wherever the chip sits. It was two implementations, one translucent over a
+ * tile and one translucent over the page, and their composited tints were each asserted (the bestseller
+ * badge shipped at 4.39:1 while measuring 4.74:1 against bare --nacre). An opaque chip has no composite.
  */
-describe('Composited surfaces meet WCAG 2.1 AA', () => {
-  it('bestseller badge label on its tinted background is at least 4.5:1', () => {
-    // ProductBadge/Badge: 12% --titanium over the --nacre card tile.
-    const badgeBackground = compositeOver(token('titanium'), token('nacre'), 0.12)
-    const ratio = contrastRatio(token('titanium-text'), badgeBackground)
-    expect(
-      Number(ratio.toFixed(2)),
-      `--titanium-text on the composited badge background is ${ratio.toFixed(2)}:1`
-    ).toBeGreaterThanOrEqual(4.5)
+describe('The badge chip meets WCAG 2.1 AA', () => {
+  const css = readFileSync(path.resolve(__dirname, '../../app/globals.css'), 'utf8')
+  const rule = (selector: string) =>
+    css.match(new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+
+  it('is opaque, so what is behind it never reaches its label', () => {
+    expect(rule('.badge')).toMatch(/background:\s*var\(--bg\)/)
   })
 
-  // Two badge implementations, two grounds. ProductBadge (globals.css .badge-*)
-  // renders on a --nacre card tile; ui/Badge renders in a HorizontalScroll strip
-  // whose section background is --bg. Both are asserted because the composite is
-  // different and a single check would leave one of them unguarded — which is
-  // the shape of the original defect.
-  it('new badge label on its tint over a card tile is at least 4.5:1', () => {
-    const badgeBackground = compositeOver(token('sage'), token('nacre'), 0.12)
-    const ratio = contrastRatio(token('sage-text'), badgeBackground)
-    expect(
-      Number(ratio.toFixed(2)),
-      `--sage-text on 12% --sage over --nacre is ${ratio.toFixed(2)}:1`
-    ).toBeGreaterThanOrEqual(4.5)
+  it.each([
+    ['bestseller', 'ink'],
+    ['new', 'sage-text'],
+  ])('%s label (--%s) on the chip is at least 4.5:1', (_variant, name) => {
+    expect(rule(`.badge-${_variant}`)).toContain(`var(--${name})`)
+    const ratio = contrastRatio(token(name), token('bg'))
+    expect(Number(ratio.toFixed(2)), `--${name} on --bg is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('new badge label on its tint over the page background is at least 4.5:1', () => {
-    const badgeBackground = compositeOver(token('sage'), token('bg'), 0.12)
-    const ratio = contrastRatio(token('sage-text'), badgeBackground)
-    expect(
-      Number(ratio.toFixed(2)),
-      `--sage-text on 12% --sage over --bg is ${ratio.toFixed(2)}:1`
-    ).toBeGreaterThanOrEqual(4.5)
+  it('has no `sale` variant: no record can carry one', () => {
+    expect(css).not.toContain('.badge-sale')
   })
 })
 

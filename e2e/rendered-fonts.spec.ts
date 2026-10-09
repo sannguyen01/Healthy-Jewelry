@@ -3,7 +3,8 @@ import { settle } from './support/viewportFit'
 
 /**
  * **Every piece of text on every page is drawn in a face the site shipped, at a weight and a
- * style it shipped, at a size it means.** ([ADR 050](../docs/adr/050-one-face-means-no-borrowed-ones.md))
+ * style it shipped, at a size it means.** ([ADR 050](../docs/adr/050-one-face-means-no-borrowed-ones.md),
+ * restated for the original pair by [ADR 052](../docs/adr/052-the-original-pair-on-the-quiet-archive.md))
  *
  * `glyph-coverage.spec.ts` asks whether the *characters* are in the face and whether the face
  * loaded. This asks what Chrome actually used, node by node, which is the only place the
@@ -48,9 +49,17 @@ const ROUTES = [
   { path: '/checkout', status: 410, min: 3 },
 ]
 
-/** The two families the loaders ship. A platform font reports the file's own name, weight included. */
-const FACES = ['Zen Kaku Gothic Antique', 'Barlow Condensed']
-const SHIPPED_WEIGHTS = [400, 500]
+/**
+ * The two families the loaders ship, and the weights each has a file for. A platform font
+ * reports the file's own name (weight and optical size included: "DM Sans 9pt Medium", "Barlow
+ * Condensed Medium"), so {@link family} reduces it to the family before it is looked up here.
+ * There is no 400 in DM Sans: a request for one is answered with the 500, and the weight check
+ * below is what turns that from a quiet substitution into a failure.
+ */
+const SHIPPED: Record<string, number[]> = {
+  'DM Sans': [300, 500],
+  'Barlow Condensed': [400, 500],
+}
 /** `--text-xs`'s minimum, 0.7rem: the smallest text the site sets (unit test: type-system-floor). */
 const FLOOR_PX = 11
 
@@ -61,10 +70,18 @@ interface Drawn {
   weight: number
   style: string
   size: number
+  transform: string
+  /** letter-spacing in em (0 when `normal`). */
+  tracking: number
+  /** line-height as a multiple of the font size (0 when `normal`). */
+  leading: number
   fonts: { familyName: string; isCustomFont: boolean }[]
 }
 
-const family = (platformName: string) => platformName.replace(/\s+(Regular|Medium|Bold|Light|Italic|Book)$/i, '')
+const family = (platformName: string) =>
+  platformName
+    .replace(/\s+(Regular|Medium|Bold|Light|Italic|Book)$/i, '')
+    .replace(/\s+\d+pt$/i, '')
 
 /** What Chrome drew every text-bearing element in, with what its CSS asked for. */
 async function drawn(page: Page): Promise<Drawn[]> {
@@ -95,6 +112,9 @@ async function drawn(page: Page): Promise<Drawn[]> {
         weight: Number(cs.fontWeight),
         style: cs.fontStyle,
         size: Number.parseFloat(cs.fontSize),
+        transform: cs.textTransform,
+        tracking: Math.round((Number.parseFloat(cs.letterSpacing) / Number.parseFloat(cs.fontSize) || 0) * 100) / 100,
+        leading: Math.round((Number.parseFloat(cs.lineHeight) / Number.parseFloat(cs.fontSize) || 0) * 100) / 100,
       })
     }
     return out
@@ -132,17 +152,67 @@ async function drawn(page: Page): Promise<Drawn[]> {
   }
 }
 
+/**
+ * **Each role is drawn in its own face, not merely in a face the site ships.** The first rule of
+ * {@link judge} cannot see a heading drawn in the wrong *allowed* face: on 2026-10-09 an unquoted
+ * fallback name with a digit in it ("Bodoni 72") invalidated every `font-family: var(--font-display)`,
+ * the browser fell back to the inherited family, and every heading and name on the site was drawn in
+ * DM Sans. Every other guard passed, because DM Sans is a shipped face. These are the roles whose face
+ * is not in doubt; anything not listed is held only to "a shipped face". `capitals` roles are also
+ * held to the case they are drawn in, because a condensed face set in lower case is a different
+ * typeface to read (ADR 052).
+ */
+const VOICES: { match: (r: Drawn) => boolean; family: string; role: string; capitals?: true }[] = [
+  { match: (r) => r.tag === 'h1', family: 'Barlow Condensed', role: 'a page title', capitals: true },
+  { match: (r) => r.cls === 'hj-card-name', family: 'Barlow Condensed', role: 'a piece\'s name', capitals: true },
+  { match: (r) => r.cls === 'hj-menu-link', family: 'Barlow Condensed', role: 'a menu link', capitals: true },
+  { match: (r) => ['hj-h2', 'hj-registry-name', 'hj-coll-name', 'hj-moment-line'].includes(r.cls), family: 'Barlow Condensed', role: 'a heading', capitals: true },
+  { match: (r) => r.cls === 'hj-lockup-text', family: 'Barlow Condensed', role: 'the brand name', capitals: true },
+  { match: (r) => ['label-eyebrow', 'hj-label', 'hj-spec', 'btn-primary', 'btn-ghost', 'btn-ghost-dark'].includes(r.cls), family: 'DM Sans', role: 'a label or a button', capitals: true },
+  // Not `th`: the shipping and materials tables set their column heads as labels, on purpose.
+  { match: (r) => ['strong', 'b'].includes(r.tag), family: 'DM Sans', role: 'emphasis' },
+]
+
 function judge(rows: Drawn[]): string[] {
   const findings: string[] = []
   for (const r of rows) {
     const where = `<${r.tag}${r.cls ? ` .${r.cls}` : ''}> "${r.text}"`
     for (const f of r.fonts) {
-      if (!FACES.includes(family(f.familyName)) || !f.isCustomFont) {
+      const name = family(f.familyName)
+      if (!(name in SHIPPED) || !f.isCustomFont) {
         findings.push(`${where}: drawn in "${f.familyName}"${f.isCustomFont ? '' : ' (a system font)'}`)
+        continue
       }
+      if (!SHIPPED[name].includes(r.weight))
+        findings.push(`${where}: asks ${name} for weight ${r.weight}; it ships ${SHIPPED[name].join(' and ')}`)
     }
     if (r.fonts.length === 0) findings.push(`${where}: Chrome reports no face drew it`)
-    if (!SHIPPED_WEIGHTS.includes(r.weight)) findings.push(`${where}: asks for weight ${r.weight}; the site ships ${SHIPPED_WEIGHTS.join(' and ')}`)
+    for (const voice of VOICES) {
+      if (voice.match(r) && r.fonts.some((f) => family(f.familyName) !== voice.family))
+        findings.push(`${where}: ${voice.role} is ${voice.family}, drawn in ${r.fonts.map((f) => `"${f.familyName}"`).join(', ')}`)
+      if (voice.match(r) && voice.capitals && r.transform !== 'uppercase')
+        findings.push(`${where}: ${voice.role} is set in capitals, drawn with text-transform ${r.transform}`)
+    }
+    // The two halves of the case rule, read off whatever was drawn rather than off the roles above, so
+    // a style no role names is held to it too (a breadcrumb that was 500 and `capitalize`, a spec line
+    // that was 300 and tracked 0.08em: both passed every rule above, and both were mixed case with a
+    // capital's tracking or weight, which is no voice of this site).
+    const label = r.fonts.some((f) => family(f.familyName) === 'DM Sans') && r.weight === 500
+    if (label && r.transform !== 'uppercase' && !['strong', 'b'].includes(r.tag))
+      findings.push(`${where}: DM Sans 500 is the label voice and the label voice is capitals, drawn with text-transform ${r.transform}`)
+    const running = r.fonts.some((f) => family(f.familyName) === 'DM Sans') && r.weight === 300
+    if (running && r.tracking > 0.02)
+      findings.push(`${where}: running text (DM Sans 300) is tracked ${r.tracking}em; only capitals are tracked`)
+    // Leading, the same way: read off what was drawn, so it also catches a style that arrives through a
+    // spread (three display lines took a paragraph's leading that way, and no source rule can see it).
+    // Running text sits on one of the two reading leadings and display text on one of the three close
+    // ones; the brand name keeps its own box, and a label (DM Sans 500) is a single line whose height
+    // is its padding's business.
+    if (running && r.leading > 0 && ![1.65, 1.75].includes(r.leading))
+      findings.push(`${where}: running text is set at leading ${r.leading}; the site reads at 1.65 or 1.75`)
+    const display = r.fonts.some((f) => family(f.familyName) === 'Barlow Condensed') && r.cls !== 'hj-lockup-text'
+    if (display && r.leading > 0 && ![1, 1.1, 1.25].includes(r.leading))
+      findings.push(`${where}: display text is set at leading ${r.leading}; headings are 1.1, names and rows 1.25, a numeral 1`)
     if (r.style !== 'normal') findings.push(`${where}: asks for font-style ${r.style}; the site ships no italic`)
     if (r.size < FLOOR_PX) findings.push(`${where}: ${r.size}px, below the ${FLOOR_PX}px label floor`)
   }
@@ -150,9 +220,9 @@ function judge(rows: Drawn[]): string[] {
 }
 
 const EXPLAIN =
-  'The site ships Zen Kaku Gothic Antique at 400 and 500, and Barlow Condensed for the name, and ' +
-  'nothing else. A request for a weight or style outside that is faked by the browser, and a ' +
-  'system font is a different typeface on every visitor\'s machine (ADR 050).'
+  'The site ships DM Sans (300, 500) and Barlow Condensed (400, 500), and nothing else. A request for a ' +
+  'weight or style outside that is faked by the browser, and a system font is a different typeface on ' +
+  'every visitor\'s machine (ADR 050, 052).'
 
 test.describe('rendered fonts', () => {
   for (const { path, status, min } of ROUTES) {
@@ -178,20 +248,61 @@ test.describe('rendered fonts', () => {
     expect(judge(rows), EXPLAIN).toEqual([])
   })
 
-  test('form controls draw in the page\'s face, not the browser\'s', async ({ page }) => {
+  test('every form control is 16px or larger on a phone, so iOS does not zoom the page on focus', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const controls: { where: string; size: number }[] = []
+    const measure = async (where: string) => {
+      const rows = await page.evaluate(() =>
+        [...document.querySelectorAll('input, select, textarea')]
+          .filter((el) => el.getClientRects().length > 0 && !(el instanceof HTMLInputElement && ['hidden', 'checkbox', 'radio'].includes(el.type)))
+          .map((el) => ({
+            name: el.getAttribute('name') ?? el.getAttribute('aria-label') ?? el.tagName.toLowerCase(),
+            size: Number.parseFloat(getComputedStyle(el).fontSize),
+          }))
+      )
+      for (const row of rows) controls.push({ where: `${where} ${row.name}`, size: row.size })
+    }
+    for (const path of ['/contact', '/search', '/shop']) {
+      await page.goto(path)
+      await settle(page)
+      await measure(path)
+    }
+    // The menu's own field is only in the DOM's layout while the menu is open.
+    await page.goto('/')
+    await page.getByRole('button', { name: /menu/i }).first().click()
+    await expect(page.locator('.hj-menu-link').first()).toBeVisible()
+    await measure('the open menu')
+    expect(controls.length, 'the sweep found the controls (contact has four, search one, shop one, the menu one)').toBeGreaterThanOrEqual(7)
+    expect(
+      controls.filter((c) => c.size < 16).map((c) => `${c.where}: ${c.size}px`),
+      'A form control set under 16px makes iOS Safari zoom the page on focus, and it does not zoom back.'
+    ).toEqual([])
+  })
+
+  test('form controls draw in one of the site\'s faces, not the browser\'s', async ({ page }) => {
     for (const path of ['/contact', '/search']) {
       await page.goto(path)
       const controls = await page.evaluate(() => {
-        const body = getComputedStyle(document.body).fontFamily
-        return [...document.querySelectorAll('input, textarea, select, button')].map((el) => ({
-          tag: el.tagName.toLowerCase(),
-          name: el.getAttribute('name') ?? el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 20) ?? '',
-          inherits: getComputedStyle(el).fontFamily === body,
-        }))
+        const first = (value: string) => value.split(',')[0].trim().replace(/["']/g, '')
+        const root = getComputedStyle(document.documentElement)
+        // Each loader sets its family on <html>; a control is in the site's faces when its first
+        // family is one of those, and in the browser's own (Arial) when it is not.
+        const ours = new Set(
+          ['--font-dm', '--font-bc'].map((v) => first(root.getPropertyValue(v)))
+        )
+        return {
+          ours: [...ours],
+          controls: [...document.querySelectorAll('input, textarea, select, button')].map((el) => ({
+            tag: el.tagName.toLowerCase(),
+            name: el.getAttribute('name') ?? el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 20) ?? '',
+            ours: ours.has(first(getComputedStyle(el).fontFamily)),
+          })),
+        }
       })
-      expect(controls.length, `${path} has controls`).toBeGreaterThan(1)
+      expect(controls.ours.length, 'the loaders set their families on <html>').toBe(2)
+      expect(controls.controls.length, `${path} has controls`).toBeGreaterThan(1)
       expect(
-        controls.filter((c) => !c.inherits).map((c) => `${path} <${c.tag}> ${c.name}`),
+        controls.controls.filter((c) => !c.ours).map((c) => `${path} <${c.tag}> ${c.name}`),
         'A form control does not inherit the page font unless the stylesheet says so; the browser\'s own is Arial.'
       ).toEqual([])
     }

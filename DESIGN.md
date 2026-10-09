@@ -17,7 +17,7 @@ copy: none of Songmont's marks, names, photographs or copy appear here.
 Much of Songmont would not suit Healthy Jewellery, so only what suits it is taken, and anything
 taken stays answerable to that test. Two consequences are already settled:
 - Songmont's typeface is not studied further.
-- The brand name keeps the typography it had before the reference.
+- The brand name keeps the typography it had before the reference, and so does the rest of the site (ADR 052).
 
 ### What is verified, and where it comes from
 
@@ -39,13 +39,13 @@ denies songmontofficial.com and every mirror tried — so each row names its sec
 
 | Songmont | Here | Enforced by |
 |---|---|---|
-| The warm grey-beige ground | `--bg` | `src/tests/unit/design-tokens-contrast.test.ts` |
-| A dark grey for secondary text, not a mid grey | `--graphite`, in the Tundora role | same |
+| The warm grey-beige ground | `--bg`, now the Quiet Archive's alabaster ([ADR 051](docs/adr/051-three-voices-one-archive.md)) | `src/tests/unit/design-tokens-contrast.test.ts` |
+| A dark grey for secondary text, not a mid grey | `--ink-2` for captions and spec rows, `--graphite` for running text | same |
 | Near-black for headings and the name | `--ink`, warm — never pure black | same |
 | Hero, then a product row with "View all", then collections, then the story | The homepage beats ([ADR 040](docs/adr/040-seven-beats-one-strip.md)) | `src/tests/unit/homepage-composition-contract.test.ts` |
 | Restraint on product imagery | Cards carry an image, a name and a material — nothing laid over the piece | `e2e/layout-invariants.spec.ts` |
-| One typeface family for the site's text | Zen Kaku Gothic Antique — the closest openly licensed relative of Tsukiji Gothic — for display, UI and body, self-hosted ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md)). Not for the brand name (below) | `src/tests/unit/typography-weights.test.ts`, `src/tests/unit/font-files.test.ts`, `e2e/glyph-coverage.spec.ts` |
-| Names in the case they are written in | Headings, product and collection names are never forced to capitals; only small labels are | `src/tests/unit/typography-weights.test.ts` |
+| One typeface family for the site's text | **Taken for five days, then returned** ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md), [ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md)): the site's text is the brand's original pair, Barlow Condensed and DM Sans, not Songmont's one family | `src/tests/unit/typography-weights.test.ts`, `src/tests/unit/font-files.test.ts`, `e2e/glyph-coverage.spec.ts` |
+| Names in the case they are written in | **Not taken** (it was, until ADR 052): headings, product and collection names are tracked capitals, the brand's original voice | `src/tests/unit/typography-weights.test.ts` |
 
 ### What it deliberately does not take
 
@@ -72,7 +72,7 @@ Songmont's site. ([ADR 044](docs/adr/044-decided-from-the-language-not-the-page.
 
 | Dimension | Decision | Why | Enforced by |
 |---|---|---|---|
-| Latin web font | The identity's one family, Zen Kaku Gothic Antique, for every role of the site's text; the brand name keeps its own face ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md)) | One family is the verified principle for the site; the name is the brand's, not the reference's | `src/tests/unit/typography-weights.test.ts`, `src/tests/unit/font-files.test.ts`, `e2e/glyph-coverage.spec.ts` |
+| Latin web font | Decided in ADR 043 as the identity's one family and revised by [ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md): the brand's original pair, Barlow Condensed (display and the name, [ADR 048](docs/adr/048-the-name-keeps-its-own-face.md)) and DM Sans (everything else) | The owner's instruction: a reference for the site is not a template for the brand, and the brand already had a pair | `src/tests/unit/typography-weights.test.ts`, `src/tests/unit/font-files.test.ts`, `e2e/glyph-coverage.spec.ts` |
 | Listing crop | 3:4 portrait (`--ratio-product`) for product cards and the homepage strip, the crop the collection and material tiles already used | One crop through the homepage instead of a square strip between two portrait rows; 8 of the 17 illustrations are taller than wide, and at 3:4 they draw up to 1.33x larger while no piece draws smaller; portrait is the frame of the verified photographic direction, pieces worn | `src/tests/unit/design-consistency.test.ts`, `e2e/layout-invariants.spec.ts` |
 | Header | Kept: centred knot-and-name lockup, two quiet text controls each side, flat fill with a hairline once scrolled, 44px targets | The verified register is restraint — tonal, typographic, nothing laid over content — and the composition already says only that | `src/tests/unit/design-consistency.test.ts`, `e2e/header-fit.spec.ts` |
 
@@ -86,49 +86,61 @@ photograph stands until the owner replaces it; no filter is laid over it to imit
 
 ## Surface and colour
 
-- **The Pampas ground is the page.** `--bg` everywhere; `--nacre` for tiles; one dark interruption per
-  homepage, the Care band (`--black`, `--on-dark`, `--mist`). Enforced by
+- **The alabaster ground is the page.** `--bg` everywhere; `--nacre` for tiles; one dark interruption per
+  homepage, the Care band (`--ink`, `--on-dark`, `--mist`). Enforced by
   `e2e/homepage-composition.spec.ts` (one dark section, first half of the page) and
   [ADR 040](docs/adr/040-seven-beats-one-strip.md).
 - **Every text colour is a classified pairing.** `--titanium` and `--sage` are accents, never
   text on light surfaces; their `-text` siblings carry text. Enforced by
   `src/tests/unit/design-tokens-contrast.test.ts`, which also reads the table in `CLAUDE.md`.
-- **No pure black.** `--black` is the darkest value. **Unenforced.**
+- **One dark, and it is not pure black.** Every dark band a visitor sees is `--ink`; `--black` remains
+  only as the ground of the two icons whose platform cannot show transparency. **Unenforced.**
 
 ## Type
 
-- **One family for the site, one face for the name.** Zen Kaku Gothic Antique at 400 and 500 sets
-  every role of the site's text; `--font-display`, `--font-ui` and `--font-body` remain separate
-  tokens because they name roles. The brand name alone is set in `--font-brand`: Barlow Condensed,
-  500 in the header and 400 in the footer, in tracked capitals, as it was before the Songmont
-  reference ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md)). Only weights the loaders ship
-  are asked for, and only the logotype's rule may use `--font-brand`. Enforced by
-  `src/tests/unit/typography-weights.test.ts`; that no other element renders in it, by
+- **Two families, four roles** ([ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md)).
+  Barlow Condensed 500 sets every heading, page title and name in tracked capitals (`--font-display`);
+  DM Sans 300 sets running text (`--font-body`) and DM Sans 500 every label, control and badge, in
+  capitals (`--font-ui`). The brand name alone is set in `--font-brand`: Barlow Condensed, 500 in the
+  header and 400 in the footer, in tracked capitals ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md)).
+  Only weights the loaders ship are asked for, and only the logotype's rule may use `--font-brand`.
+  Enforced by `src/tests/unit/typography-weights.test.ts`; that no other element renders in it, by
   `e2e/glyph-coverage.spec.ts`.
-- **Weights are chosen by typographic colour, not by number.** Body copy and small labels were
-  DM Sans 300; this family's 300 carries about half that ink, its 400 nearly all of it, so the
-  300 role is 400 and no Light face ships. See `src/app/fonts/README.md`. **Unenforced** beyond
-  the loader: a 300 cannot be asked for because none is loaded.
+- **There is no 400 in DM Sans.** A request for one is answered with the 500 by the nearest-weight
+  rule, so running text would turn Medium silently; the loader ships 300 and 500 and the weight
+  test fails on a 400. See `src/app/fonts/README.md`.
 - **The files are what the loader says they are.** Each file's own `OS/2` weight class matches the
   weight `layout.tsx` declares, under the licence shipped beside it, with the SHA-256 its README
   records. Enforced by `src/tests/unit/font-files.test.ts`.
-- **Only characters the face draws.** The site ships the latin slice (219 characters); anything
+- **Only characters the faces draw.** The site ships the latin slice of each family; anything
   outside it renders in the fallback face mid-line. Enforced over the content by
   `src/tests/unit/font-files.test.ts` and over every route's rendered text by
-  `e2e/glyph-coverage.spec.ts`, which also checks that the face loaded and every role uses it.
-- **Headings and names are set in the case they are written in, at a declared weight.** Capitals
-  belong to small `--font-ui` labels — eyebrows, buttons, badges — and to the logotype. A `--font-display`
-  style never inherits its weight. Both enforced by `src/tests/unit/typography-weights.test.ts`.
+  `e2e/glyph-coverage.spec.ts`, which also checks that the faces loaded and every role uses its own.
+- **Display and label text are capitals, running text is not, and every weight is declared.** A
+  condensed face in lower case reads as a different, smaller typeface, so the case is part of the
+  voice. Both enforced by `src/tests/unit/typography-weights.test.ts`, and in the browser by
+  `e2e/rendered-fonts.spec.ts`.
 - **The browser draws only what the site shipped** ([ADR 050](docs/adr/050-one-face-means-no-borrowed-ones.md)).
   `font-synthesis: none` on the root; `strong`, `b` and `th` are the 500 face rather than the
   browser's 700; nothing is italic, because the face has none to draw. A document that is not
   rendered inside the layout (the 410 page, the root error boundary) declares the face itself from
   two byte-identical files in `public/fonts/`, never a system stack. Enforced by
   `src/tests/unit/type-system-floor.test.ts` and, in the browser, by `e2e/rendered-fonts.spec.ts`.
-- **One tier, one weight.** h1 is 500; display text at `--text-lg` or smaller is 500 (at that size
-  it competes with body copy in the same family); larger display text is 400. Keyed to the size
-  token, because the tokens are `clamp()`s. A piece's name is `.hj-card-name`. Enforced by
-  `src/tests/unit/typography-weights.test.ts`.
+- **One role, one weight.** Display and label styles are 500, running text 300, declared on every
+  style. A piece's name is `.hj-card-name`. Enforced by `src/tests/unit/typography-weights.test.ts`.
+- **One tracking scale.** Capitals are tracked and nothing else is: the label voice takes
+  `--tracking-meta` or `--tracking-label`, a heading takes `--tracking-display`, `--tracking-title` or
+  `--tracking-name`, running text takes none, and a typed number is a failure. Enforced by
+  `src/tests/unit/typography-tracking.test.ts` and, on what Chrome drew, by `e2e/rendered-fonts.spec.ts`
+  ([ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md), "One tracking scale").
+- **One size scale and one leading scale.** A size is a `--text-*` token and a leading one of four
+  (`--leading-display`, `-snug`, `-text`, `-long`); a heading is not set like a paragraph; no form
+  control is set smaller than the base text size on a phone. Enforced by `src/tests/unit/typography-scale.test.ts` and
+  `e2e/rendered-fonts.spec.ts` (ADR 052, "One leading scale").
+- **Every other layer is a token too** ([ADR 053](docs/adr/053-the-other-layers-and-the-tree-the-browser-reads.md)):
+  colour, motion, layers, elevation, space, shape and the breakpoints, held by
+  `src/tests/unit/design-layers.test.ts`. A new value is a token first, then a use; there is one badge, one
+  primary button and one ghost button, not a second of each.
 - **The label token is the floor.** Nothing is declared smaller than `--text-xs`'s minimum (0.7rem).
 - Page titles go through `PageHeader`. See `CLAUDE.md`, Typography.
 

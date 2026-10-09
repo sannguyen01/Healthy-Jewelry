@@ -16,25 +16,27 @@ function tagline(): string {
   return claimText('brand-positioning', { kind: 'site' })
 }
 
+// The board's column head: a label in ink-2, not a second paragraph colour (ADR 051).
 const columnHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
-  fontSize: 'var(--text-xs)',
+  fontWeight: 500,
+  fontSize: 'var(--text-label)',
   letterSpacing: 'var(--tracking-label)',
   textTransform: 'uppercase' as const,
-  color: 'var(--graphite)',
+  color: 'var(--ink-2)',
 }
 
 const linkStyle: React.CSSProperties = {
   display: 'block',
   fontFamily: 'var(--font-body)',
-  fontWeight: 400,
+  fontWeight: 300,
   fontSize: 'var(--text-sm)',
   color: 'var(--graphite)',
   textDecoration: 'none',
   // 12px above and below clears the 44px touch target on a 0.85rem line.
   padding: '12px 0',
   marginBottom: 0,
-  transition: 'color 0.2s ease',
+  transition: 'color var(--duration-fast) var(--ease)',
 }
 
 export function Footer() {
@@ -85,11 +87,11 @@ export function Footer() {
             <p
               style={{
                 fontFamily: 'var(--font-body)',
-                fontWeight: 400,
+                fontWeight: 300,
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
                 maxWidth: '280px',
-                lineHeight: 1.7,
+                lineHeight: 'var(--leading-long)',
               }}
             >
               {tagline()} Grade 23 titanium, niobium and 316L surgical steel.
@@ -161,10 +163,10 @@ export function Footer() {
         >
           <span
             style={{
-              fontFamily: 'var(--font-ui)',
+              fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-xs)',
-              letterSpacing: 'var(--tracking-label)',
-              color: 'var(--titanium-text)',
+              lineHeight: 'var(--leading-text)',
+              color: 'var(--ink-2)',
             }}
           >
             {/* The registered company, not the display name: see LEGAL_ENTITY_NAME. */}
@@ -179,11 +181,27 @@ export function Footer() {
             underneath, since it opens something rather than going anywhere.
           */}
           <MeasurementPreferences
-            style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }}
+            style={{
+              ...linkStyle,
+              fontSize: 'var(--text-xs)',
+              lineHeight: 'var(--leading-text)',
+              // The 44px target is stated, not left to padding plus a line box: it was 13px of padding
+              // round an 18px line until the type and the leading moved onto their scales, and the
+              // box came out 42px on a phone. A control's size is its own declaration.
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: '44px',
+              padding: '12px 0',
+              color: 'var(--ink-2)',
+              textDecoration: 'underline',
+              textUnderlineOffset: '3px',
+              textAlign: 'left',
+            }}
           />
           <span
             style={{
               fontFamily: 'var(--font-ui)',
+              fontWeight: 500,
               fontSize: 'var(--text-xs)',
               letterSpacing: 'var(--tracking-label)',
               textTransform: 'uppercase',
@@ -239,9 +257,13 @@ export function Footer() {
           }
           .footer-icon {
             display: inline-block;
-            font-size: 1.2rem;
-            transition: transform 0.3s ease-out;
-            font-weight: 400;
+            font-size: var(--text-lg);
+            transition: transform var(--duration-fast) var(--ease);
+            font-weight: 300;
+            /* A symbol is not tracked. It inherited the summary's label tracking as a length, which
+               made the glyph "running text, tracked" and left a gap after it that pulled the plus
+               off the right edge and off the centre it rotates about. */
+            letter-spacing: 0;
           }
           
           .footer-group-inner {

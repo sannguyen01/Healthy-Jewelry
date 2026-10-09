@@ -158,8 +158,8 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**121 unit spec files**',
-    claimed: '121',
+    context: '**126 unit spec files**',
+    claimed: '126',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
@@ -234,17 +234,17 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     actual: () => cssValue('hj-product-tile-max'),
   },
   {
-    // The only check on this number. The card measures at most 0.514 of the photograph, so
-    // 0.60 never binds, and the hero spec reads its ceiling from this same token: raised to
+    // The only check on this number. The card measures at most 0.467 of the photograph, so
+    // 0.55 never binds, and the hero spec reads its ceiling from this same token: raised to
     // 0.98, nothing rendered moves and the spec's ceiling moves with it — 48 passed, measured
     // 2026-10-02. NUMERIC skips it too (no unit). Every declaration in src is read, not the
     // first one in globals.css: a media query or a scoped rule that redeclared it would raise
-    // the computed cap the spec measures against while the first match still read 0.60. And
+    // the computed cap the spec measures against while the first match still read 0.55. And
     // because a context must state its own claimed value, a wider card edits CLAUDE.md as
     // well as this line — the reviewed change ADR 013 asks for.
     doc: 'CLAUDE.md',
-    context: '`--hj-hero-card-max-ratio` (0.60)',
-    claimed: '0.60',
+    context: '`--hj-hero-card-max-ratio` (0.55)',
+    claimed: '0.55',
     actual: () => declarationsOf('hj-hero-card-max-ratio').join(', '),
   },
   {
@@ -284,40 +284,54 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--titanium` at 2.18:1',
-    claimed: '2.18',
+    context: '`--titanium` at 2.32:1',
+    claimed: '2.32',
     actual: () => ratioOnBg('titanium').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--sage` at 2.29:1',
-    claimed: '2.29',
+    context: '`--sage` at 2.44:1',
+    claimed: '2.44',
     actual: () => ratioOnBg('sage').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--titanium-text` (5.47:1)',
-    claimed: '5.47',
+    context: '`--titanium-text` (5.83:1)',
+    claimed: '5.83',
     actual: () => ratioOnBg('titanium-text').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--sage-text` (5.84:1)',
-    claimed: '5.84',
+    context: '`--sage-text` (6.22:1)',
+    claimed: '6.22',
     actual: () => ratioOnBg('sage-text').toFixed(2),
+  },
+  {
+    // The two ends of the Quiet Archive's edge rule (ADR 051): the hairline cannot be a control's
+    // edge, the outline can.
+    doc: 'CLAUDE.md',
+    context: '`--ash` is a divider at 1.32:1',
+    claimed: '1.32',
+    actual: () => ratioOnBg('ash').toFixed(2),
+  },
+  {
+    doc: 'CLAUDE.md',
+    context: '`--outline` is, at 3.48:1',
+    claimed: '3.48',
+    actual: () => ratioOnBg('outline').toFixed(2),
   },
   {
     doc: 'docs/testing-strategy.md',
     // The claim that was wrong in two documents. Both halves are checked: the hex against
     // globals.css, and the ratio against the hex.
-    context: '`--titanium-text` (#59636B, 5.47:1 on `--bg`)',
-    claimed: '#59636B|5.47',
+    context: '`--titanium-text` (#59636B, 5.83:1 on `--bg`)',
+    claimed: '#59636B|5.83',
     actual: () => `${token('titanium-text')}|${ratioOnBg('titanium-text').toFixed(2)}`,
   },
   {
     doc: 'docs/testing-strategy.md',
-    context: 'is 2.18:1 on `--bg`',
-    claimed: '2.18',
+    context: 'is 2.32:1 on `--bg`',
+    claimed: '2.32',
     actual: () => ratioOnBg('titanium').toFixed(2),
   },
   {
@@ -371,11 +385,9 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   { doc: 'CLAUDE.md', context: '184px past a 320px viewport' },
   { doc: 'CLAUDE.md', context: 'one `svgScale="70%"`' },
   { doc: 'CLAUDE.md', context: '(lint · type-check · unit · build, ~2 min)' },
-  { doc: 'CLAUDE.md', context: '(Playwright, both projects, ~3–5 min)' },
   { doc: 'docs/testing-strategy.md', context: 'desktop + mobile | ~3-5 min' },
   { doc: 'docs/testing-strategy.md', context: 'used as 10-12px body copy' },
   { doc: 'docs/testing-strategy.md', context: '| E2E wall time | 24.2 min | ~3-5 min |' },
-  { doc: 'docs/testing-strategy.md', context: '(1.36:1 on `--bg`)' },
   { doc: 'docs/testing-strategy.md', context: 'text on dark surfaces (7.29:1' },
   { doc: 'docs/testing-strategy.md', context: 'it was simply the wrong 25% of the frame' },
   { doc: 'docs/testing-strategy.md', context: 'correct above ~866px' },

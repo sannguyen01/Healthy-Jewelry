@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { MetalDot } from '@/components/ui/MetalDot'
 
 interface HeroProps {
   /**
@@ -28,7 +29,7 @@ export function Hero({ headlineLines }: HeroProps) {
     children.forEach((child, i) => {
       child.style.opacity = '0'
       child.style.transform = 'translateY(32px)'
-      child.style.transition = `opacity 0.7s var(--ease), transform 0.7s var(--ease)`
+      child.style.transition = `opacity var(--duration-slow) var(--ease), transform var(--duration-slow) var(--ease)`
       setTimeout(
         () => {
           child.style.opacity = '1'
@@ -47,7 +48,6 @@ export function Hero({ headlineLines }: HeroProps) {
         backgroundColor: 'var(--bg)',
         position: 'relative',
         display: 'flex',
-        alignItems: 'center',
         overflow: 'hidden',
       }}
     >
@@ -105,6 +105,10 @@ export function Hero({ headlineLines }: HeroProps) {
           maxWidth: 'calc(var(--hj-hero-card-max-ratio) * 100%)',
           padding: 'clamp(28px, 3.5vw, 48px)',
           backgroundColor: 'var(--bg)',
+          // A frame, like every card on the site (ADR 051): the hairline and the 6px radius. The
+          // hairline is why the card reads as an object on the photograph and not as a hole in it.
+          border: '1px solid var(--ash)',
+          borderRadius: 'var(--radius-frame)',
         }}
       >
         <div
@@ -117,20 +121,32 @@ export function Hero({ headlineLines }: HeroProps) {
           }}
         >
           {/* "Implant-Grade Titanium" until 2026-09-26: a regulatory claim in the first words
-              a visitor reads. The eyebrow now names the three metals by specification. */}
-          <span className="label-eyebrow" style={{ marginBottom: '24px' }}>
-            Grade 23 Titanium · Niobium · 316L Steel
+              a visitor reads. The eyebrow now names the three metals by specification, behind the
+              titanium dot the board puts at the head of the line. */}
+          <span
+            className="label-eyebrow"
+            style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '28px' }}
+          >
+            <span style={{ paddingTop: '4px' }}>
+              <MetalDot metal="titanium" />
+            </span>
+            {/* The words in an element of their own, so the box that is measured for legibility is the
+                words' and not the dot's: a pixel of --titanium is not what the text sits on. */}
+            <span>Grade 23 Titanium · Niobium · 316L Steel</span>
           </span>
 
           <h1
             style={{
               fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
               fontSize: 'var(--text-hero)',
               fontWeight: 500,
               color: 'var(--ink)',
-              lineHeight: 0.9,
+              // 0.9 until the hero moved from 136px to 60px: a didone's ascenders and descenders
+              // clear each other at 1.1, and at this size the leading is what the eye reads.
+              lineHeight: 'var(--leading-display)',
               letterSpacing: 'var(--tracking-display)',
-              margin: '0 0 28px',
+              margin: '0 0 24px',
             }}
           >
             {/* Fragments, not spans: the DOM is the one the legibility spec has always
@@ -146,78 +162,24 @@ export function Hero({ headlineLines }: HeroProps) {
           <p
             style={{
               fontFamily: 'var(--font-body)',
-              fontWeight: 400,
-              fontSize: 'var(--text-lg)',
+              fontWeight: 300,
+              fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
-              margin: '0 0 44px',
-              lineHeight: 1.6,
+              margin: '0 0 40px',
+              lineHeight: 'var(--leading-text)',
               maxWidth: '400px',
             }}
           >
             No stones. No fillers. Pure material integrity.
           </p>
 
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <Link
-              href="/shop"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '14px 32px',
-                backgroundColor: 'var(--ink)',
-                color: 'var(--bg)',
-                fontFamily: 'var(--font-ui)',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 500,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                transition: 'background-color 0.25s var(--ease)',
-              }}
-              onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--mid)'
-              }}
-              onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--ink)'
-              }}
-            >
+          <div className="hj-hero-actions">
+            <Link href="/shop" className="btn-primary">
               Shop Collection
             </Link>
             <Link href="/about" className="btn-ghost">
               Our Story
             </Link>
-          </div>
-
-          {/* Scroll indicator — now a normal child of the card instead of an
-            independently absolutely-positioned corner element. It used to be
-            pinned to the viewport's bottom-left assuming the old full-height
-            scrim always covered that corner; once the scrim shrank to wrap
-            just the text, that assumption stopped holding and the cue would
-            have landed on bare photograph. Living inside the card removes the
-            gap between "where the backdrop is" and "where this sits" instead
-            of re-deriving a second protected zone. */}
-          <div
-            className="hj-hero-scroll"
-            aria-hidden="true"
-            style={{
-              marginTop: '40px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              gap: '8px',
-            }}
-          >
-            <span
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: 'var(--text-xs)',
-                letterSpacing: '0.28em',
-                textTransform: 'uppercase',
-                color: 'var(--graphite)',
-              }}
-            >
-              Scroll
-            </span>
-            <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--ash)' }} />
           </div>
         </div>
       </div>
@@ -234,17 +196,24 @@ export function Hero({ headlineLines }: HeroProps) {
           protect — instead of a card that has to be repositioned per
           breakpoint.
 
-          900px is the existing breakpoint from globals.css (.hj-coll-tile,
-          .hj-mat-grid), and it clears the ~866px failure point with margin.
+          900px is the breakpoint the homepage's bands collapse at too (.hj-grid and
+          .hj-coll-grid in globals.css), and it clears the ~866px failure point with margin.
           Enforced by e2e/hero-legibility.spec.ts across six widths. */}
-      {/* `!important` throughout, matching MaterialsSection and the
-          .hj-coll-tile rules in globals.css: this component styles itself with
-          inline `style` props, and an inline declaration outranks any
-          stylesheet rule that is not marked important. Without it these rules
-          parse fine and do nothing. */}
+      {/* `!important` on the rules that override an inline declaration: this component
+          styles the card and the section with inline `style` props, and an inline
+          declaration outranks any stylesheet rule that is not marked important. Without
+          it those rules parse fine and do nothing. */}
       <style>{`
+        /* The card sits at the foot of the photograph, as the board has it, with the page's own
+           inset below it. Set here and not inline so the stacked layout can drop both. */
+        .hj-hero {
+          align-items: flex-end;
+          padding-bottom: var(--hj-hero-pad-x);
+        }
+
         @media (max-width: 900px) {
           .hj-hero {
+            padding-bottom: 0 !important;
             flex-direction: column !important;
             align-items: stretch !important;
             /* A stacked hero already fills most of a phone screen; forcing
@@ -268,6 +237,8 @@ export function Hero({ headlineLines }: HeroProps) {
                normal flow below the copy, not a backdrop behind it — so the
                card has nothing left to protect against and disappears. */
             background-color: transparent !important;
+            border-color: transparent !important;
+            border-radius: 0 !important;
           }
 
           .hj-hero-media {

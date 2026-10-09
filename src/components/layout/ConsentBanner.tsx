@@ -103,7 +103,7 @@ export function ConsentBanner() {
         // better than a floating card.
         left: 'auto',
         bottom: 'clamp(16px, 3vw, 32px)',
-        zIndex: 94,
+        zIndex: 'var(--z-consent)',
         width: 'min(380px, calc(100vw - 2 * var(--space-gutter, 24px)))',
         backgroundColor: 'var(--bg)',
         border: '1px solid var(--ash)',
@@ -112,16 +112,16 @@ export function ConsentBanner() {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: '14px',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
-        animation: 'hjSlideUp 0.5s var(--ease) both',
+        boxShadow: 'var(--shadow-float)',
+        animation: 'hjSlideUp var(--duration-base) var(--ease) both',
       }}
     >
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 400,
+          fontWeight: 300,
           fontSize: 'var(--text-sm)',
-          lineHeight: 1.65,
+          lineHeight: 'var(--leading-text)',
           color: 'var(--ink)',
           margin: 0,
         }}
@@ -152,8 +152,9 @@ export function ConsentBanner() {
         <p
           data-testid="consent-current"
           style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: 'var(--text-xs, 0.75rem)',
+            fontFamily: 'var(--font-body)',
+            fontWeight: 300,
+            fontSize: 'var(--text-xs)',
             color: 'var(--graphite)',
             margin: 0,
           }}

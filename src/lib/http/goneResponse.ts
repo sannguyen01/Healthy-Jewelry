@@ -29,13 +29,18 @@
  * rather than as `var(--bg)`, and loads nothing.
  *
  * The literals are the T4 tokens (`--bg`, `--ink`, `--graphite`, `--titanium-text`) written
- * out. That duplication is deliberate and is the only place in this codebase where it is:
+ * out, and the type scale's values with them: the body's leading is `--leading-text` (1.65), the
+ * heading's `--leading-display` (1.1) and its tracking `--tracking-title` (0.04em). A unit test
+ * (`type-system-floor.test.ts`) reads the leading back against the tokens, because this page once
+ * said 1.6 and 1.2 where the site says 1.65 and 1.1, and only a measurement of the rendered 410
+ * (`e2e/rendered-fonts.spec.ts`) found it.
+ * That duplication is deliberate and is the only place in this codebase where it is:
  * resolving a custom property requires the stylesheet, and requiring the stylesheet is
  * exactly the dependency this page exists without.
  */
 
 import { SITE_NAME } from '@/config/brand'
-import { SITE_FACE_FONT_FACE_CSS, SITE_FACE_STACK } from '@/lib/design/siteFace'
+import { SITE_FACE_FONT_FACE_CSS, SITE_STACKS } from '@/lib/design/siteFace'
 
 /** What a retired capability says for itself. */
 export interface GoneCopy {
@@ -74,13 +79,13 @@ export function renderGonePage(copy: GoneCopy): string {
   :root { color-scheme: light dark; font-synthesis: none; }
   body {
     margin: 0; min-height: 100vh; display: grid; place-items: center;
-    background: #F3F2EC; color: #1A1714;
-    font-family: ${SITE_FACE_STACK};
-    line-height: 1.6; padding: 24px;
+    background: #FAF9F5; color: #1A1918;
+    font-family: ${SITE_STACKS.body}; font-weight: 300;
+    line-height: 1.65; padding: 24px;
   }
   main { max-width: 34rem; }
-  h1 { font-size: 1.5rem; font-weight: 500; margin: 0 0 1rem; letter-spacing: 0.01em; }
-  p { margin: 0 0 1rem; color: #4A4744; }
+  h1 { font-family: ${SITE_STACKS.display}; font-size: 1.75rem; font-weight: 500; text-transform: uppercase; line-height: 1.1; margin: 0 0 1rem; letter-spacing: 0.04em; }
+  p { margin: 0 0 1rem; color: #3D3935; }
   a { color: #59636B; }
 </style>
 </head>

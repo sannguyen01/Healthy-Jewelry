@@ -71,7 +71,7 @@ export const SENTINELS = [
     id: 'font-weight-resolution',
     runner: 'vitest',
     file: 'src/app/layout.tsx',
-    find: "    { path: './fonts/zen-kaku-gothic-antique-latin-500.woff2', weight: '500', style: 'normal' },\n",
+    find: "    { path: './fonts/dm-sans-9pt-latin-500.woff2', weight: '500', style: 'normal' },\n",
     replace: '',
     specs: ['src/tests/unit/typography-weights.test.ts', 'src/tests/unit/font-files.test.ts'],
     invariant: 'every weight a component asks for has a downloaded face',
@@ -81,8 +81,8 @@ export const SENTINELS = [
     id: 'font-file-weight-class',
     runner: 'vitest',
     file: 'src/app/layout.tsx',
-    find: "zen-kaku-gothic-antique-latin-400.woff2', weight: '400'",
-    replace: "zen-kaku-gothic-antique-latin-400.woff2', weight: '500'",
+    find: "dm-sans-9pt-latin-300.woff2', weight: '300'",
+    replace: "dm-sans-9pt-latin-300.woff2', weight: '500'",
     specs: ['src/tests/unit/font-files.test.ts'],
     invariant: 'each self-hosted font file is the weight the loader declares it to be, read from its own OS/2 table',
     scar: 'next/font/local believes the weight it is told. A Regular file declared as Medium renders Regular wherever 500 is asked for, and nothing synthesises or warns — the one-layer-down form of the faux-bold defect.',
@@ -91,11 +91,11 @@ export const SENTINELS = [
     id: 'display-case',
     runner: 'vitest',
     file: 'src/app/globals.css',
-    find: '    font-size: 0.95rem;\n    letter-spacing: var(--tracking-name);',
-    replace: '    font-size: 0.95rem;\n    letter-spacing: var(--tracking-name);\n    text-transform: uppercase;',
+    find: '    font-family: var(--font-display);\n    text-transform: uppercase;\n    font-weight: 500;\n    font-size: clamp(1.125rem, 1rem + 0.4vw, 1.25rem);',
+    replace: '    font-family: var(--font-display);\n    text-transform: none;\n    font-weight: 500;\n    font-size: clamp(1.125rem, 1rem + 0.4vw, 1.25rem);',
     specs: ['src/tests/unit/typography-weights.test.ts'],
-    invariant: 'headings and names are set in the case they are written in, never forced to capitals',
-    scar: 'Thirty-seven uppercase declarations overrode a catalogue written in Title Case, a Gentle Monster idiom kept after the reference moved to Songmont, whose pieces are named in Title Case.',
+    invariant: 'headings and names are set in tracked capitals, declared and never inherited',
+    scar: 'The original is condensed capitals. Between 2026-10-04 and 2026-10-09 names were written in the case the catalogue has them in, first in a gothic and then in a didone; a condensed face in lower case is a different, smaller typeface, so the case is part of the voice (ADR 052).',
   },
   {
     id: 'display-weight-declared',
@@ -520,18 +520,18 @@ export const SENTINELS = [
 
   {
     // A vitest sentinel since 2026-10-02, and dead for the five weeks it was a Playwright one.
-    // The card measures at most 0.514 of the photograph, so a 0.60 cap never binds, and the hero
+    // The card measures at most 0.467 of the photograph, so a 0.55 cap never binds, and the hero
     // spec reads its ceiling from this token: raised to 0.98, nothing rendered moved and the
     // spec's ceiling moved with it (48 passed). No rendered measurement can see a raise, so the
-    // number is pinned to CLAUDE.md's stated 0.60, and `hero-card-measured` below proves the
+    // number is pinned to CLAUDE.md's stated 0.55, and `hero-card-measured` below proves the
     // measurement itself fires.
     id: 'hero-card-bound',
     runner: 'vitest',
     file: 'src/app/globals.css',
-    find: '--hj-hero-card-max-ratio: 0.60;',
+    find: '--hj-hero-card-max-ratio: 0.55;',
     replace: '--hj-hero-card-max-ratio: 0.98;',
     specs: ['src/tests/unit/doc-numeric-claims.test.ts'],
-    invariant: 'the hero copy card never covers more than 60% of the photograph',
+    invariant: 'the hero copy card never covers more than 55% of the photograph',
     scar: 'Every guardrail on the hero was satisfied better the larger the card grew, so the codified pressure pointed one way and the end state is a photograph behind a floating memo — ADR 013.',
   },
   {
@@ -646,11 +646,11 @@ export const SENTINELS = [
     id: 'glyph-coverage',
     runner: 'playwright',
     file: 'src/components/home/HorizontalScroll.tsx',
-    find: '          View All\n',
-    replace: '          View All →\n',
+    find: '          View all\n',
+    replace: '          View all →\n',
     specs: ['e2e/glyph-coverage.spec.ts'],
     invariant: 'every character a route renders is one the self-hosted brand face draws',
-    scar: 'The site ships only the latin slice of a Japanese family. "View All →" used U+2192, which the slice lacks, so the arrow rendered in the fallback face mid-label and no check could see it.',
+    scar: 'The site ships only the latin slice of its faces. "View All →" used U+2192, which the slice lacks, so the arrow rendered in the fallback face mid-label and no check could see it.',
   },
   {
     id: 'hero-card-measured',
@@ -673,6 +673,26 @@ export const SENTINELS = [
     scar: 'min-height plus aspect-ratio is a contradiction, not a floor with a ratio: a 480px box rendered at every width and hung 184px past a 320px viewport, invisibly, because overflow-x is hidden — ADR 017.',
   },
   {
+    id: 'body-weight-light',
+    runner: 'vitest',
+    file: 'src/app/globals.css',
+    find: '    font-weight: 300;\n    font-size: var(--text-base);\n    line-height: var(--leading-text);\n    overflow-x: hidden;',
+    replace: '    font-weight: 400;\n    font-size: var(--text-base);\n    line-height: var(--leading-text);\n    overflow-x: hidden;',
+    specs: ['src/tests/unit/typography-weights.test.ts'],
+    invariant: 'running text is DM Sans 300, and nothing asks DM Sans for a 400 it has no file for',
+    scar: 'DM Sans ships 300 and 500. With no 400 file, a request for 400 is answered with the 500 by the nearest-weight rule, so running text would be set in Medium with nothing in the stylesheet or the console to say so (ADR 052).',
+  },
+  {
+    id: 'control-edge-visible',
+    runner: 'playwright',
+    file: 'src/components/contact/ContactForm.tsx',
+    find: "  border: '1px solid var(--outline)',\n  backgroundColor: 'transparent',",
+    replace: "  border: '1px solid var(--ash)',\n  backgroundColor: 'transparent',",
+    specs: ['e2e/layout-invariants.spec.ts'],
+    invariant: 'every bordered control draws its edge at 3:1 or more against the surface it sits on',
+    scar: 'The hairline is 1.32:1 on the ground, right for a divider and invisible as the edge of an input or a button. Before the Quiet Archive every control used it, and no token test could see which token a component named; the dark ghost button on the contact page was found by the probe at 2.22:1 the first time it ran (ADR 051).',
+  },
+  {
     id: 'font-synthesis-off',
     runner: 'vitest',
     file: 'src/app/globals.css',
@@ -685,7 +705,7 @@ export const SENTINELS = [
   {
     id: 'label-size-floor',
     runner: 'vitest',
-    file: 'src/components/ui/Badge.tsx',
+    file: 'src/components/product/ProductBadge.tsx',
     find: "fontSize: 'var(--text-xs)',",
     replace: "fontSize: '9px',",
     specs: ['src/tests/unit/type-system-floor.test.ts'],

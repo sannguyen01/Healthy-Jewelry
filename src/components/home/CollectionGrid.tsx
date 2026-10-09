@@ -1,175 +1,80 @@
-'use client'
-
 import Link from 'next/link'
 import Image from 'next/image'
-import { JewelrySVG } from '@/components/svg/JewelrySVG'
-import type { HJSvgType } from '@/lib/svg/types'
-
-const COLLECTION_PHOTOS: Partial<Record<string, string>> = {
-  charms: '/images/collections/charms.jpg',
-  earrings: '/images/collections/earrings.jpg',
-}
+import { countWord } from '@/lib/utils/countWord'
+import { ArrowIcon } from '@/components/ui/ArrowIcon'
 
 /**
- * One tile, resolved by the server before this component renders.
- *
- * `svgType` used to be read here via `getProductsByCollection` from the
- * *static* catalogue — a catalogue lookup in a `'use client'` component, which
- * can never see a Shopify product, so tiles were illustrated by whatever the
- * bundled fixture happened to contain. A client component cannot await
- * Shopify, so the resolved value arrives as a prop instead.
+ * The collections that have a photograph. Earrings and charms do; rings, necklaces and bracelets
+ * are pending photography (and in the actual metals: both photographs show gold-coloured pieces),
+ * so they appear in the index only, rather than as a placeholder tile the page would have to
+ * apologise for. When a collection is photographed it is added here and takes the next feature slot.
  */
+const COLLECTION_PHOTOS: Partial<Record<string, string>> = {
+  earrings: '/images/collections/earrings.jpg',
+  charms: '/images/collections/charms.jpg',
+}
+
+/** The board shows two photographs and an index. A third would need a third slot designed. */
+const FEATURED = 2
+
+/** One collection, resolved by the server from the catalogue. */
 export interface CollectionTile {
   handle: string
   title: string
-  /**
-   * Illustration for collections with no photograph yet. Null renders no mark.
-   *
-   * Typed as `HJSvgType`, and the catalogue's media union stores `svgType` as a plain
-   * `string` — the schema deliberately does not import that union, because it has to
-   * outlive `@/lib/catalog/types` (WS-4b deletes it). `svg-viewbox-contract.test.tsx`
-   * is what reconciles the two: every `svgType` in the content must have a measured
-   * viewBox entry, which is a stronger check than the type would give.
-   */
-  svgType: HJSvgType | null
+  /** The catalogue's line for it ("Studs, hoops and drops"). */
+  description: string
 }
 
+/**
+ * Two photographs and an index (ADR 051, B4).
+ *
+ * The photographs are the collections that have one, in the order the catalogue lists them; the
+ * index beside them is every collection, so all five paths are on the page whether or not they
+ * have been shot. A server component: nothing here holds state or handles an event, and the hover
+ * it used to script is a CSS rule.
+ */
 export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
+  const featured = tiles.filter((tile) => COLLECTION_PHOTOS[tile.handle]).slice(0, FEATURED)
+
   return (
-    <section
-      style={{
-        backgroundColor: 'var(--bg)',
-        padding: 'var(--space-section) var(--space-gutter)',
-        // Matches the hairline HorizontalScroll draws. Without it the seam below this
-        // section was the only light-on-light boundary on the homepage with no divider,
-        // while its two structural twins had one — because the rule lived on the strip
-        // component rather than on the boundary, so it applied wherever a strip happened to
-        // end. Asserted in e2e/homepage-composition.spec.ts.
-        borderBottom: '1px solid var(--ash)',
-      }}
-    >
-      <div
-        style={{
-          marginBottom: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '20px',
-        }}
-      >
-        {/* Also an h2: this section rendered h3 tile titles with no heading above them,
-            so its tiles hung off the previous section's outline. See HorizontalScroll. */}
-        <h2 className="label-eyebrow" style={{ margin: 0 }}>
-          Collections
-        </h2>
-        <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
+    <section className="hj-band" data-tone="subtle">
+      <div className="hj-coll-head">
+        <span className="label-eyebrow">Collections</span>
+        <h2 className="hj-h2">{countWord(tiles.length)} ways in.</h2>
       </div>
 
-      {/* 4-column horizontal bar */}
-      <div className="hj-coll-grid" style={{ gap: '2px' }}>
-        {tiles.map((collection) => {
-          const svgType = collection.svgType
-          return (
-            <Link
-              key={collection.handle}
-              href={`/shop/${collection.handle}`}
-              style={{
-                display: 'block',
-                position: 'relative',
-                aspectRatio: '3 / 4',
-                overflow: 'hidden',
-                textDecoration: 'none',
-                transition: 'opacity 0.3s var(--ease)',
-              }}
-              className="card-tile hj-coll-tile"
-              onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.opacity = '0.88'
-              }}
-              onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.opacity = '1'
-              }}
-            >
-              {/* Background photo or SVG illustration */}
-              {COLLECTION_PHOTOS[collection.handle] ? (
-                <Image
-                  src={COLLECTION_PHOTOS[collection.handle] as string}
-                  alt=""
-                  fill
-                  sizes="(max-width: 768px) 50vw, 25vw"
-                  style={{ objectFit: 'cover' }}
-                />
-              ) : (
-                svgType && (
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'var(--nacre)',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    <JewelrySVG type={svgType} className="w-2/3 h-2/3" style={{ opacity: 0.45 }} />
-                  </div>
-                )
-              )}
-
-              {/* Bottom scrim — ensures label stays legible over photo backgrounds */}
-              <div
-                aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: '42%',
-                  background:
-                    'linear-gradient(180deg, rgba(247,245,241,0) 0%, rgba(247,245,241,0.85) 68%, var(--bg) 100%)',
-                  pointerEvents: 'none',
-                }}
+      <div className="hj-grid hj-coll-grid">
+        {featured.map((tile) => (
+          <Link key={tile.handle} href={`/shop/${tile.handle}`} className="hj-coll-tile">
+            <div className="card-tile hj-coll-photo">
+              <Image
+                src={COLLECTION_PHOTOS[tile.handle] as string}
+                alt=""
+                fill
+                sizes="(max-width: 900px) 50vw, 40vw"
+                style={{ objectFit: 'cover' }}
               />
+            </div>
+            <div className="hj-coll-caption">
+              <h3 className="hj-coll-name">{tile.title}</h3>
+              <span className="hj-spec">{tile.description}</span>
+            </div>
+          </Link>
+        ))}
 
-              {/* Bottom label */}
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  padding: '20px 16px',
-                }}
-              >
-                <h3
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: '1.1rem',
-                    fontWeight: 500,
-                    letterSpacing: 'var(--tracking-name)',
-                    color: 'var(--ink)',
-                    margin: '0 0 4px',
-                  }}
-                >
-                  {collection.title}
-                </h3>
-                <span
-                  style={{
-                    display: 'block',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: 'var(--text-xs)',
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    color: 'var(--graphite)',
-                  }}
-                >
-                  {/* No arrow glyph — see "View All" in HorizontalScroll.tsx. */}
-                  Shop
-                </span>
-              </div>
-            </Link>
-          )
-        })}
+        <nav aria-label="All collections" className="hj-coll-index">
+          <p className="hj-label hj-coll-index-head">Index</p>
+          <ul className="hj-coll-index-list" role="list">
+            {tiles.map((tile) => (
+              <li key={tile.handle}>
+                <Link href={`/shop/${tile.handle}`} className="hj-coll-index-row">
+                  {tile.title}
+                  <ArrowIcon />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
     </section>
   )

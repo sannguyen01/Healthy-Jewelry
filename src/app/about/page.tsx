@@ -27,7 +27,7 @@ export default function AboutPage() {
     <>
       <Nav />
 
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* ── 1. Hero ────────────────────────────────────────────────── */}
         <section
           style={{
@@ -45,9 +45,9 @@ export default function AboutPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               maxWidth: '620px',
-              fontWeight: 400,
+              fontWeight: 300,
             }}
           >
             Most jewelry is made for display cases. Ours is made to be worn. Every piece is one of
@@ -76,9 +76,10 @@ export default function AboutPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
-                fontWeight: 400,
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: 'var(--tracking-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: '0 0 24px',
               }}
@@ -93,8 +94,8 @@ export default function AboutPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
                 margin: '0 0 20px',
               }}
             >
@@ -108,8 +109,8 @@ export default function AboutPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
               }}
             >
               We asked one question: what would jewelry look like if every piece were named by its
@@ -182,25 +183,28 @@ export default function AboutPage() {
                 }}
               >
                 <p
+                  aria-hidden="true"
+                  className="hj-ghost-numeral"
+                  data-numeral={card.num}
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontWeight: 400,
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: '3.5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
                     margin: '0 0 20px',
-                    letterSpacing: '0.02em',
+                    letterSpacing: 'var(--tracking-display)',
                   }}
-                >
-                  {card.num}
-                </p>
+                />
 
                 <h3
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontWeight: 400,
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: 'var(--text-xl)',
-                    letterSpacing: 'var(--tracking-display)',
+                    letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
                   }}
@@ -213,8 +217,8 @@ export default function AboutPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
-                    lineHeight: 1.7,
-                    fontWeight: 400,
+                    lineHeight: 'var(--leading-long)',
+                    fontWeight: 300,
                     margin: 0,
                   }}
                 >
@@ -241,9 +245,10 @@ export default function AboutPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-2xl)',
-              letterSpacing: 'var(--tracking-display)',
+              letterSpacing: 'var(--tracking-title)',
               color: 'var(--ink)',
               margin: 0,
             }}
@@ -260,8 +265,8 @@ export default function AboutPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
-              lineHeight: 1.75,
-              fontWeight: 400,
+              lineHeight: 'var(--leading-long)',
+              fontWeight: 300,
               margin: 0,
             }}
           >
@@ -289,7 +294,8 @@ export default function AboutPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--bg)',
@@ -303,9 +309,9 @@ export default function AboutPage() {
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
-              color: 'var(--ash)',
-              lineHeight: 1.6,
-              fontWeight: 400,
+              color: 'var(--on-dark)',
+              lineHeight: 'var(--leading-text)',
+              fontWeight: 300,
               maxWidth: '480px',
               margin: 0,
             }}

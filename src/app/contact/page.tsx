@@ -21,7 +21,7 @@ export default function ContactPage() {
     <>
       <Nav />
 
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* ── Page header ───────────────────────────────────────────── */}
         <section
           style={{
@@ -39,8 +39,8 @@ export default function ContactPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
-              fontWeight: 400,
+              lineHeight: 'var(--leading-long)',
+              fontWeight: 300,
               maxWidth: '520px',
               margin: 0,
             }}
@@ -73,8 +73,9 @@ export default function ContactPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-ui)',
+                    fontWeight: 500,
                     fontSize: 'var(--text-xs)',
-                    letterSpacing: '0.18em',
+                    letterSpacing: 'var(--tracking-label)',
                     textTransform: 'uppercase',
                     color: 'var(--graphite)',
                     margin: '0 0 8px',
@@ -87,7 +88,7 @@ export default function ContactPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--ink)',
-                    fontWeight: 400,
+                    fontWeight: 300,
                     margin: 0,
                   }}
                 >
@@ -106,7 +107,9 @@ export default function ContactPage() {
         {/* ── Dark CTA band ─────────────────────────────────────────── */}
         <section
           style={{
-            backgroundColor: 'var(--black)',
+            // --ink, the Quiet Archive's one dark (ADR 051): this band and the homepage's care band
+            // are the same ground, so the site has one dark rather than two nearly alike.
+            backgroundColor: 'var(--ink)',
             padding: 'clamp(56px, 7vw, 96px) clamp(24px, 6vw, 120px)',
             display: 'flex',
             flexDirection: 'column',
@@ -122,12 +125,13 @@ export default function ContactPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-2xl)',
-              letterSpacing: 'var(--tracking-display)',
+              letterSpacing: 'var(--tracking-title)',
               color: 'var(--on-dark)',
               margin: 0,
-              lineHeight: 1.1,
+              lineHeight: 'var(--leading-display)',
             }}
           >
             Questions about our metals?
@@ -137,9 +141,9 @@ export default function ContactPage() {
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-base)',
-              color: 'var(--ash)',
-              lineHeight: 1.7,
-              fontWeight: 400,
+              color: 'var(--on-dark)',
+              lineHeight: 'var(--leading-long)',
+              fontWeight: 300,
               maxWidth: '460px',
               margin: 0,
             }}

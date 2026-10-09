@@ -73,14 +73,15 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
                   key={value}
                   onClick={() => setActiveCollection(value)}
                   style={{
-                    padding: '7px 16px',
-                    border: '1px solid var(--ash)',
+                    padding: '8px 16px',
+                    border: '1px solid var(--outline)',
                     backgroundColor: isActive ? 'var(--ink)' : 'transparent',
                     color: isActive ? 'var(--bg)' : 'var(--ink)',
                     fontFamily: 'var(--font-ui)',
+                    fontWeight: 500,
                     fontSize: 'var(--text-xs)',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.12em',
+                    letterSpacing: 'var(--tracking-label)',
                     cursor: 'pointer',
                     transition: `background-color var(--duration-fast) var(--ease),
                                  color var(--duration-fast) var(--ease),
@@ -95,7 +96,7 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
                   onMouseLeave={(e) => {
                     if (!isActive) {
                       const btn = e.currentTarget as HTMLButtonElement
-                      btn.style.borderColor = 'var(--ash)'
+                      btn.style.borderColor = 'var(--outline)'
                     }
                   }}
                   aria-pressed={isActive}
@@ -110,15 +111,13 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortKey)}
+            // The type is `.hj-sort`'s: a label's on a desktop, a field's on a phone (globals.css says why).
+            className="hj-sort"
             style={{
-              padding: '7px 12px',
-              border: '1px solid var(--ash)',
+              padding: '8px 12px',
+              border: '1px solid var(--outline)',
               backgroundColor: 'transparent',
               color: 'var(--ink)',
-              fontFamily: 'var(--font-ui)',
-              fontSize: 'var(--text-xs)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
               cursor: 'pointer',
               appearance: 'none',
               WebkitAppearance: 'none',
@@ -141,8 +140,9 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
             textAlign: 'center',
             padding: '80px 0',
             fontFamily: 'var(--font-ui)',
+            fontWeight: 500,
             fontSize: 'var(--text-sm)',
-            letterSpacing: '0.14em',
+            letterSpacing: 'var(--tracking-label)',
             textTransform: 'uppercase',
             color: 'var(--graphite)',
           }}

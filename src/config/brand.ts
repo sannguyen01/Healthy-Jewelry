@@ -39,6 +39,8 @@ export const BRAND_MARK_PATH = '/brand/knot-silver.png'
 export const BRAND_MARK_SRC = {
   inline: ['/brand/knot-30.png', '/brand/knot-60.png', '/brand/knot-90.png'],
   stacked: ['/brand/knot-44.png', '/brand/knot-88.png', '/brand/knot-132.png'],
+  // The Care band's seal: 132 CSS px, so its 1x is the stacked variant's largest copy.
+  seal: ['/brand/knot-132.png', '/brand/knot-264.png'],
 } as const
 
 /**

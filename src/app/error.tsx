@@ -14,10 +14,10 @@ export default function Error({ error, reset }: ErrorProps) {
   }, [error])
 
   return (
-    <main
+    <main id="main" tabIndex={-1}
       style={{
-        backgroundColor: 'var(--bg, #F3F2EC)',
-        color: 'var(--ink, #1A1714)',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--ink)',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -30,22 +30,24 @@ export default function Error({ error, reset }: ErrorProps) {
     >
       <p
         style={{
-          fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
+          fontFamily: 'var(--font-ui)',
+          fontWeight: 500,
           fontSize: 'var(--text-xs)',
-          letterSpacing: '0.22em',
+          letterSpacing: 'var(--tracking-label)',
           textTransform: 'uppercase',
-          color: 'var(--graphite, #4A4744)',
+          color: 'var(--ink-2)',
         }}
       >
         Something went wrong
       </p>
       <h1
         style={{
-          fontFamily: 'var(--font-display, "Zen Kaku Gothic Antique", sans-serif)',
+          fontFamily: 'var(--font-display)',
+          textTransform: 'uppercase',
           fontWeight: 500,
-          fontSize: 'clamp(2.4rem, 5vw, 4rem)',
+          fontSize: 'var(--text-2xl)',
           letterSpacing: 'var(--tracking-display)',
-          lineHeight: 1.1,
+          lineHeight: 'var(--leading-display)',
           margin: 0,
         }}
       >
@@ -53,47 +55,22 @@ export default function Error({ error, reset }: ErrorProps) {
       </h1>
       <p
         style={{
-          fontFamily: 'var(--font-body, "Zen Kaku Gothic Antique", sans-serif)',
-          fontWeight: 400,
-          fontSize: '1rem',
-          color: 'var(--graphite, #4A4744)',
+          fontFamily: 'var(--font-body)',
+          fontWeight: 300,
+          fontSize: 'var(--text-base)',
+          color: 'var(--graphite)',
           maxWidth: '400px',
-          lineHeight: 1.6,
+          lineHeight: 'var(--leading-text)',
           margin: 0,
         }}
       >
         We&apos;re sorry — something didn&apos;t work as expected. You can try again or return home.
       </p>
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button
-          onClick={reset}
-          style={{
-            padding: '12px 28px',
-            border: '1px solid var(--ink, #1A1714)',
-            backgroundColor: 'transparent',
-            fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
-            fontSize: 'var(--text-xs)',
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            color: 'var(--ink, #1A1714)',
-          }}
-        >
+        <button type="button" onClick={reset} className="btn-ghost">
           Try again
         </button>
-        <Link
-          href="/"
-          style={{
-            padding: '12px 28px',
-            backgroundColor: 'var(--ink, #1A1714)',
-            color: 'var(--bg, #F3F2EC)',
-            fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
-            fontSize: 'var(--text-xs)',
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            textDecoration: 'none',
-          }}
-        >
+        <Link href="/" className="btn-primary">
           Return home
         </Link>
       </div>

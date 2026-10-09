@@ -61,6 +61,10 @@ export const DERIVATIVES = /** @type {const} */ ({
   stacked1x: { path: 'public/brand/knot-44.png', size: 44, tile: false, inset: 0 },
   stacked2x: { path: 'public/brand/knot-88.png', size: 88, tile: false, inset: 0 },
   stacked3x: { path: 'public/brand/knot-132.png', size: 132, tile: false, inset: 0 },
+  // The Care band's seal (ADR 051): the mark at 132 CSS px, the one place it is drawn large. Its
+  // 1x is `stacked3x` (132px), so only the 2x is new; a 3x would be ~100 KB of lossless PNG for a
+  // lazy, below-the-fold image, and a 264px copy at 3x density is only a little soft.
+  seal2x: { path: 'public/brand/knot-264.png', size: 264, tile: false, inset: 0 },
 })
 
 export const MASTER_PATH = 'assets/brand/knot-master.png'

@@ -112,7 +112,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <JsonLd type="Product" data={productJsonLd(product)} />
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
-      <main style={{ paddingTop: '64px' }}>
+      <main id="main" tabIndex={-1} style={{ paddingTop: '64px' }}>
         <Breadcrumbs items={breadcrumbItems} />
 
         {/* Product detail */}
@@ -125,7 +125,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </section>
 
         {/* Related products */}
-        {related.length > 0 && <HorizontalScroll label="YOU MAY ALSO LIKE" products={related} />}
+        {related.length > 0 && <HorizontalScroll label="You may also like" products={related} />}
       </main>
       <Footer />
     </>

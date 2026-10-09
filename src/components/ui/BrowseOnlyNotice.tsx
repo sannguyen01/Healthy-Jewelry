@@ -39,9 +39,9 @@ export function BrowseOnlyNotice() {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 400,
+          fontWeight: 300,
           fontSize: 'var(--text-base)',
-          lineHeight: 1.7,
+          lineHeight: 'var(--leading-long)',
           color: 'var(--ink)',
           margin: '0 0 12px',
         }}
@@ -51,8 +51,9 @@ export function BrowseOnlyNotice() {
       <p
         style={{
           fontFamily: 'var(--font-ui)',
+          fontWeight: 500,
           fontSize: 'var(--text-xs)',
-          letterSpacing: '0.12em',
+          letterSpacing: 'var(--tracking-label)',
           textTransform: 'uppercase',
           margin: 0,
         }}

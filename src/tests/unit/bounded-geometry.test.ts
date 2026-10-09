@@ -65,6 +65,30 @@ const ROOT = resolve(__dirname, '../../..')
  * Keyed `file | property | value`, which is stable across edits that move a line.
  */
 const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded'; why: string }> = {
+  'src/components/layout/Footer.tsx | minHeight | 44px': {
+    state: 'intrinsic',
+    why: 'The footer\'s "Measurement preferences" button: one line of text in a flex row the bar bounds. The floor states the 44px touch target as a declaration; it was padding round a line box, which came out 42px on a phone when the type and leading moved onto their scales. The label is the ceiling, and it does not wrap.',
+  },
+  'src/components/layout/MenuArchive.tsx | minWidth | 112': {
+    state: 'intrinsic',
+    why: 'The menu search button, in a flex row beside a `flex: 1` field. The floor stops "Search" being a sliver on a phone; the row caps the width and the label caps the button, which never grows past its text and padding.',
+  },
+  'src/app/globals.css | minHeight | 52px': {
+    state: 'intrinsic',
+    why: 'A row in the menu archive (.hj-archive-row): one line of text in a list the column bounds. The floor is the touch target (44px) with room, and a row only grows by wrapping its own label.',
+  },
+  'src/app/globals.css | minHeight | 64px': {
+    state: 'intrinsic',
+    why: 'A category in the menu archive (.hj-menu-link) and a row of the homepage collection index (.hj-coll-index-row): one line of the title voice in a list. The floor is the board\'s 64px row; the label is the ceiling.',
+  },
+  'src/app/globals.css | minHeight | 96px': {
+    state: 'intrinsic',
+    why: 'A metal in the menu archive (.hj-archive-metal): an ordinal, a name and a specification in a three-track grid whose middle track wraps. The floor is the board\'s row; the content, not the floor, is what makes it taller.',
+  },
+  'src/app/globals.css | minHeight | 48px': {
+    state: 'intrinsic',
+    why: 'A text field (.hj-field). One line of input in a row the container bounds; the floor is the board\'s 48px control, comfortably past the 44px touch target.',
+  },
   'src/components/contact/ContactForm.tsx | minHeight | 140px': {
     state: 'intrinsic',
     why: "A <textarea>. Its height is the user's to change by dragging, and the floor only stops it opening as a single line. Capping it would fight the resize handle.",
@@ -77,21 +101,17 @@ const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded';
     state: 'intrinsic',
     why: 'A spec label column in a wrapping flex row. The floor sets the wrap point; the row caps the width.',
   },
-  'src/components/home/CollectionGrid.tsx | aspectRatio | 3 / 4': {
+  'src/app/globals.css | aspectRatio | 3 / 4': {
     state: 'bounded',
-    why: 'The tile is a grid cell, so its width comes from the track and the ratio derives height from a width that is already bounded. This is the safe direction of ADR 017: a ratio is only dangerous when the axis it derives *from* is unbounded.',
-  },
-  'src/components/home/MaterialsSection.tsx | aspectRatio | 3 / 4': {
-    state: 'bounded',
-    why: 'Declared alongside `width: 200px` on the same element, so the deriving axis is fixed.',
+    why: 'The homepage collection photograph (.hj-coll-photo). It is a grid cell, so its width comes from a track of the 1296px band and the ratio derives height from a width that is already bounded. This is the safe direction of ADR 017: a ratio is only dangerous when the axis it derives *from* is unbounded.',
   },
   'src/components/home/HorizontalScroll.tsx | aspectRatio | var(--ratio-product)': {
     state: 'intrinsic',
-    why: 'The image box fills a strip card whose own width is `clamp(200px, 68vw, 260px)`. The container caps the deriving axis at 260px, so the 3 / 4 listing crop (ADR 044) cannot grow past 260 x 347.',
+    why: 'The image box fills a strip card whose own width is `clamp(200px, 68vw, 320px)` (.hj-strip-card). The container caps the deriving axis at 320px, so the 3 / 4 listing crop (ADR 044) cannot grow past 320 x 427.',
   },
-  'src/components/home/HorizontalScroll.tsx | minHeight | 24px': {
+  'src/app/globals.css | minHeight | 24px': {
     state: 'intrinsic',
-    why: 'The WCAG 2.5.8 hit area of "View All", one line of --text-xs in a `flexShrink: 0` link that never wraps. The content is the ceiling: the floor only lifts a 19-20px line of type to a 24px target (ADR 045).',
+    why: 'The WCAG 2.5.8 hit area of a destination link (.hj-link: "View all", "The materials page"), one line of label type that never grows with the viewport. The content is the ceiling: the floor only lifts a 19-20px line of type to a 24px target (ADR 045).',
   },
   'src/components/ui/BrowseOnlyNotice.tsx | minHeight | 24px': {
     state: 'intrinsic',
@@ -103,7 +123,7 @@ const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded';
   },
   'src/app/globals.css | minHeight | 44px': {
     state: 'intrinsic',
-    why: 'The WCAG 2.2 target-size floor on header controls. The header bar is a fixed 64px tall, so the row caps the axis; the floor only stops a short label or icon collapsing below a thumb.',
+    why: 'The WCAG 2.2 target-size floor on header controls and on the buttons and tap links (.btn-primary, .btn-ghost, .btn-ghost-dark, .hj-tap). The header bar is a fixed 64px tall and a button is one line of label type with its padding, so the content caps the axis; the floor only stops a short label or icon collapsing below a thumb.',
   },
   'src/app/globals.css | minWidth | 44px': {
     state: 'intrinsic',

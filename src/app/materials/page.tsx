@@ -119,7 +119,7 @@ export default function MaterialsPage() {
     <>
       <Nav />
 
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* ── Page header ───────────────────────────────────────────── */}
         <section
           style={{
@@ -138,8 +138,8 @@ export default function MaterialsPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
-              fontWeight: 400,
+              lineHeight: 'var(--leading-long)',
+              fontWeight: 300,
               maxWidth: '580px',
             }}
           >
@@ -171,28 +171,31 @@ export default function MaterialsPage() {
               {/* Left: number + title */}
               <div>
                 <p
+                  aria-hidden="true"
+                  className="hj-ghost-numeral"
+                  data-numeral={MATERIAL_NUMBERS[index]}
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontWeight: 400,
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: '5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
                     margin: '0 0 12px',
-                    letterSpacing: '0.02em',
+                    letterSpacing: 'var(--tracking-display)',
                   }}
-                >
-                  {MATERIAL_NUMBERS[index]}
-                </p>
+                />
 
                 <h2
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontWeight: 400,
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: 'var(--text-2xl)',
-                    letterSpacing: 'var(--tracking-display)',
+                    letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 8px',
-                    lineHeight: 1.1,
+                    lineHeight: 'var(--leading-display)',
                   }}
                 >
                   {material.title}
@@ -201,8 +204,9 @@ export default function MaterialsPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-ui)',
+                    fontWeight: 500,
                     fontSize: 'var(--text-xs)',
-                    letterSpacing: '0.18em',
+                    letterSpacing: 'var(--tracking-meta)',
                     textTransform: 'uppercase',
                     color: 'var(--titanium-text)',
                     margin: 0,
@@ -219,8 +223,8 @@ export default function MaterialsPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
-                    lineHeight: 1.75,
-                    fontWeight: 400,
+                    lineHeight: 'var(--leading-long)',
+                    fontWeight: 300,
                     margin: '0 0 28px',
                   }}
                 >
@@ -263,7 +267,14 @@ export default function MaterialsPage() {
             Side by Side
           </p>
 
-          <div style={{ overflowX: 'auto' }}>
+          {/* A region that scrolls sideways on a phone must be reachable and named for a keyboard
+              (WCAG 2.1.1): focusable, with a role and a label. */}
+          <div
+            role="region"
+            aria-label="The three metals compared, side by side"
+            tabIndex={0}
+            style={{ overflowX: 'auto' }}
+          >
             <table
               style={{
                 width: '100%',
@@ -280,11 +291,11 @@ export default function MaterialsPage() {
                       padding: '14px 20px',
                       fontFamily: 'var(--font-ui)',
                       fontSize: 'var(--text-xs)',
-                      letterSpacing: '0.16em',
+                      letterSpacing: 'var(--tracking-label)',
                       textTransform: 'uppercase',
                       color: 'var(--graphite)',
                       borderBottom: '2px solid var(--ash)',
-                      fontWeight: 400,
+                      fontWeight: 500,
                       minWidth: '160px',
                     }}
                   >
@@ -298,11 +309,11 @@ export default function MaterialsPage() {
                         padding: '14px 20px',
                         fontFamily: 'var(--font-ui)',
                         fontSize: 'var(--text-xs)',
-                        letterSpacing: '0.16em',
+                        letterSpacing: 'var(--tracking-label)',
                         textTransform: 'uppercase',
                         color: 'var(--ink)',
                         borderBottom: '2px solid var(--ash)',
-                        fontWeight: 400,
+                        fontWeight: 500,
                         minWidth: '160px',
                       }}
                     >
@@ -322,11 +333,11 @@ export default function MaterialsPage() {
                         padding: '14px 20px',
                         fontFamily: 'var(--font-ui)',
                         fontSize: 'var(--text-xs)',
-                        letterSpacing: '0.1em',
+                        letterSpacing: 'var(--tracking-meta)',
                         textTransform: 'uppercase',
                         color: 'var(--graphite)',
                         borderBottom: '1px solid var(--ash)',
-                        fontWeight: 400,
+                        fontWeight: 500,
                       }}
                     >
                       {row.property}
@@ -338,7 +349,7 @@ export default function MaterialsPage() {
                           padding: '14px 20px',
                           color: 'var(--ink)',
                           borderBottom: '1px solid var(--ash)',
-                          fontWeight: 400,
+                          fontWeight: 300,
                         }}
                       >
                         {cell}
@@ -380,8 +391,9 @@ export default function MaterialsPage() {
                 <h3
                   style={{
                     fontFamily: 'var(--font-display)',
+                    textTransform: 'uppercase',
                     fontSize: 'var(--text-lg)',
-                    letterSpacing: 'var(--tracking-display)',
+                    letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
                     fontWeight: 500,
@@ -394,8 +406,8 @@ export default function MaterialsPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
-                    lineHeight: 1.75,
-                    fontWeight: 400,
+                    lineHeight: 'var(--leading-long)',
+                    fontWeight: 300,
                     margin: 0,
                   }}
                 >

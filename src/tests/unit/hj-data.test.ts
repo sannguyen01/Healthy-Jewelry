@@ -45,6 +45,7 @@ describe('hjMaterials', () => {
     for (const material of hjMaterials) {
       expect(material.title.length, `${material.handle} has no title`).toBeGreaterThan(0)
       expect(material.subtitle.length, `${material.handle} has no subtitle`).toBeGreaterThan(0)
+      expect(material.designation.length, `${material.handle} has no designation`).toBeGreaterThan(0)
       expect(material.body.length, `${material.handle} has no body`).toBeGreaterThan(0)
       expect(
         material.properties.length,

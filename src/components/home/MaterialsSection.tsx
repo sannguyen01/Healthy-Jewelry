@@ -1,197 +1,73 @@
-import Image from 'next/image'
+import Link from 'next/link'
 import { hjMaterials } from '@/lib/data/hj-data'
 import { materialChips } from '@/lib/catalog'
+import { countWord } from '@/lib/utils/countWord'
+import { MetalDot } from '@/components/ui/MetalDot'
+import { ArrowIcon } from '@/components/ui/ArrowIcon'
 
 const ordinals = ['01', '02', '03']
 
+/**
+ * The metals, as a registry (ADR 051): a left column that says what this is and where the full
+ * page is, and on the right one ruled row per metal. Each row is its ordinal and finish dot, its
+ * name and designation, and its description with the specification chips.
+ *
+ * The three rows are `hjMaterials` whole, so the page, the menu's metallurgy column and `/materials`
+ * cannot disagree about a metal. The chips are `materialChips()`: specification facts first, then
+ * any claim a named reviewer has approved for this metal (none yet; see `hj-data.ts`).
+ *
+ * The ordinals were `--ash` numerals at 3rem, decoration exempt from contrast under WCAG 1.4.3 and
+ * excluded from axe by `data-decorative`. They are `01` in the label voice now, at `--ink-2`, beside
+ * the provenance dot: a number that tells the reader where they are in a list is not ornament, so
+ * it clears 4.5:1 like any other text and nothing is excluded.
+ */
 export function MaterialsSection() {
   return (
-    <section
-      style={{
-        backgroundColor: 'var(--bg)',
-        padding: 'var(--space-section) var(--space-gutter)',
-      }}
-    >
-      <div
-        className="hj-materials-intro"
-        style={{
-          maxWidth: '1200px',
-          margin: '0 auto 48px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 'clamp(24px, 4vw, 48px)',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '20px',
-              marginBottom: '24px',
-            }}
-          >
-            <span className="label-eyebrow">Materials</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--ash)' }} />
-          </div>
-          <h2
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-2xl)',
-              fontWeight: 400,
-              color: 'var(--ink)',
-              margin: 0,
-              lineHeight: 1.1,
-              letterSpacing: 'var(--tracking-display)',
-            }}
-          >
-            Built from the inside out.
+    <section className="hj-band">
+      <div className="hj-grid">
+        <div className="hj-registry-intro">
+          <span className="label-eyebrow">Materials</span>
+          <h2 className="hj-h2">
+            Built from the
+            <br />
+            inside out.
           </h2>
+          <p className="hj-lede">
+            {countWord(hjMaterials.length)} metals, each named by its exact specification.
+          </p>
+          <Link href="/materials" className="hj-link">
+            The materials page
+            <ArrowIcon />
+          </Link>
         </div>
 
-        <div
-          className="hj-materials-photo"
-          style={{
-            position: 'relative',
-            width: '200px',
-            aspectRatio: '3 / 4',
-            flexShrink: 0,
-            overflow: 'hidden',
-          }}
-        >
-          <Image
-            src="/images/lifestyle/philosophy-waterproof.jpg"
-            // Alt text describes the photograph. It also asserted "waterproof, non-corrosion
-            // material integrity" until 2026-09-26 — a corrosion claim read aloud to every
-            // screen-reader user, with nothing behind it.
-            alt="Titanium jewelry worn in water"
-            fill
-            sizes="200px"
-            style={{ objectFit: 'cover' }}
-          />
-        </div>
+        <ol className="hj-registry" role="list">
+          {hjMaterials.map((material, i) => (
+            <li key={material.handle} className="hj-registry-row">
+              <div className="hj-registry-ordinal hj-label" aria-hidden="true">
+                <MetalDot metal={material.handle} />
+                {ordinals[i]}
+              </div>
+
+              <div>
+                <h3 className="hj-registry-name">{material.title}</h3>
+                <p className="hj-spec hj-registry-designation">{material.designation}</p>
+              </div>
+
+              <div>
+                <p className="hj-registry-body">{material.body}</p>
+                <ul className="hj-chips" role="list">
+                  {materialChips(material).map((chip) => (
+                    <li key={chip} className="hj-spec hj-chip">
+                      {chip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
-
-      <div
-        className="hj-materials-row"
-        style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'flex',
-          flexDirection: 'row',
-          gap: 'clamp(24px, 3vw, 48px)',
-        }}
-      >
-        {hjMaterials.map((material, i) => (
-          <div
-            key={material.handle}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              paddingTop: '28px',
-              borderTop: '1px solid var(--ash)',
-            }}
-          >
-            {/* Ordinal rules — deliberately faint. Not content: the material
-                name below carries the meaning, and these are hidden from
-                assistive tech. WCAG 1.4.3 exempts pure decoration from the
-                contrast minimum, so `--ash` stays. `data-decorative` is what
-                e2e/a11y.spec.ts excludes, keeping the exemption explicit and
-                greppable rather than an unexplained axe failure. */}
-            <p
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '3rem',
-                fontWeight: 400,
-                color: 'var(--ash)',
-                lineHeight: 1,
-                margin: '0 0 16px',
-                letterSpacing: '0.02em',
-              }}
-              aria-hidden="true"
-              data-decorative
-            >
-              {ordinals[i]}
-            </p>
-
-            <h3
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '1.2rem',
-                fontWeight: 500,
-                letterSpacing: 'var(--tracking-name)',
-                color: 'var(--ink)',
-                margin: '0 0 6px',
-              }}
-            >
-              {material.title}
-            </h3>
-
-            <p
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: 'var(--text-xs)',
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: 'var(--titanium-text)',
-                margin: '0 0 16px',
-              }}
-            >
-              {material.subtitle}
-            </p>
-
-            <p
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontWeight: 400,
-                fontSize: 'var(--text-sm)',
-                color: 'var(--graphite)',
-                lineHeight: 1.7,
-                margin: '0 0 20px',
-              }}
-            >
-              {material.body}
-            </p>
-
-            {/* Pill badges: specification first, then any claim approved for this metal.
-                Today that second list is empty for all three — see hj-data.ts. */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {materialChips(material).map((prop) => (
-                <span
-                  key={prop}
-                  style={{
-                    display: 'inline-block',
-                    padding: '4px 12px',
-                    border: '1px solid var(--ash)',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: 'var(--text-xs)',
-                    letterSpacing: '0.08em',
-                    color: 'var(--graphite)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {prop}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <style>{`
-        @media (max-width: 768px) {
-          .hj-materials-row {
-            flex-direction: column !important;
-          }
-          .hj-materials-intro {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-          }
-          .hj-materials-photo {
-            width: 100% !important;
-          }
-        }
-      `}</style>
     </section>
   )
 }

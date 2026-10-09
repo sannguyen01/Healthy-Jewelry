@@ -85,3 +85,14 @@ right creative answer at all — as against typography integrated into the photo
 this brand's positioning would normally reach for — is a live question and deliberately not
 settled here. The ceiling exists so that question can be answered on its own timeline instead of
 being foreclosed by drift.
+
+## Amendment, 2026-10-09: the ceiling was recalibrated, by the rule above
+
+The Quiet Archive (ADR 051, B4) moved the headline from a 51–136px fluid size to the board's 36–60px,
+and set the card's buttons and eyebrow in the label voice. The card now measures **0.467** of the
+photograph at the 901px floor (0.426 at 1024px, 0.323 at 1440px, 0.182 at 2560px) and plateaus at
+465px, where it was 0.514 and 682px. The rule was never "0.60"; it was *today's maximum rounded up
+with one step of headroom*, so the ceiling is **0.55**. A ceiling left at 0.60 over a 0.467 card would
+have let it grow by more than a quarter before a check noticed, which is the drift this record exists
+to stop. The edit is the reviewed change the original asked for: the token, `CLAUDE.md`, the
+`doc-numeric-claims` row and the `hero-card-bound` sentinel move together.

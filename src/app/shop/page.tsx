@@ -24,7 +24,7 @@ export default async function ShopPage() {
     <>
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(BREADCRUMB_ITEMS)} />
       <Nav />
-      <main style={{ paddingTop: '64px' }}>
+      <main id="main" tabIndex={-1} style={{ paddingTop: '64px' }}>
         <Breadcrumbs items={BREADCRUMB_ITEMS} />
 
         {/* Section header */}
@@ -39,11 +39,12 @@ export default async function ShopPage() {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
               fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
-              lineHeight: 1.05,
+              lineHeight: 'var(--leading-display)',
             }}
           >
             The Collection
@@ -58,8 +59,9 @@ export default async function ShopPage() {
                 href={collection.href}
                 style={{
                   fontFamily: 'var(--font-ui)',
-                  fontSize: '0.75rem',
-                  letterSpacing: '0.18em',
+                  fontWeight: 500,
+                  fontSize: 'var(--text-xs)',
+                  letterSpacing: 'var(--tracking-label)',
                   textTransform: 'uppercase',
                   color: 'var(--ink)',
                   textDecoration: 'none',

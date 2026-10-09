@@ -139,7 +139,10 @@ test.describe('images match their containers', () => {
       for (const width of WIDTHS) {
         await visit(page, path, width)
         const rows = await page.evaluate(() =>
-          [...document.querySelectorAll('main img')].map((img) => {
+          // Not a brand mark: the care band's seal is an image beside the name in one container, a
+          // lockup rather than a photograph filling a frame, so its container's shape is not its own.
+          // visual-assets.spec.ts holds the mark to decoded, boxed, visible and transparent.
+          [...document.querySelectorAll('main img:not([data-brand-mark])')].map((img) => {
             const a = img.getBoundingClientRect()
             const c = (img.parentElement as HTMLElement).getBoundingClientRect()
             return {
@@ -200,7 +203,7 @@ test.describe('/shop product cards', () => {
           const media = a.querySelector('img, svg')
           const tile =
             (media?.parentElement as HTMLElement | null) ??
-            (a.querySelector('article')?.firstElementChild as HTMLElement | null) ??
+            (a.querySelector('.card-tile')?.firstElementChild as HTMLElement | null) ??
             (a as HTMLElement)
           const box = tile.getBoundingClientRect()
           const lines = ((a as HTMLElement).innerText ?? '')
@@ -466,6 +469,121 @@ test.describe('visible focus indicators', () => {
   }
 })
 
+/* ───────────────────────── 5b. a control's edge is visible ───────────────────────── */
+
+/**
+ * **A bordered control's edge clears 3:1 against what it sits on** (WCAG 1.4.11, ADR 051).
+ *
+ * `--ash` is the hairline: 1.32:1 on `--bg`, which is right for a divider and wrong for the edge of
+ * a button, a chip or an input, where it is the only thing that says "this is a control". The
+ * Quiet Archive board's answer is a separate token, `--outline`, at 3.48:1. A token test can prove
+ * the values; only a browser can see which one a control actually uses, so this measures it: for
+ * every visible control that draws a border, the border colour against the opaque surface behind it,
+ * unless the control is filled with a colour that is itself 3:1 against that surface (the ink
+ * button, an active chip). A control with no border is not judged: its text is its boundary.
+ */
+const EDGE_MIN = 3
+const EDGE_ROUTES = [{ path: '/' }, { path: '/shop' }, { path: '/contact' }, { path: '/search' }, { path: '/products/arc-hoops-titanium' }]
+
+interface EdgeRow {
+  label: string
+  edge: number | null
+  fill: number | null
+  detail: string
+}
+
+async function controlEdges(page: Page): Promise<EdgeRow[]> {
+  return page.evaluate(() => {
+    type Rgba = [number, number, number, number]
+    const parse = (value: string): Rgba | null => {
+      const m = value.match(/rgba?\(([^)]+)\)/)
+      if (!m) return null
+      const [r, g, b, a = 1] = m[1].split(/[ ,/]+/).filter(Boolean).map(Number)
+      return [r, g, b, a]
+    }
+    const over = (fg: Rgba, bg: Rgba): Rgba => {
+      const a = fg[3]
+      return [fg[0] * a + bg[0] * (1 - a), fg[1] * a + bg[1] * (1 - a), fg[2] * a + bg[2] * (1 - a), 1]
+    }
+    const lum = ([r, g, b]: Rgba) => {
+      const c = [r, g, b].map((v) => {
+        const x = v / 255
+        return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    }
+    const ratio = (a: Rgba, b: Rgba) => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+      return (hi + 0.05) / (lo + 0.05)
+    }
+    /** The first ancestor with an opaque fill, else the page's own. */
+    const surface = (el: Element): Rgba => {
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const bg = parse(getComputedStyle(p).backgroundColor)
+        if (bg && bg[3] >= 0.99) return bg
+      }
+      return parse(getComputedStyle(document.body).backgroundColor) ?? [255, 255, 255, 1]
+    }
+    const rows: EdgeRow[] = []
+    const selector = 'button, select, textarea, input:not([type=hidden]):not([type=checkbox]):not([type=radio]), a[class*="btn"]'
+    for (const el of document.querySelectorAll(selector)) {
+      const cs = getComputedStyle(el)
+      const box = el.getBoundingClientRect()
+      if (cs.display === 'none' || cs.visibility === 'hidden' || box.width === 0 || box.height === 0) continue
+      const width = Number.parseFloat(cs.borderTopWidth)
+      const border = parse(cs.borderTopColor)
+      const label = `<${el.tagName.toLowerCase()}> "${((el as HTMLElement).innerText || (el as HTMLInputElement).placeholder || el.getAttribute('aria-label') || '').trim().slice(0, 24)}"`
+      const behind = surface(el)
+      const fillColour = parse(cs.backgroundColor)
+      const fill = fillColour && fillColour[3] >= 0.99 ? ratio(fillColour, behind) : null
+      if (!(width > 0) || cs.borderTopStyle === 'none' || !border || border[3] === 0) {
+        rows.push({ label, edge: null, fill, detail: 'no border' })
+        continue
+      }
+      const edge = ratio(over(border, behind), behind)
+      rows.push({ label, edge, fill, detail: `${cs.borderTopColor} on rgb(${behind.slice(0, 3).map(Math.round).join(', ')})` })
+    }
+    return rows
+  })
+}
+
+const weakEdges = (rows: EdgeRow[]) =>
+  rows.filter((r) => r.edge !== null && r.edge < EDGE_MIN && !(r.fill !== null && r.fill >= EDGE_MIN))
+
+test.describe('control edges', () => {
+  for (const { path } of EDGE_ROUTES) {
+    test(`${path}: every bordered control's edge is at least ${EDGE_MIN}:1 against its surface`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: HEIGHT })
+      await page.goto(path)
+      await expect(page.locator('main')).toBeVisible()
+      await page.evaluate(() => document.fonts.ready)
+      await settle(page)
+      const rows = await controlEdges(page)
+      expect(rows.length, `${path}: no controls found, so nothing was judged`).toBeGreaterThan(0)
+      expect(rows.some((r) => r.edge !== null), `${path}: no bordered control found`).toBe(true)
+      expect(
+        weakEdges(rows).map((r) => `${r.label}: edge ${r.edge?.toFixed(2)}:1 (${r.detail})`),
+        'A control\'s edge is --outline (3.48:1), not --ash, the 1.32:1 hairline for dividers (ADR 051).'
+      ).toEqual([])
+    })
+  }
+
+  test('known-bad proof: a control edged in the hairline is flagged', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: HEIGHT })
+    await page.goto('/')
+    await expect(page.locator('main')).toBeVisible()
+    await page.evaluate(() => {
+      const button = document.createElement('button')
+      button.id = 'hj-known-bad-edge'
+      button.textContent = 'Known bad'
+      button.setAttribute('style', 'position:fixed;top:120px;left:20px;z-index:9999;padding:12px 24px;background:transparent;border:1px solid var(--ash)')
+      document.body.appendChild(button)
+    })
+    const flagged = weakEdges(await controlEdges(page)).map((r) => r.label)
+    expect(flagged.some((l) => l.includes('Known bad')), `the probe did not flag the hairline-edged control: ${flagged.join(' | ')}`).toBe(true)
+  })
+})
+
 /* ───────────────────────── 6. one h1 ───────────────────────── */
 
 test.describe('heading structure', () => {
@@ -485,10 +603,14 @@ test.describe('heading structure', () => {
  * Band, derived from the section TSX (not measured):
  *   gap(prev -> next) = padBottom(prev) + padTop(next) + borderBottom(prev) + borderTop(next)
  * with vertical padding per section (clamp(min, vw%, max), identical top and bottom):
- *   standard (materials, strip, collection-grid, follow-up) = --space-section 56/8vw/96
+ *   standard (materials, strip, collection-grid, follow-up) = --space-section 56/8vw/120
  *   editorial (care-band, real-moment) = --space-section-lg 96/12vw/160
- * Borders are read from computed style (strip bottom 1px, real-moment bottom 1px, follow-up
- * top 1px). Band = [sum - 1, sum + 1 + 2*INNER_SLACK_PX]. Lower edge: leaf content cannot sit
+ * Borders are read from computed style (every band but the dark one and the last draws a 1px
+ * hairline under it; ADR 051).
+ * A ruled row is content: the registry and the collection index close on a hairline, and the rule
+ * is as much of the section as the words above it, so an element's own painted top and bottom
+ * borders extend the content block (they used to be absent from the homepage, which had no ruled
+ * lists). Band = [sum - 1, sum + 1 + 2*INNER_SLACK_PX]. Lower edge: leaf content cannot sit
  * closer than the padding. Upper slack: the content block is measured from in-flow leaf
  * elements, and an inline leaf (e.g. .material-tag span) has a rect shorter than its line box,
  * so each side may add a few px. 8px per side is a guess to be tuned once, from the first run;
@@ -497,13 +619,13 @@ test.describe('heading structure', () => {
  * (RealMoment media: 40px) are neutralised in-page so layout, not animation, is measured.
  */
 const PAD_CLAMP: Record<string, [number, number, number]> = {
-  // --space-section: clamp(56px, 8vw, 96px); --space-section-lg: clamp(96px, 12vw, 160px)
-  materials: [56, 8, 96],
+  // --space-section: clamp(56px, 8vw, 120px); --space-section-lg: clamp(96px, 12vw, 160px)
+  materials: [56, 8, 120],
   'care-band': [96, 12, 160],
-  collection: [56, 8, 96],
-  strip: [56, 8, 96],
+  collection: [56, 8, 120],
+  strip: [56, 8, 120],
   'real-moment': [96, 12, 160],
-  'follow-up': [56, 8, 96],
+  'follow-up': [56, 8, 120],
 }
 const INNER_SLACK_PX = 8
 
@@ -546,6 +668,18 @@ test.describe('homepage vertical rhythm', () => {
               if (!inFlow(p)) skip = true
             }
             if (skip) continue
+            // A painted rule is content (see the band note above): a ruled row's closing hairline
+            // sits below its last word, and the section really does end there.
+            const own = getComputedStyle(e)
+            const ownBox = e.getBoundingClientRect()
+            if (own.display !== 'none' && own.visibility !== 'hidden' && ownBox.height > 0 && ownBox.width > 0) {
+              if (own.borderTopStyle !== 'none' && parseFloat(own.borderTopWidth) > 0) {
+                top = Math.min(top, ownBox.top + window.scrollY)
+              }
+              if (own.borderBottomStyle !== 'none' && parseFloat(own.borderBottomWidth) > 0) {
+                bottom = Math.max(bottom, ownBox.bottom + window.scrollY)
+              }
+            }
             const isLeaf =
               e.tagName.toLowerCase() === 'svg' || ![...e.children].some((c) => inFlow(c))
             if (!isLeaf) continue

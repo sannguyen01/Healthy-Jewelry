@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { describeWoff2, uncoveredCharacters } from '@/lib/design/fontFile'
+import { describeSfnt, describeWoff2, uncoveredCharacters } from '@/lib/design/fontFile'
 import { SITE_NAME } from '@/config/brand'
 
 /**
@@ -10,10 +10,9 @@ import { SITE_NAME } from '@/config/brand'
  * their own tables, not taken from their names. See `src/app/fonts/README.md` for why the site
  * self-hosts one latin slice of each family, and `src/lib/design/fontFile.ts` for the reader.
  *
- * Two families, each with one job:
- * - **Zen Kaku Gothic Antique** sets every role of the site's text (ADR 043);
- * - **Barlow Condensed** sets the brand name and nothing else: the typography it had before the
- *   Songmont reference, kept by the owner's ruling (ADR 048).
+ * The original pair (ADR 052), each a family of static instances:
+ * - **Barlow Condensed** is the display voice, 500, and sets the brand name, 400 and 500 (ADR 048);
+ * - **DM Sans** is everything else: 300 for running text, 500 for labels and emphasis.
  *
  * Each block here answers a question no other gate asks:
  * - is each file the weight `layout.tsx` tells the browser it is (a mislabelled file renders
@@ -29,10 +28,11 @@ const README = readFileSync(path.join(FONTS, 'README.md'), 'utf8')
 
 /** Each family the site ships, keyed by its files' prefix. */
 const FAMILIES = {
-  'zen-kaku-gothic-antique': {
-    family: 'Zen Kaku Gothic Antique',
-    copyright: /^Copyright \d{4} The Zen Project Authors/,
-    licence: 'OFL.txt',
+  // A static instance files itself under the optical size it was cut at ("DM Sans 9pt").
+  'dm-sans-9pt': {
+    family: 'DM Sans 9pt',
+    copyright: /^Copyright \d{4} The DM Sans Project Authors/,
+    licence: 'OFL-DMSans.txt',
   },
   'barlow-condensed': {
     family: 'Barlow Condensed',
@@ -66,8 +66,8 @@ describe('the font files are what layout.tsx says they are', () => {
     expect(declared.map((d) => `${familyOf(d.file)} ${d.weight}`).sort()).toEqual([
       'barlow-condensed 400',
       'barlow-condensed 500',
-      'zen-kaku-gothic-antique 400',
-      'zen-kaku-gothic-antique 500',
+      'dm-sans-9pt 300',
+      'dm-sans-9pt 500',
     ])
   })
 
@@ -82,7 +82,7 @@ describe('the font files are what layout.tsx says they are', () => {
   })
 
   it('every file is the family its name says', () => {
-    // Medium files itself under a legacy family name ("… Medium"), as families with more
+    // Barlow's Medium files itself under a legacy family name ("… Medium"), as families with more
     // than four styles do when they carry no typographic family (name ID 16).
     for (const { file, key, font } of fonts) expect(font.family.startsWith(FAMILIES[key].family), file).toBe(true)
   })
@@ -105,9 +105,9 @@ describe('provenance and licence', () => {
     }
   })
 
-  it.each(Object.values(FAMILIES).map((f) => [f.family, f.licence] as const))(
-    '%s: its OFL ships beside the files and reserves no font name',
-    (_family, licence) => {
+  it.each([...new Set(Object.values(FAMILIES).map((f) => f.licence))].map((licence) => [licence] as const))(
+    '%s ships beside the files and reserves no font name',
+    (licence) => {
       const ofl = path.join(FONTS, licence)
       expect(existsSync(ofl), licence).toBe(true)
       const text = readFileSync(ofl, 'utf8')
@@ -120,6 +120,49 @@ describe('provenance and licence', () => {
   )
 })
 
+describe('the share-card copies are the same faces as TrueType', () => {
+  // Satori reads TTF and not WOFF2, so the cards bundle these (README, "The share-card copies").
+  const PUBLIC = path.join(ROOT, 'public/fonts')
+  const CARD_FONTS = [
+    { file: 'barlow-condensed-500.ttf', family: /^Barlow Condensed/, weight: 500, key: 'barlow-condensed' as FamilyKey },
+    { file: 'dm-sans-9pt-300.ttf', family: /^DM Sans/, weight: 300, key: 'dm-sans-9pt' as FamilyKey },
+    { file: 'dm-sans-9pt-500.ttf', family: /^DM Sans/, weight: 500, key: 'dm-sans-9pt' as FamilyKey },
+  ]
+
+  it('public/fonts holds exactly the three TrueType cards and the three WOFF2 copies, nothing else', () => {
+    expect(readdirSync(PUBLIC).sort()).toEqual([
+      'barlow-condensed-500.ttf',
+      'barlow-condensed-latin-500.woff2',
+      'dm-sans-9pt-300.ttf',
+      'dm-sans-9pt-500.ttf',
+      'dm-sans-9pt-latin-300.woff2',
+      'dm-sans-9pt-latin-500.woff2',
+    ])
+  })
+
+  it.each(CARD_FONTS.map((f) => [f.file] as const))('%s matches the SHA-256 the README records', (file) => {
+    const digest = createHash('sha256').update(readFileSync(path.join(PUBLIC, file))).digest('hex')
+    const row = README.split('\n').find((line) => line.includes(`\`${file}\``) && line.includes('|'))
+    expect(row, `the README has no row for ${file}`).toBeDefined()
+    expect(README.split('\n').filter((line) => line.includes(`\`${file}\``) && line.includes(digest))).toHaveLength(1)
+  })
+
+  it.each(CARD_FONTS.map((f) => [f.file, f] as const))('%s is the family, weight, licence and copyright it claims', (file, expected) => {
+    const font = describeSfnt(readFileSync(path.join(PUBLIC, file)))
+    expect(font.family).toMatch(expected.family)
+    expect(font.weight).toBe(expected.weight)
+    expect(font.licenseUrl).toMatch(/scripts\.sil\.org\/OFL/)
+    expect(font.copyright).toMatch(FAMILIES[expected.key].copyright)
+  })
+
+  it.each(CARD_FONTS.map((f) => [f.file] as const))('%s draws printable ASCII and the typographic punctuation', (file) => {
+    const { codepoints } = describeSfnt(readFileSync(path.join(PUBLIC, file)))
+    let ascii = ''
+    for (let code = 0x20; code <= 0x7e; code++) ascii += String.fromCharCode(code)
+    expect(uncoveredCharacters(ascii + '\u2018\u2019\u201C\u201D\u2013\u2014\u2026\u00B7', codepoints)).toEqual([])
+  })
+})
+
 describe('the brand name\'s face draws the brand name', () => {
   // Its one job (ADR 048). Both cases: the logotype renders in capitals through CSS, and a
   // screen reader or a copy-paste meets the name as written.
@@ -128,20 +171,25 @@ describe('the brand name\'s face draws the brand name', () => {
   })
 })
 
-describe('the face draws every character the content can render', () => {
-  const coverage = ofFamily('zen-kaku-gothic-antique')[0].font.codepoints
+describe('the faces draw every character the content can render', () => {
+  // A character any one face lacks might be set in that face somewhere, so the safe set is the
+  // intersection. The latin slices are one unicode-range, so in practice they are near-equal.
+  const coverage: ReadonlySet<number> = fonts
+    .map((f) => f.font.codepoints)
+    .reduce((common, next) => new Set([...common].filter((cp) => next.has(cp))))
 
-  it('every weight covers the same characters, so coverage is one question', () => {
-    for (const { file, font } of ofFamily('zen-kaku-gothic-antique')) expect([...font.codepoints].sort(), file).toEqual([...coverage].sort())
-  })
-
-  it('covers printable ASCII', () => {
+  it('covers printable ASCII in every file', () => {
     let ascii = ''
     for (let code = 0x20; code <= 0x7e; code++) ascii += String.fromCharCode(code)
-    expect(uncoveredCharacters(ascii, coverage)).toEqual([])
+    for (const { file, font } of fonts) expect(uncoveredCharacters(ascii, font.codepoints), file).toEqual([])
   })
 
-  it('covers every string in src/content', () => {
+  it('covers typographic punctuation the copy uses: quotes, dashes, the ellipsis, the bullet, the euro', () => {
+    const punctuation = '\u2018\u2019\u201C\u201D\u2013\u2014\u2026\u2022\u20AC\u00B7\u00D7'
+    for (const { file, font } of fonts) expect(uncoveredCharacters(punctuation, font.codepoints), file).toEqual([])
+  })
+
+  it('covers every string in src/content, in every face', () => {
     const strings: string[] = []
     const collect = (value: unknown) => {
       if (typeof value === 'string') strings.push(value)

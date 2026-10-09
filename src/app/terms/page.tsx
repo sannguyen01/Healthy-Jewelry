@@ -16,9 +16,10 @@ export const metadata: Metadata = {
 
 const sectionHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-display)',
-  fontWeight: 400,
-  fontSize: 'var(--text-xl, 1.4rem)',
-  letterSpacing: 'var(--tracking-display)',
+  textTransform: 'uppercase',
+  fontWeight: 500,
+  fontSize: 'var(--text-xl)',
+  letterSpacing: 'var(--tracking-title)',
   color: 'var(--ink)',
   margin: '0 0 16px',
 }
@@ -27,8 +28,8 @@ const bodyStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  lineHeight: 1.75,
-  fontWeight: 400,
+  lineHeight: 'var(--leading-long)',
+  fontWeight: 300,
   margin: '0 0 16px',
 }
 
@@ -36,17 +37,20 @@ const listStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  lineHeight: 1.75,
-  fontWeight: 400,
+  lineHeight: 'var(--leading-long)',
+  fontWeight: 300,
   margin: '0 0 16px',
   paddingLeft: '24px',
+  // The stylesheet's reset removes list markers; an indented block of lines with none reads as
+  // a stray paragraph, not as the list it is.
+  listStyleType: 'disc',
 }
 
 export default function TermsPage() {
   return (
     <>
       <Nav />
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* Hero */}
         <section
           style={{
@@ -199,8 +203,10 @@ export default function TermsPage() {
               style={{
                 ...bodyStyle,
                 fontFamily: 'var(--font-display)',
-                fontSize: 'var(--text-lg, 1.1rem)',
-                letterSpacing: 'var(--tracking-display)',
+                textTransform: 'uppercase',
+                fontSize: 'var(--text-lg)',
+                lineHeight: 'var(--leading-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 fontWeight: 500,
               }}

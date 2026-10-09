@@ -344,6 +344,89 @@ test.describe('Header fit', () => {
     ).toBeLessThanOrEqual(BREAKPOINT_HEADROOM_MAX_PX)
   })
 
+  /**
+   * **The open menu has to fit the screen it is opened on, in height as well as in width.**
+   *
+   * Every probe above, and the drawer's control checks in `layout-invariants.spec.ts`, ask about
+   * *width*. Nothing asked about height, and the menu this guard was first written against
+   * (the dark overlay of six links at up to 72px on the body's 1.65 line-height, 2026-10-09) failed
+   * it on eight of twelve real screens: at 1440x900 the first link started at 14px, under the header,
+   * with its top half drawn over the brand name; at 1366x768 it started 52px *above the viewport*
+   * and the last ended 52px below it; on a landscape phone 219px above. That drawer had
+   * `overflow: visible`, so the part off the screen could be neither seen nor scrolled to, and
+   * `toBeVisible()` passed on all of them because the links were rendered. The ADR 016 predicate is
+   * containment, not rendering.
+   *
+   * The archive that replaced it scrolls and starts below the bar. This holds it there: at each real
+   * screen no control may start above the bottom of the header, and every control must end inside the
+   * viewport, or, on a screen too short for the menu, the drawer must scroll and the last control must
+   * be reachable by scrolling it. The sizes include the laptop heights (768, 720) and the small phones
+   * (667, 640, 568) that a tall list fails on first.
+   */
+  const MENU_SCREENS: Array<[number, number]> = [
+    [1920, 1080],
+    [1440, 900],
+    [1366, 768],
+    [1280, 720],
+    [1024, 768],
+    [768, 1024],
+    [844, 390],
+    [430, 932],
+    [390, 844],
+    [375, 667],
+    [360, 640],
+    [320, 568],
+  ]
+
+  test('the open menu fits the screen: no control under the header, none out of reach', async ({ page }) => {
+    const failures: string[] = []
+    for (const [width, height] of MENU_SCREENS) {
+      await page.setViewportSize({ width, height })
+      await page.goto('/about')
+      await page.getByRole('button', { name: /open menu/i }).click()
+      await expect(page.getByRole('dialog', { name: /mobile navigation/i })).toBeVisible()
+      // The archive rises 16px into place as the drawer opens; measure it where it rests.
+      await page.waitForFunction(() => {
+        const inner = document.querySelector('.hj-archive')
+        return inner !== null && ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(inner).transform)
+      })
+
+      const m = await page.evaluate(() => {
+        const header = (document.querySelector('header') as HTMLElement).getBoundingClientRect().bottom
+        const drawer = document.querySelector('.hj-menu-drawer') as HTMLElement
+        const controls = () =>
+          [...drawer.querySelectorAll('a[href], button, input')]
+            .map((el) => {
+              const r = el.getBoundingClientRect()
+              return { label: (el.textContent || el.getAttribute('aria-label') || el.getAttribute('name') || el.tagName).trim().slice(0, 24), top: r.top, bottom: r.bottom, height: r.height }
+            })
+            .filter((c) => c.height > 0)
+        drawer.scrollTop = 0
+        const atTop = controls()
+        const scrolls = ['auto', 'scroll'].includes(getComputedStyle(drawer).overflowY) && drawer.scrollHeight > drawer.clientHeight
+        drawer.scrollTop = drawer.scrollHeight
+        const atEnd = controls()
+        return { header, vh: window.innerHeight, atTop, atEnd, scrolls }
+      })
+
+      const where = `${width}x${height}`
+      const first = m.atTop[0]
+      if (first.top < m.header - 0.5)
+        failures.push(`${where}: "${first.label}" starts at ${first.top.toFixed(0)}px, above the header's bottom edge (${m.header.toFixed(0)}px)`)
+      const last = m.atTop[m.atTop.length - 1]
+      if (last.bottom > m.vh + 0.5) {
+        // Past the bottom: only acceptable if the drawer scrolls and the end of the menu can be reached.
+        const reachable = m.scrolls && m.atEnd[m.atEnd.length - 1].bottom <= m.vh + 0.5
+        if (!reachable)
+          failures.push(
+            `${where}: "${last.label}" ends at ${last.bottom.toFixed(0)}px, past the viewport (${m.vh}px)` +
+              (m.scrolls ? ', and scrolling the drawer does not bring it in' : ', and the drawer does not scroll')
+          )
+      }
+    }
+    expect(failures, failures.join('\n')).toEqual([])
+  })
+
   test('the mobile overlay carries everything the header sheds', async ({ page }) => {
     // Search is hidden from the header below 769px. That is only safe if it is
     // somewhere else, and nothing else in the suite would notice a control that

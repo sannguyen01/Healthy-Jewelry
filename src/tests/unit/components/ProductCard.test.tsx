@@ -135,7 +135,7 @@ describe('ProductCard', () => {
   })
 
   describe('className prop', () => {
-    it('appends custom className to the article', () => {
+    it('appends custom className to the card tile', () => {
       const { container } = render(
         <ProductCard product={baseProduct} className="my-custom-class" />
       )

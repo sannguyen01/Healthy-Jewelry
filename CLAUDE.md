@@ -19,11 +19,17 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 
 ## Tech Stack
 - Framework: Next.js 16, App Router, TypeScript (strict mode)
-- Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`)
-- Fonts: Zen Kaku Gothic Antique for every role of the site's text, and Barlow Condensed for the
-  brand name alone, both self-hosted (latin slice) from `src/app/fonts/`. Barlow Condensed + DM
-  Sans set everything until 2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md));
-  the name kept its face by the owner's ruling ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md))
+- Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`, Quiet Archive values)
+- Fonts: **the original pair**, self-hosted (latin slice) from `src/app/fonts/`: Barlow Condensed
+  for the display voice and the brand name, DM Sans for everything else
+  ([ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md)). They set everything until
+  2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md) replaced them with
+  one gothic family, and [ADR 051](docs/adr/051-three-voices-one-archive.md) tried a third); the owner
+  set both aside and the pair is back under the Quiet Archive's layout. The name keeps its face by the
+  owner's ruling ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md))
+- Architecture: **`docs/architecture.md`** is the map of the whole system, front end to back end (requirements, data
+  flow, the API table, the security boundary, caching, delivery, trade-offs). Read it before adding a route,
+  a service or a layer ([ADR 053](docs/adr/053-the-other-layers-and-the-tree-the-browser-reads.md)).
 - State: **none.** This said "Zustand (cart store)" until 2026-09-20; `src/store/` and the
   dependency both went with the bag. Nothing on this site holds client state across a
   navigation, which is a property worth keeping rather than an absence to fill.
@@ -31,30 +37,37 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Deployment: Vercel (auto-deploy on push to `main`)
 - Testing: Vitest + Testing Library (80%+ coverage required)
 
-## Design System — T4 (Pampas ground dominant)
+## Design System — T4, Quiet Archive values (alabaster ground dominant)
 
 | Token | Hex | Use |
 |-------|-----|-----|
-| `--bg` | #F3F2EC | Pampas ground (warm grey-beige) — dominant background |
-| `--nacre` | #EDEAE4 | Card tile background |
-| `--ash` | #D8D3CB | Borders, dividers |
-| `--graphite` | #4A4744 | Secondary text (the Tundora role) |
-| `--ink` | #1A1714 | Primary text, logo |
+| `--bg` | #FAF9F5 | Ground (warm alabaster) — dominant background |
+| `--subtle` | #F5F3ED | Alternate band |
+| `--nacre` | #ECE8E1 | Travertine: card tile and panel background |
+| `--bone` | #E4DFD5 | Chip |
+| `--ash` | #DFDACF | Hairline: dividers only, never a control edge |
+| `--outline` | #8A857D | Control edge (the WCAG floor for the boundary of a control) |
+| `--ink-2` | #5F5B55 | Secondary text: captions, spec rows |
+| `--graphite` | #3D3935 | Running text, and the dark hover of a button |
+| `--ink` | #1A1918 | Primary text, logo, the primary button |
 | `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
 | `--titanium-text` | #59636B | Titanium-toned **text** on light backgrounds |
 | `--sage` | #8CA89A | Green accent — borders, tints, fills. **Not text** |
 | `--sage-text` | #516159 | Sage-toned **text** on light backgrounds |
+| `--error-text` | #B3261E | A field's error message and a failed submit, on light surfaces |
+| `--metal-niobium` | #6F7FAE | A metal's finish as a provenance dot (anodized niobium). Decorative |
+| `--metal-steel` | #BCC1C5 | A metal's finish as a provenance dot (polished 316L). Decorative |
 | `--mist` | #A8A49E | Muted text — dark backgrounds only |
 | `--on-dark` | #F0EDE8 | Text on dark backgrounds |
-| `--black` | #0A0A0A | Campaign band dark |
-| `--mid` | #2C2926 | Dark hover states |
+| `--black` | #0A0A0A | The ground of the two icons whose platform cannot show transparency (tab, home screen), and the unused `CampaignBand` (held by a sentinel, ADR 051). Nothing a visitor sees on the site is `--black` |
 
 **Contrast rule**: the two chromatic accents are both below the WCAG AA 4.5:1 floor on `--bg` —
-`--titanium` at 2.18:1 and `--sage` at 2.29:1 — so each has a darkened sibling for text. Use
-`--titanium-text` (5.47:1) and `--sage-text` (5.84:1) for any accent-toned copy on a light surface;
+`--titanium` at 2.32:1 and `--sage` at 2.44:1 — so each has a darkened sibling for text. Use
+`--titanium-text` (5.83:1) and `--sage-text` (6.22:1) for any accent-toned copy on a light surface;
 the raw accents are fine for borders, tints, and (for `--titanium`) text on `--ink`/`--black`.
 Neither `-text` token is a general-purpose text colour: both fail on dark surfaces, where
-`--on-dark` and `--mist` apply.
+`--on-dark` and `--mist` apply. `--ash` is a divider at 1.32:1 and can never be the edge of a
+control; `--outline` is, at 3.48:1.
 
 This table is enforced too, not just the pairings: `design-tokens-contrast.test.ts` reads every
 hex above and every ratio in the paragraph above back out of this file and compares them against
@@ -72,15 +85,23 @@ option, because "unclassified" is how `--sage` shipped as 9–13px text at 1.97:
 - `--ease: cubic-bezier(0.16, 1, 0.3, 1)` (smooth spring)
 - `--ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00)` (sharp snap)
 
-### Typography
-One family sets every role of the site's text. The three tokens stay separate because they name
-**roles**, and the case rule keys on the role:
-- `--font-display` → headings, product and collection names, collection numbers, the menu
-  overlay's links. **Set in the case they are written in** (the catalogue writes Title Case),
-  **at a declared weight**, tracked with `--tracking-display` / `--tracking-name`.
-- `--font-ui` → nav controls, eyebrows, buttons, badges, metadata, the logotype. Small, and the
-  only role that may be set in tracked capitals.
-- `--font-body` → body text and descriptions.
+### Typography — the original pair (ADR 052)
+Two families, four tokens. The tokens name **roles**, and the case and weight rules key on the role:
+- `--font-display` → Barlow Condensed 500: headings, page titles, product, collection and metal
+  names, collection numbers, the menu's links. **Tracked capitals, at a declared weight**, tracked
+  with `--tracking-display` / `--tracking-title` / `--tracking-name` (looser as it gets smaller).
+- `--font-ui` → DM Sans 500: nav controls, eyebrows, buttons, badges, metadata. Small, and tracked
+  capitals too, in two steps: `--tracking-meta` for a datum beside a name (a specification, a tag, a
+  breadcrumb) and `--tracking-label` for everything read or pressed as a label. **Only capitals are
+  tracked**, and a `letter-spacing` is a token or nothing (`typography-tracking.test.ts`; the browser
+  half is in `e2e/rendered-fonts.spec.ts`).
+- **Size and leading are scales too.** A `font-size` is a `--text-*` token (what may set its own is named
+  in `typography-scale.test.ts`: the brand name, decorative numerals, a piece's name), never with a
+  fallback; a `line-height` is `--leading-display` (headings), `--leading-snug` (a name or one-line
+  label), `--leading-text` (running text) or `--leading-long` (long-form reading), and a heading does
+  not take a paragraph's. A form control is never set smaller than the base text size on a phone, or iOS zooms the page on focus.
+- `--font-body` → DM Sans 300: body text and descriptions. Emphasis (`strong`, `b`, `th`) is the 500
+  of the same family. Never capitals.
 - `--font-brand` → **the brand name, and nothing else**: the logotype in the header and the
   footer, in Barlow Condensed, the typography it had before the Songmont reference — 500 in the
   header, 400 in the footer, in tracked capitals. The owner's ruling (2026-10-04,
@@ -92,13 +113,12 @@ One family sets every role of the site's text. The three tokens stay separate be
 
 | Token | Font | Weights available |
 |-------|------|-------------------|
-| `--font-display` / `--font-ui` / `--font-body` | Zen Kaku Gothic Antique | **400, 500** |
-| `--font-brand` (the brand name only) | Barlow Condensed | **400, 500** |
+| `--font-display` / `--font-brand` | Barlow Condensed | **400, 500** |
+| `--font-ui` / `--font-body` | DM Sans | **300, 500** |
 
-There is deliberately **no 300**. Weight numbers do not carry between families: measured as ink
-per unit of text, this family's 300 lays down about half of what the DM Sans 300 it replaced did,
-and its 400 nearly all of it. Body copy and small labels are therefore 400, which is what keeps
-them as dark as they shipped (`src/app/fonts/README.md`).
+There is deliberately **no 400 in DM Sans**, and a request for one is not ignored: the nearest-weight
+rule answers it with the 500, so running text would be set in Medium with nothing in the stylesheet to
+say so. The test below fails on it. Running text is 300, as it was; labels and emphasis are 500.
 
 A weight with no downloaded face is not ignored — the browser *synthesises* it,
 smearing the strokes of the nearest face and distorting the letterforms, so the text reads as a
@@ -107,12 +127,12 @@ homepage's real 500. Enforced by `src/tests/unit/typography-weights.test.ts`, wh
 `--font-*` token back to its loader and fails on any weight that font does not ship. To use a heavier
 face, add its file to the `localFont` call in `src/app/layout.tsx` first.
 
-The same test fails a `--font-display` style that forces capitals or that **inherits** its weight.
-The second is not pedantry: twenty-seven headings inherited the body's 300 and rendered at 400
-only because Barlow Condensed had no 300 face; the first family with a real Light turned every
-one of them Light.
+The same test fails a `--font-display` or `--font-ui` style that does not force capitals, one that
+**inherits** its weight, and a `--font-body` style that forces capitals. The second is not pedantry:
+twenty-seven headings inherited the body's 300 and rendered at 400 only because Barlow Condensed had
+no 300 face; the first family with a real Light turned every one of them Light.
 
-**The face draws 219 characters, and nothing else renders in it.** Only the latin slice ships, so
+**The faces draw a little over two hundred characters, and nothing else renders in them.** Only the latin slice ships, so
 a character outside it — an arrow, a check mark — is drawn by the fallback face mid-line. Use what
 the slice has (`src/app/fonts/README.md`), or ship the slice that has it. Enforced over
 `src/content/**` by `font-files.test.ts` (which also reads each file's own weight class, licence
@@ -124,29 +144,29 @@ which face drew every text node on 48 page states: the faces were right, but the
 `<strong>` and `<th>` asked for 700 (faked bold), the footer tagline was italic on every page (a
 sheared upright gothic), the 410 page was set in `system-ui`, and one heading tier had two weights.
 So: `font-synthesis: none` on `<html>`; `strong, b, th` are 500 and `em, i, …` are upright; **nothing is
-italic**; **h1 is 500, display text at `--text-lg` or smaller is 500, larger display text is 400**
-(by size *token*, not computed size, because the tokens are `clamp()`s); a piece's name is
-`.hj-card-name`; **nothing is declared below `--text-xs`'s minimum** (0.7rem), so use the token; and a
-document outside the layout (the 410 page, `global-error.tsx`) declares the face itself from
-`src/lib/design/siteFace.ts`, whose two files in `public/fonts/` are the loader's, byte for byte.
-Enforced by `type-system-floor.test.ts`, the tier rule in `typography-weights.test.ts`, and
-`e2e/rendered-fonts.spec.ts`, which reads Chrome's own report of the face, weight, style and size used.
+italic**; **every display and label style is 500 and every running-text style 300**, declared;
+a piece's name is `.hj-card-name`; **nothing is declared below `--text-xs`'s minimum** (0.7rem), so
+use the token; and a document outside the layout (the 410 page, `global-error.tsx`) declares the faces
+itself from `src/lib/design/siteFace.ts`, whose files in `public/fonts/` are the loader's, byte for byte.
+Enforced by `type-system-floor.test.ts`, the weight and case rules in `typography-weights.test.ts`, and
+`e2e/rendered-fonts.spec.ts`, which reads Chrome's own report of the face, weight, style, size and case used.
 
 **Page titles use `PageHeader`** (`src/components/ui/PageHeader.tsx`) — never a hand-rolled `<h1>`.
 Two variants, chosen by what the page is for: `display` for brand/marketing routes (Our Story, Contact,
 Materials, Stores) and `compact` for utility/legal routes (FAQ, Shipping, Terms, Privacy, Legal). The
 homepage hero is the one exception, since it owns `--text-hero`.
 
-### Architecture — quiet editorial, referenced to Songmont
-The design reference is Songmont (the owner's choice, 2026-10-04; it was Gentle Monster before).
-**A reference, not a template** (the owner's ruling, 2026-10-04): take what suits Healthy
-Jewellery and leave what does not; much of it would not. Its typeface is not studied further,
-and the brand name keeps its own. What was verified about it, what was adopted, and what was
-decided from the language without the live page is in `DESIGN.md`, "Reference: Songmont" — read
-that before changing a token, a section or a card.
+### Architecture — the Quiet Archive, in the original typography
+The layout, palette and chrome are the Quiet Archive's ([ADR 051](docs/adr/051-three-voices-one-archive.md):
+a gallery ground, hairline structure, the archive menu, the registry-and-index homepage); the
+typography is the brand's original pair ([ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md)).
+Songmont, the reference before it (the owner's choice, 2026-10-04), was **a reference, not a template**
+(the owner's ruling, 2026-10-04): take what suits Healthy Jewellery and leave what does not. What was
+verified about it, what was adopted, and what was decided from the language without the live page is
+in `DESIGN.md`, "Reference: Songmont" — read that before changing a token, a section or a card.
 - Horizontal scroll strips on homepage (no product grids), each with a "View All" link
-- The Pampas ground (`--bg`) everywhere, with `--graphite` carrying secondary text in the
-  Tundora role
+- The alabaster ground (`--bg`) everywhere, with `--ink-2` carrying secondary text and
+  `--graphite` running text
 - Single dark interruption: the Care band (`CareSection`, ADR 040). The campaign band it
   replaced is gone
 - Nav: transparent over the hero → solid `--bg` with a hairline (scrollY > 60). Flat: no blur,
@@ -211,7 +231,8 @@ change all three together.
 1. Hero — **two compositions, breakpoint at 900px**:
    - **≥901px**: full-bleed. The "Euro Summer" lifestyle photo fills the entire section
      (`object-position: right center`), and the copy sits in its own opaque `--bg` card
-     (`.hj-hero-scrim`) sized to wrap the text plus padding — not a section-spanning rectangle.
+     (`.hj-hero-scrim`, a hairline and the frame radius, at the foot of the photograph) sized to wrap
+     the text plus padding — not a section-spanning rectangle.
      Because the card wraps its own content instead of being measured/positioned independently,
      there is no separate width to keep in sync with the text column, which is what caused the
      scrim-drift regressions in commits a4cfb9c/b1e5178/c55962a. The card is opaque rather than
@@ -227,19 +248,28 @@ change all three together.
      shrinking the same composition.
    - Enforced across seven widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
      photograph without the card behind it.
-   - The card is also **bounded**: `--hj-hero-card-max-ratio` (0.60) caps it at a fraction of the
+   - The card is also **bounded**: `--hj-hero-card-max-ratio` (0.55) caps it at a fraction of the
      photograph's own rendered box, because every other guardrail here is satisfied better the
      larger the card gets and so none of them push back. Enforced as `max-width` and asserted as
      both a width and an occluded-area ratio. See
      [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md) before widening it.
-2. MaterialsSection — Grade 23 Ti / Niobium / 316L Steel
-3. CareSection — "Care & Craft", copy through the claims registry. **The page's single dark
-   interruption** (`--black` / `--on-dark` / `--mist`, all contrast-tested), placed beside the
-   materials it follows and inside the first half of the page.
-4. HorizontalScroll — "CURATED PIECES" (4–6 items, bestsellers then new arrivals, deduplicated)
-5. CollectionGrid — 5 collection paths (Charms and Earrings tiles use real photography; Rings/Necklaces/Bracelets still use the SVG placeholder pending photos)
+2. MaterialsSection — a **registry** of the three metals (Grade 23 Ti / Niobium / 316L Steel): a left
+   column with a link to `/materials`, and on the right one ruled row per metal (ordinal and
+   provenance dot, name and designation, description and specification chips, all from `hjMaterials`).
+3. CareSection — "Care & Craft", copy through the claims registry, then "Ask an ambassador". **The
+   page's single dark interruption** (`--ink` / `--on-dark` / `--mist`, all contrast-tested), with the
+   knot and the name as its seal (`BrandSeal`), placed beside the materials it follows and inside the
+   first half of the page.
+4. HorizontalScroll — "The pieces" / "Curated pieces" (4–6 items, bestsellers then new arrivals,
+   deduplicated)
+5. CollectionGrid — **two photographs and an index**: the collections that have a photograph
+   (earrings and charms) are the two features, and the index lists all five collection paths in the
+   menu's own order, so a collection without a photograph is a row, not a placeholder.
 6. RealMoment — "The Moment"
 7. FollowUp — links come from `SOCIAL_LINKS`, never a generic domain
+
+Every beat is a `.hj-band` (a ground, the section rhythm and a hairline under it) laid on the
+twelve-column `.hj-grid`; the dark band and the last band draw no hairline.
 
 Then the Footer, which is site chrome rather than a beat (it was numbered 8 under "seven beats").
 
@@ -265,7 +295,7 @@ ways, clipping, spread across ratios, buy-control position) and
 
 ## Architecture Principles
 - Server Components by default; `'use client'` only for interactive elements
-- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
+- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer), `home/` (page sections), `product/` (product components), `contact/` (the form), `analytics/` (the measurement-preferences control), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
 - **Content**: `src/content/catalog/**` — 17 product records and 5 collection records, as
   reviewed JSON. This is the **only** product data source.
 - **Reader**: `src/lib/catalog/**` — the only runtime access layer. `schema.ts` validates
@@ -332,6 +362,8 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - Named + default exports on all components
 - Run `pnpm lint && pnpm build` before every commit
 - Run `pnpm test` — maintain 80%+ coverage
+- When an instruction has two readings and a large revert on each, **ask before acting** (ADR 052): the owner's
+  "keep current designs, I just want to change the typography" was first read the wrong way round and reverted a design.
 - Commit format: `feat|fix|docs|style|content|test|refactor|perf|chore: description` — the same
   types `.github/PULL_REQUEST_TEMPLATE.md` lists (the two disagreed about `docs`, `refactor`
   and `perf` until 2026-10-04)
@@ -340,7 +372,7 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 Full detail in **`docs/testing-strategy.md`**. In short:
 
 - **`verify`** (lint · type-check · unit · build, ~2 min) is the merge gate.
-- **`e2e`** (Playwright, both projects, ~3–5 min) runs on every PR and blocks.
+- **`e2e`** (Playwright, both projects, about seven minutes on CI) runs on every PR and blocks.
 - `vitest` coverage is scoped to `src/lib`, `src/store`, `src/config` on purpose — **E2E is the only
   automated coverage the UI layer has.** Anything a user has to see or click belongs in `e2e/`.
 - Presence is not visibility. `e2e/visual-assets.spec.ts` asserts imagery actually renders — bytes
@@ -348,6 +380,15 @@ Full detail in **`docs/testing-strategy.md`**. In short:
 - **And absence is invisible to both.** Every per-image check passes on zero images: the logo
   was missing from the header and footer for the whole redesign, and everything stayed green.
   `e2e/visual-assets.spec.ts` now asserts the marks are *there*.
+- **axe reads the DOM; a screen reader is handed the accessibility tree.** `e2e/a11y.spec.ts` scans every page at
+  every impact level, in the states a visitor reaches, **and** reads the tree through the protocol: every piece
+  link on the listing pages had no accessible name (an `<article>` inside the `<a>`) while axe passed all of them.
+  A new interactive element is checked in the tree, not only by axe ([ADR 053](docs/adr/053-the-other-layers-and-the-tree-the-browser-reads.md)).
+- **A function with a unit test is not a feature; the page's output is.** `organizationJsonLd()` was tested for weeks and
+  rendered by no page. Assert what the served page contains (`e2e/metadata.spec.ts`), not only what the builder returns.
+- **Every design layer is a token with a guard**: colour, motion, layers, elevation, space, shape and breakpoints in
+  `design-layers.test.ts`, type in `typography-*.test.ts`. A new value is a token first, then a use. When the look of
+  something changes, measure what is rendered (face, weight, size, leading, tracking) before and after.
 - **A page can be measured before it arrives.** The root `loading.tsx` fallback can still be on
   screen when `page.goto` resolves, with the real page in a hidden streamed segment; a probe that
   measured then saw zero-sized boxes and passed. `settle()` waits for the reveal, and a probe
@@ -393,5 +434,5 @@ Full detail in **`docs/testing-strategy.md`**. In short:
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand
 - ~~Healing, mystical, spiritual copy~~
 - ~~"HealingBadge", "StoneCard"~~ — use Badge, ProductCard
-- ~~Dark background as default~~ — the Pampas ground (`--bg`) is dominant
+- ~~Dark background as default~~ — the alabaster ground (`--bg`) is dominant
 - ~~Product grids on homepage~~ — horizontal scroll strips only

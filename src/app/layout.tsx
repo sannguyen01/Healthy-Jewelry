@@ -6,42 +6,35 @@ import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
 /**
- * One family for every role — display, UI and body — except the brand's own name, which keeps
- * its original face (`barlowCondensed`, below). Songmont's identity sets everything in
- * one family, the FW Tsukiji Gothic family (DESIGN.md, "Reference: Songmont"). Zen Kaku
- * Gothic Antique is its closest openly licensed relative, an antique gothic with the same
- * classical, brush-softened strokes.
+ * **The original pair, self-hosted** (ADR 052): Barlow Condensed for the display voice and the brand
+ * name, DM Sans for everything else. It is the typography the brand had before the Songmont
+ * reference (ADR 043) and before the Quiet Archive's first trial of three voices (ADR 051), which
+ * the owner set aside on 2026-10-09: the design stays, the typography goes back. Provenance,
+ * licence and hashes for every file: `src/app/fonts/README.md`.
  *
- * Self-hosted, and only the *latin* slice: Google serves this CJK family as 121 slices per
- * weight, and `next/font/google` downloads every one of them at build time to serve the one
- * a Latin page uses. The two files here are 9.7 KB each. There is no 300: weight numbers do
- * not carry between families, and this one's 300 carries about half the ink DM Sans 300 did
- * (globals.css, `body`), so the 300 role became 400. The characters they cover are the
- * characters the site may render — `e2e/glyph-coverage.spec.ts` fails on any other, since a
- * missing glyph silently renders in the fallback face. Provenance and licence:
- * `src/app/fonts/README.md`; `font-files.test.ts` reads each file's own tables to hold the
- * weights declared here to the weights the files actually are.
- */
-const zenKakuGothicAntique = localFont({
-  src: [
-    { path: './fonts/zen-kaku-gothic-antique-latin-400.woff2', weight: '400', style: 'normal' },
-    { path: './fonts/zen-kaku-gothic-antique-latin-500.woff2', weight: '500', style: 'normal' },
-  ],
-  display: 'swap',
-  variable: '--font-zk',
-  fallback: ['Helvetica Neue', 'Arial', 'sans-serif'],
-})
-
-/**
- * **The brand name keeps the typography it was given before the Songmont reference.** It is the
- * owner's ruling (2026-10-04, ADR 048), not a lapse in "one family": Songmont is a reference
- * for the site, not a template for the brand, and the logotype is the brand. Barlow Condensed
- * sets the name as it did before: 500 in the header, 400 in the footer, in tracked capitals.
+ * - **Barlow Condensed, 400 and 500** (`--font-display`, `--font-brand`): headings, page titles,
+ *   piece and collection names, the menu's links and the logotype, set in tracked capitals. The
+ *   500 is the display weight; the 400 is the footer's name (ADR 048).
+ * - **DM Sans, 300 and 500** (`--font-body`, `--font-ui`): running text at 300, as it always was,
+ *   and every label, control and badge at 500. There is no 400 file and nothing asks for one:
+ *   `typography-weights.test.ts` fails on a weight these files are not, because a weight with no
+ *   face is not ignored, it is faked.
  *
- * Used by `--font-brand` and nothing else: `typography-weights.test.ts` fails if the token
- * reaches any rule but the logotype's, so the second family cannot spread back into the
- * site's text. Self-hosted latin slice for the same reasons as the family above; provenance,
- * licence and hashes in `src/app/fonts/README.md`.
+ * Each file is a *fixed instance* of a variable family, as Google Fonts serves them through `css2`
+ * (`opsz,wght@14,300`): static, one weight, latin slice only, about 14 KB. Only the characters the
+ * slice draws: `e2e/glyph-coverage.spec.ts` fails on any other, since a missing glyph silently
+ * renders in the fallback face. `font-files.test.ts` reads each file's own tables to hold the
+ * weights declared here to the weights the files are.
+ *
+ * **Fallback names are written into the CSS unquoted**, so a name with a digit in it ("Bodoni 72")
+ * is not an identifier sequence and invalidates the whole `font-family` list at computed-value
+ * time: every `var(--font-display)` then computes to `unset` and the heading inherits the body's
+ * face, silently, with nothing in the stylesheet to say so (measured 2026-10-09). Every name below
+ * is plain identifiers; `typography-weights.test.ts` holds that, and `rendered-fonts.spec.ts`
+ * holds each role to its face.
+ *
+ * Everything is preloaded: the bar and the hero need both families on the first paint, and the
+ * total is smaller than the pair it replaces.
  */
 const barlowCondensed = localFont({
   src: [
@@ -51,6 +44,16 @@ const barlowCondensed = localFont({
   display: 'swap',
   variable: '--font-bc',
   fallback: ['Arial Narrow', 'Helvetica Neue', 'Arial', 'sans-serif'],
+})
+
+const dmSans = localFont({
+  src: [
+    { path: './fonts/dm-sans-9pt-latin-300.woff2', weight: '300', style: 'normal' },
+    { path: './fonts/dm-sans-9pt-latin-500.woff2', weight: '500', style: 'normal' },
+  ],
+  display: 'swap',
+  variable: '--font-dm',
+  fallback: ['Helvetica Neue', 'Arial', 'sans-serif'],
 })
 
 /**
@@ -117,7 +120,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#F3F2EC',
+  themeColor: '#FAF9F5',
 }
 
 /**
@@ -135,12 +138,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${zenKakuGothicAntique.variable} ${barlowCondensed.variable}`}
+      className={[barlowCondensed, dmSans].map((f) => f.variable).join(' ')}
       style={
         {
-          '--font-display': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
-          '--font-ui': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
-          '--font-body': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
+          '--font-display': 'var(--font-bc, "Barlow Condensed", "Arial Narrow", sans-serif)',
+          '--font-body': 'var(--font-dm, "DM Sans", sans-serif)',
+          '--font-ui': 'var(--font-dm, "DM Sans", sans-serif)',
           '--font-brand': 'var(--font-bc, "Barlow Condensed", "Arial Narrow", sans-serif)',
         } as React.CSSProperties
       }
@@ -159,6 +162,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="hj-build" content={buildStamp()} />
       </head>
       <body>
+        {/* WCAG 2.4.1: the first stop of every page, off screen until it takes focus. */}
+        <a href="#main" className="btn-primary hj-skip">
+          Skip to content
+        </a>
         {children}
         {/* Asks once, then never again. Nothing is measured until it is answered. */}
         <ConsentBanner />

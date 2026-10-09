@@ -127,7 +127,7 @@ export default function FAQPage() {
   return (
     <>
       <Nav />
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* Hero */}
         <section
           style={{
@@ -168,8 +168,9 @@ export default function FAQPage() {
               <p
                 style={{
                   fontFamily: 'var(--font-ui)',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xs)',
-                  letterSpacing: '0.22em',
+                  letterSpacing: 'var(--tracking-label)',
                   textTransform: 'uppercase',
                   color: 'var(--titanium-text)',
                   marginBottom: '32px',
@@ -196,8 +197,9 @@ export default function FAQPage() {
                     <h2
                       style={{
                         fontFamily: 'var(--font-display)',
-                        fontSize: 'var(--text-lg, 1.1rem)',
-                        letterSpacing: 'var(--tracking-display)',
+                        textTransform: 'uppercase',
+                        fontSize: 'var(--text-lg)',
+                        letterSpacing: 'var(--tracking-title)',
                         color: 'var(--ink)',
                         margin: '0 0 14px',
                         fontWeight: 500,
@@ -210,8 +212,8 @@ export default function FAQPage() {
                         fontFamily: 'var(--font-body)',
                         fontSize: 'var(--text-base)',
                         color: 'var(--graphite)',
-                        lineHeight: 1.75,
-                        fontWeight: 400,
+                        lineHeight: 'var(--leading-long)',
+                        fontWeight: 300,
                         margin: 0,
                       }}
                     >
@@ -233,9 +235,11 @@ export default function FAQPage() {
             <p
               style={{
                 fontFamily: 'var(--font-display)',
-                fontWeight: 400,
-                fontSize: 'var(--text-xl, 1.3rem)',
-                letterSpacing: 'var(--tracking-display)',
+                textTransform: 'uppercase',
+                fontWeight: 500,
+                fontSize: 'var(--text-xl)',
+                lineHeight: 'var(--leading-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: '0 0 12px',
               }}
@@ -247,8 +251,8 @@ export default function FAQPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.7,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
                 margin: '0 0 20px',
               }}
             >

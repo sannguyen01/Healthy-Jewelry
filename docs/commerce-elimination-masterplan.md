@@ -394,7 +394,7 @@ production-build E2E, then preview probes.
 |---|---|---|---|
 | 1 | `main` refuses a pull request with a failing required check | `probe-merge-denial.mjs` against a canary, `denied` | **met** 2026-10-03 07:56 UTC: #98 `denied`, closed unmerged, after the 05:00 conclusive read-back. It failed on 2026-10-02 (#94 merged). It holds for the ruleset version it ran against |
 | 2 | A clean clone builds and tests without commerce credentials | CI on a fresh runner | met, except the webhook's mock secret |
-| 3 | The register is empty under the phase rule | `verify:commerce-contract`, phase `complete` | 35 rows (one added 2026-10-03: a sentinel on the retained receiver, leaving with it) |
+| 3 | The register is empty under the phase rule | `verify:commerce-contract`, phase `complete` | 36 rows (one added 2026-10-03: a sentinel on the retained receiver, leaving with it; one added 2026-10-09: the architecture map names that receiver, leaving with it) |
 | 4 | Source, lockfile, build output, browser traffic and server calls show no commerce dependency | scanner, `auditPackages`, artifact scan, egress fixture, server harness | met, except the retained route |
 | 5 | Every legacy path and the checkout host give the approved answer | retired-route matrix; live-surface probe | paths met; host waits on WS-E |
 | 6 | No environment holds an unnecessary commerce variable | `vercel env ls` per runbook | none in the project, per the owner's 2026-10-02 read; shared bindings and a dated per-environment record still owed (WS-D) |

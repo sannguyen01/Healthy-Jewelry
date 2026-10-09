@@ -144,11 +144,12 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
               fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
-              lineHeight: 1.05,
+              lineHeight: 'var(--leading-display)',
             }}
           >
             {product.title}
@@ -167,9 +168,10 @@ export function ProductDetail({ product }: ProductDetailProps) {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
                 color: 'var(--graphite)',
-                letterSpacing: '0.1em',
+                letterSpacing: 'var(--tracking-meta)',
                 textTransform: 'uppercase',
               }}
             >
@@ -181,10 +183,10 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <p
             style={{
               fontFamily: 'var(--font-body)',
-              fontWeight: 400,
+              fontWeight: 300,
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
+              lineHeight: 'var(--leading-long)',
               marginTop: '16px',
             }}
           >
@@ -223,16 +225,17 @@ export function ProductDetail({ product }: ProductDetailProps) {
               flexWrap: 'wrap',
               gap: '12px',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'flex-start',
               paddingTop: '8px',
               listStyle: 'none',
               margin: 0,
               paddingLeft: 0,
             }}
           >
-            {/* A designation is case-sensitive — Ti-6Al-4V is not TI-6AL-4V — so it is the
-                one note not set in capitals. */}
-            <li style={{ ...NOTE_STYLE, textTransform: 'none' }}>{notes.designation}</li>
+            {/* A designation is case-sensitive — Ti-6Al-4V is not TI-6AL-4V — so it cannot be
+                a label. It is set as running text (body voice, 300, untracked), not as a 500
+                label with capitals switched off, which was tracked mixed case. */}
+            <li style={DESIGNATION_STYLE}>{notes.designation}</li>
             {notes.standard !== null && <li style={NOTE_STYLE}>{notes.standard}</li>}
             {notes.claims.map((claim) => (
               <li key={claim} style={NOTE_STYLE}>
@@ -246,11 +249,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
   )
 }
 
+const DESIGNATION_STYLE: React.CSSProperties = {
+  fontFamily: 'var(--font-body)',
+  fontWeight: 300,
+  fontSize: 'var(--text-sm)',
+  color: 'var(--titanium-text)',
+}
+
 const NOTE_STYLE: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
+  fontWeight: 500,
   fontSize: 'var(--text-xs)',
   color: 'var(--titanium-text)',
-  letterSpacing: '0.16em',
+  letterSpacing: 'var(--tracking-label)',
   textTransform: 'uppercase',
 }
 

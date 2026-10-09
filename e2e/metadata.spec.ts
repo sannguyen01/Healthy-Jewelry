@@ -150,3 +150,33 @@ test.describe('Search', () => {
     await expect(page.locator('a[href^="/products/"]')).toHaveCount(0)
   })
 })
+
+/**
+ * `organizationJsonLd()` and `webSiteJsonLd()` were written, unit-tested and rendered by no page: the
+ * Organization logo "fix" of 2026-10-04 corrected a function nothing called, so the site told search engines
+ * nothing about who it is. A builder is not the same as a page that calls it, so this reads the served home page.
+ */
+test.describe('Structured data on the home page', () => {
+  test('names the organisation, with a raster logo, and the website, with its search action', async ({ page }) => {
+    await page.goto('/')
+    const blocks = await page
+      .locator('script[type="application/ld+json"]')
+      .evaluateAll((els) => els.map((el) => JSON.parse(el.textContent ?? '{}') as Record<string, unknown>))
+    const org = blocks.find((b) => b['@type'] === 'Organization') as { name?: string; logo?: string } | undefined
+    const site = blocks.find((b) => b['@type'] === 'WebSite') as
+      | { potentialAction?: { target?: { urlTemplate?: string } } }
+      | undefined
+    expect(org?.name, 'an Organization block with a name').toBeTruthy()
+    expect(org?.logo, 'its logo is a raster, which search engines can show').toMatch(/^https?:\/\/.+\.png$/)
+    expect(site?.potentialAction?.target?.urlTemplate, 'a WebSite block that can be searched').toContain(
+      '/search?q={search_term_string}'
+    )
+  })
+
+  test('says nothing about price, availability or a claim', async ({ page }) => {
+    await page.goto('/')
+    const text = (await page.locator('script[type="application/ld+json"]').allTextContents()).join(' ')
+    expect(text).not.toMatch(/"(offers|price|priceCurrency|availability)"/)
+  })
+})
+

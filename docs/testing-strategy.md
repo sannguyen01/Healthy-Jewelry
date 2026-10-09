@@ -333,10 +333,24 @@ place.
 - **A dead control.** The header search button rendered correctly, was keyboard-focusable, had a
   correct `aria-label`, and had no `onClick`. It shipped that way. No unit test could see it; the
   component rendered exactly as written.
-- **WCAG AA contrast failures.** `--titanium` (#9DA7AF) is 2.18:1 on `--bg` — used as 10-12px body copy
+- **WCAG AA contrast failures.** `--titanium` (#9DA7AF) is 2.32:1 on `--bg` — used as 10-12px body copy
   in nine places. Two were on the homepage, where axe found them.
 
 Neither is a crash. Both are the kind of defect that quietly costs conversions.
+
+### What a screen reader is handed is not what axe reads
+
+`axe` reads the DOM's text. A screen reader is handed the browser's **accessibility tree**, and the two
+disagreed: every piece link on the listing pages had no accessible name in Chrome's tree (an `<article>` inside
+the `<a>`) while axe passed all of them. `e2e/a11y.spec.ts` therefore does both, on every page route and in
+both projects: `axe` at every impact level (WCAG 2.1 and 2.2 AA plus best practice, with the consent notice up and
+once answered, with the menu open, with the contact form in error), and `Accessibility.getFullAXTree` through the
+protocol, failing on any link or control with no name. It also holds the skip link (the first Tab stop, landing in
+`main`) and one `<h1>` per page. The consent notice mounts after hydration, so the spec waits for it rather than
+counting once. See [ADR 053](adr/053-the-other-layers-and-the-tree-the-browser-reads.md).
+
+A function with a unit test is not a feature: `organizationJsonLd()` was tested and rendered by no page, so
+`e2e/metadata.spec.ts` reads the served home page for its structured data.
 
 ### What the browser drew is not what the CSS asked for
 
@@ -346,7 +360,10 @@ loaded. `e2e/rendered-fonts.spec.ts` asks what Chrome *used*, node by node, thro
 with what the CSS requested. That is the only place a faked bold, a sheared italic or a system font
 shows, because in each the computed `font-family` is correct. It covers 16 routes (the 404 and the 410
 included) and the open menu, in both projects, and fails on a face that is not ours, a weight outside
-400 and 500, a non-normal style, or text below the label floor. Placeholders are not text nodes, so form controls
+400 and 500, a non-normal style, text below the label floor, a label (DM Sans 500) that is not in
+capitals, running text (DM Sans 300) that is tracked or set at a leading other than the two reading ones,
+display text (Barlow Condensed) set at a leading other than the three close ones, or a form control set
+smaller than the base text size on a phone. Placeholders are not text nodes, so form controls
 are held to inheriting the page's family instead. Its two races, both found writing it, are the phone
 footer collapsing after hydration and a page measured before it arrived (ADR 042). See
 [ADR 050](adr/050-one-face-means-no-borrowed-ones.md).
@@ -528,16 +545,12 @@ pnpm exec playwright test -g "search"       # one test by name
 
 ## Recorded exceptions
 
-**Decorative ordinals are excluded from the axe contrast check.**
-`src/components/home/MaterialsSection.tsx` renders oversized `01 / 02 / 03` numerals in `--ash`
-(1.36:1 on `--bg`). They are deliberately faint, `aria-hidden="true"`, and convey nothing the adjacent
-material heading does not. WCAG 1.4.3 exempts pure decoration from the contrast minimum.
-
-axe cannot infer intent, so those nodes carry `data-decorative` and `e2e/a11y.spec.ts` excludes that
-selector — a narrow attribute match, never a blanket `[aria-hidden="true"]` exclusion, which would also
-hide genuine failures inside hidden subtrees.
-
-This is written down so it stays a decision someone made, rather than a permanently red check.
+**There are no axe exclusions.** Until ADR 051 (B4) the homepage's oversized `01 / 02 / 03` ordinals
+were `--ash` on `--bg`, well under the text-contrast floor, `aria-hidden`, and excluded by a narrow
+`[data-decorative]` selector under WCAG 1.4.3's exemption for pure decoration. They are now `--ink-2`
+text in the label voice, which clears the floor like any other text, so the selector and the attribute
+were deleted rather than left as an escape hatch nothing needs. A new exemption is a decision: write it here, with the element, the criterion and who
+decided, before it is added to `e2e/a11y.spec.ts`.
 
 ---
 
@@ -552,7 +565,7 @@ documented pairing, rather than 25 minutes into E2E against whatever happens to 
 pages the a11y spec visits.
 
 `--titanium` is the accent token: borders, tints, fills, and text on dark surfaces (7.29:1 on `--ink`).
-`--titanium-text` (#59636B, 5.47:1 on `--bg`) is what carries titanium-toned text on light surfaces.
+`--titanium-text` (#59636B, 5.83:1 on `--bg`) is what carries titanium-toned text on light surfaces.
 The test asserts that `--titanium` **fails** AA on `--bg`, so the reason the second token exists is
 itself part of the contract.
 

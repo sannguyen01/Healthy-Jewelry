@@ -16,9 +16,10 @@ export const metadata: Metadata = {
 
 const sectionHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-display)',
-  fontWeight: 400,
-  fontSize: 'var(--text-xl, 1.4rem)',
-  letterSpacing: 'var(--tracking-display)',
+  textTransform: 'uppercase',
+  fontWeight: 500,
+  fontSize: 'var(--text-xl)',
+  letterSpacing: 'var(--tracking-title)',
   color: 'var(--ink)',
   margin: '0 0 16px',
 }
@@ -27,8 +28,8 @@ const bodyStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  lineHeight: 1.75,
-  fontWeight: 400,
+  lineHeight: 'var(--leading-long)',
+  fontWeight: 300,
   margin: '0 0 16px',
 }
 
@@ -36,10 +37,13 @@ const listStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  lineHeight: 1.75,
-  fontWeight: 400,
+  lineHeight: 'var(--leading-long)',
+  fontWeight: 300,
   margin: '0 0 16px',
   paddingLeft: '24px',
+  // The stylesheet's reset removes list markers; an indented block of lines with none reads as
+  // a stray paragraph, not as the list it is.
+  listStyleType: 'disc',
 }
 
 const tableStyle: React.CSSProperties = {
@@ -66,7 +70,7 @@ const thStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
   fontSize: 'var(--text-xs)',
   fontWeight: 500,
-  letterSpacing: '0.16em',
+  letterSpacing: 'var(--tracking-label)',
   textTransform: 'uppercase',
   color: 'var(--graphite)',
   textAlign: 'left' as const,
@@ -79,7 +83,7 @@ const tdStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  fontWeight: 400,
+  fontWeight: 300,
   padding: `14px ${CELL_PAD_X}`,
   borderBottom: '1px solid var(--ash)',
 }
@@ -88,7 +92,7 @@ export default function ShippingPage() {
   return (
     <>
       <Nav />
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* Hero */}
         <section
           style={{
@@ -103,9 +107,11 @@ export default function ShippingPage() {
           <p
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
-              fontSize: 'var(--text-xl, 1.3rem)',
-              letterSpacing: 'var(--tracking-display)',
+              textTransform: 'uppercase',
+              fontWeight: 500,
+              fontSize: 'var(--text-xl)',
+              lineHeight: 'var(--leading-display)',
+              letterSpacing: 'var(--tracking-title)',
               color: 'var(--titanium-text)',
               margin: 0,
             }}
@@ -153,7 +159,12 @@ export default function ShippingPage() {
               Shipping is free on every piece, wherever it is going. No minimum, no handling fees.
             </p>
 
-            <div style={tableWrapStyle}>
+            <div
+              role="region"
+              aria-label="Delivery times and costs by destination"
+              tabIndex={0}
+              style={tableWrapStyle}
+            >
               <table style={tableStyle}>
                 <thead>
                   <tr>

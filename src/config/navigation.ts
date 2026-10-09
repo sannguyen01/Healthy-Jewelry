@@ -100,6 +100,17 @@ export const collectionsNav: CollectionNav[] = [
   },
 ]
 
+// ── The menu archive ───────────────────────────────────────────────────────
+// The open menu is an archive of three columns (ADR 051): the categories, the metallurgy and
+// the places to go. The first is the collections plus a way to all of them, built from the same
+// list the footer and the shop use; the third is `mainNav` whole, so a destination added there
+// appears in the header's menu without a second edit (`header-fit.spec.ts` holds the overlay to it).
+
+export const archiveCategories: NavLink[] = [
+  { label: 'All pieces', href: '/shop' },
+  ...collectionsNav.map((collection) => ({ label: collection.title, href: collection.href })),
+]
+
 // ── Footer groups ──────────────────────────────────────────────────────────
 // The footer's disclosure groups, built from the same lists the header and drawer use so a
 // destination is added or removed in one place.

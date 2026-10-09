@@ -96,7 +96,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
       />
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
-      <main style={{ paddingTop: '64px' }}>
+      <main id="main" tabIndex={-1} style={{ paddingTop: '64px' }}>
         <Breadcrumbs items={breadcrumbItems} />
 
         {/* Collection header */}
@@ -115,34 +115,36 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           {/* Decorative number — bottom-right, large, very faint */}
           <span
             aria-hidden="true"
+            className="hj-ghost-numeral"
+            data-numeral={COLLECTION_NUMBERS[handle] ?? '01'}
             style={{
               position: 'absolute',
               bottom: '-0.1em',
               right: 'var(--space-gutter)',
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'clamp(8rem, 20vw, 18rem)',
-              letterSpacing: '-0.02em',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--ash)',
               opacity: 0.35,
               lineHeight: 1,
               pointerEvents: 'none',
               userSelect: 'none',
             }}
-          >
-            {COLLECTION_NUMBERS[handle] ?? '01'}
-          </span>
+          />
 
           <span className="label-eyebrow">{col?.description ?? 'Collection'}</span>
 
           <h1
             style={{
               fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
               fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
-              lineHeight: 1.02,
+              lineHeight: 'var(--leading-display)',
               margin: 0,
               position: 'relative',
               zIndex: 1,
@@ -156,8 +158,8 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
-              lineHeight: 1.6,
-              fontWeight: 400,
+              lineHeight: 'var(--leading-text)',
+              fontWeight: 300,
               margin: 0,
               maxWidth: '480px',
               position: 'relative',
@@ -180,8 +182,9 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           <span
             style={{
               fontFamily: 'var(--font-ui)',
+              fontWeight: 500,
               fontSize: 'var(--text-xs)',
-              letterSpacing: '0.14em',
+              letterSpacing: 'var(--tracking-label)',
               textTransform: 'uppercase',
               color: 'var(--graphite)',
             }}

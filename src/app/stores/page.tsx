@@ -16,7 +16,7 @@ export default function StoresPage() {
   return (
     <>
       <Nav />
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* Hero */}
         <section
           style={{
@@ -33,8 +33,8 @@ export default function StoresPage() {
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
-              lineHeight: 1.7,
-              fontWeight: 400,
+              lineHeight: 'var(--leading-long)',
+              fontWeight: 300,
               maxWidth: '560px',
               margin: 0,
             }}
@@ -74,8 +74,9 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
-                letterSpacing: '0.22em',
+                letterSpacing: 'var(--tracking-label)',
                 textTransform: 'uppercase',
                 color: 'var(--titanium-text)',
                 marginBottom: '20px',
@@ -86,9 +87,10 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
-                fontWeight: 400,
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: 'var(--tracking-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: '0 0 20px',
               }}
@@ -102,8 +104,8 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
                 margin: '0 0 16px',
               }}
             >
@@ -116,8 +118,8 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
                 margin: 0,
               }}
             >
@@ -129,8 +131,9 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
-                letterSpacing: '0.22em',
+                letterSpacing: 'var(--tracking-label)',
                 textTransform: 'uppercase',
                 color: 'var(--titanium-text)',
                 marginBottom: '20px',
@@ -141,9 +144,10 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
-                fontWeight: 400,
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: 'var(--tracking-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: '0 0 20px',
               }}
@@ -157,8 +161,8 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
                 margin: '0 0 16px',
               }}
             >
@@ -170,8 +174,8 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
                 margin: 0,
               }}
             >
@@ -200,8 +204,9 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
-                letterSpacing: '0.22em',
+                letterSpacing: 'var(--tracking-label)',
                 textTransform: 'uppercase',
                 color: 'var(--graphite)',
                 margin: 0,
@@ -212,9 +217,10 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
-                fontWeight: 400,
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: 'var(--tracking-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: 0,
               }}
@@ -226,8 +232,8 @@ export default function StoresPage() {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
-                lineHeight: 1.75,
-                fontWeight: 400,
+                lineHeight: 'var(--leading-long)',
+                fontWeight: 300,
                 margin: 0,
               }}
             >

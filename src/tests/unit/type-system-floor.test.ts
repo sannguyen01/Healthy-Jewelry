@@ -7,11 +7,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import GlobalError from '@/app/global-error'
 import { renderGonePage } from '@/lib/http/goneResponse'
-import { SITE_FACE_FAMILY, SITE_FACE_FILES, SITE_FACE_FONT_FACE_CSS, SITE_FACE_STACK } from '@/lib/design/siteFace'
+import { SITE_FACES, SITE_FACE_FILES, SITE_FACE_FONT_FACE_CSS, SITE_STACKS } from '@/lib/design/siteFace'
 
 /**
  * **The browser draws only what the site shipped, and nothing the site draws is smaller than its
- * smallest label.** ([ADR 050](../../../docs/adr/050-one-face-means-no-borrowed-ones.md))
+ * smallest label.** ([ADR 050](../../../docs/adr/050-one-face-means-no-borrowed-ones.md), carried
+ * over to the three voices by ADR 051)
  *
  * A measurement of what Chrome actually used to draw every piece of text on 48 page states
  * (CDP `CSS.getPlatformFontsForNode`, 2026-10-09) found no fallback face under any text node: the
@@ -77,8 +78,9 @@ describe('nothing is synthesised', () => {
     expect(ruleBody('html')).toMatch(/font-synthesis:\s*none/)
   })
 
-  it('asks for the shipped weight where the browser default asks for 700', () => {
+  it('asks for the shipped weight where the browser default asks for 700, in the file that has it', () => {
     expect(ruleBody('strong, b, th')).toMatch(/font-weight:\s*500/)
+    expect(ruleBody('strong, b, th')).toMatch(/font-family:\s*var\(--font-body\)/)
   })
 
   it('asks for upright where the browser default asks for italic', () => {
@@ -120,19 +122,30 @@ describe('a document outside the layout names no system face', () => {
     expect(named).toEqual([])
   })
 
-  it('sets the 410 page in the site face, declared by the page itself', () => {
+  it('sets the 410 page in the site faces, declared by the page itself', () => {
     const html = renderGonePage({ title: 'Gone', heading: 'This page is gone.', paragraphs: ['x'] })
     expect(html).toContain(SITE_FACE_FONT_FACE_CSS)
-    expect(html).toContain(`font-family: ${SITE_FACE_STACK}`)
+    expect(html).toContain(`font-family: ${SITE_STACKS.body}`)
+    expect(html).toContain(`h1 { font-family: ${SITE_STACKS.display}`)
     expect(html).toContain('font-synthesis: none')
     expect(html).not.toMatch(SYSTEM)
   })
 
-  it('sets the root error boundary in the site face, with a button that inherits it', () => {
+  it('sets the 410 page\'s leading on the site\'s leading scale, as literals (it has no stylesheet)', () => {
+    const html = renderGonePage({ title: 'Gone', heading: 'This page is gone.', paragraphs: ['x'] })
+    const scale = new Set([...GLOBALS.matchAll(/--leading-[a-z]+:\s*([\d.]+);/g)].map((m) => m[1]))
+    const used = [...html.matchAll(/line-height:\s*([\d.]+)/g)].map((m) => m[1])
+    expect(scale.size, 'globals.css defines the leading tokens').toBe(4)
+    expect(used.length, 'the page sets a leading for its body and its heading').toBe(2)
+    expect(used.filter((v) => !scale.has(v)), 'a leading that is not one of the four').toEqual([])
+  })
+
+  it('sets the root error boundary in the site faces, with a button that names the label voice', () => {
     const html = renderToStaticMarkup(createElement(GlobalError, { error: new Error('x'), reset: () => {} }))
     expect(html).toContain('@font-face')
-    expect(html).toContain(SITE_FACE_FAMILY)
-    expect(html).toMatch(/<button[^>]*font-family:inherit/)
+    for (const { family } of SITE_FACES) expect(html, family).toContain(family)
+    // A <button> does not inherit a font, so it names one; the attribute is HTML-escaped.
+    expect(html).toMatch(/<button[^>]*font-family:(&quot;|")DM Sans/)
     expect(html).not.toMatch(SYSTEM)
   })
 })
@@ -140,15 +153,20 @@ describe('a document outside the layout names no system face', () => {
 describe('the copies those documents load are the loader\'s files', () => {
   const sha = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex')
 
-  it('serves exactly the two weights the site ships', () => {
-    expect(SITE_FACE_FILES.map((f) => f.weight)).toEqual([400, 500])
-    expect(SITE_FACE_FONT_FACE_CSS.match(/@font-face/g)).toHaveLength(2)
+  it('serves one face per voice, at a weight the site ships', () => {
+    expect(SITE_FACE_FILES.map((f) => f.voice)).toEqual(['display', 'body', 'label'])
+    expect(SITE_FACE_FILES.map((f) => f.weight)).toEqual([500, 300, 500])
+    expect(SITE_FACE_FONT_FACE_CSS.match(/@font-face/g)).toHaveLength(3)
     expect(SITE_FACE_FONT_FACE_CSS).toContain('font-display:swap')
   })
 
-  it.each(SITE_FACE_FILES)('public$url is byte-identical to the loader\'s weight $weight', ({ url, weight }) => {
+  it('names no installed font in any stack: each ends in a generic keyword', () => {
+    for (const stack of Object.values(SITE_STACKS)) expect(stack).toMatch(/, (serif|sans-serif)$/)
+  })
+
+  it.each(SITE_FACE_FILES)('public$url is byte-identical to the loader\'s $file', ({ url, file }) => {
     const served = path.join(ROOT, 'public', url)
-    const loader = path.join(SRC, 'app/fonts', `zen-kaku-gothic-antique-latin-${weight}.woff2`)
+    const loader = path.join(SRC, 'app/fonts', file)
     expect(sha(served)).toBe(sha(loader))
   })
 })
@@ -188,7 +206,10 @@ describe('the label size is a floor', () => {
 
   it('sees the sizes it judges, so the floor is not checked against nothing', () => {
     const sizes = literalSizes()
-    expect(sizes.length).toBeGreaterThan(20)
+    // Fewer than it once read: `typography-scale.test.ts` now holds literals to a short named list (the
+    // brand name, the decorative numerals, a piece's name, the share cards' own pixels), so the number
+    // seen here fell from dozens to a dozen. It is a check that the reader still finds some.
+    expect(sizes.length).toBeGreaterThan(8)
     expect(Math.max(...sizes.map((s) => s.px))).toBeGreaterThan(100)
   })
 

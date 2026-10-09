@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ProductCard } from '@/components/product/ProductCard'
@@ -97,7 +98,7 @@ async function SearchResults({ query }: { query: string }) {
           event={{ name: 'search_performed', resultCount: results.length, facets: searchFacets(query) }}
         />
       )}
-      <main
+      <main id="main" tabIndex={-1}
         style={{
           backgroundColor: 'var(--bg)',
           color: 'var(--ink)',
@@ -112,9 +113,7 @@ async function SearchResults({ query }: { query: string }) {
             borderBottom: '1px solid var(--ash)',
           }}
         >
-          <p className="label-eyebrow" style={{ marginBottom: '20px' }}>
-            Search
-          </p>
+          <PageHeader title="Search" variant="compact" style={{ marginBottom: '16px' }} />
 
           <form
             method="get"
@@ -137,10 +136,10 @@ async function SearchResults({ query }: { query: string }) {
                 fontSize: 'var(--text-base)',
                 color: 'var(--ink)',
                 backgroundColor: 'var(--nacre)',
-                border: '1px solid var(--ash)',
+                border: '1px solid var(--outline)',
                 borderRight: 'none',
                 outline: 'none',
-                fontWeight: 400,
+                fontWeight: 300,
               }}
             />
             <button
@@ -150,8 +149,9 @@ async function SearchResults({ query }: { query: string }) {
                 backgroundColor: 'var(--ink)',
                 color: 'var(--bg)',
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
-                letterSpacing: '0.16em',
+                letterSpacing: 'var(--tracking-label)',
                 textTransform: 'uppercase',
                 border: 'none',
                 cursor: 'pointer',
@@ -168,7 +168,7 @@ async function SearchResults({ query }: { query: string }) {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
-                fontWeight: 400,
+                fontWeight: 300,
                 marginTop: '16px',
               }}
             >
@@ -198,9 +198,10 @@ async function SearchResults({ query }: { query: string }) {
               <p
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontWeight: 400,
+                  textTransform: 'uppercase',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xl)',
-                  letterSpacing: 'var(--tracking-display)',
+                  letterSpacing: 'var(--tracking-title)',
                   color: 'var(--graphite)',
                   margin: '0 0 24px',
                 }}
@@ -212,7 +213,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 400,
+                  fontWeight: 300,
                   margin: '0 0 32px',
                 }}
               >
@@ -238,9 +239,10 @@ async function SearchResults({ query }: { query: string }) {
               <p
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontWeight: 400,
+                  textTransform: 'uppercase',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xl)',
-                  letterSpacing: 'var(--tracking-display)',
+                  letterSpacing: 'var(--tracking-title)',
                   color: 'var(--ink)',
                   margin: '0 0 16px',
                 }}
@@ -252,7 +254,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 400,
+                  fontWeight: 300,
                   margin: '0 0 32px',
                 }}
               >
@@ -270,9 +272,10 @@ async function SearchResults({ query }: { query: string }) {
               <p
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontWeight: 400,
+                  textTransform: 'uppercase',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xl)',
-                  letterSpacing: 'var(--tracking-display)',
+                  letterSpacing: 'var(--tracking-title)',
                   color: 'var(--ink)',
                   margin: '0 0 16px',
                 }}
@@ -285,7 +288,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 400,
+                  fontWeight: 300,
                   margin: '0 0 8px',
                 }}
               >
@@ -349,7 +352,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       <Suspense
         key={query}
         fallback={
-          <main
+          // Not a `<main>`, and with no `id="main"`: while the results stream, the page and this fallback
+          // are both in the document, and two main landmarks (and two ids the skip link targets) are one
+          // too many. A status region says what it is.
+          <div
+            role="status"
             style={{
               backgroundColor: 'var(--bg)',
               minHeight: '100vh',
@@ -362,15 +369,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
-                letterSpacing: '0.16em',
+                letterSpacing: 'var(--tracking-label)',
                 textTransform: 'uppercase',
                 color: 'var(--graphite)',
               }}
             >
               Loading…
             </p>
-          </main>
+          </div>
         }
       >
         <SearchResults query={query} />
