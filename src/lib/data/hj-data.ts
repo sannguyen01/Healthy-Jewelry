@@ -37,11 +37,6 @@ export interface HJMaterial {
   handle: string
   title: string
   subtitle: string
-  /**
-   * The short specification line the menu and the materials registry set under the name
-   * ("Ti-6Al-4V ELI"): what the metal is, in the words the files already use. Never a claim.
-   */
-  designation: string
   body: string
   /** Specification facts about the metal — always rendered. Never a claim. */
   properties: string[]
@@ -79,7 +74,6 @@ export const hjMaterials: HJMaterial[] = [
     handle: 'titanium',
     title: 'Grade 23 Titanium',
     subtitle: 'Titanium alloy',
-    designation: 'Ti-6Al-4V ELI',
     body: 'Titanium alloyed with aluminum and vanadium, in its Extra Low Interstitial grade — the alloy family used in aerospace structures. About 45% lighter than steel.',
     properties: ['Ti-6Al-4V ELI', '45% lighter than steel'],
     claims: ['implant-grade', 'hypoallergenic', 'saltwater-resistant', 'colour-stability', 'mri-safe'],
@@ -88,7 +82,6 @@ export const hjMaterials: HJMaterial[] = [
     handle: 'niobium',
     title: 'Niobium',
     subtitle: 'Anodized',
-    designation: 'Anodized surface',
     body: 'A refractory metal, colored by anodizing: the process grows a thin oxide layer on the surface, and that layer is the color — no pigment, no dye, no coating.',
     properties: ['Pigment-free color', 'Anodized finish'],
     claims: ['nickel-free', 'biocompatible', 'anodized-permanence'],
@@ -97,7 +90,6 @@ export const hjMaterials: HJMaterial[] = [
     handle: 'surgical-steel',
     title: '316L Surgical Steel',
     subtitle: 'Low-carbon stainless',
-    designation: 'Low-carbon stainless',
     body: 'The low-carbon grade of 316 stainless steel — the L in 316L stands for low carbon. It takes a mirror polish.',
     properties: ['Low-carbon spec', 'Polishable'],
     claims: ['corrosion-resistance', 'fda-recognised'],

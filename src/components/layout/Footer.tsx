@@ -16,14 +16,12 @@ function tagline(): string {
   return claimText('brand-positioning', { kind: 'site' })
 }
 
-// The board's column head: a label in ink-2, not a second paragraph colour (ADR 051).
 const columnHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
-  fontWeight: 500,
-  fontSize: 'var(--text-label)',
+  fontSize: 'var(--text-xs)',
   letterSpacing: 'var(--tracking-label)',
   textTransform: 'uppercase' as const,
-  color: 'var(--ink-2)',
+  color: 'var(--graphite)',
 }
 
 const linkStyle: React.CSSProperties = {
@@ -163,10 +161,10 @@ export function Footer() {
         >
           <span
             style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: '0.75rem',
-              lineHeight: 1.5,
-              color: 'var(--ink-2)',
+              fontFamily: 'var(--font-ui)',
+              fontSize: 'var(--text-xs)',
+              letterSpacing: 'var(--tracking-label)',
+              color: 'var(--titanium-text)',
             }}
           >
             {/* The registered company, not the display name: see LEGAL_ENTITY_NAME. */}
@@ -181,17 +179,7 @@ export function Footer() {
             underneath, since it opens something rather than going anywhere.
           */}
           <MeasurementPreferences
-            style={{
-              ...linkStyle,
-              fontSize: '0.75rem',
-              lineHeight: 1.5,
-              // 12px of type on a 1.5 line is 18px: 13px above and below clears the 44px target.
-              padding: '13px 0',
-              color: 'var(--ink-2)',
-              textDecoration: 'underline',
-              textUnderlineOffset: '3px',
-              textAlign: 'left',
-            }}
+            style={{ ...linkStyle, textDecoration: 'none', textAlign: 'left' }}
           />
           <span
             style={{

@@ -333,7 +333,7 @@ place.
 - **A dead control.** The header search button rendered correctly, was keyboard-focusable, had a
   correct `aria-label`, and had no `onClick`. It shipped that way. No unit test could see it; the
   component rendered exactly as written.
-- **WCAG AA contrast failures.** `--titanium` (#9DA7AF) is 2.32:1 on `--bg` — used as 10-12px body copy
+- **WCAG AA contrast failures.** `--titanium` (#9DA7AF) is 2.18:1 on `--bg` — used as 10-12px body copy
   in nine places. Two were on the homepage, where axe found them.
 
 Neither is a crash. Both are the kind of defect that quietly costs conversions.
@@ -552,7 +552,7 @@ documented pairing, rather than 25 minutes into E2E against whatever happens to 
 pages the a11y spec visits.
 
 `--titanium` is the accent token: borders, tints, fills, and text on dark surfaces (7.29:1 on `--ink`).
-`--titanium-text` (#59636B, 5.83:1 on `--bg`) is what carries titanium-toned text on light surfaces.
+`--titanium-text` (#59636B, 5.47:1 on `--bg`) is what carries titanium-toned text on light surfaces.
 The test asserts that `--titanium` **fails** AA on `--bg`, so the reason the second token exists is
 itself part of the contract.
 

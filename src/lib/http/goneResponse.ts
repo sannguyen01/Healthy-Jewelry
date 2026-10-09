@@ -74,13 +74,13 @@ export function renderGonePage(copy: GoneCopy): string {
   :root { color-scheme: light dark; font-synthesis: none; }
   body {
     margin: 0; min-height: 100vh; display: grid; place-items: center;
-    background: #FAF9F5; color: #1A1918;
+    background: #F3F2EC; color: #1A1714;
     font-family: ${SITE_STACKS.body};
     line-height: 1.6; padding: 24px;
   }
   main { max-width: 34rem; }
   h1 { font-family: ${SITE_STACKS.title}; font-size: 1.75rem; font-weight: 400; line-height: 1.2; margin: 0 0 1rem; letter-spacing: -0.01em; }
-  p { margin: 0 0 1rem; color: #3D3935; }
+  p { margin: 0 0 1rem; color: #4A4744; }
   a { color: #59636B; }
 </style>
 </head>

@@ -32,7 +32,7 @@ const FIELD_VALIDATORS: Record<keyof FormFields, (value: string) => string | nul
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '14px 16px',
-  border: '1px solid var(--outline)',
+  border: '1px solid var(--ash)',
   backgroundColor: 'transparent',
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',

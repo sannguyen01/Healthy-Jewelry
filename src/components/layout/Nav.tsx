@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import { useScrolled } from '@/lib/hooks/useScrolled'
+import { mainNav } from '@/config/navigation'
 import { BrandLockup } from '@/components/layout/BrandLockup'
-import { MenuArchive } from '@/components/layout/MenuArchive'
 
 export function Nav() {
   const router = useRouter()
@@ -34,29 +34,15 @@ export function Nav() {
     const header = headerRef.current
     if (!drawer || !menuBtn || !header) return
 
-    // The archive carries a search field as well as links and a button, and a Tab cycle that skipped
-    // it would walk past the one control that takes text.
-    const FOCUSABLE = 'a[href], button, input:not([type=hidden]), select, textarea'
     const cycle = (): HTMLElement[] => [
-      ...Array.from(header.querySelectorAll<HTMLElement>(FOCUSABLE)),
-      ...Array.from(drawer.querySelectorAll<HTMLElement>(FOCUSABLE)),
+      ...Array.from(header.querySelectorAll<HTMLElement>('a[href], button')),
+      ...Array.from(drawer.querySelectorAll<HTMLElement>('a[href], button')),
     ]
 
-    // Focus the first link once the drawer is actually focusable. The archive mounts with the open
-    // state, and for a moment its links compute `visibility: hidden` (the drawer's own transition
-    // has not reached them yet), so one `focus()` at a fixed delay is silently ignored. Measured: the
-    // first attempt at 60ms found the link hidden. So try again until focus has landed.
-    let attempts = 0
-    let focusTimer = 0
-    const focusFirstLink = () => {
-      const target = drawer.querySelector<HTMLElement>('a[href]')
-      target?.focus()
-      if (target && document.activeElement !== target && attempts < 12) {
-        attempts += 1
-        focusTimer = window.setTimeout(focusFirstLink, 50)
-      }
-    }
-    focusTimer = window.setTimeout(focusFirstLink, 50)
+    const focusTimer = window.setTimeout(
+      () => drawer.querySelector<HTMLElement>('a[href]')?.focus(),
+      50
+    )
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -100,16 +86,7 @@ export function Nav() {
             onClick={() => setMenuOpen((v) => !v)}
             className="hj-menu-btn"
           >
-            {menuOpen ? (
-              <svg className="hj-menu-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg className="hj-menu-icon" width="18" height="12" viewBox="0 0 18 12" fill="none" aria-hidden="true">
-                <path d="M1 2h16M1 10h16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-            )}
-            <span>{menuOpen ? 'CLOSE' : 'MENU'}</span>
+            {menuOpen ? 'CLOSE' : 'MENU'}
           </button>
         </div>
 
@@ -155,9 +132,28 @@ export function Nav() {
         aria-hidden={!menuOpen}
         inert={!menuOpen}
       >
-        {/* Mounted only while open: a closed menu is a hidden page of links, a form and a paragraph on
-            every route, and the specs that look for "the first form on the page" found it. */}
-        {menuOpen && <MenuArchive onNavigate={closeMenu} />}
+        <div className="hj-menu-drawer-inner">
+          {mainNav.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={closeMenu}
+              className="hj-menu-link"
+            >
+              {item.label}
+            </Link>
+          ))}
+          <button
+            type="button"
+            className="hj-menu-link hj-menu-search"
+            onClick={() => {
+              closeMenu()
+              router.push('/search')
+            }}
+          >
+            Search
+          </button>
+        </div>
       </div>
     </>
   )

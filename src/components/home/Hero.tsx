@@ -174,7 +174,7 @@ export function Hero({ headlineLines }: HeroProps) {
                 transition: 'background-color 0.25s var(--ease)',
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--graphite)'
+                ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--mid)'
               }}
               onMouseLeave={(e) => {
                 ;(e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--ink)'

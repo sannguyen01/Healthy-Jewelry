@@ -21,8 +21,8 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
       </head>
       <body
         style={{
-          backgroundColor: '#FAF9F5',
-          color: '#1A1918',
+          backgroundColor: '#F3F2EC',
+          color: '#1A1714',
           margin: 0,
           fontFamily: SITE_STACKS.body,
           fontSynthesis: 'none',
@@ -43,7 +43,7 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
             fontSize: '0.8125rem',
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
-            color: '#5F5B55',
+            color: '#4A4744',
             margin: 0,
           }}
         >
@@ -64,7 +64,7 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
           onClick={reset}
           style={{
             padding: '12px 28px',
-            border: '1px solid #1A1918',
+            border: '1px solid #1A1714',
             backgroundColor: 'transparent',
             fontFamily: SITE_STACKS.label,
             fontWeight: 500,

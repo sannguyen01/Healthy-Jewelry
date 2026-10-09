@@ -683,16 +683,6 @@ export const SENTINELS = [
     scar: 'A didone is drawn for its size: its hairlines are fine at display sizes and break up at the size of a piece\'s name. Static instances make an optical size a file, so which cut a rule uses is a function of its size token, and a wrong pairing renders as a heading that looks thin or a name that looks heavy with nothing in the CSS to say why (ADR 051).',
   },
   {
-    id: 'control-edge-visible',
-    runner: 'playwright',
-    file: 'src/components/contact/ContactForm.tsx',
-    find: "  border: '1px solid var(--outline)',\n  backgroundColor: 'transparent',",
-    replace: "  border: '1px solid var(--ash)',\n  backgroundColor: 'transparent',",
-    specs: ['e2e/layout-invariants.spec.ts'],
-    invariant: 'every bordered control draws its edge at 3:1 or more against the surface it sits on',
-    scar: 'The hairline is 1.32:1 on the ground, right for a divider and invisible as the edge of an input or a button. Before the Quiet Archive every control used it, and no token test could see which token a component named; the dark ghost button on the contact page was found by the probe at 2.22:1 the first time it ran (ADR 051).',
-  },
-  {
     id: 'font-synthesis-off',
     runner: 'vitest',
     file: 'src/app/globals.css',

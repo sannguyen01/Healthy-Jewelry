@@ -284,54 +284,40 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--titanium` at 2.32:1',
-    claimed: '2.32',
+    context: '`--titanium` at 2.18:1',
+    claimed: '2.18',
     actual: () => ratioOnBg('titanium').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--sage` at 2.44:1',
-    claimed: '2.44',
+    context: '`--sage` at 2.29:1',
+    claimed: '2.29',
     actual: () => ratioOnBg('sage').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--titanium-text` (5.83:1)',
-    claimed: '5.83',
+    context: '`--titanium-text` (5.47:1)',
+    claimed: '5.47',
     actual: () => ratioOnBg('titanium-text').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--sage-text` (6.22:1)',
-    claimed: '6.22',
+    context: '`--sage-text` (5.84:1)',
+    claimed: '5.84',
     actual: () => ratioOnBg('sage-text').toFixed(2),
-  },
-  {
-    // The two ends of the Quiet Archive's edge rule (ADR 051): the hairline cannot be a control's
-    // edge, the outline can.
-    doc: 'CLAUDE.md',
-    context: '`--ash` is a divider at 1.32:1',
-    claimed: '1.32',
-    actual: () => ratioOnBg('ash').toFixed(2),
-  },
-  {
-    doc: 'CLAUDE.md',
-    context: '`--outline` is, at 3.48:1',
-    claimed: '3.48',
-    actual: () => ratioOnBg('outline').toFixed(2),
   },
   {
     doc: 'docs/testing-strategy.md',
     // The claim that was wrong in two documents. Both halves are checked: the hex against
     // globals.css, and the ratio against the hex.
-    context: '`--titanium-text` (#59636B, 5.83:1 on `--bg`)',
-    claimed: '#59636B|5.83',
+    context: '`--titanium-text` (#59636B, 5.47:1 on `--bg`)',
+    claimed: '#59636B|5.47',
     actual: () => `${token('titanium-text')}|${ratioOnBg('titanium-text').toFixed(2)}`,
   },
   {
     doc: 'docs/testing-strategy.md',
-    context: 'is 2.32:1 on `--bg`',
-    claimed: '2.32',
+    context: 'is 2.18:1 on `--bg`',
+    claimed: '2.18',
     actual: () => ratioOnBg('titanium').toFixed(2),
   },
   {
