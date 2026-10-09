@@ -48,6 +48,8 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--titanium-text` | #59636B | Titanium-toned **text** on light backgrounds |
 | `--sage` | #8CA89A | Green accent — borders, tints, fills. **Not text** |
 | `--sage-text` | #516159 | Sage-toned **text** on light backgrounds |
+| `--metal-niobium` | #6F7FAE | A metal's finish as a provenance dot (anodized niobium). Decorative |
+| `--metal-steel` | #BCC1C5 | A metal's finish as a provenance dot (polished 316L). Decorative |
 | `--mist` | #A8A49E | Muted text — dark backgrounds only |
 | `--on-dark` | #F0EDE8 | Text on dark backgrounds |
 | `--black` | #0A0A0A | Campaign band dark |

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { mainNav, footerGroups, legalLinks, byHref, type NavLink } from '@/config/navigation'
+import { mainNav, footerGroups, legalLinks, byHref, archiveCategories, type NavLink } from '@/config/navigation'
 
 /**
  * Every internal destination the header, drawer and footer render has to be a real route.
@@ -19,6 +19,7 @@ const rendered: Array<{ source: string; link: NavLink }> = [
     group.links.map((link) => ({ source: `footer:${group.title}`, link }))
   ),
   ...legalLinks.map((link) => ({ source: 'legal', link })),
+  ...archiveCategories.map((link) => ({ source: 'archive', link })),
 ]
 
 /** A literal directory per segment, or a dynamic `[param]` one, ending in a page. */

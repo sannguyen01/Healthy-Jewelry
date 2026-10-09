@@ -138,6 +138,35 @@ text roles, and the badge tints over them); `--outline` is held to 3:1 by name a
 *below* it, so the reason the second token exists is itself part of the contract. The ratios in
 `CLAUDE.md` are read back out of the stylesheet by the same test.
 
+## The chrome (B3)
+
+- **The open menu is an archive on the ground**, not a dark overlay: three columns on the
+  12-column grid from 961px (the categories, the metallurgy, the places to go with a note on the
+  foundation), one column below, then a search whose label stays above its field and a footer strip.
+  It reads its lists from `navigation.ts` (`archiveCategories`, `mainNav`) and the metals from
+  `hjMaterials`, which gained a `designation` ("Ti-6Al-4V ELI"): the specification line, never a claim.
+  `header-fit.spec.ts` still holds the overlay to every `mainNav` entry and to a Search button; the
+  search is now a real GET form to `/search` (a request from anywhere, ADR 045), so it works without
+  script. A Tab cycle that skipped the field would walk past the one control that takes text, so the
+  trap's selector includes inputs.
+- **The icon beside MENU is for the wide bar only.** The board draws one on the phone too. It costs
+  26px of the bar, which moved the width at which the whole name fits from 353px to 386px and
+  would have hidden the name on every 375px phone; `header-fit.spec.ts` failed on it, and that is
+  the measurement ADR 016 asks for. The phone keeps its text-only control.
+- **One hairline and one label size.** The bar's open state is the same flat bar (the ground, one
+  `--ash` hairline), and labels move to `--text-label` (13px), because Barlow Condensed at the
+  11px spec size is too small to find your way by; `--text-xs` stays for spec rows. The old
+  translucent `--line` token is gone, as is the dark `--mid`.
+- **Shared primitives, defined once:** `.hj-label`, `.hj-spec`, `.hj-field` (an edge in `--outline`,
+  the label always above), `.btn-primary` (ink, graphite on hover) and `MetalDot`, with two swatch
+  tokens for the finishes the accent does not cover. The later workstreams adopt them.
+- **The footer already had the board's structure**; it takes the board's label colour for its
+  column heads, the small `--ink-2` copyright and an underlined preferences link (still a 44px
+  target on a phone).
+- **The board's copy is not adopted where it differs from the site's** ("Pure element. Honest
+  craft." against the site's headline): copy is the owner's, and a design reference does not
+  rewrite it.
+
 ## What this does not do
 
 - It does not retune the size ladder (about 40 sizes, unchanged since ADR 050); the palette

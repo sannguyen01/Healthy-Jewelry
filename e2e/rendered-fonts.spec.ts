@@ -165,7 +165,8 @@ async function drawn(page: Page): Promise<Drawn[]> {
 const VOICES: { match: (r: Drawn) => boolean; family: string; role: string }[] = [
   { match: (r) => r.tag === 'h1', family: 'Bodoni Moda', role: 'a page title' },
   { match: (r) => r.cls === 'hj-card-name', family: 'Bodoni Moda', role: 'a piece\'s name' },
-  { match: (r) => r.cls === 'hj-menu-link', family: 'Bodoni Moda', role: 'a menu link' },
+  { match: (r) => r.cls === 'hj-menu-link', family: 'Bodoni Moda', role: 'a menu category' },
+  { match: (r) => r.cls === 'hj-archive-metal-name', family: 'Bodoni Moda', role: 'a metal\'s name in the menu' },
   { match: (r) => r.cls === 'label-eyebrow', family: 'Barlow Condensed', role: 'an eyebrow label' },
   { match: (r) => r.cls === 'hj-lockup-text', family: 'Barlow Condensed', role: 'the brand name' },
   // Not `th`: the shipping and materials tables set their column heads as labels, on purpose.

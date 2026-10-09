@@ -215,6 +215,8 @@ describe('T4 design tokens', () => {
 const ACCENT_ONLY = new Set([
   'sage', // 2.44:1 on --bg — borders and tints only. See --sage-text.
   'ash', // the hairline: dividers, and the decorative ordinals (WCAG 1.4.3 exempt). Never a control edge.
+  'metal-niobium', // a six-pixel provenance dot beside a metal's name (MetalDot); carries no text.
+  'metal-steel', // as above.
   'outline', // the edge of a control: held to 3:1 by name, below (WCAG 1.4.11), not to 4.5:1 as text.
 ])
 // Everything else in the palette is already named by TEXT_PAIRINGS, as a

@@ -104,7 +104,6 @@ describe('design consistency', () => {
       '--space-page-top',
       '--ratio-product',
       '--tracking-label',
-      '--line',
     ]) {
       expect(css, `${token} missing from :root`).toMatch(new RegExp(`${token}:`))
     }

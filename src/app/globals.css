@@ -75,6 +75,10 @@
        Light surfaces only: 2.68:1 on --ink, asserted as a negative.
        Enforced by src/tests/unit/design-tokens-contrast.test.ts. */
     --sage-text: #516159; /* sage-toned text on light backgrounds */
+    /* A metal's finish, as a six-pixel dot beside its name (MetalDot.tsx). Titanium's is --titanium;
+       these two are the other metals'. Decorative: they carry no text. */
+    --metal-niobium: #6F7FAE;  /* anodized niobium */
+    --metal-steel:   #BCC1C5;  /* polished 316L */
     --mist:      #A8A49E;  /* muted text — on dark backgrounds only */
     --on-dark:   #F0EDE8;  /* text on dark backgrounds */
     --black:     #0A0A0A;  /* campaign band dark */
@@ -92,6 +96,10 @@
     --text-base:    clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
     --text-sm:      clamp(0.825rem, 0.8rem + 0.12vw, 0.95rem);
     --text-xs:      clamp(0.7rem, 0.675rem + 0.12vw, 0.8rem);
+    /* The label voice at its working size (the board's 13px). --text-xs stays for spec rows and badges,
+       the board's 11px; a label is the thing you read to find your way, and Barlow Condensed at 11px
+       is too small for that. */
+    --text-label:   0.8125rem;
 
     /* ── Hero geometry ── */
     /* The hero copy card may never occupy more than this fraction of the
@@ -153,10 +161,8 @@
     --tracking-display: -0.02em;
     --tracking-title: -0.01em;
     --tracking-name: 0;
-    /* A hairline instead of a shadow: the page stays flat and quiet. */
-    --line: rgba(26, 25, 24, 0.08);
-    /* Two radii, the board's: a control and a frame (a card, a tile, a panel). Everything else
-       stays square. */
+    /* A hairline (--ash) instead of a shadow: the page stays flat and quiet. Two radii, the board's:
+       a control and a frame (a card, a tile, a panel). Everything else stays square. */
     --radius-control: 4px;
     --radius-frame: 6px;
 
@@ -646,17 +652,19 @@
 
   .hj-header[data-state="solid"] {
     background-color: var(--bg);
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ash);
     color: var(--ink);
   }
 
+  /* The bar in its open state is the same flat bar as every page: the ground, one hairline, ink. The
+     menu is an archive on the ground (ADR 051), not a dark overlay, so nothing here inverts. */
   .hj-header[data-state="menu-open"] {
-    background-color: transparent;
+    background-color: var(--bg);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border-bottom: none;
+    border-bottom: 1px solid var(--ash);
     box-shadow: none;
-    color: var(--on-dark);
+    color: var(--ink);
   }
 
   .hj-header-left {
@@ -683,8 +691,9 @@
 
   .hj-menu-btn, .hj-icon-btn, .hj-wordmark {
     font-family: var(--font-ui);
-    font-size: var(--text-xs);
-    letter-spacing: 0.16em;
+    font-weight: 500;
+    font-size: var(--text-label);
+    letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     color: inherit;
     transition: color 0.3s ease-out;
@@ -698,6 +707,23 @@
 
   .hj-menu-btn {
     min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* The board draws an icon beside MENU and CLOSE. On a phone it costs 26px of the bar, which moves
+     the width at which the whole name fits from 353px to 386px and would hide the name on every
+     375px phone (header-fit.spec.ts measured it). So the icon is for the wide bar, and the phone
+     keeps the text-only control it had (ADR 051; 'the brand gives, the controls never do', ADR 016). */
+  .hj-menu-icon {
+    display: none;
+  }
+
+  @media (min-width: 769px) {
+    .hj-menu-icon {
+      display: block;
+    }
   }
 
   .hj-wordmark {
@@ -826,16 +852,20 @@
     }
   }
 
-  /* ── Menu Drawer ── */
+  /* ── Menu: the archive ──
+     The open menu is a page on the ground, under the same flat bar (ADR 051): three columns on the
+     12-column grid at 961px and up (the categories, the metallurgy, the places to go), one column
+     below, a labelled search and a footer strip. It scrolls when it is taller than the viewport
+     and the page behind it does not (Nav.tsx locks the body). */
   .hj-menu-drawer {
     position: fixed;
     inset: 0;
     z-index: 89;
-    background-color: var(--ink);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    background-color: var(--bg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Clear of the fixed 64px bar, with the board's breathing room. */
+    padding: calc(64px + clamp(24px, 4vw, 56px)) var(--space-gutter) 0;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
@@ -846,37 +876,260 @@
     visibility: visible;
   }
 
-  .hj-menu-drawer-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 32px;
+  .hj-archive {
+    max-width: 1296px;
+    margin: 0 auto;
+    padding-bottom: clamp(32px, 4vw, 48px);
     transform: translateY(16px);
     transition: transform 0.4s ease-out;
   }
 
-  .hj-menu-drawer[data-state="menu-open"] .hj-menu-drawer-inner {
+  .hj-menu-drawer[data-state="menu-open"] .hj-archive {
     transform: translateY(0);
   }
 
-  .hj-menu-link {
-    font-family: var(--font-display);
-    font-weight: 400;
-    font-size: clamp(2.4rem, 8vw, 4.5rem);
-    letter-spacing: var(--tracking-display);
-    color: var(--bg);
+  .hj-archive-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 40px;
+  }
+
+  @media (min-width: 961px) {
+    .hj-archive-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 40px;
+    }
+    .hj-archive-categories { grid-column: 1 / span 4; }
+    .hj-archive-metals { grid-column: 5 / span 5; }
+    .hj-archive-explore { grid-column: 10 / span 3; }
+  }
+
+  /* A column's head and a list's rows share one hairline rhythm. */
+  .hj-label {
+    font-family: var(--font-ui);
+    font-weight: 500;
+    font-size: var(--text-label);
+    line-height: 1.25;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  .hj-spec {
+    font-family: var(--font-ui);
+    font-weight: 500;
+    font-size: var(--text-xs);
+    line-height: 1.3;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .hj-archive-head {
+    color: var(--ink-2);
+    padding-bottom: 20px;
+  }
+
+  .hj-archive-list {
+    list-style: none;
+    border-bottom: 1px solid var(--ash);
+  }
+
+  /* Named transitions, not the default `all`: under reduced motion `all` animates the focus ring
+     and it reads 0px at the moment of focus (see .hj-lockup). */
+  .hj-archive-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 52px;
+    border-top: 1px solid var(--ash);
+    color: var(--ink);
     text-decoration: none;
-    transition: color 0.3s ease-out, transform 0.3s ease-out;
+    transition: padding-left 0.25s var(--ease), background-color 0.25s var(--ease);
   }
 
-  .hj-menu-link:hover, .hj-menu-link:focus-visible {
-    color: var(--nacre);
-    transform: scale(1.02);
+  .hj-archive-row:hover,
+  .hj-archive-row:focus-visible {
+    padding-left: 12px;
+    background-color: var(--subtle);
   }
 
-  /* Keyboard focus needs a ring the colour change alone cannot provide (WCAG 2.4.7). */
-  .hj-menu-link:focus-visible {
-    outline: 2px solid var(--on-dark);
-    outline-offset: 4px;
+  .hj-archive-arrow {
+    flex: none;
+    opacity: 0.35;
+    transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
   }
+
+  .hj-archive-row:hover .hj-archive-arrow,
+  .hj-archive-row:focus-visible .hj-archive-arrow {
+    opacity: 1;
+    transform: translateX(-6px);
+  }
+
+  /* Categories: the title voice at the board's 30px. */
+  .hj-menu-link {
+    min-height: 64px;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: clamp(1.5rem, 1.2rem + 1vw, 1.875rem);
+    line-height: 1.27;
+    letter-spacing: var(--tracking-title);
+  }
+
+  /* The metallurgy: an ordinal and a dot, the metal's name, its specification. */
+  .hj-archive-metal {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) 14px;
+    align-items: center;
+    column-gap: 16px;
+    min-height: 96px;
+    padding: 20px 0;
+    border-top: 1px solid var(--ash);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .hj-archive-ordinal {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-2);
+  }
+
+  .hj-archive-metal-name {
+    display: block;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
+    line-height: 1.33;
+    letter-spacing: var(--tracking-title);
+  }
+
+  .hj-archive-metal-spec {
+    display: block;
+    margin-top: 6px;
+    color: var(--ink-2);
+  }
+
+  .hj-archive-explore-row {
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+  }
+
+  .hj-archive-note {
+    margin-top: 32px;
+    padding: 24px;
+    background-color: var(--nacre);
+    border: 1px solid var(--ash);
+    border-radius: var(--radius-frame);
+  }
+
+  .hj-archive-note .hj-spec {
+    display: block;
+    color: var(--ink-2);
+    margin-bottom: 10px;
+  }
+
+  .hj-archive-note p {
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    color: var(--graphite);
+  }
+
+  /* Search: a label that stays above the field, never floating inside it. */
+  .hj-archive-search {
+    margin-top: clamp(40px, 6vw, 72px);
+    max-width: 520px;
+  }
+
+  .hj-archive-search label {
+    display: block;
+    color: var(--ink-2);
+    margin-bottom: 10px;
+  }
+
+  .hj-archive-search-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .hj-archive-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 24px;
+    margin-top: clamp(32px, 5vw, 56px);
+    padding-top: 20px;
+    border-top: 1px solid var(--ash);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  .hj-archive-foot .hj-spec {
+    color: var(--ink-2);
+  }
+
+  /* Keyboard focus needs a ring the colour change alone cannot provide (WCAG 2.4.7); the base
+     layer's outline applies, and a row's hover shift is not a substitute for it. */
+
+  /* ── Field and primary button: the board's two controls, defined once ──
+     A field's edge is --outline (3:1), its label is always above it, and focus darkens the edge
+     without removing the outline. The primary button is ink with graphite on hover. */
+  .hj-field {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 16px;
+    background-color: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: var(--radius-control);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    color: var(--ink);
+    transition: border-color 0.2s var(--ease-sharp);
+  }
+
+  .hj-field:focus {
+    border-color: var(--ink);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 12px 24px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background-color: var(--ink);
+    color: var(--bg);
+    font-family: var(--font-ui);
+    font-weight: 500;
+    font-size: var(--text-label);
+    line-height: 1.25;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.25s var(--ease-sharp);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--graphite);
+  }
+
+  .hj-metal-dot {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid rgba(26, 25, 24, 0.18);
+    background-color: var(--titanium);
+  }
+
+  .hj-metal-dot[data-metal="niobium"] { background-color: var(--metal-niobium); }
+  .hj-metal-dot[data-metal="surgical-steel"] { background-color: var(--metal-steel); }
 }
