@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import { useScrolled } from '@/lib/hooks/useScrolled'
 import { mainNav } from '@/config/navigation'
+import { BrandLockup } from '@/components/layout/BrandLockup'
 
 export function Nav() {
   const router = useRouter()
@@ -89,11 +90,9 @@ export function Nav() {
           </button>
         </div>
 
-        {/* Center: Genuinely centered wordmark */}
+        {/* Center: the knot mark and the name, genuinely centred */}
         <div className="hj-header-center">
-          <Link href="/" aria-label="Healthy Jewelry — home" className="hj-wordmark" onClick={closeMenu}>
-            HEALTHY JEWELLERY
-          </Link>
+          <BrandLockup variant="inline" className="hj-wordmark" onClick={closeMenu} eager />
         </div>
 
         {/* Right: Search and Contact */}

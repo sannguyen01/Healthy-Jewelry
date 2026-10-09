@@ -10,7 +10,7 @@ import type { CSSProperties } from 'react'
  * recurring — a page can no longer invent a heading treatment by accident.
  *
  * Weight is deliberately fixed at 500 and not exposed as a prop.
- * `src/app/layout.tsx` loads Barlow Condensed at 400 and 500 only, so anything
+ * `src/app/layout.tsx` loads the brand family at 300, 400 and 500 only, so anything
  * heavier is synthesised by the browser: it smears the strokes of the nearest
  * face and distorts the letterform proportions, which is why those pages read
  * as a different typeface. `src/tests/unit/typography-weights.test.ts` enforces
@@ -64,11 +64,10 @@ export function PageHeader({ title, eyebrow, variant = 'display', style }: PageH
       <h1
         style={{
           fontFamily: 'var(--font-display)',
-          // 500 is the heaviest Barlow Condensed face the app loads. See the
+          // 500 is the heaviest face the app loads. See the
           // note above before changing this.
           fontWeight: 500,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
+          letterSpacing: 'var(--tracking-display)',
           color: 'var(--ink)',
           margin: 0,
           ...typeStyles,

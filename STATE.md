@@ -1,7 +1,220 @@
 # Loop State — Healthy-Jewelry
 
 Last run: never (scaffold not yet scheduled)
-Last refreshed by hand: 2026-10-03
+Last refreshed by hand: 2026-10-04
+
+## Session note — 2026-10-04
+
+**The redesign (W0–W4, #103) is on `main`; this session added the logo it had lost.** The owner
+believed the knot logo was in the header and footer. It was in neither: the redesign had replaced
+the pre-redesign `<Image src="/logo.png">` with a text wordmark, and the footer never had one.
+Every test passed, because no test asked whether a mark was *there*.
+
+- **The logo, made actually transparent** (ADR 041). The master's background was already α=0;
+  its edge pixels were premultiplied against black and drew a grey ring on `--bg`.
+  `scripts/build-brand-mark.mjs` derives every served copy without it; the 1.1 MB master left
+  `public/`. Header (inline, mark-only below 360px) and footer (stacked), from one `BrandLockup`.
+  The tab and home-screen icons are the knot on a `--black` tile; the Organization JSON-LD logo
+  is the real mark, not the placeholder double circle.
+- **One spelling.** `SITE_NAME` = "Healthy Jewellery" (owner, 2026-10-04), typed once.
+  `LEGAL_ENTITY_NAME` = "Healthy Jewelry" stays on the held legal pages and the copyright line.
+- **A harness gap closed** (ADR 042). About one cold load in forty, `page.goto` resolves while the
+  root `loading.tsx` fallback is still on screen; header probes measured the hidden streamed copy
+  and passed on zero-sized boxes. `settle()` now waits for the reveal.
+- **`DESIGN.md` rewritten** to what the code does, held to it by `design-consistency.test.ts`;
+  `CLAUDE.md`'s header composition, nav and homepage list corrected.
+- Design canvas the owner reviewed: https://claude.ai/artifact/BXPnYW6EYBYrApdgHGfAsF
+
+**Later the same day: review fixes, and Songmont as the design reference.**
+- A `/code-review` of #104 found the root `loading.tsx` shipped the prerendered homepage inside a
+  hidden streamed segment: without JavaScript, every visitor saw only "LOADING". It is deleted,
+  and the no-JS test now checks for hidden ancestors. Fourteen further findings were fixed in
+  the same commit (legal pages render `LEGAL_ENTITY_NAME`; the 410 handlers no longer import
+  `site.ts`; a tiled logo for search engines; hue-preserving un-premultiply; DPR-3 `sizes`;
+  header-fit bounds and probes).
+- The owner set **Songmont** as the design reference. `--bg` is now its warm grey-beige ground
+  and `--graphite` carries secondary text in its dark-grey role. `DESIGN.md`, "Reference:
+  Songmont", records what was verified, from which secondary source, and what was not adopted.
+
+**Later still: the typeface** (ADR 043). Songmont's identity is one family (FW Tsukiji Gothic, per
+Founder Type's case page) and names its pieces in Title Case. The site now sets every role in Zen
+Kaku Gothic Antique — its closest OFL relative — self-hosted as the 9.7 KB latin slice per weight,
+and headings and names render in the case the catalogue writes them. The switch surfaced four
+things the old faces had hidden, three of them now rules:
+- 27 headings inherited the body's 300 and had rendered at 400 only because Barlow had no 300 face.
+  Written out as 400; `typography-weights` fails a display style that inherits its weight.
+- "View All →" and "Shop →" used a glyph the slice does not have. Arrows removed;
+  `e2e/glyph-coverage.spec.ts` holds every route's text to the font's own `cmap`.
+- The wider name needed 397px to clear the header controls. The phone logotype is 13px/0.08em,
+  measured to fit from 357px against the 360px breakpoint.
+- Weight numbers do not carry between families: this face's 300 lays down 43–56% of DM Sans 300's
+  ink, its 400 75–95%. Fifty `300` declarations and the body default became 400, and no Light
+  face ships (two files, 19.4 KB).
+
+**Later: a site-wide audit** (ADR 045), at the owner's request — every API route probed with
+adversarial requests, all 14 page routes swept at 12 desktop and 5 touch widths (306
+measurements), every control exercised on both formats (71 checks), and `pnpm audit`:
+- **Critical, fixed:** Next.js 16.3.5's `next/og` RCE (GHSA-vcvr-r3jv-pc5j); now 16.3.8.
+- **High, fixed:** the contact route took a cross-site `text/plain` form as JSON (now 403 on a
+  foreign `Origin`/`Sec-Fetch-Site`); a pre-hydration or no-JS submit was a GET with the name,
+  email and message in the URL (now a POST the API answers with a page).
+- **Medium/low, fixed:** an unsanitised name in the mail subject; `/search?q=a&q=b` crashing;
+  `/search`'s button 17px off-screen at 320px; a `null` body answering 500; the strip's hidden
+  scrollbar for mice; `/about`'s rule overflowing; three sub-24px targets.
+- **Settled:** Vercel overwrites `x-forwarded-for` (its documentation, via the connector), so the
+  rate limiter's IP is not spoofable on this deployment.
+- `e2e/responsive-sweep.spec.ts` now holds the width sweep on every PR.
+
+**Last: the latest failed deployment, debugged** (ADRs 046, 047). `dpl_Fs9crbjE8nJ4M2uJvbVT41Apzje5`
+(Vercel, `ERROR`, `ERR_PNPM_BROKEN_LOCKFILE`) built PR #101 at `ed7594a`.
+- **Root cause.** PR #101's merge of `main` was resolved on github.com by keeping both sides of all
+  22 conflict hunks. Both files are byte-identical to that resolution: ten duplicated lockfile keys,
+  and, hidden behind the install, a footer referencing deleted `shopLinks`/`infoLinks`
+  (`TS2304`). CI failed the same way in 21 seconds, after the step named "Manifest and lockfile
+  integrity" had passed.
+- **PR #101 is superseded**: #103 (`0bcb55c`) says so and carried its footer. Production
+  (`dpl_8S2TqXpWgPX9AjwxXAzMXkGEkLc7`, `main` `0bcb55c`) and every #104 preview are `READY`.
+- **The pattern.** 9 of the project's 13 failed deployments are lockfile failures (7 broken, 2
+  outdated). Three of the nine were production builds of `main`, after PRs #68, #72 and #73.
+  Replayed, the first incident (`1c0419c`) is also a 7-hunk conflict kept both ways, not the
+  clean merge ADR 031 records.
+- **Prevented, not just detected.** `.gitattributes` makes git refuse to text-merge the lockfile
+  (both incidents replayed: no markers, nothing to keep both of). The integrity step now reads the
+  lockfile's keys, measured against the `yaml` parser, plus conflict markers in both files.
+  `docs/runbooks/lockfile-conflicts.md` gives the resolution.
+- **Found on the way:** one unresolvable `readFile` in the share card traced 520 repository files
+  (tests, ADRs, scripts) into two server functions on every deploy. The path is now literal and
+  `scripts/audit-function-traces.mjs` checks every trace after the build.
+- **Environment, read without decrypting.** One variable is set (`NEXT_PUBLIC_SITE_URL`).
+  `RESEND_API_KEY`, the two Upstash variables, `RATE_LIMIT_KEY_SECRET` and
+  `SHOPIFY_WEBHOOK_SECRET` are unset, all known items below. The dashboard says Node `24.x`, but
+  `engines.node` (`22.x`) overrides it on Vercel (per its documentation), matching CI.
+
+**Then: three owner rulings** (ADR 048).
+- **"The background of the logo is transparent."** Two parts were already transparent: the mark
+  in the header and footer, and its file. Three things were not:
+  - the tab icon, the home-screen icon and the search logo were black tiles;
+  - the image optimiser's AVIF left alpha up to 19/255 where the mark is clear. Browsers got
+    WebP only because of the order of `images.formats`.
+
+  Now the tab icon is the bare mark, and the lockup serves lossless PNGs (1x/2x/3x) directly. In
+  the browser, on the production build: mark corners α=0, and 0–2 levels between the mark's box
+  and its surroundings. The home-screen icon and the search logo keep the tile, because iOS
+  paints clear pixels black and Google lays logos on white.
+- **"Not everything from Songmont; no need to study its typeface."** It is a reference, not a
+  template. DESIGN.md and CLAUDE.md say so, and no further typeface research is open.
+- **"The original typography for the brand name."** The logotype is Barlow Condensed again: 500 in
+  the header and 400 in the footer, in tracked capitals, as on `main` before the Songmont pass.
+  It is self-hosted, and `--font-brand` is bounded to the logotype by test. Header fit: the name
+  fits from 353px, which is the original figure.
+
+### Still blocked, and on what
+
+- **PR #101 (owner):** close it as superseded by #103. Keeping it means:
+  - regenerate its lockfile from `main`'s (`git checkout origin/main -- pnpm-lock.yaml &&
+    pnpm install --lockfile-only` makes the frozen install pass, verified on `ed7594a`);
+  - then resolve its footer, which still fails type-check.
+
+  Until one of these happens, every push to it is a failing Vercel preview and a failing CI run.
+- **Vercel connector scope (owner):** build logs, runtime logs/errors and authenticated deployment
+  fetches return 403 for the team `sannguyen01s-projects`, while project and deployment metadata
+  read fine. Re-authorise the Vercel connection for that team so runtime errors can be read.
+- **Observation pending:** how GitHub's conflict editor and "Update branch" present a conflict on a
+  `merge=binary` path. Record it on the first lockfile conflict after #104 merges.
+- **Tab icon legibility (owner's call).** The transparent knot reads at a median 5.6–7.4:1 on dark
+  tab strips but 1.45–1.80:1 on light ones. If that matters, the remedy that keeps the background
+  transparent is an SVG icon whose knot darkens in light mode. It changes the knot's colour, so it
+  has not been done.
+- **CI's first red E2E, and what is and is not known (round 6, `434c3c9`).** Thirteen tests failed,
+  all on the phone project; every earlier run on this branch was green, including E2E. Three causes:
+  - `/shipping` overflowed the viewport at 320px by one pixel in CI's newer Chromium (it fit in this
+    container's older one). Fixed: the table's side padding shrinks with the viewport and the table
+    scrolls in a wrapper instead of overflowing, measured at 38px of padding saved against the 25px
+    that CI overflowed by.
+  - `visual-assets` sampled an image's opacity while `RealMoment`'s reveal transition (0.7s) was still
+    running, which reads under the floor on a loaded machine. Reproduced locally beside other specs;
+    the sample now waits for finite transitions and animations to finish, and the assertion still
+    judges the settled value.
+  - **Twelve tests stall, and CI's second run named what stalls (still unexplained why).** On
+    `531b6eb` the same 12 phone tests failed with the new diagnostic: two `/_next/image` requests,
+    for `charms.jpg` and `earrings.jpg` at `w=640`, were still unfinished after 20s, while the
+    server logged nothing. Facts, in order of weight:
+    - every CI run on this branch through round 5 was green; the first red is the commit that moved
+      Next 16.3.5 → 16.3.8, and that release rewrote the image optimizer, response cache and
+      incremental cache (a route-ownership refactor and a new upstream-fetch path);
+    - **no newer 16.3.x exists** (checked on the registry), and rolling back would reintroduce the
+      critical `next/og` RCE this bump fixed, so the version stays;
+    - it does not reproduce locally: aborted or concurrent requests for cold variants of both photographs,
+      at 12 widths, all answered 200 in under 1.7s on the same build;
+    - **what this does not tell us is whether Vercel's own image service is affected.** CI serves
+      `/_next/image` from `next start`; Vercel production uses its platform optimizer. That is an
+      inference, not a measurement, so do not read "CI-only" as proven.
+
+    The diagnostic now also re-requests each stuck image, and `/robots.txt`, with Playwright's own
+    HTTP client while the server is still up. That separates a server that never answers that URL
+    from a request only the browser stalled on. Read that line first on the next failure.
+  - **Then it passed, then failed again, with the same runtime code.** `56cbe4e` differs from the red
+    `531b6eb` only in the diagnostic's wait cap and in docs, and its E2E passed in full; `4806efc`
+    (docs only again) failed the same twelve. On this Next version three of four runs failed
+    (`434c3c9`, `531b6eb`, `4806efc`) and one passed (`56cbe4e`), so the stall is intermittent in CI,
+    not a deterministic failure of this Next version. The third failure also exposed a gap: the
+    diagnostic only saw requests that started after it was called, so with two `lazy` images at
+    `w=3840` unfinished it had nothing in flight to re-ask.
+  - **Round 9 (mitigation, not a fix): the optimizer is warmed before the suite, serially.**
+    `e2e/global-setup.ts` requests every `/_next/image` variant on eleven pages, twice, under a 20s
+    ceiling, and fails setup naming the URL and the pass; `networkQuiet` now also re-asks every
+    incomplete `<img>`. Measured here on a cold cache: 43 variants, cold 35.0s, warm 0.2s, slowest
+    2.1s; the twelve tests pass beside it. I also read the 16.3.5 → 16.3.8 diff of the image path:
+    the rewrite is the **remote**-image fetch (unused here), `fetchInternalImage` and `sharp` are
+    identical, and a web search found no upstream report. [ADR 049](docs/adr/049-a-wait-that-names-what-it-waits-for.md)
+    has the evidence and how to read the next outcome: **green** is a supported inference that a cold
+    or concurrent first optimisation is the trigger (not proof, nothing about Vercel); **red at the
+    primer** is the first direct measurement and the failing URL is the upstream report. Remove it
+    when a Next release fixes the hang and three runs are green without it. **First CI run with it
+    (`23934d3`): green** (43 variants, cold 19.6s, warm 0.1s, slowest 885ms `charms.jpg`; 794 passed
+    in 5.0 min). One green run after three reds in four proves nothing; it is the first data point.
+  - **Round 9b (typography, [ADR 050](docs/adr/050-one-face-means-no-borrowed-ones.md)).** The owner
+    asked that all typography be aligned across every page with no face outside the design
+    principles. Chrome was asked which face drew every text node on 48 page states (2,928
+    elements): the faces were right (no system or fallback face drew any text node), but the
+    requests were not. Fixed: `<strong>` and `<th>` asked for a faked 700; the footer tagline was
+    italic on every page; the 410 page was set in `system-ui` and the root error boundary named an
+    undefined family; one heading tier had two weights; nine label sizes sat below the label token.
+    New guards: `type-system-floor.test.ts`, the weight-tier rule in `typography-weights.test.ts`,
+    `e2e/rendered-fonts.spec.ts` (proven red on the three original defects). **Not done:** the share
+    cards are still Noto Sans (Satori reads TTF, not WOFF2), and the size ladder (about 40 sizes) is
+    unchanged. The Quiet Archive's type (Bodoni Moda, DM Sans, Barlow Condensed) is the next system and
+    its own PR after #104 merges; these guards key to tokens and files so they will hold it too.
+  - **Local runs need `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium`.** This container's
+    Chromium is build 1194 and Playwright 1.63 wants 1243; without it every test dies at
+    `browserType.launch`, which looks like a wall of failures and tests nothing.
+- **Production admission is not configured, so a merge to `main` deploys whether or not CI is green.**
+  Nothing about this branch should be merged while its E2E is red.
+- **Vercel project settings (owner, cosmetic):** Node.js Version reads `24.x`; set it to `22.x` to
+  match `engines`, or move both to 24 together before Node 22 leaves maintenance (2027-04-30).
+
+- **Two dependency upgrades, deliberately not in #104** (dev-only, each a major): Vitest to ≥4.1.11
+  for GHSA-82fw-gwwq-j7x9, and `eslint-config-next` to the 16.x line, which should drop the only
+  path to `braces` (GHSA-vfj7-8cjw-p6xm, no patched release). `pnpm audit` lists both.
+- **Counsel (WS-H):** is the registered company "Healthy Jewelry" or "Healthy Jewellery"? Until
+  answered, `LEGAL_ENTITY_NAME` keeps the former on `/legal`, `/terms`, `/privacy`, `/shipping` and
+  the copyright line — the footer shows both spellings, deliberately.
+- **Claims reviewer:** `faq-continuous-wear` (pending) says "your Healthy Jewelry";
+  `brand-name.test.ts` fails if it is approved unchanged.
+- **W5 (next PR from this branch):** no performance budget exists in CI yet. (The "LOADING"
+  first paint is fixed: the root `loading.tsx` is gone — see below.)
+- **W6, W7:** contact delivery evidence and the production admission read-back need the owner's
+  accounts; unchanged from 2026-10-03.
+- **Songmont pass, closed without the live page** (ADR 044). The network policy denies
+  `songmontofficial.com`, and the owner ruled it need not be reached: the Latin font (the one
+  family), the listing crop (3:4) and the header (kept) are decided from the verified language and
+  recorded as decisions, not measurements. Open for the owner: photography in the verified
+  direction (pieces worn, linen, soft grounds) to replace the hero image.
+- **Local-only, recorded so it is not rediscovered:** with this container's Chromium (1194, older
+  than the one Playwright 1.63 pins), `layout-invariants` "visible focus indicators" reads a 0px
+  outline on product-card links at the instant of focus — reduced motion's 0.01ms transitions on
+  elements with no transition of their own. It fails identically on unmodified `main` locally and
+  passes in CI. The brand lockup names its transition, so it is not exposed to it.
 
 ## Session note — 2026-10-03
 

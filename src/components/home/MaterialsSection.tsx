@@ -38,12 +38,11 @@ export function MaterialsSection() {
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-2xl)',
-              fontWeight: 500,
-              textTransform: 'uppercase',
+              fontWeight: 400,
               color: 'var(--ink)',
               margin: 0,
               lineHeight: 1.1,
-              letterSpacing: '0.02em',
+              letterSpacing: 'var(--tracking-display)',
             }}
           >
             Built from the inside out.
@@ -120,8 +119,7 @@ export function MaterialsSection() {
                 fontFamily: 'var(--font-display)',
                 fontSize: '1.2rem',
                 fontWeight: 500,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-name)',
                 color: 'var(--ink)',
                 margin: '0 0 6px',
               }}
@@ -145,7 +143,7 @@ export function MaterialsSection() {
             <p
               style={{
                 fontFamily: 'var(--font-body)',
-                fontWeight: 300,
+                fontWeight: 400,
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
                 lineHeight: 1.7,

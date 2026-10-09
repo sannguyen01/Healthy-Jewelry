@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from './support/test'
+import { SITE_NAME } from '../src/config/site'
 
 /**
  * The search control lives in two places depending on width, and these tests run
@@ -55,15 +56,18 @@ test.describe('Navigation', () => {
     await expect(page.locator('header')).toBeVisible()
   })
 
-  test('brand wordmark is visible', async ({ page }) => {
-    await expect(page.getByText('HEALTHY JEWELLERY')).toBeVisible()
+  test('brand wordmark and knot mark are visible', async ({ page }) => {
+    // Scoped to the header: the footer carries the same lockup.
+    const header = page.locator('header')
+    await expect(header.getByText(SITE_NAME)).toBeVisible()
+    await expect(header.locator('img[data-brand-mark]')).toBeVisible()
   })
 
   test('logo links to homepage', async ({ page }) => {
     // Scoped to the header: the footer carries an identically-labelled home
     // link, so a page-wide lookup resolves to two elements and trips strict
     // mode. Both links are correct — only the query was ambiguous.
-    const homeLink = page.locator('header').getByRole('link', { name: /healthy jewelry.*home/i })
+    const homeLink = page.locator('header').getByRole('link', { name: `${SITE_NAME} — home` })
     await expect(homeLink).toBeVisible()
     await homeLink.click()
     await expect(page).toHaveURL('/')
@@ -120,6 +124,17 @@ test.describe('Navigation', () => {
     await input.fill('titanium')
     await input.press('Enter')
     await expect(page).toHaveURL(/\/search\?q=titanium/)
+  })
+})
+
+test.describe('Search — a repeated query parameter', () => {
+  test('?q=ring&q=band searches for the first value instead of failing', async ({ page }) => {
+    // Next passes a repeated parameter as an array; the page called .trim() on it and
+    // rendered "Something went wrong" (found 2026-10-04 by probing the running build).
+    await page.goto('/search?q=ring&q=band')
+    await expect(page.getByText(/something went wrong/i)).toHaveCount(0)
+    await expect(page.getByText(/results? for "ring"/i)).toBeVisible()
+    await expect(page.locator('main a[href^="/products/"]').first()).toBeVisible()
   })
 })
 

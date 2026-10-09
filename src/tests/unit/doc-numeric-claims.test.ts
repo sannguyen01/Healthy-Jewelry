@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { contrastRatio } from '@/lib/utils/contrast'
+import { nameShownFromPx } from '@/lib/design/lockupBreakpoint'
 
 import { ROOT, agentFacingDocuments, missingAgentDocuments } from '../support/agentDocs'
 
@@ -157,15 +158,29 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**113 unit spec files**',
-    claimed: '113',
+    context: '**121 unit spec files**',
+    claimed: '121',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
     doc: CONVENTIONS,
-    context: '**18 E2E spec files**',
-    claimed: '18',
+    context: '**21 E2E spec files**',
+    claimed: '21',
     actual: () => String(countFiles('e2e', (f) => /\.spec\.ts$/.test(f))),
+  },
+  {
+    // The same floor, as CLAUDE.md's testing notes state it.
+    doc: 'CLAUDE.md',
+    context: 'a control under 24px',
+    claimed: '24px',
+    actual: () => `${read('e2e/responsive-sweep.spec.ts').match(/MIN_TARGET_PX = (\d+)/)?.[1]}px`,
+  },
+  {
+    // The target floor the responsive sweep enforces on every page route.
+    doc: CONVENTIONS,
+    context: 'the viewport, 24px targets',
+    claimed: '24px',
+    actual: () => `${read('e2e/responsive-sweep.spec.ts').match(/MIN_TARGET_PX = (\d+)/)?.[1]}px`,
   },
   {
     doc: CONVENTIONS,
@@ -246,6 +261,21 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     },
   },
   {
+    // The header's mark-only breakpoint (ADR 041): the name is display:none up to one pixel
+    // below the stated width, and header-fit.spec.ts sweeps that the two agree.
+    doc: 'CLAUDE.md',
+    context: 'below 360px the name is not rendered',
+    claimed: '360px',
+    actual: () => `${nameShownFromPx(read('src/app/globals.css'))}px`,
+  },
+  {
+    // The headroom bound header-fit.spec.ts enforces in both directions.
+    doc: 'CLAUDE.md',
+    context: 'breakpoint at 16px either way',
+    claimed: '16px',
+    actual: () => `${read('e2e/header-fit.spec.ts').match(/BREAKPOINT_HEADROOM_MAX_PX = (\d+)/)?.[1]}px`,
+  },
+  {
     doc: 'CLAUDE.md',
     context: 'breakpoint at 900px',
     claimed: '900px',
@@ -254,40 +284,40 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--titanium` at 2.25:1',
-    claimed: '2.25',
+    context: '`--titanium` at 2.18:1',
+    claimed: '2.18',
     actual: () => ratioOnBg('titanium').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--sage` at 2.36:1',
-    claimed: '2.36',
+    context: '`--sage` at 2.29:1',
+    claimed: '2.29',
     actual: () => ratioOnBg('sage').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--titanium-text` (5.64:1)',
-    claimed: '5.64',
+    context: '`--titanium-text` (5.47:1)',
+    claimed: '5.47',
     actual: () => ratioOnBg('titanium-text').toFixed(2),
   },
   {
     doc: 'CLAUDE.md',
-    context: '`--sage-text` (6.02:1)',
-    claimed: '6.02',
+    context: '`--sage-text` (5.84:1)',
+    claimed: '5.84',
     actual: () => ratioOnBg('sage-text').toFixed(2),
   },
   {
     doc: 'docs/testing-strategy.md',
     // The claim that was wrong in two documents. Both halves are checked: the hex against
     // globals.css, and the ratio against the hex.
-    context: '`--titanium-text` (#59636B, 5.64:1 on `--bg`)',
-    claimed: '#59636B|5.64',
+    context: '`--titanium-text` (#59636B, 5.47:1 on `--bg`)',
+    claimed: '#59636B|5.47',
     actual: () => `${token('titanium-text')}|${ratioOnBg('titanium-text').toFixed(2)}`,
   },
   {
     doc: 'docs/testing-strategy.md',
-    context: 'is 2.25:1 on `--bg`',
-    claimed: '2.25',
+    context: 'is 2.18:1 on `--bg`',
+    claimed: '2.18',
     actual: () => ratioOnBg('titanium').toFixed(2),
   },
   {
@@ -328,6 +358,10 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   { doc: 'CLAUDE.md', context: 'required 414px' },
   { doc: 'CLAUDE.md', context: 'empty and 435px with a bag badge' },
   { doc: 'CLAUDE.md', context: 'This is why the 768px breakpoint' },
+  // Measured by header-fit.spec.ts on the build that introduced the lockup; the live figure is
+  // its `brand lockup` annotation, printed on every run.
+  { doc: 'CLAUDE.md', context: 'Measured 2026-10-04, the whole name keeps' },
+  { doc: 'CLAUDE.md', context: "button off-screen at 320px" },
   { doc: 'CLAUDE.md', context: 'sweeps 320–1440px' },
   { doc: 'CLAUDE.md', context: '**≥901px**' },
   { doc: 'CLAUDE.md', context: 'at `right: -120px`' },

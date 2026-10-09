@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { parseDocument } from 'yaml'
 
-const { findDuplicateJsonKeys, compareSpecifiers } = await import(
-  '../../../scripts/lib/manifest-integrity.mjs'
-)
+const { findDuplicateJsonKeys, findDuplicateLockfileKeys, findConflictMarkers, compareSpecifiers } =
+  await import('../../../scripts/lib/manifest-integrity.mjs')
 const { audit, render, exitCode } = await import('../../../scripts/audit-manifest-integrity.mjs')
 
 /**
@@ -161,6 +162,12 @@ describe('the scanner is exact, not approximate', () => {
   })
 })
 
+// The range the real lockfile records for `next`, read from the manifest —
+// 'this repository agrees with its own lockfile' holds the two equal. It was the literal
+// `^16.3.4`, which made the upgrade to `^16.3.8` (GHSA-vcvr-r3jv-pc5j) fail two tests about
+// something else entirely.
+const lockedNext: string = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).dependencies.next
+
 describe('manifest and lockfile are compared on the effective range', () => {
   const lockfile = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8')
 
@@ -178,7 +185,7 @@ describe('manifest and lockfile are compared on the effective range', () => {
     expect(result.divergences).toContainEqual({
       name: 'next',
       manifest: '^15.5.24',
-      lockfile: '^16.3.4',
+      lockfile: lockedNext,
       overridden: false,
     })
   })
@@ -288,7 +295,7 @@ describe('the probe itself, pointed at the bytes that shipped', () => {
 
   it('names the package and both versions when the two files diverge', () => {
     const text = render(audit('{"dependencies":{"next":"^15.5.24"}}', lockfile)).join('\n')
-    expect(text).toContain('next: package.json says ^15.5.24, lockfile says ^16.3.4')
+    expect(text).toContain(`next: package.json says ^15.5.24, lockfile says ${lockedNext}`)
   })
 })
 
@@ -304,7 +311,10 @@ describe('the audit runs against this repository and passes', () => {
     )
     expect(JSON.parse(out)).toMatchObject({
       ok: true,
+      findings: 0,
+      markers: { manifest: [], lockfile: [] },
       duplicates: [],
+      lockfile: { status: 'ok', duplicates: [] },
       specifiers: { status: 'ok' },
     })
   })
@@ -336,5 +346,378 @@ describe('ci.yml asks the question before pnpm install, not after', () => {
         'the install itself failed, so a check in that position would not have run at all ' +
         'and every check after would have reported `skipped` (ADR 011).'
     ).toBeLessThan(installAt)
+  })
+})
+
+/*
+ * ─── The lockfile half (ADR 046) ─────────────────────────────────────────────────────────
+ *
+ * ADR 031 left duplicate keys in `pnpm-lock.yaml` to pnpm, because pnpm refuses such a file
+ * loudly. On 2026-10-03 the step named "Manifest and lockfile integrity" printed two ticks
+ * and exited 0 on PR #101, one line above the install that died on ten of them.
+ */
+
+/**
+ * Verbatim from `pnpm-lock.yaml` at `ed7594a` — PR #101's merge of `main`, resolved in GitHub's
+ * conflict editor by keeping both sides — reduced to two of its ten damaged blocks: real lines
+ * 1–2, 13–15, 44, 81–87, 3461–3463 and 6745–6754. pnpm's own report on the full file was
+ * `duplicated mapping key (84:9)`: the second `version` below.
+ */
+const DAMAGED_LOCKFILE_PR101 = `lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: ^4.7.0
+        version: 4.7.0(vite@6.4.3(@types/node@26.6.1)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1))
+        version: 4.7.0(vite@6.4.3(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+      '@vitest/coverage-v8':
+        specifier: ^3.2.7
+        version: 3.2.7(vitest@3.2.7)
+
+snapshots:
+
+  vite-node@3.2.4(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1):
+    dependencies:
+      cac: 6.7.14
+      debug: 4.4.3
+      es-module-lexer: 1.7.0
+      pathe: 2.0.3
+      vite: 6.4.3(@types/node@26.6.1)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1)
+      vite: 6.4.3(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+    transitivePeerDependencies:
+      - '@types/node'
+`
+
+/**
+ * Verbatim from `pnpm-lock.yaml` at `1c0419c` — the merge of `main` into Dependabot PR #72, the
+ * first incident (ADR 031) — reduced to its first damaged block: real lines 1–2, 13–15, 44 and 57–66.
+ * pnpm's report on the full file was `duplicated mapping key (63:9)`.
+ */
+const DAMAGED_LOCKFILE_PR72 = `lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    devDependencies:
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@3.2.7)
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@testing-library/user-event':
+        specifier: ^14.6.7
+`
+
+/** The duplicates as YAML itself counts them: the reference the scanner is held to. */
+function referenceDuplicateLines(source: string): number[] {
+  return parseDocument(source, { uniqueKeys: true })
+    .errors.filter((e) => e.code === 'DUPLICATE_KEY')
+    .map((e) => e.linePos?.[0]?.line ?? -1)
+}
+
+describe('pnpm-lock.yaml duplicate keys, pointed at the bytes that broke', () => {
+  it('finds both duplicates the PR #101 resolution wrote, where pnpm found the first', () => {
+    const result = findDuplicateLockfileKeys(DAMAGED_LOCKFILE_PR101)
+    expect(result.status).toBe('ok')
+    expect(result.duplicates).toEqual([
+      {
+        key: 'version',
+        line: 10,
+        firstLine: 9,
+        path: ['importers', '.', 'devDependencies', '@vitejs/plugin-react'],
+      },
+      {
+        key: 'vite',
+        line: 24,
+        firstLine: 23,
+        path: [
+          'snapshots',
+          'vite-node@3.2.4(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)',
+          'dependencies',
+        ],
+      },
+    ])
+    // Column 9 is where pnpm pointed (`84:9` on the full file): the key after 8 spaces.
+    expect(DAMAGED_LOCKFILE_PR101.split('\n')[9].indexOf('version') + 1).toBe(9)
+  })
+
+  it('finds both duplicates in the first incident too', () => {
+    const result = findDuplicateLockfileKeys(DAMAGED_LOCKFILE_PR72)
+    expect(result.duplicates.map((d: { key: string; line: number; firstLine: number }) => [d.key, d.line, d.firstLine])).toEqual([
+      ['specifier', 13, 11],
+      ['version', 14, 12],
+    ])
+  })
+
+  it('agrees with a real YAML parser on both fixtures', () => {
+    for (const fixture of [DAMAGED_LOCKFILE_PR101, DAMAGED_LOCKFILE_PR72]) {
+      expect(findDuplicateLockfileKeys(fixture).duplicates).toHaveLength(referenceDuplicateLines(fixture).length)
+    }
+  })
+
+  it("finds nothing in this repository's lockfile, and neither does the reference", () => {
+    const lockfile = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8')
+    expect(findDuplicateLockfileKeys(lockfile)).toEqual({ status: 'ok', duplicates: [] })
+    expect(referenceDuplicateLines(lockfile)).toEqual([])
+  })
+
+  it(
+    'agrees with a real YAML parser on seeded mutations of the real lockfile',
+    () => {
+      /*
+       * ADR 007: a hand-written scanner has unknown coverage until something measures it.
+       * This measures it against the `yaml` package on the shapes this repository's lockfile
+       * actually contains — a corpus cut from the real file at entry boundaries, so every
+       * line shape pnpm writes is present — under three mutations: a key line duplicated in
+       * place, a key renamed to its preceding sibling's name (always a duplicate), and a key
+       * renamed to a fresh one (never). Duplicates are compared as (first, second) pairs,
+       * because for a duplicated block key `yaml` reports the first line and this scanner
+       * the second; both identify the same pair.
+       */
+      const lines = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8').split('\n')
+      const cut = (header: string, count: number) => {
+        const start = lines.indexOf(header)
+        expect(start, `${header} is missing from pnpm-lock.yaml`).toBeGreaterThan(-1)
+        let end = Math.min(lines.length, start + count)
+        while (end < lines.length && lines[end] !== '') end++
+        return lines.slice(start, end + 1)
+      }
+      const corpusLines = [...lines.slice(0, lines.indexOf('packages:')), ...cut('packages:', 350), ...cut('snapshots:', 350)]
+      const corpus = corpusLines.join('\n')
+      // The corpus has to contain the shapes the scanner claims to read, or agreement on it
+      // would prove nothing about them.
+      expect(corpus).toMatch(/^ {6}- \S/m) // a plain-scalar sequence item
+      expect(corpus).toMatch(/: \{[^}]*\}$/m) // a single-line flow mapping
+      expect(corpus).toMatch(/: \[[^\]]*\]$/m) // a single-line flow sequence
+      expect(corpus).toMatch(/^ {2}'@/m) // a quoted key
+      expect(findDuplicateLockfileKeys(corpus)).toEqual({ status: 'ok', duplicates: [] })
+      expect(referenceDuplicateLines(corpus)).toEqual([])
+
+      let seed = 20261004
+      const random = () => {
+        seed = (seed + 0x6d2b79f5) | 0
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+      const indentOf = (line: string) => line.length - line.trimStart().length
+      const keyOf = (line: string) => {
+        const content = line.trimStart()
+        return content.startsWith("'") ? content.slice(0, content.indexOf("':") + 1) : content.slice(0, content.search(/:( |$)/))
+      }
+      const keyLines = corpusLines
+        .map((line, i) => (line.trim() && !line.trimStart().startsWith('- ') && /:( |$)/.test(line) ? i : -1))
+        .filter((i) => i >= 0)
+
+      const tally = { mutations: 0, withDuplicate: 0, agreed: 0 }
+      for (let n = 0; tally.mutations < 120; n++) {
+        const i = keyLines[Math.floor(random() * keyLines.length)]
+        const kind = (['in-place', 'to-sibling', 'fresh'] as const)[n % 3]
+        const mutated = corpusLines.slice()
+        if (kind === 'in-place') {
+          mutated.splice(i + 1, 0, corpusLines[i])
+        } else {
+          let sibling: number | null = null
+          for (let j = i - 1; j >= 0; j--) {
+            if (!corpusLines[j].trim()) continue
+            const depth = indentOf(corpusLines[j])
+            if (depth < indentOf(corpusLines[i])) break
+            if (depth === indentOf(corpusLines[i]) && !corpusLines[j].trimStart().startsWith('- ')) {
+              sibling = j
+              break
+            }
+          }
+          if (kind === 'to-sibling' && sibling === null) continue
+          const name = kind === 'fresh' ? `zz-mutant-${n}` : keyOf(corpusLines[sibling as number])
+          mutated[i] = ' '.repeat(indentOf(corpusLines[i])) + name + corpusLines[i].trimStart().slice(keyOf(corpusLines[i]).length)
+        }
+        const source = mutated.join('\n')
+        const ours = findDuplicateLockfileKeys(source)
+        const reference = referenceDuplicateLines(source)
+        tally.mutations++
+        expect(ours.status, `mutation ${n} (${kind}, line ${i + 1}) made the scanner give up: ${ours.reason}`).toBe('ok')
+        expect(
+          ours.duplicates.length,
+          `mutation ${n} (${kind}, line ${i + 1}): scanner found ${ours.duplicates.length}, yaml found ${reference.length}`
+        ).toBe(reference.length)
+        for (const d of ours.duplicates as Array<{ line: number; firstLine: number }>) {
+          expect(reference.includes(d.line) || reference.includes(d.firstLine), `mutation ${n}: pair ${d.firstLine}/${d.line} not in ${reference}`).toBe(true)
+        }
+        if (reference.length > 0) tally.withDuplicate++
+        tally.agreed++
+      }
+      // Both directions were exercised, or "agreed" could mean "never saw a duplicate".
+      expect(tally.withDuplicate).toBeGreaterThanOrEqual(60)
+      expect(tally.mutations - tally.withDuplicate).toBeGreaterThanOrEqual(30)
+    },
+    { timeout: 60_000 }
+  )
+
+  it('treats a quoted and a plain spelling as the same key, as YAML does', () => {
+    const source = "packages:\n  'clsx@2.1.1':\n    resolution: {integrity: a}\n  clsx@2.1.1:\n    resolution: {integrity: b}\n"
+    expect(findDuplicateLockfileKeys(source).duplicates).toMatchObject([{ key: 'clsx@2.1.1', line: 4, firstLine: 2 }])
+    expect(referenceDuplicateLines(source)).toHaveLength(1)
+  })
+
+  it('does not call the same key under two parents a duplicate, or a repeated sequence item a key', () => {
+    const source = [
+      'snapshots:',
+      '  a@1.0.0:',
+      '    dependencies:',
+      '      vite: 6.4.3',
+      '    transitivePeerDependencies:',
+      "      - '@types/node'",
+      "      - '@types/node'",
+      '  b@1.0.0:',
+      '    dependencies:',
+      '      vite: 6.4.3',
+      '',
+    ].join('\n')
+    expect(findDuplicateLockfileKeys(source)).toEqual({ status: 'ok', duplicates: [] })
+    expect(referenceDuplicateLines(source)).toEqual([])
+  })
+
+  it.each([
+    ['a block scalar', 'packages:\n  a@1:\n    note: |\n      text\n', 3],
+    ['an anchor', 'packages:\n  a@1: &shared\n    x: 1\n', 2],
+    ['an alias', 'packages:\n  a@1:\n    x: *shared\n', 3],
+    ['a merge key', 'packages:\n  a@1:\n    <<: {x: 1}\n', 3],
+    ['a flow collection spanning lines', 'packages:\n  a@1:\n    resolution: {integrity:\n      sha512-x}\n', 3],
+    ['a tab in the indentation', 'packages:\n\ta@1:\n', 2],
+    ['a mapping inside a sequence', 'packages:\n  a@1:\n    list:\n      - name: x\n', 4],
+    ['an indentation nothing opened', 'packages:\n  a@1: 1.0.0\n    b: 2\n', 3],
+    ['a dedent to an unused indentation', 'packages:\n    a@1:\n      x: 1\n  b@1:\n', 4],
+    ['a sequence item after a key that already has a value', 'packages:\n  a@1: 1.0.0\n    - x\n', 3],
+  ])('says it could not run on %s, never "ok"', (_shape, source, line) => {
+    const result = findDuplicateLockfileKeys(source)
+    expect(result.status).toBe('unevaluable')
+    expect(result.line).toBe(line)
+    expect(result.reason).toMatch(/could not run/)
+  })
+})
+
+describe('conflict markers', () => {
+  it('finds each kind git writes, at the start of a line only', () => {
+    const source = ['<<<<<<< ours', 'a: 1', '||||||| base', '=======', 'a: 2', '>>>>>>> theirs', '  =======', 'x: "======="'].join('\n')
+    expect(findConflictMarkers(source)).toEqual([
+      { line: 1, marker: '<<<<<<<' },
+      { line: 3, marker: '|||||||' },
+      { line: 4, marker: '=======' },
+      { line: 6, marker: '>>>>>>>' },
+    ])
+  })
+
+  it('reports a manifest carrying markers instead of throwing on it', () => {
+    // Before 2026-10-04 `JSON.parse` threw out of the probe: a stack trace, not a verdict.
+    const manifest = '{\n<<<<<<< HEAD\n  "name": "a"\n=======\n  "name": "b"\n>>>>>>> main\n}\n'
+    const lockfile = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8')
+    const verdict = audit(manifest, lockfile)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.markers.manifest).toHaveLength(3)
+    expect(exitCode(verdict)).toBe(1)
+    expect(render(verdict).join('\n')).toContain('✗ neither file carries a conflict marker')
+  })
+
+  it('reports a lockfile carrying markers as a finding, not as "could not run"', () => {
+    const lockfile = `lockfileVersion: '9.0'\n<<<<<<< HEAD\nimporters: {}\n=======\nimporters: {}\n>>>>>>> main\n`
+    const verdict = audit(readFileSync(join(ROOT, 'package.json'), 'utf8'), lockfile)
+    expect(verdict.markers.lockfile).toHaveLength(3)
+    expect(exitCode(verdict)).toBe(1)
+  })
+})
+
+describe('the probe, pointed at the PR #101 lockfile', () => {
+  const manifest = readFileSync(join(ROOT, 'package.json'), 'utf8')
+
+  it('fails, where it printed two ticks on 2026-10-03', () => {
+    const verdict = audit(manifest, DAMAGED_LOCKFILE_PR101)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.lockfile.duplicates).toHaveLength(2)
+    expect(exitCode(verdict)).toBe(1)
+  })
+
+  it('names each duplicate by its path, and gives a remedy that regenerates rather than edits', () => {
+    const text = render(audit(manifest, DAMAGED_LOCKFILE_PR101)).join('\n')
+    expect(text).toContain('✗ pnpm-lock.yaml declares each key once')
+    expect(text).toContain('importers > . > devDependencies > @vitejs/plugin-react > version — line 10, first declared on line 9')
+    expect(text).toContain('ERR_PNPM_BROKEN_LOCKFILE')
+    expect(text).toContain('git checkout origin/main -- pnpm-lock.yaml && pnpm install --lockfile-only')
+    expect(text).toContain('docs/runbooks/lockfile-conflicts.md')
+    expect(text, 'the remedy must never be "edit the lockfile"').not.toMatch(/edit the lockfile/i)
+  })
+
+  it('says nothing about lockfile duplicates when there are none', () => {
+    const text = render(audit(manifest, readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8'))).join('\n')
+    expect(text).toContain('✓ pnpm-lock.yaml declares each key once')
+    expect(text).not.toContain('ERR_PNPM_BROKEN_LOCKFILE')
+  })
+})
+
+describe('.gitattributes: git never text-merges the lockfile', () => {
+  /*
+   * The prevention, as opposed to the detection above. Both incidents were a text conflict in
+   * the lockfile resolved by keeping both sides of every hunk (7 hunks on PR #72, 20 on PR
+   * #101). With `merge=binary` git refuses to text-merge the file at all: it keeps the current
+   * branch's copy, writes no markers, and marks the path conflicted, so there is nothing to
+   * keep both of. Asserted as behaviour — a real three-way merge — and paired with the same
+   * merge without the attribute, so the test proves the attribute is what changes the outcome.
+   */
+  it('git resolves the attribute for pnpm-lock.yaml, and only for it', () => {
+    const attr = (path: string) =>
+      execFileSync('git', ['check-attr', 'merge', '--', path], { cwd: ROOT, encoding: 'utf8' }).trim()
+    expect(attr('pnpm-lock.yaml')).toBe('pnpm-lock.yaml: merge: binary')
+    expect(attr('package.json')).toBe('package.json: merge: unspecified')
+  })
+
+  function mergeAdjacentLockfileChanges(withAttribute: boolean) {
+    const dir = mkdtempSync(join(tmpdir(), 'hj-lockfile-merge-'))
+    const git = (...args: string[]) =>
+      spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'init.defaultBranch=main', ...args], {
+        cwd: dir,
+        encoding: 'utf8',
+      })
+    try {
+      git('init', '-q')
+      if (withAttribute) writeFileSync(join(dir, '.gitattributes'), readFileSync(join(ROOT, '.gitattributes'), 'utf8'))
+      const base = DAMAGED_LOCKFILE_PR72.split('\n').filter((_, i) => i !== 12 && i !== 13).join('\n')
+      writeFileSync(join(dir, 'pnpm-lock.yaml'), base)
+      git('add', '-A')
+      git('commit', '-qm', 'base')
+      git('checkout', '-qb', 'side')
+      writeFileSync(join(dir, 'pnpm-lock.yaml'), base.replace('specifier: ^16.3.3', 'specifier: ^16.3.2'))
+      git('commit', '-qam', 'side')
+      git('checkout', '-q', 'main')
+      writeFileSync(join(dir, 'pnpm-lock.yaml'), base.replace('specifier: ^16.3.3', 'specifier: ^16.3.4'))
+      git('commit', '-qam', 'main')
+      const merge = git('merge', '--no-edit', 'side')
+      return {
+        status: merge.status,
+        output: `${merge.stdout}${merge.stderr}`,
+        file: readFileSync(join(dir, 'pnpm-lock.yaml'), 'utf8'),
+        ours: base.replace('specifier: ^16.3.3', 'specifier: ^16.3.4'),
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('without it, git writes markers a person can "accept both" of', () => {
+    const result = mergeAdjacentLockfileChanges(false)
+    expect(result.status).not.toBe(0)
+    expect(findConflictMarkers(result.file).length).toBeGreaterThan(0)
+  })
+
+  it('with it, git refuses the text merge and leaves nothing to keep both of', () => {
+    const result = mergeAdjacentLockfileChanges(true)
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain('Cannot merge binary files: pnpm-lock.yaml')
+    expect(findConflictMarkers(result.file)).toEqual([])
+    expect(result.file).toBe(result.ours)
   })
 })

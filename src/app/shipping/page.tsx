@@ -3,7 +3,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { BrowseOnlyNotice } from '@/components/ui/BrowseOnlyNotice'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
+import { LEGAL_ENTITY_NAME, ORDER_REFERENCE_HINT, SUPPORT_EMAIL } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Shipping & Returns',
@@ -11,14 +11,14 @@ export const metadata: Metadata = {
     // A search snippet, so it says what the page is for rather than restating the terms as
     // an offer: "Free shipping on all … orders worldwide" read as an online store in search
     // results, on a site that takes no orders. The terms themselves are unchanged below.
-    'How a piece arranged with a Healthy Jewelry ambassador is delivered, returned or exchanged.',
+    `How a piece arranged with a ${LEGAL_ENTITY_NAME} ambassador is delivered, returned or exchanged.`,
 }
 
 const sectionHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-display)',
+  fontWeight: 400,
   fontSize: 'var(--text-xl, 1.4rem)',
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase' as const,
+  letterSpacing: 'var(--tracking-display)',
   color: 'var(--ink)',
   margin: '0 0 16px',
 }
@@ -28,7 +28,7 @@ const bodyStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 300,
+  fontWeight: 400,
   margin: '0 0 16px',
 }
 
@@ -37,7 +37,7 @@ const listStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 300,
+  fontWeight: 400,
   margin: '0 0 16px',
   paddingLeft: '24px',
 }
@@ -48,14 +48,29 @@ const tableStyle: React.CSSProperties = {
   marginBottom: '24px',
 }
 
+/**
+ * The table's side padding shrinks with the viewport. Three columns of tracked capitals need
+ * about 297px of cell content plus padding at 320px, and the page leaves 272: at the old fixed
+ * 16px the COST column ended 1px past the viewport in CI's Chromium (it fit by a pixel in an
+ * older one). 8px a side at the narrowest and 16px from about 533px keeps the rhythm on wider
+ * screens. The wrapper below scrolls instead of overflowing if a longer word ever needs more.
+ */
+const CELL_PAD_X = 'clamp(8px, 3vw, 16px)'
+
+const tableWrapStyle: React.CSSProperties = {
+  maxWidth: '100%',
+  overflowX: 'auto',
+}
+
 const thStyle: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
-  fontSize: '0.7rem',
+  fontSize: 'var(--text-xs)',
+  fontWeight: 500,
   letterSpacing: '0.16em',
   textTransform: 'uppercase',
   color: 'var(--graphite)',
   textAlign: 'left' as const,
-  padding: '12px 16px',
+  padding: `12px ${CELL_PAD_X}`,
   borderBottom: '1px solid var(--ash)',
   backgroundColor: 'var(--nacre)',
 }
@@ -64,8 +79,8 @@ const tdStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
-  fontWeight: 300,
-  padding: '14px 16px',
+  fontWeight: 400,
+  padding: `14px ${CELL_PAD_X}`,
   borderBottom: '1px solid var(--ash)',
 }
 
@@ -88,9 +103,9 @@ export default function ShippingPage() {
           <p
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-xl, 1.3rem)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--titanium-text)',
               margin: 0,
             }}
@@ -135,35 +150,36 @@ export default function ShippingPage() {
               false implication on an otherwise accurate page.
             */}
             <p style={bodyStyle}>
-              Shipping is free on every piece, wherever it is going. No minimum, no handling
-              fees.
+              Shipping is free on every piece, wherever it is going. No minimum, no handling fees.
             </p>
 
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Destination</th>
-                  <th style={thStyle}>Delivery Time</th>
-                  <th style={thStyle}>Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={tdStyle}>International</td>
-                  <td style={tdStyle}>7–14 business days</td>
-                  <td style={tdStyle}>Free</td>
-                </tr>
-              </tbody>
-            </table>
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Destination</th>
+                    <th style={thStyle}>Delivery Time</th>
+                    <th style={thStyle}>Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={tdStyle}>International</td>
+                    <td style={tdStyle}>7–14 business days</td>
+                    <td style={tdStyle}>Free</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
             <p style={bodyStyle}>
-              A confirmed arrangement is dispatched within 1 business day. Your ambassador
-              sends a shipping confirmation with a tracking number once it is on its way.
+              A confirmed arrangement is dispatched within 1 business day. Your ambassador sends a
+              shipping confirmation with a tracking number once it is on its way.
             </p>
             <p style={bodyStyle}>
-              International shipments may be subject to customs duties and import taxes levied
-              by the destination country. These charges are the responsibility of the
-              recipient and are not included in free shipping.
+              International shipments may be subject to customs duties and import taxes levied by
+              the destination country. These charges are the responsibility of the recipient and are
+              not included in free shipping.
             </p>
           </div>
 
@@ -171,9 +187,8 @@ export default function ShippingPage() {
           <div>
             <h2 style={sectionHeadStyle}>Returns</h2>
             <p style={bodyStyle}>
-              We accept returns within <strong>30 days</strong> of delivery, on any piece
-              however it was arranged. Items must be unworn, in original condition, and in
-              original packaging.
+              We accept returns within <strong>30 days</strong> of delivery, on any piece however it
+              was arranged. Items must be unworn, in original condition, and in original packaging.
             </p>
             <ul style={listStyle}>
               <li>
@@ -188,8 +203,8 @@ export default function ShippingPage() {
               </li>
               <li>We will provide a prepaid return label for all returns.</li>
               <li>
-                Once we receive and inspect the returned item, your refund is processed by
-                the same method you paid, within 5–7 business days.
+                Once we receive and inspect the returned item, your refund is processed by the same
+                method you paid, within 5–7 business days.
               </li>
               <li>Piercing jewelry that has been worn cannot be returned for hygiene reasons.</li>
             </ul>

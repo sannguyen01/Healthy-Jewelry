@@ -2,19 +2,19 @@ import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { LEGAL_EMAIL, SITE_DOMAIN } from '@/config/site'
+import { LEGAL_EMAIL, LEGAL_ENTITY_NAME, SITE_DOMAIN } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Legal Notice',
   description:
-    'Legal notice for Healthy Jewelry. Company information, intellectual property, trademarks, and disclaimer of warranties.',
+    `Legal notice for ${LEGAL_ENTITY_NAME}. Company information, intellectual property, trademarks, and disclaimer of warranties.`,
 }
 
 const sectionHeadStyle: React.CSSProperties = {
   fontFamily: 'var(--font-display)',
+  fontWeight: 400,
   fontSize: 'var(--text-xl, 1.4rem)',
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase' as const,
+  letterSpacing: 'var(--tracking-display)',
   color: 'var(--ink)',
   margin: '0 0 16px',
 }
@@ -24,7 +24,7 @@ const bodyStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 300,
+  fontWeight: 400,
   margin: '0 0 16px',
 }
 
@@ -70,7 +70,7 @@ export default function LegalPage() {
           <div>
             <h2 style={sectionHeadStyle}>Company Information</h2>
             <p style={bodyStyle}>
-              <strong>Company name:</strong> Healthy Jewelry
+              <strong>Company name:</strong> {LEGAL_ENTITY_NAME}
               <br />
               <strong>Website:</strong> {SITE_DOMAIN}
               <br />
@@ -89,7 +89,7 @@ export default function LegalPage() {
               the one sentence changed.
             */}
             <p style={bodyStyle}>
-              Healthy Jewelry is a premium jewelry brand working in three metals: Grade 23
+              {LEGAL_ENTITY_NAME} is a premium jewelry brand working in three metals: Grade 23
               Titanium, Niobium, and 316L Surgical Steel.
             </p>
           </div>
@@ -100,14 +100,14 @@ export default function LegalPage() {
             <p style={bodyStyle}>
               All content on {SITE_DOMAIN} — including but not limited to text, photography,
               graphics, product designs, logos, page layouts, and source code — is the exclusive
-              property of Healthy Jewelry and is protected under applicable copyright law and
+              property of {LEGAL_ENTITY_NAME} and is protected under applicable copyright law and
               applicable international treaties.
             </p>
-            <p style={bodyStyle}>© 2026 Healthy Jewelry. All rights reserved.</p>
+            <p style={bodyStyle}>© 2026 {LEGAL_ENTITY_NAME}. All rights reserved.</p>
             <p style={bodyStyle}>
               No part of this website or its content may be reproduced, distributed, transmitted,
               modified, adapted, publicly displayed, or otherwise exploited without the prior
-              written permission of Healthy Jewelry. Requests for licensing or permitted use should
+              written permission of {LEGAL_ENTITY_NAME}. Requests for licensing or permitted use should
               be directed to{' '}
               <a
                 href={`mailto:${LEGAL_EMAIL}`}
@@ -123,9 +123,9 @@ export default function LegalPage() {
           <div>
             <h2 style={sectionHeadStyle}>Trademark Notice</h2>
             <p style={bodyStyle}>
-              &ldquo;Healthy Jewelry&rdquo; and the Healthy Jewelry logotype are trademarks of
-              Healthy Jewelry. The tagline &ldquo;Metal that works with your body&rdquo; is the
-              proprietary brand copy of Healthy Jewelry. Use of these marks without explicit written
+              &ldquo;{LEGAL_ENTITY_NAME}&rdquo; and the {LEGAL_ENTITY_NAME} logotype are trademarks of
+              {' '}{LEGAL_ENTITY_NAME}. The tagline &ldquo;Metal that works with your body&rdquo; is the
+              proprietary brand copy of {LEGAL_ENTITY_NAME}. Use of these marks without explicit written
               authorization is prohibited.
             </p>
             <p style={bodyStyle}>
@@ -175,7 +175,7 @@ export default function LegalPage() {
                 {LEGAL_EMAIL}
               </a>
               <br />
-              <strong>Address:</strong> Healthy Jewelry
+              <strong>Address:</strong> {LEGAL_ENTITY_NAME}
             </p>
           </div>
         </section>

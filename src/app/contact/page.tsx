@@ -3,12 +3,12 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ContactForm } from '@/components/contact/ContactForm'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { CONTACT_EMAIL } from '@/config/site'
+import { CONTACT_EMAIL, SITE_NAME } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Contact',
   description:
-    'Get in touch with Healthy Jewelry. Questions about materials, sizing, or arranging a piece with an ambassador — we respond within 24 hours.',
+    `Get in touch with ${SITE_NAME}. Questions about materials, sizing, or arranging a piece with an ambassador — we respond within 24 hours.`,
 }
 
 const INFO_ITEMS = [
@@ -40,7 +40,7 @@ export default function ContactPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '520px',
               margin: 0,
             }}
@@ -87,7 +87,7 @@ export default function ContactPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--ink)',
-                    fontWeight: 300,
+                    fontWeight: 400,
                     margin: 0,
                   }}
                 >
@@ -122,9 +122,9 @@ export default function ContactPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-2xl)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--on-dark)',
               margin: 0,
               lineHeight: 1.1,
@@ -139,7 +139,7 @@ export default function ContactPage() {
               fontSize: 'var(--text-base)',
               color: 'var(--ash)',
               lineHeight: 1.7,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '460px',
               margin: 0,
             }}

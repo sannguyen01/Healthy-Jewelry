@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, retiredRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/brand'
 
 /**
  * `/cart` and `/cart/*` — **308 to `/shop` for browsing, 410 for anything else.**
@@ -16,7 +17,7 @@ import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, retiredRoute } from '@/lib/http
  * the two contract §7 rows `/cart` and `/cart/:path*`.
  */
 const COPY = {
-  title: 'Online orders are closed — Healthy Jewellery',
+  title: `Online orders are closed — ${SITE_NAME}`,
   heading: 'This catalogue no longer accepts online orders.',
   paragraphs: [
     'Nothing was added and nothing was sent: there is no bag on this website any more, and ' +

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './support/test'
+import { networkQuiet } from './support/networkQuiet'
 
 /**
  * Visual-asset visibility.
@@ -20,7 +21,7 @@ import { test, expect, type Page } from './support/test'
  */
 
 /**
- * Below this, artwork over `--bg` (#F7F5F1) reads as a smudge rather than an
+ * Below this, artwork over `--bg` reads as a smudge rather than an
  * image. The ghost tiles shipped at 0.12; the deliberate placeholder treatment
  * is 0.45. 0.30 sits between them, so it catches a regression toward invisible
  * without forbidding intentionally soft treatments.
@@ -38,6 +39,8 @@ interface ImageProbe {
   height: number
   effectiveOpacity: number
   visibility: string
+  /** Where a knot mark sits (`img[data-brand-mark]`), or null for every other image. */
+  brandMark: 'header' | 'footer' | 'elsewhere' | null
 }
 
 /**
@@ -75,7 +78,7 @@ async function probeHomepage(page: Page): Promise<{
   }
   await page.evaluate(() => window.scrollTo(0, 0))
 
-  await page.waitForLoadState('networkidle')
+  await networkQuiet(page)
   // `networkidle` only means the bytes arrived. `next/image` serves AVIF/WebP
   // that the browser still has to decode, and an image mid-decode reports
   // naturalWidth 0 — indistinguishable from a broken source. Waiting for decode
@@ -86,6 +89,28 @@ async function probeHomepage(page: Page): Promise<{
     .waitForFunction(() => [...document.images].every((image) => image.complete), null, {
       timeout: 20_000,
     })
+    .catch(() => undefined)
+
+  // Sections reveal on scroll: `RealMoment` shows `hero-banner.jpg` at opacity 0 and eases it to
+  // 1 over 0.7s once its IntersectionObserver fires, and the hero copy does the same. Sampling
+  // before that transition ends reads an in-flight value, which on a loaded machine is under the
+  // floor — a race in the sample, not a faint image (seen 2026-10-04: the w=1200 hero reading
+  // opacity 0 when this ran beside other specs). So wait for every finite transition and
+  // animation to finish; the assertion below still judges the settled value. A looping
+  // animation is excluded, and the wait is capped so a stuck one still reaches the assertions.
+  await page
+    .waitForFunction(
+      () =>
+        document
+          .getAnimations()
+          .every(
+            (animation) =>
+              animation.playState !== 'running' ||
+              animation.effect?.getComputedTiming().iterations === Infinity
+          ),
+      null,
+      { timeout: 5_000 }
+    )
     .catch(() => undefined)
 
   const { images, placeholderTiles } = await page.evaluate((): {
@@ -113,6 +138,13 @@ async function probeHomepage(page: Page): Promise<{
         height: Math.round(box.height),
         effectiveOpacity: effectiveOpacity(el),
         visibility: getComputedStyle(el).visibility,
+        brandMark: !el.hasAttribute('data-brand-mark')
+          ? null
+          : el.closest('header')
+            ? ('header' as const)
+            : el.closest('footer')
+              ? ('footer' as const)
+              : ('elsewhere' as const),
       }
     })
 
@@ -185,6 +217,61 @@ test.describe('Homepage visual assets', () => {
         .map((image) => `  ${describeImage(image)} → opacity ${image.effectiveOpacity}`)
         .join('\n')}`
     ).toEqual([])
+  })
+
+  test('the knot mark renders once in the header and once in the footer', async ({ page }) => {
+    // The generic checks above already hold every <img> to the three conditions, the marks
+    // included. What they cannot see is a mark that is not there: zero brand marks pass all of
+    // them. On 2026-10-04 the owner believed the logo was in the header and footer, and it was
+    // in neither — the redesign had replaced it with a text wordmark and nothing noticed.
+    const { images } = await probeHomepage(page)
+    const marks = images.filter((image) => image.brandMark !== null)
+    expect(marks.map((m) => m.brandMark).sort()).toEqual(['footer', 'header'])
+    for (const mark of marks) {
+      expect(mark.naturalWidth, `${mark.brandMark} mark never decoded`).toBeGreaterThan(0)
+      expect(mark.width * mark.height, `${mark.brandMark} mark has no box`).toBeGreaterThan(0)
+      expect(mark.effectiveOpacity, `${mark.brandMark} mark too faint`).toBeGreaterThanOrEqual(MIN_EFFECTIVE_OPACITY)
+      expect(mark.alt, 'decorative: the link around it carries the name').toBe('')
+    }
+  })
+
+  test('the knot mark the browser draws has a transparent background, exactly', async ({ page }) => {
+    // The owner's instruction (ADR 048). Read from the bytes the browser chose and decoded,
+    // not from the file in the repository: the image optimiser re-encodes lossily, and its AVIF
+    // left alpha up to 19/255 where the mark is clear. So the mark must arrive as one of the
+    // lossless copies, and every pixel the lossless copy leaves clear must decode as clear.
+    await page.goto('/')
+    // The footer's copy is lazy: it is not fetched, and `decode()` never settles, until it is near.
+    await page.locator('footer img[data-brand-mark]').scrollIntoViewIfNeeded()
+    const report = await page.evaluate(async () => {
+      const out = []
+      for (const img of document.querySelectorAll<HTMLImageElement>('img[data-brand-mark]')) {
+        await img.decode()
+        const res = await fetch(img.currentSrc)
+        const bmp = await createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
+        const canvas = new OffscreenCanvas(bmp.width, bmp.height)
+        const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D
+        ctx.drawImage(bmp, 0, 0)
+        const alpha = ctx.getImageData(0, 0, bmp.width, bmp.height).data.filter((_, i) => i % 4 === 3)
+        const at = (x: number, y: number) => alpha[y * bmp.width + x]
+        const last = bmp.width - 1
+        out.push({
+          where: img.closest('header') ? 'header' : 'footer',
+          src: new URL(img.currentSrc).pathname,
+          type: res.headers.get('content-type'),
+          corners: [at(0, 0), at(last, 0), at(0, last), at(last, last)],
+          clearShare: alpha.filter((a) => a === 0).length / alpha.length,
+        })
+      }
+      return out
+    })
+    expect(report.map((r) => r.where).sort()).toEqual(['footer', 'header'])
+    for (const mark of report) {
+      expect(mark.src, `${mark.where}: served through the lossy optimiser`).toMatch(/^\/brand\/knot-\d+\.png$/)
+      expect(mark.type, mark.where).toBe('image/png')
+      expect(mark.corners, `${mark.where}: corners`).toEqual([0, 0, 0, 0])
+      expect(mark.clearShare, `${mark.where}: share of fully clear pixels`).toBeGreaterThan(0.3)
+    }
   })
 
   test('collection placeholder tiles are legible, not ghosts', async ({ page }) => {

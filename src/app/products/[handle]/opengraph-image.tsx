@@ -3,6 +3,7 @@ import path from 'node:path'
 import { ImageResponse } from 'next/og'
 import { getProductByHandle } from '@/lib/catalog'
 import { productSeo } from '@/lib/seo/productSeo'
+import { SITE_NAME } from '@/config/site'
 
 // `next/og`'s automatic font loader fetches Google Fonts per glyph range at
 // **request time**, keyed off a font-name heuristic it does not document. That
@@ -21,19 +22,25 @@ import { productSeo } from '@/lib/seo/productSeo'
 // symptom. `opengraph-bundled-font.test.tsx` exercises the real rasteriser
 // against the characters the card actually renders today.
 //
-// Noto Sans, not the brand's DM Sans, is a leftover of the original fix — it
-// was chosen for pan-Unicode currency coverage. Switching to DM Sans would put
-// the share card in the brand's own typeface and is a deliberate change with
-// its own glyph-coverage question, not a tidy-up to fold into a decommission.
-const FONT_FILES = {
-  regular: path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf'),
-  bold: path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf'),
-} as const
-
+// Noto Sans, not the brand's Zen Kaku Gothic Antique, is a leftover of the
+// original fix — it was chosen for pan-Unicode currency coverage. The brand face
+// cannot simply be swapped in: Satori reads TTF/OTF/WOFF but not the WOFF2 the
+// site ships, and the family's full TTF is a CJK font of several megabytes per
+// weight. Putting the share card in the brand face means a Latin-subset TTF built
+// for it — a deliberate change with its own glyph-coverage question.
+//
+// **The two paths are written at the call, and must stay there.** They were a `FONT_FILES`
+// object until 2026-10-04, and Turbopack cannot resolve a path read out of an object, so it
+// treated `readFile(FONT_FILES.regular)` as reading *any* file and traced the whole
+// repository into this function: 752 files and 54 MB against ~250 and 43 MB for every
+// other route — the tests, the ADRs, the scripts and the e2e specs shipped as server code
+// on every deploy. A literal `path.join(process.cwd(), '…')` is the scoped form its warning
+// asks for. `scripts/audit-function-traces.mjs` fails the build if any function traces
+// repository files again (ADR 047).
 async function loadCardFonts() {
   const [regular, bold] = await Promise.all([
-    readFile(FONT_FILES.regular),
-    readFile(FONT_FILES.bold),
+    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf')),
   ])
   return [
     { name: 'Noto Sans', data: regular, weight: 400 as const, style: 'normal' as const },
@@ -65,7 +72,7 @@ async function loadCardFonts() {
 // describes a different route.
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
-export const alt = 'Healthy Jewelry product'
+export const alt = `${SITE_NAME} product`
 
 interface Props {
   params: Promise<{ handle: string }>
@@ -89,7 +96,7 @@ export default async function Image({ params }: Props) {
   return new ImageResponse(
     <div
       style={{
-        background: '#F7F5F1',
+        background: '#F3F2EC',
         width: '100%',
         height: '100%',
         display: 'flex',
@@ -120,7 +127,7 @@ export default async function Image({ params }: Props) {
           display: 'flex',
         }}
       >
-        HEALTHY JEWELRY
+        {SITE_NAME.toUpperCase()}
       </div>
       {/* Satori has no block layout: a div with more than one child must
             declare display explicitly or rendering throws at request time. */}
@@ -149,7 +156,7 @@ export default async function Image({ params }: Props) {
                 padding: '8px 16px',
                 fontSize: 12,
                 letterSpacing: '0.12em',
-                color: '#6B6762',
+                color: '#4A4744',
                 display: 'flex',
               }}
             >

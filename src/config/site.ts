@@ -1,6 +1,9 @@
-// Healthy Jewelry — Site constants and SEO defaults
+// Healthy Jewellery — Site constants and SEO defaults
 
-export const SITE_NAME = 'Healthy Jewelry'
+import { LEGAL_ENTITY_NAME, SITE_NAME } from './brand'
+
+// The name and the marks live in a dependency-free module; see the note at the top of brand.ts.
+export { SITE_NAME, LEGAL_ENTITY_NAME, BRAND_MARK_PATH, BRAND_MARK_SRC, BRAND_LOGO_PATH } from './brand'
 
 /**
  * `||`, not `??`.
@@ -58,14 +61,14 @@ export const SITE_DESCRIPTION =
  * standard behind it (see the titanium materialSpec in the claims registry), and it was
  * the first thing a search result or a browser tab said about the brand.
  */
-export const SITE_DEFAULT_TITLE = 'Healthy Jewelry — Grade 23 Titanium, Niobium, 316L Steel'
+export const SITE_DEFAULT_TITLE = `${SITE_NAME} — Grade 23 Titanium, Niobium, 316L Steel`
 
 export const SITE_TAGLINE = 'Material integrity. No compromise.'
 
 // ── SEO defaults ───────────────────────────────────────────────────────────
 
 export const SEO_DEFAULTS = {
-  titleTemplate: '%s — Healthy Jewelry',
+  titleTemplate: `%s — ${SITE_NAME}`,
   defaultTitle: SITE_DEFAULT_TITLE,
   description: SITE_DESCRIPTION,
   openGraph: {
@@ -126,9 +129,13 @@ export const SENDER_EMAIL = 'contact@healthyjewellery.com'
  *
  * Deliberately says what *is* true rather than only what is not: "no online orders" alone
  * reads as a fault, and a visitor who wants a piece needs the next step in the same breath.
+ *
+ * It names the company, not the display name: the only pages that render it are `/terms` and
+ * `/shipping`, held legal pages that name the contracting party as `LEGAL_ENTITY_NAME` a few
+ * lines below it. Two spellings of one party on one instrument is the defect ADR 041 removed.
  */
 export const BROWSE_ONLY_STATEMENT =
-  'This catalogue is for browsing. Healthy Jewelry does not take orders on this site — a ' +
+  `This catalogue is for browsing. ${LEGAL_ENTITY_NAME} does not take orders on this site — a ` +
   'piece is arranged with an ambassador, or through the contact channel below.'
 
 /**

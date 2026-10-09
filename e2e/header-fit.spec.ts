@@ -1,5 +1,8 @@
-import { test, expect } from './support/test'
+import { test, expect, type Page } from './support/test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { mainNav } from '../src/config/navigation'
+import { nameShownFromPx } from '../src/lib/design/lockupBreakpoint'
 import {
   describeOffenders,
   minimumFittingWidth,
@@ -8,6 +11,7 @@ import {
   sweep,
   LAYOUT_SEGMENTS,
   type FitProbe,
+  type Offender,
 } from './support/viewportFit'
 
 /**
@@ -54,6 +58,83 @@ const DEVICE_WIDTHS = [320, 360, 375, 390, 412, 414, 768, 769, 1024, 1440]
 
 const headerFits: FitProbe = (page) => offendersPastViewport(page, 'header')
 
+/**
+ * Below this the header shows the knot mark without the name. Read out of `globals.css` by the
+ * same function the unit tests use, so the stylesheet is the one place it is decided; this spec
+ * checks that the browser renders what the stylesheet says, at the breakpoint's own two pixels
+ * as well as across the sweep (whose 8px step would otherwise straddle a small drift).
+ */
+const NAME_SHOWN_FROM_PX = (() => {
+  const px = nameShownFromPx(readFileSync(join(__dirname, '../src/app/globals.css'), 'utf8'))
+  if (px === undefined) throw new Error('the lockup breakpoint rule is missing from globals.css')
+  return px
+})()
+
+/**
+ * How far above the measured fit the breakpoint may sit. The measurement bounds it from below
+ * (never show a name that crowds a control); this bounds it from above, so hiding the name on
+ * phones where it fits comfortably — a breakpoint raised to 700px, say — fails too. 16px is two
+ * sweep steps: room for font-rendering variance, not for a different decision.
+ */
+const BREAKPOINT_HEADROOM_MAX_PX = 16
+
+/** The header mark's rendered width: 30px alone, 24px beside the name on phones, 28px on desktop. */
+const MARK_PX = { min: 24, max: 30 }
+
+interface LockupState {
+  viewport: number
+  shown: boolean
+  /** How much of the name the box hides: `scrollWidth - clientWidth`. 0 when whole. */
+  cutPx: number
+  /**
+   * The narrower of the two gaps between the lockup and its neighbours (MENU on the left, the
+   * first visible control on the right). Fitting is not the same as not overlapping: at 320px
+   * the whole name fits with under 8px of air either side, and reads as one run-on line.
+   */
+  clearancePx: number
+  /** The gap the header's own controls keep between each other (`.hj-header-right`). */
+  controlGapPx: number
+  mark: { left: number; right: number; width: number }
+}
+
+/** The lockup's geometry, or the name of the part that could not be found. */
+async function lockupState(page: Page): Promise<LockupState> {
+  const state = await page.evaluate((): LockupState | string => {
+    const link = document.querySelector('header a.hj-lockup')
+    const mark = link?.querySelector('img[data-brand-mark]')
+    const text = link?.querySelector<HTMLElement>('.hj-lockup-text')
+    if (!link) return 'header a.hj-lockup'
+    if (!mark) return 'img[data-brand-mark] inside the lockup'
+    if (!text) return '.hj-lockup-text inside the lockup'
+    const box = mark.getBoundingClientRect()
+    const shown = getComputedStyle(text).display !== 'none'
+    const lockup = link.getBoundingClientRect()
+    const menu = document.querySelector('header .hj-menu-btn')?.getBoundingClientRect()
+    const rightCluster = document.querySelector<HTMLElement>('header .hj-header-right')
+    const firstRight = [...(rightCluster?.children ?? [])]
+      .map((el) => el.getBoundingClientRect())
+      .find((r) => r.width > 0)
+    if (!menu) return 'header .hj-menu-btn'
+    if (!rightCluster) return 'header .hj-header-right'
+    if (!firstRight) return 'a visible control in .hj-header-right'
+    // `gap` is how the cluster spaces its controls. If that ever moves to margins, columnGap
+    // reads "normal", parses as NaN, and `clearance < NaN` is false for every width: the check
+    // would pass having compared nothing. So a NaN is reported as a missing part.
+    if (Number.isNaN(Number.parseFloat(getComputedStyle(rightCluster).columnGap)))
+      return 'a numeric column-gap on .hj-header-right'
+    return {
+      viewport: window.innerWidth,
+      shown,
+      cutPx: shown ? text.scrollWidth - text.clientWidth : 0,
+      clearancePx: Math.min(lockup.left - menu.right, firstRight.left - lockup.right),
+      controlGapPx: Number.parseFloat(getComputedStyle(rightCluster).columnGap),
+      mark: { left: box.left, right: box.right, width: Math.round(box.width) },
+    }
+  })
+  if (typeof state === 'string') throw new Error(`brand lockup probe: no ${state} at ${page.viewportSize()?.width}px`)
+  return state
+}
+
 test.describe('Header fit', () => {
   // The nav crossfades its background at scrollY > 60 and the hero staggers its
   // children in. Neither moves the header's own box, but measuring 141 widths
@@ -74,6 +155,9 @@ test.describe('Header fit', () => {
     test(`no header control leaves the viewport at any supported width — ${state}`, async ({
       page,
     }) => {
+      // A 141-width sweep: ~11-13s alone, a third of the default budget. See the note on the
+      // lockup sweep below for what that costs under the full suite.
+      test.slow()
       await page.goto('/')
       await expect(page.locator('header')).toBeVisible()
 
@@ -165,6 +249,99 @@ test.describe('Header fit', () => {
     }
 
     expect(unreachable, `Header controls unreachable:\n  ${unreachable.join('\n  ')}`).toEqual([])
+  })
+
+  test('the brand lockup is whole or absent at every width — never cut off', async ({ page }) => {
+    // The same 141-width sweep plus the breakpoint's two pixels: 10.6-11.7s alone (eight runs,
+    // 2026-10-04), and once past 30s inside the full two-worker suite, where it shares the
+    // machine with the 14-route glyph-coverage pass. Its cost is the width count, not a wait
+    // that can hang, so the budget is tripled rather than the sweep thinned.
+    test.slow()
+    // ADR 016 makes the brand the thing that gives. Since 2026-10-04 it gives in two steps: the
+    // name stays whole while it fits, and below NAME_SHOWN_FROM_PX it is not rendered at all and
+    // the knot mark carries the brand alone. What must never happen is the third state an
+    // ellipsis allows — "HEALTHY JEWEL…" — which reads as a fault rather than a choice.
+    await page.goto('/')
+    await expect(page.locator('header')).toBeVisible()
+
+    const judge = async (p: Page): Promise<Offender[]> => {
+      const state = await lockupState(p)
+      const out: Offender[] = []
+      if (state.shown && state.cutPx > 0)
+        out.push({ label: `the name, cut off by ${state.cutPx}px`, overhangPx: state.cutPx, edge: 'right' })
+      if (state.shown && state.clearancePx < state.controlGapPx)
+        out.push({
+          label: `the name has ${state.clearancePx.toFixed(1)}px of air beside a control (needs ${state.controlGapPx}px)`,
+          overhangPx: 0,
+          edge: 'right',
+        })
+      if (state.shown !== state.viewport >= NAME_SHOWN_FROM_PX)
+        out.push({ label: `the name is ${state.shown ? 'shown' : 'hidden'} at ${state.viewport}px`, overhangPx: 0, edge: 'right' })
+      if (state.mark.width < MARK_PX.min || state.mark.width > MARK_PX.max)
+        out.push({ label: `the knot mark is ${state.mark.width}px wide`, overhangPx: 0, edge: 'right' })
+      if (state.mark.left < 0) out.push({ label: 'the knot mark', overhangPx: -state.mark.left, edge: 'left' })
+      if (state.mark.right > state.viewport)
+        out.push({ label: 'the knot mark', overhangPx: state.mark.right - state.viewport, edge: 'right' })
+      return out
+    }
+    const findings = await sweep(page, SWEEP, judge)
+    expect(findings.length).toBe(Math.floor((SWEEP.to - SWEEP.from) / SWEEP.step) + 1)
+    // The breakpoint's own two pixels: the last width without the name and the first with it.
+    for (const width of [NAME_SHOWN_FROM_PX - 1, NAME_SHOWN_FROM_PX]) {
+      findings.push(...(await sweep(page, { from: width, to: width, step: 1 }, judge)))
+    }
+
+    const failures = findings.filter((f) => f.offenders.length > 0)
+    expect(
+      failures.map((f) => `${f.width}px — ${f.offenders.map((o) => o.label).join('; ')}`),
+      'The header lockup must show the whole name or none of it, with the mark inside the viewport.'
+    ).toEqual([])
+  })
+
+  test('the name is shown only where it fits whole with room around it, and hidden only just below that', async ({
+    page,
+  }) => {
+    // The breakpoint is a measurement, not a guess: force the name visible, find the narrowest
+    // width at which it is uncut, pushes no control off-screen, and keeps at least the gap the
+    // controls keep between themselves on both sides — then require the breakpoint to sit at or
+    // above that width. Printed on every run so the headroom is visible before it is spent.
+    //
+    // The first estimate, made before this test existed, said the name could not fit at 320px
+    // at all. Measured, it fits there with 4.9px to spare each side: not a cut, but not a
+    // composition either. "Fits" had to mean "fits with air", or the test would pass a header a
+    // designer would reject.
+    await page.goto('/')
+    // Force the configuration that would render if the name were kept: the name shown, and the
+    // mark at its beside-the-name size rather than the larger size it takes when alone.
+    await page.addStyleTag({
+      content:
+        '.hj-lockup[data-variant="inline"] .hj-lockup-text { display: inline !important; } ' +
+        `.hj-lockup[data-variant="inline"] .hj-lockup-mark { width: ${MARK_PX.min}px !important; height: ${MARK_PX.min}px !important; }`,
+    })
+
+    const fitsWhole: FitProbe = async (p) => {
+      const offenders = await headerFits(p)
+      const state = await lockupState(p)
+      if (state.cutPx > 0) offenders.push({ label: 'the name, cut off', overhangPx: state.cutPx, edge: 'right' })
+      if (state.clearancePx < state.controlGapPx)
+        offenders.push({ label: 'the name, crowding a control', overhangPx: 0, edge: 'right' })
+      return offenders
+    }
+    const mobile = LAYOUT_SEGMENTS[0]
+    const fitsFrom = await minimumFittingWidth(page, fitsWhole, mobile)
+    test.info().annotations.push({
+      type: 'brand lockup',
+      description:
+        `whole name fits with the controls' spacing from ${fitsFrom ?? 'never'}px; ` +
+        `shown from ${NAME_SHOWN_FROM_PX}px` +
+        (fitsFrom === null ? '' : `; ${NAME_SHOWN_FROM_PX - fitsFrom}px of headroom`),
+    })
+    expect(fitsFrom, `the whole name never fits in ${mobile.label}`).not.toBeNull()
+    expect(fitsFrom as number, 'the name is shown where it crowds a control').toBeLessThanOrEqual(NAME_SHOWN_FROM_PX)
+    expect(
+      NAME_SHOWN_FROM_PX - (fitsFrom as number),
+      `the name is hidden on ${NAME_SHOWN_FROM_PX - (fitsFrom as number)}px of widths where it fits`
+    ).toBeLessThanOrEqual(BREAKPOINT_HEADROOM_MAX_PX)
   })
 
   test('the mobile overlay carries everything the header sheds', async ({ page }) => {

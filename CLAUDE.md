@@ -1,7 +1,7 @@
-# CLAUDE.md — Healthy Jewelry Website
+# CLAUDE.md — Healthy Jewellery Website
 
 ## Brand Identity
-Healthy Jewelry is a premium titanium and non-corrosion metal jewelry brand. Implant-grade materials, biocompatible, designed for people with metal sensitivities.
+Healthy Jewellery is a premium titanium and non-corrosion metal jewelry brand. Implant-grade materials, biocompatible, designed for people with metal sensitivities.
 
 **Positioning**: *Metal that works with your body.*
 No stones. No gemstones. No healing crystals. No chakras. Pure material science.
@@ -20,7 +20,10 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 ## Tech Stack
 - Framework: Next.js 16, App Router, TypeScript (strict mode)
 - Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`)
-- Fonts: Barlow Condensed (display) + DM Sans (UI + body)
+- Fonts: Zen Kaku Gothic Antique for every role of the site's text, and Barlow Condensed for the
+  brand name alone, both self-hosted (latin slice) from `src/app/fonts/`. Barlow Condensed + DM
+  Sans set everything until 2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md));
+  the name kept its face by the owner's ruling ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md))
 - State: **none.** This said "Zustand (cart store)" until 2026-09-20; `src/store/` and the
   dependency both went with the bag. Nothing on this site holds client state across a
   navigation, which is a property worth keeping rather than an absence to fill.
@@ -28,14 +31,14 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 - Deployment: Vercel (auto-deploy on push to `main`)
 - Testing: Vitest + Testing Library (80%+ coverage required)
 
-## Design System — T4 (Void-White Dominant)
+## Design System — T4 (Pampas ground dominant)
 
 | Token | Hex | Use |
 |-------|-----|-----|
-| `--bg` | #F7F5F1 | Void-white — dominant background |
+| `--bg` | #F3F2EC | Pampas ground (warm grey-beige) — dominant background |
 | `--nacre` | #EDEAE4 | Card tile background |
 | `--ash` | #D8D3CB | Borders, dividers |
-| `--graphite` | #6B6762 | Secondary text |
+| `--graphite` | #4A4744 | Secondary text (the Tundora role) |
 | `--ink` | #1A1714 | Primary text, logo |
 | `--titanium` | #9DA7AF | Accent — borders, tints, fills, text on dark |
 | `--titanium-text` | #59636B | Titanium-toned **text** on light backgrounds |
@@ -47,8 +50,8 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--mid` | #2C2926 | Dark hover states |
 
 **Contrast rule**: the two chromatic accents are both below the WCAG AA 4.5:1 floor on `--bg` —
-`--titanium` at 2.25:1 and `--sage` at 2.36:1 — so each has a darkened sibling for text. Use
-`--titanium-text` (5.64:1) and `--sage-text` (6.02:1) for any accent-toned copy on a light surface;
+`--titanium` at 2.18:1 and `--sage` at 2.29:1 — so each has a darkened sibling for text. Use
+`--titanium-text` (5.47:1) and `--sage-text` (5.84:1) for any accent-toned copy on a light surface;
 the raw accents are fine for borders, tints, and (for `--titanium`) text on `--ink`/`--black`.
 Neither `-text` token is a general-purpose text colour: both fail on dark surfaces, where
 `--on-dark` and `--mist` apply.
@@ -70,41 +73,93 @@ option, because "unclassified" is how `--sage` shipped as 9–13px text at 1.97:
 - `--ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00)` (sharp snap)
 
 ### Typography
-- `--font-display` → Barlow Condensed (section labels, CTAs, product names, collection numbers, nav)
-- `--font-ui` → DM Sans (nav links, metadata, labels, eyebrows, utility)
-- `--font-body` → DM Sans (body text, prices, descriptions)
+One family sets every role of the site's text. The three tokens stay separate because they name
+**roles**, and the case rule keys on the role:
+- `--font-display` → headings, product and collection names, collection numbers, the menu
+  overlay's links. **Set in the case they are written in** (the catalogue writes Title Case),
+  **at a declared weight**, tracked with `--tracking-display` / `--tracking-name`.
+- `--font-ui` → nav controls, eyebrows, buttons, badges, metadata, the logotype. Small, and the
+  only role that may be set in tracked capitals.
+- `--font-body` → body text and descriptions.
+- `--font-brand` → **the brand name, and nothing else**: the logotype in the header and the
+  footer, in Barlow Condensed, the typography it had before the Songmont reference — 500 in the
+  header, 400 in the footer, in tracked capitals. The owner's ruling (2026-10-04,
+  [ADR 048](docs/adr/048-the-name-keeps-its-own-face.md)): Songmont is a reference for the site,
+  not a template for the brand. `typography-weights.test.ts` fails if any rule but
+  `.hj-lockup-text` uses it, and `e2e/glyph-coverage.spec.ts` if any other element renders in it.
 
 **Loaded weights — never request one that isn't here:**
 
 | Token | Font | Weights available |
 |-------|------|-------------------|
-| `--font-display` | Barlow Condensed | **400, 500** |
-| `--font-ui` / `--font-body` | DM Sans | **300, 400, 500** |
+| `--font-display` / `--font-ui` / `--font-body` | Zen Kaku Gothic Antique | **400, 500** |
+| `--font-brand` (the brand name only) | Barlow Condensed | **400, 500** |
+
+There is deliberately **no 300**. Weight numbers do not carry between families: measured as ink
+per unit of text, this family's 300 lays down about half of what the DM Sans 300 it replaced did,
+and its 400 nearly all of it. Body copy and small labels are therefore 400, which is what keeps
+them as dark as they shipped (`src/app/fonts/README.md`).
 
 A weight with no downloaded face is not ignored — the browser *synthesises* it,
 smearing the strokes of the nearest face and distorting the letterforms, so the text reads as a
 different typeface. Nine pages once asked Barlow Condensed for 700 and rendered a fake bold beside the
 homepage's real 500. Enforced by `src/tests/unit/typography-weights.test.ts`, which resolves each
 `--font-*` token back to its loader and fails on any weight that font does not ship. To use a heavier
-face, add it to the `next/font` call in `src/app/layout.tsx` first.
+face, add its file to the `localFont` call in `src/app/layout.tsx` first.
+
+The same test fails a `--font-display` style that forces capitals or that **inherits** its weight.
+The second is not pedantry: twenty-seven headings inherited the body's 300 and rendered at 400
+only because Barlow Condensed had no 300 face; the first family with a real Light turned every
+one of them Light.
+
+**The face draws 219 characters, and nothing else renders in it.** Only the latin slice ships, so
+a character outside it — an arrow, a check mark — is drawn by the fallback face mid-line. Use what
+the slice has (`src/app/fonts/README.md`), or ship the slice that has it. Enforced over
+`src/content/**` by `font-files.test.ts` (which also reads each file's own weight class, licence
+and SHA-256) and over every route's rendered text by `e2e/glyph-coverage.spec.ts`.
+
+**The browser draws only what the site shipped, and the same tier is the same weight everywhere**
+([ADR 050](docs/adr/050-one-face-means-no-borrowed-ones.md)). Measured 2026-10-09 by asking Chrome
+which face drew every text node on 48 page states: the faces were right, but the *requests* were not.
+`<strong>` and `<th>` asked for 700 (faked bold), the footer tagline was italic on every page (a
+sheared upright gothic), the 410 page was set in `system-ui`, and one heading tier had two weights.
+So: `font-synthesis: none` on `<html>`; `strong, b, th` are 500 and `em, i, …` are upright; **nothing is
+italic**; **h1 is 500, display text at `--text-lg` or smaller is 500, larger display text is 400**
+(by size *token*, not computed size, because the tokens are `clamp()`s); a piece's name is
+`.hj-card-name`; **nothing is declared below `--text-xs`'s minimum** (0.7rem), so use the token; and a
+document outside the layout (the 410 page, `global-error.tsx`) declares the face itself from
+`src/lib/design/siteFace.ts`, whose two files in `public/fonts/` are the loader's, byte for byte.
+Enforced by `type-system-floor.test.ts`, the tier rule in `typography-weights.test.ts`, and
+`e2e/rendered-fonts.spec.ts`, which reads Chrome's own report of the face, weight, style and size used.
 
 **Page titles use `PageHeader`** (`src/components/ui/PageHeader.tsx`) — never a hand-rolled `<h1>`.
 Two variants, chosen by what the page is for: `display` for brand/marketing routes (Our Story, Contact,
 Materials, Stores) and `compact` for utility/legal routes (FAQ, Shipping, Terms, Privacy, Legal). The
 homepage hero is the one exception, since it owns `--text-hero`.
 
-### Architecture (Gentle Monster style)
-- Horizontal scroll strips on homepage (no product grids)
-- Void-white (#F7F5F1) everywhere
-- Single dark interruption: campaign band (#0A0A0A)
-- Nav: transparent → frosted glass (scrollY > 60)
-- Cards: image + name + price only (minimal)
+### Architecture — quiet editorial, referenced to Songmont
+The design reference is Songmont (the owner's choice, 2026-10-04; it was Gentle Monster before).
+**A reference, not a template** (the owner's ruling, 2026-10-04): take what suits Healthy
+Jewellery and leave what does not; much of it would not. Its typeface is not studied further,
+and the brand name keeps its own. What was verified about it, what was adopted, and what was
+decided from the language without the live page is in `DESIGN.md`, "Reference: Songmont" — read
+that before changing a token, a section or a card.
+- Horizontal scroll strips on homepage (no product grids), each with a "View All" link
+- The Pampas ground (`--bg`) everywhere, with `--graphite` carrying secondary text in the
+  Tundora role
+- Single dark interruption: the Care band (`CareSection`, ADR 040). The campaign band it
+  replaced is gone
+- Nav: transparent over the hero → solid `--bg` with a hairline (scrollY > 60). Flat: no blur,
+  no shadow (`design-consistency.test.ts`). It said "frosted glass" until 2026-10-04.
+- Cards: image + name + material — never a price (see "No prices, anywhere"). Listing cards crop
+  3:4 (`--ratio-product`), the same crop as the homepage's collection and material tiles; the
+  product detail tile alone is square ([ADR 044](docs/adr/044-decided-from-the-language-not-the-page.md))
 
 ### Header composition — two layouts, breakpoint at 768px
-- **≥769px**: brand lockup · centred primary links · Search · Bag.
-- **≤768px**: brand lockup · Bag · Menu. **Search moves into the full-screen
-  overlay** (`.hj-desktop-only`), which also carries the three primary links. It is not
-  duplicated — the header copy is `display: none` down here.
+- **≥769px**: MENU · centred brand lockup (knot mark + name) · SEARCH · CONTACT.
+- **≤768px**: MENU · brand lockup · a Search icon. CONTACT leaves the bar; the full-screen
+  overlay carries every `mainNav` link and a second Search. (Until 2026-10-04 these two lines
+  described a Bag control and centred primary links, neither of which survived the redesign.)
 - The header **must fit 320px**. It did not: with four controls in the bar it required 414px
   empty and 435px with a bag badge, so on every phone the MENU button — the only route to
   navigation there is — was cut off at the viewport edge. See
@@ -115,16 +170,38 @@ homepage hero is the one exception, since it owns `--text-hero`.
   the defect cost, and replacing them with today's figures would falsify that account rather
   than correct it. The live number is the one `e2e/header-fit.spec.ts` prints on every run
   as a `minimum fitting width` annotation — read that, not this line.
-- **The brand gives, the controls never do.** The brand link is `flex: 0 1 auto; min-width: 0`
-  and the wordmark ellipsises; the control cluster is `flexShrink: 0`. A truncated wordmark is
-  a cosmetic loss, an unreachable control is a functional one. This is why the 768px breakpoint
+- **The brand gives, the controls never do.** The lockup's column can shrink
+  (`.hj-header-center { min-width: 0 }`), the mark never does, and the name is shown whole or
+  not at all: below 360px the name is not rendered and the knot mark stands alone, because a
+  cut-off name reads as a fault. Measured 2026-10-04, the whole name keeps the controls' own 24px spacing from 353px
+  in Barlow Condensed — the face the name is set in (ADR 048) — at the header's own size, with no
+  phone-only override (the spec bounds the gap to the breakpoint at 16px either way).
+  An unreachable control is a functional loss; a hidden name is not. This is why the 768px breakpoint
   is a *composition* choice rather than a correctness dependency: get it wrong and the layout
   degrades instead of amputating.
 - Enforced by `e2e/header-fit.spec.ts`, which sweeps 320–1440px and binary-searches the
-  narrowest fitting width per layout mode. Probes are geometric — element boxes against
+  narrowest fitting width per layout mode, and prints the lockup's measured headroom as a
+  `brand lockup` annotation. Probes are geometric — element boxes against
   `window.innerWidth` — because `scrollWidth` is blind here twice over (the header is `fixed`,
   and `globals.css` sets `overflow-x: hidden`), and because `toBeVisible()` and `.click()` both
   pass on a control whose centre is off-screen.
+
+### Brand name and mark
+- The name renders only through `SITE_NAME` ("Healthy Jewellery", spelled as the domain is).
+  `LEGAL_ENTITY_NAME` ("Healthy Jewelry") is the registered company on `/legal`, `/terms`,
+  `/privacy`, `/shipping` and the footer's copyright line, and is counsel's to change (WS-H).
+  `brand-name.test.ts` fails on a typed copy of either spelling anywhere else in rendered code.
+- The mark is rendered by `BrandLockup.tsx` in the header and the footer, from `BRAND_MARK_SRC`:
+  lossless PNG at 1x, 2x and 3x, served as they are. **Its background is transparent, exactly**
+  (the owner's instruction, ADR 048), which rules out the image optimiser: its lossy re-encode
+  left alpha where the mark is clear. The browser-tab icon is transparent too. The home-screen
+  icon and the search-engine logo stay on a `--black` tile because their platforms cannot show
+  transparency (iOS paints it black; Google lays the logo on white).
+  Every served copy is derived from `assets/brand/knot-master.png` by
+  `node scripts/build-brand-mark.mjs` — never exported from an image editor.
+  `brand-mark-asset.test.ts` compares each copy with what the master derives, pixel for pixel,
+  and checks its edges for the black matte the master was keyed out of. See
+  [ADR 041](docs/adr/041-a-transparent-logo-is-a-measurement.md).
 
 ## Homepage Section Sequence
 Seven beats, decided in [ADR 040](docs/adr/040-seven-beats-one-strip.md) (the earlier eight-beat
@@ -163,7 +240,8 @@ change all three together.
 5. CollectionGrid — 5 collection paths (Charms and Earrings tiles use real photography; Rings/Necklaces/Bracelets still use the SVG placeholder pending photos)
 6. RealMoment — "The Moment"
 7. FollowUp — links come from `SOCIAL_LINKS`, never a generic domain
-8. Footer
+
+Then the Footer, which is site chrome rather than a beat (it was numbered 8 under "seven beats").
 
 ## Product Detail Page — the image tile
 
@@ -254,7 +332,9 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - Named + default exports on all components
 - Run `pnpm lint && pnpm build` before every commit
 - Run `pnpm test` — maintain 80%+ coverage
-- Commit format: `feat|fix|style|content|test|chore: description`
+- Commit format: `feat|fix|docs|style|content|test|refactor|perf|chore: description` — the same
+  types `.github/PULL_REQUEST_TEMPLATE.md` lists (the two disagreed about `docs`, `refactor`
+  and `perf` until 2026-10-04)
 
 ## Testing & CI
 Full detail in **`docs/testing-strategy.md`**. In short:
@@ -265,6 +345,18 @@ Full detail in **`docs/testing-strategy.md`**. In short:
   automated coverage the UI layer has.** Anything a user has to see or click belongs in `e2e/`.
 - Presence is not visibility. `e2e/visual-assets.spec.ts` asserts imagery actually renders — bytes
   arrive, the box is non-zero, and the effective opacity clears the legibility floor.
+- **And absence is invisible to both.** Every per-image check passes on zero images: the logo
+  was missing from the header and footer for the whole redesign, and everything stayed green.
+  `e2e/visual-assets.spec.ts` now asserts the marks are *there*.
+- **A page can be measured before it arrives.** The root `loading.tsx` fallback can still be on
+  screen when `page.goto` resolves, with the real page in a hidden streamed segment; a probe that
+  measured then saw zero-sized boxes and passed. `settle()` waits for the reveal, and a probe
+  root with no box throws. See [ADR 042](docs/adr/042-a-page-measured-before-it-arrived.md).
+- **And every page is measured, not only the ones a spec was written for.**
+  `e2e/responsive-sweep.spec.ts` visits all 14 page routes at every width its project stands
+  for and fails on anything past the viewport, a control under 24px, overlapping controls, or a
+  page error. Its first run found `/search`'s button off-screen at 320px — a page no geometric
+  spec had visited. See [ADR 045](docs/adr/045-a-form-is-a-request-from-anywhere.md).
 - **And visibility is not reachability.** `toBeVisible()` returns true for a control whose centre
   is outside the viewport, and `.click()` deliberately aims at an in-viewport point instead, so
   both pass on a button a thumb cannot hit. `e2e/support/viewportFit.ts` measures geometry
@@ -283,10 +375,23 @@ Full detail in **`docs/testing-strategy.md`**. In short:
   becomes a question about execution — see
   [ADR 027](docs/adr/027-governance-and-execution-are-different-questions.md), enforced by
   `src/tests/unit/workflow-condition-contract.test.ts`.
+- **`pnpm-lock.yaml` is regenerated, never merged.** Twice a lockfile conflict was resolved by
+  keeping both sides of every hunk — the second time in GitHub's web editor on PR #101 — and each
+  time pnpm, CI and Vercel refused the result (`ERR_PNPM_BROKEN_LOCKFILE`). `.gitattributes` now
+  sets `merge=binary`, so git leaves no hunks to keep. The "Manifest and lockfile integrity" step,
+  which passed on that lockfile, now reads its keys and both files' conflict markers before the
+  install. Resolve with `docs/runbooks/lockfile-conflicts.md`. See
+  [ADR 046](docs/adr/046-a-resolved-conflict-is-a-write-nobody-reviewed.md).
+- **A server function ships what it traces.** A `readFile` whose path Turbopack cannot resolve
+  traces the whole repository into the function — tests, ADRs and scripts went out with the
+  product share card on every deploy, shown only as a build warning. Write filesystem paths at the
+  call (`path.join(process.cwd(), 'public/…')`). `scripts/audit-function-traces.mjs` fails
+  `verify` on any repository file in a trace that `RUNTIME_READS` does not name, and on a named
+  runtime read missing from its trace. See [ADR 047](docs/adr/047-a-function-ships-what-it-traces.md).
 
 ## PROHIBITED
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand
 - ~~Healing, mystical, spiritual copy~~
 - ~~"HealingBadge", "StoneCard"~~ — use Badge, ProductCard
-- ~~Dark background as default~~ — void-white is dominant
+- ~~Dark background as default~~ — the Pampas ground (`--bg`) is dominant
 - ~~Product grids on homepage~~ — horizontal scroll strips only

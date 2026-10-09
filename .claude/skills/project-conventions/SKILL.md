@@ -33,20 +33,32 @@ flag it if you see:
   spiritual copy anywhere in content or component names.
 - Component names like `HealingBadge` or `StoneCard` (should be `Badge`,
   `ProductCard`).
-- A dark background used as the *default* — void-white (`--bg: #F7F5F1`) is
-  the dominant background; the single sanctioned dark surface is the
-  Campaign Band (`--black: #0A0A0A`).
+- A dark background used as the *default* — the Pampas ground (`--bg`, see the
+  token table in `CLAUDE.md`) is the dominant background; the single sanctioned
+  dark surface is the Care band (`--black`), per ADR 040.
 - Product grids added to the homepage — homepage uses horizontal scroll
-  strips only, per the Gentle Monster-style architecture in `CLAUDE.md`.
+  strips only, per the architecture in `CLAUDE.md` (referenced to Songmont
+  since 2026-10-04; it was Gentle Monster before).
 
 ## Testing baseline
 
-The suite spans **113 unit spec files** and **18 E2E spec files**.
+The suite spans **121 unit spec files** and **21 E2E spec files**.
 
 Those two counts are the machine-checked half of this section:
 `src/tests/unit/doc-numeric-claims.test.ts` reconciles them against the filesystem, so a
 spec file disappearing fails the gate instead of quietly lowering the bar. Do not edit
 them by hand to make a check pass — re-measure, and if the number really moved, ask why.
+
+**It rose by two on 2026-10-04**: `brand-name` (one spelling of the brand, typed once) and
+`brand-mark-asset` (the served knot mark is derived from the master, with no black matte at
+its edges). See docs/adr/041. **And by two unit and one E2E later the same day**, with the move
+to one self-hosted typeface: `font-files` (each file is the weight, licence and SHA-256 the
+loader and README say), `font-file-reader` (the WOFF2 reader those checks rely on, against
+fonts built byte by byte) and `e2e/glyph-coverage` (every character a route renders is one the
+face draws, and the face loaded). See docs/adr/043. **And by one of each again with the
+2026-10-04 audit**: `search-param` (a repeated query parameter becomes one string) and
+`e2e/responsive-sweep` (every page route at every width its project stands for: nothing past
+the viewport, 24px targets, no overlapping controls, no page errors). See docs/adr/045.
 
 **The unit count fell from 91 to 86 on 2026-09-20, and the reason is on the record rather
 than in a diff.** The Shopify decommission deleted seven specs whose subjects no longer

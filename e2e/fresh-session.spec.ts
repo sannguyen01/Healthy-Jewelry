@@ -1,6 +1,7 @@
 import { test, expect, type BrowserContext, type Page, type Response } from './support/test'
 import { approvedRoutes } from './support/contract'
 import { getAllCollections, getAllProducts } from '../src/lib/catalog'
+import { networkQuiet } from './support/networkQuiet'
 
 /**
  * **A visitor who looks at everything leaves with nothing.**
@@ -133,7 +134,7 @@ async function scrollThrough(page: Page, response: Response | null) {
     window.scrollTo(0, document.documentElement.scrollHeight)
     await frame()
   })
-  await page.waitForLoadState('networkidle')
+  await networkQuiet(page)
 }
 
 test.describe('A fresh session leaves nothing behind', () => {

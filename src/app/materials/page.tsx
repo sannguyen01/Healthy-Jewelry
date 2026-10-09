@@ -12,13 +12,14 @@ import {
   materialStandard,
   toMaterialHandle,
 } from '@/lib/catalog'
+import { SITE_NAME } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Materials',
   // "The science of biocompatible jewelry metals — hypoallergenic, corrosion-proof,
   // MRI-safe" until 2026-09-26: three claims and an implication in one search snippet.
   description:
-    'Grade 23 titanium (Ti-6Al-4V ELI), anodized niobium and 316L surgical steel: the three metals Healthy Jewelry works in, each named by its exact specification.',
+    `Grade 23 titanium (Ti-6Al-4V ELI), anodized niobium and 316L surgical steel: the three metals ${SITE_NAME} works in, each named by its exact specification.`,
 }
 
 /**
@@ -138,7 +139,7 @@ export default function MaterialsPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '580px',
             }}
           >
@@ -172,6 +173,7 @@ export default function MaterialsPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: '5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
@@ -185,9 +187,9 @@ export default function MaterialsPage() {
                 <h2
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: 'var(--text-2xl)',
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-display)',
                     color: 'var(--ink)',
                     margin: '0 0 8px',
                     lineHeight: 1.1,
@@ -218,7 +220,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.75,
-                    fontWeight: 300,
+                    fontWeight: 400,
                     margin: '0 0 28px',
                   }}
                 >
@@ -336,7 +338,7 @@ export default function MaterialsPage() {
                           padding: '14px 20px',
                           color: 'var(--ink)',
                           borderBottom: '1px solid var(--ash)',
-                          fontWeight: 300,
+                          fontWeight: 400,
                         }}
                       >
                         {cell}
@@ -379,11 +381,10 @@ export default function MaterialsPage() {
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontSize: 'var(--text-lg)',
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-display)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
-                    fontWeight: 400,
+                    fontWeight: 500,
                   }}
                 >
                   {item.q}
@@ -394,7 +395,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.75,
-                    fontWeight: 300,
+                    fontWeight: 400,
                     margin: 0,
                   }}
                 >

@@ -34,7 +34,7 @@ export function ProductBadge({ badge, className }: ProductBadgeProps) {
       className={badgeClass + (className ? ` ${className}` : '')}
       style={{
         fontFamily: 'var(--font-ui)',
-        fontSize: '9px',
+        fontSize: 'var(--text-xs)',
         letterSpacing: '0.15em',
         textTransform: 'uppercase',
       }}

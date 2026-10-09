@@ -139,9 +139,9 @@ export function ContactForm() {
         <span
           style={{
             fontFamily: 'var(--font-display)',
+            fontWeight: 400,
             fontSize: 'var(--text-xl)',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-display)',
             // --text-xl clamps 22.4px -> 35.2px, so this crosses WCAG's 24px
             // large-text boundary mid-viewport: it is normal text needing 4.5:1
             // on a phone and large text needing 3:1 on a desktop. --sage-text
@@ -157,7 +157,7 @@ export function ContactForm() {
             fontSize: 'var(--text-base)',
             color: 'var(--graphite)',
             lineHeight: 1.7,
-            fontWeight: 300,
+            fontWeight: 400,
             margin: 0,
           }}
         >
@@ -168,7 +168,11 @@ export function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
+    // method + action are what a submit does before this component hydrates, or with scripts
+    // off: a POST to the API, which answers with a page. Without them the browser's default
+    // was a GET to this page, which put the visitor's name, email and message in the URL —
+    // and so in history and request logs — and sent nothing (found 2026-10-04).
+    <form method="post" action="/api/contact" onSubmit={handleSubmit} noValidate>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Name */}
         <div>

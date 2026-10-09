@@ -1,12 +1,13 @@
 import { test, expect, type Page } from './support/test'
+import { SITE_NAME } from '../src/config/site'
 
 test.describe('Contact page — layout', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/contact')
   })
 
-  test('page title includes Healthy Jewelry', async ({ page }) => {
-    await expect(page).toHaveTitle(/healthy jewelry/i)
+  test('page title includes the brand name', async ({ page }) => {
+    await expect(page).toHaveTitle(new RegExp(SITE_NAME))
   })
 
   test('page heading is visible', async ({ page }) => {
@@ -238,5 +239,38 @@ test.describe('Contact form — submission', () => {
 
     await expect(page.getByText(/something went wrong/i)).toBeVisible({ timeout: 8000 })
     await expect(page.getByRole('link', { name: /hello@healthyjewellery\.com/i })).toBeVisible()
+  })
+})
+
+test.describe('Contact form — before JavaScript, or without it', () => {
+  // A visitor who submits before the page hydrates — or browses with scripts off — gets the
+  // browser's own form submission. Until 2026-10-04 the form had no method or action, so that
+  // was a GET to /contact with the name, email and message in the query string: in history,
+  // in request logs, and nothing sent.
+  test.use({ javaScriptEnabled: false })
+
+  test('posts to the API, keeps what was typed out of every URL, and answers with a page', async ({
+    page,
+  }) => {
+    const navigations: string[] = []
+    page.on('request', (r) => {
+      if (r.isNavigationRequest()) navigations.push(`${r.method()} ${r.url()}`)
+    })
+    await page.goto('/contact')
+    await page.locator('input[name="name"]').fill('Ada Lovelace')
+    await page.locator('input[name="email"]').fill('ada@example.com')
+    await page.locator('textarea[name="message"]').fill('A private question about sizing.')
+    // Enter in a field is the browser's implicit submission — the way a keyboard user sends a
+    // form, and free of a click's actionability checks, which outlive the page they began on.
+    await Promise.all([page.waitForURL('**/api/contact'), page.locator('input[name="email"]').press('Enter')])
+
+    // CI holds no RESEND_API_KEY, so the real route answers 503 — honestly, as a page.
+    await expect(page.getByRole('heading', { name: /your message was not sent/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /return to the contact page/i })).toBeVisible()
+
+    expect(navigations.some((n) => n.startsWith('POST ') && n.endsWith('/api/contact'))).toBe(true)
+    for (const navigation of navigations) {
+      expect(navigation, 'a typed value reached a URL').not.toMatch(/Ada|Lovelace|example\.com|sizing/)
+    }
   })
 })

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './support/test'
+import { LEGAL_ENTITY_NAME, SITE_NAME } from '../src/config/site'
 
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
@@ -6,7 +7,7 @@ test.describe('Homepage', () => {
   })
 
   test('renders page title', async ({ page }) => {
-    await expect(page).toHaveTitle(/healthy jewelry/i)
+    await expect(page).toHaveTitle(new RegExp(SITE_NAME))
   })
 
   test('hero section is visible', async ({ page }) => {
@@ -64,7 +65,7 @@ test.describe('Homepage', () => {
   })
 
   test('footer shows copyright', async ({ page }) => {
-    await expect(page.getByText(/© 2026 Healthy Jewelry/i)).toBeVisible()
+    await expect(page.getByText(`© 2026 ${LEGAL_ENTITY_NAME}`)).toBeVisible()
   })
 
   test('horizontal scroll strip shows product cards', async ({ page }) => {
@@ -82,6 +83,27 @@ test.describe('Homepage', () => {
     const productLinks = page.locator('a[href^="/products/"]')
     await expect(productLinks.first()).toBeVisible()
     await expect(await productLinks.count()).toBeGreaterThan(1)
+  })
+
+  test('the strip offers a mouse a scrollbar, and leaves touch without one', async ({ page }, testInfo) => {
+    // A plain wheel scrolls vertically only. With the bar hidden everywhere, the cards past
+    // the strip's edge (2 of 6 at 1280px) were reachable by mouse only with Shift+wheel
+    // (found 2026-10-04). Fine pointers get a hairline bar; touch scrolls sideways natively.
+    //
+    // Asserted on the computed `scrollbar-width`, not on the bar's box: Playwright launches
+    // headless Chromium with --hide-scrollbars, so no scrollbar ever takes layout space here
+    // and `offsetHeight - clientHeight` reads 0 whatever the stylesheet says.
+    const strip = page.locator('.hj3-noscroll').first()
+    await expect(strip).toBeVisible()
+    const m = await strip.evaluate((el: HTMLElement) => ({
+      fine: matchMedia('(hover: hover) and (pointer: fine)').matches,
+      overflow: el.scrollWidth - el.clientWidth,
+      scrollbar: getComputedStyle(el).scrollbarWidth,
+    }))
+    // Each project must exercise the branch it is here for, or this proves nothing.
+    expect(m.fine, `pointer media in ${testInfo.project.name}`).toBe(testInfo.project.name !== 'mobile')
+    expect(m.overflow, 'the strip no longer overflows, so this checks nothing').toBeGreaterThan(0)
+    expect(m.scrollbar).toBe(m.fine ? 'thin' : 'none')
   })
 
   test('the homepage quotes no prices', async ({ page }) => {

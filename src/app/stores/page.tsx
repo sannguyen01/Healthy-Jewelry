@@ -2,14 +2,14 @@ import type { Metadata } from 'next'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { CONTACT_EMAIL, SITE_DOMAIN } from '@/config/site'
+import { CONTACT_EMAIL, SITE_DOMAIN, SITE_NAME } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Locations',
   description:
     // Neutralised with /shipping's and /terms' on 2026-09-26: "shipped worldwide with free
     // delivery" is a commercial term, and in a search snippet it reads as a store's offer.
-    'How to see and arrange a Healthy Jewelry piece: through an ambassador, or by showroom appointment.',
+    `How to see and arrange a ${SITE_NAME} piece: through an ambassador, or by showroom appointment.`,
 }
 
 export default function StoresPage() {
@@ -34,7 +34,7 @@ export default function StoresPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '560px',
               margin: 0,
             }}
@@ -46,7 +46,7 @@ export default function StoresPage() {
               sentence left in the catalogue after the decommission, because it is the page
               somebody reads when they want to know how to actually get one.
             */}
-            Arranged in person, through a Healthy Jewelry ambassador — then shipped
+            Arranged in person, through a {SITE_NAME} ambassador — then shipped
             worldwide, free, wherever you are.
           </p>
         </section>
@@ -74,7 +74,7 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
-                fontSize: '0.62rem',
+                fontSize: 'var(--text-xs)',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
                 color: 'var(--titanium-text)',
@@ -86,9 +86,9 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: '0 0 20px',
               }}
@@ -103,7 +103,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: '0 0 16px',
               }}
             >
@@ -117,7 +117,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: 0,
               }}
             >
@@ -129,7 +129,7 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
-                fontSize: '0.62rem',
+                fontSize: 'var(--text-xs)',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
                 color: 'var(--titanium-text)',
@@ -141,9 +141,9 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: '0 0 20px',
               }}
@@ -158,7 +158,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: '0 0 16px',
               }}
             >
@@ -171,7 +171,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: 0,
               }}
             >
@@ -200,7 +200,7 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
-                fontSize: '0.62rem',
+                fontSize: 'var(--text-xs)',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
                 color: 'var(--graphite)',
@@ -212,9 +212,9 @@ export default function StoresPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: 0,
               }}
@@ -227,7 +227,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: 0,
               }}
             >

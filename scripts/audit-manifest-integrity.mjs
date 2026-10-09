@@ -2,15 +2,19 @@
 /**
  * **The step before `pnpm install`, because the failure it looks for kills `pnpm install`.**
  *
- * Runs the two questions in `scripts/lib/manifest-integrity.mjs` against this repository's
+ * Runs the four questions in `scripts/lib/manifest-integrity.mjs` against this repository's
  * real `package.json` and `pnpm-lock.yaml`:
  *
- *   1. Does `package.json` declare the same key twice among its siblings?
- *   2. Do the manifest's effective ranges and the lockfile's recorded ranges agree?
+ *   1. Does either file carry a git conflict marker?
+ *   2. Does `package.json` declare the same key twice among its siblings?
+ *   3. Does `pnpm-lock.yaml` declare the same key twice among its siblings?
+ *   4. Do the manifest's effective ranges and the lockfile's recorded ranges agree?
  *
- * Both answers were wrong on `main` at `4c7c5f6`, produced by a text merge that emitted no
- * conflict marker. See `scripts/lib/manifest-integrity.mjs` and
- * [ADR 031](../docs/adr/031-a-clean-merge-is-not-a-correct-merge.md) for the incident.
+ * Questions 2 and 4 were both wrong on `main` at `4c7c5f6`, produced by a text merge that
+ * emitted no conflict marker ([ADR 031](../docs/adr/031-a-clean-merge-is-not-a-correct-merge.md)).
+ * Question 3 was wrong on PR #101 at `ed7594a`, produced by a conflict resolution that kept
+ * both sides, while this step printed two ticks above the install that died on it
+ * ([ADR 046](../docs/adr/046-a-resolved-conflict-is-a-write-nobody-reviewed.md)).
  *
  * Dependency-free, importing nothing but `node:fs` and `node:path`, so it survives the state
  * it exists to report — a check on the dependency manifest that needed the dependencies
@@ -22,7 +26,12 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { findDuplicateJsonKeys, compareSpecifiers } from './lib/manifest-integrity.mjs'
+import {
+  findDuplicateJsonKeys,
+  findDuplicateLockfileKeys,
+  findConflictMarkers,
+  compareSpecifiers,
+} from './lib/manifest-integrity.mjs'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 
@@ -37,9 +46,52 @@ const ROOT = path.resolve(import.meta.dirname, '..')
  * @param {string} lockfileSource
  */
 export function audit(manifestSource, lockfileSource) {
+  const markers = {
+    manifest: findConflictMarkers(manifestSource),
+    lockfile: findConflictMarkers(lockfileSource),
+  }
   const duplicates = findDuplicateJsonKeys(manifestSource)
-  const specifiers = compareSpecifiers(JSON.parse(manifestSource), lockfileSource)
-  return { ok: duplicates.length === 0 && specifiers.status === 'ok', duplicates, specifiers }
+  const lockfile =
+    markers.lockfile.length > 0
+      ? { status: /** @type {const} */ ('unevaluable'), duplicates: [], reason: 'pnpm-lock.yaml carries conflict markers, so its keys were not read.' }
+      : findDuplicateLockfileKeys(lockfileSource)
+  const specifiers = compareParsed(manifestSource, lockfileSource, markers)
+  const findings =
+    markers.manifest.length +
+    markers.lockfile.length +
+    duplicates.length +
+    lockfile.duplicates.length +
+    (specifiers.status === 'divergent' ? 1 : 0)
+  return {
+    ok: findings === 0 && specifiers.status === 'ok' && lockfile.status === 'ok',
+    findings,
+    markers,
+    duplicates,
+    lockfile,
+    specifiers,
+  }
+}
+
+/**
+ * The range comparison, if there is a manifest to compare. A manifest carrying conflict
+ * markers is not JSON, and before 2026-10-04 `JSON.parse` threw out of this probe with a
+ * stack trace in place of a verdict.
+ */
+function compareParsed(manifestSource, lockfileSource, markers) {
+  if (markers.manifest.length > 0 || markers.lockfile.length > 0) {
+    return { status: /** @type {const} */ ('unevaluable'), divergences: [], reason: 'a conflict marker has to be resolved before the two files can be compared.' }
+  }
+  let manifest
+  try {
+    manifest = JSON.parse(manifestSource)
+  } catch (error) {
+    return {
+      status: /** @type {const} */ ('unevaluable'),
+      divergences: [],
+      reason: `package.json is not valid JSON (${error instanceof Error ? error.message : String(error)}).`,
+    }
+  }
+  return compareSpecifiers(manifest, lockfileSource)
 }
 
 /**
@@ -50,8 +102,24 @@ export function audit(manifestSource, lockfileSource) {
  * @param {ReturnType<typeof audit>} verdict
  * @returns {string[]}
  */
-export function render({ duplicates, specifiers }) {
-  const out = [`${duplicates.length === 0 ? '✓' : '✗'} package.json declares each key once`]
+export function render({ markers, duplicates, lockfile, specifiers }) {
+  const markerCount = markers.manifest.length + markers.lockfile.length
+  const out = [`${markerCount === 0 ? '✓' : '✗'} neither file carries a conflict marker`]
+
+  if (markerCount > 0) {
+    out.push('')
+    for (const [file, found] of [['package.json', markers.manifest], ['pnpm-lock.yaml', markers.lockfile]]) {
+      for (const m of found) out.push(`  · ${file} line ${m.line}: ${m.marker}`)
+    }
+    out.push(
+      '',
+      'A merge was committed before its conflicts were resolved. Resolve package.json by',
+      'hand; never resolve pnpm-lock.yaml by hand — take the base branch\'s copy and let',
+      'pnpm rebuild it (docs/runbooks/lockfile-conflicts.md).'
+    )
+  }
+
+  out.push('', `${duplicates.length === 0 ? '✓' : '✗'} package.json declares each key once`)
 
   if (duplicates.length > 0) {
     out.push('')
@@ -67,6 +135,30 @@ export function render({ duplicates, specifiers }) {
       'Pick the intended version for each key above, delete the other, then regenerate the',
       'lockfile with `pnpm install --no-frozen-lockfile` — never by editing it.'
     )
+  }
+
+  const lockfileMark = lockfile.duplicates.length > 0 ? '✗' : lockfile.status === 'ok' ? '✓' : '?'
+  out.push('', `${lockfileMark} pnpm-lock.yaml declares each key once`)
+
+  if (lockfile.duplicates.length > 0) {
+    out.push('')
+    for (const d of lockfile.duplicates) {
+      out.push(`  · ${[...d.path, d.key].join(' > ')} — line ${d.line}, first declared on line ${d.firstLine}`)
+    }
+    out.push(
+      '',
+      'pnpm refuses this file (ERR_PNPM_BROKEN_LOCKFILE), so the install after this step and',
+      'every Vercel build fail on it. It is the shape a lockfile conflict leaves when both sides are kept —',
+      "GitHub's conflict editor, or an editor's \"Accept Both\" — and the repository's",
+      '.gitattributes now stops git from text-merging this file at all. Never resolve it by',
+      "hand: take the base branch's copy and let pnpm rebuild it from package.json:",
+      '',
+      '    git checkout origin/main -- pnpm-lock.yaml && pnpm install --lockfile-only',
+      '',
+      'See docs/runbooks/lockfile-conflicts.md.'
+    )
+  } else if (lockfile.status === 'unevaluable') {
+    out.push('', `  ${lockfile.reason}`)
   }
 
   out.push('', `${{ ok: '✓', divergent: '✗', unevaluable: '?' }[specifiers.status]} package.json and pnpm-lock.yaml name the same versions`)
@@ -98,8 +190,11 @@ export function render({ duplicates, specifiers }) {
  *
  * @param {ReturnType<typeof audit>} verdict
  */
-export function exitCode({ ok, specifiers }) {
-  if (specifiers.status === 'unevaluable') return 2
+export function exitCode({ ok, findings, lockfile, specifiers }) {
+  // A finding outranks "could not run": a conflict marker makes the comparison impossible,
+  // and the marker, not the impossibility, is what somebody has to act on.
+  if (findings > 0) return 1
+  if (specifiers.status === 'unevaluable' || lockfile.status === 'unevaluable') return 2
   return ok ? 0 : 1
 }
 

@@ -69,6 +69,8 @@ const INTENTIONALLY_NOT_FOUND: Record<string, string> = {
     'Asserts a real 404 rather than the static fallback catalogue — ADR 004.',
   '/shop/not-a-collection':
     'Asserts the collection route 404s on an unknown handle (dynamicParams = false).',
+  '/this-page-does-not-exist':
+    'Measures the typography of the 404 page the app renders, and asserts the status is 404 (rendered-fonts.spec.ts, ADR 050).',
 }
 
 function specFiles(): string[] {

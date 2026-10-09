@@ -23,6 +23,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { ImageResponse } from 'next/og'
 import { getAllProducts } from '@/lib/catalog'
+import { SITE_NAME } from '@/config/site'
 
 /**
  * **This file was `opengraph-vnd-font.test.tsx`, and the glyph it was named for is no
@@ -62,7 +63,7 @@ async function bundledFonts() {
 
 /** Every character the card can be asked to draw, from the catalogue itself. */
 function cardCharacters(): string {
-  const parts: string[] = ['HEALTHY JEWELRY']
+  const parts: string[] = [SITE_NAME.toUpperCase()]
   for (const product of getAllProducts()) {
     parts.push(product.title.toUpperCase())
     parts.push(product.materialLabel.toUpperCase())

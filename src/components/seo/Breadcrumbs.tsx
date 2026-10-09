@@ -16,7 +16,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
   return (
     <>
       <style>{`
-        .hj-bc-link { color: var(--graphite); text-decoration: none; transition: color 0.2s ease; }
+        .hj-bc-link { color: var(--graphite); text-decoration: none; transition: color 0.2s ease; display: inline-flex; align-items: center; min-height: 24px; }
         .hj-bc-link:hover { color: var(--ink); }
       `}</style>
       <nav

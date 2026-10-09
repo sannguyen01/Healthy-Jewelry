@@ -4,11 +4,12 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { JewelrySVG } from '@/components/svg/JewelrySVG'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { SITE_NAME } from '@/config/site'
 
 export const metadata: Metadata = {
   title: 'Our Story',
   description:
-    'Why Healthy Jewelry works in three metals — Grade 23 titanium, niobium and 316L surgical steel — and names each by its exact specification.',
+    `Why ${SITE_NAME} works in three metals — Grade 23 titanium, niobium and 316L surgical steel — and names each by its exact specification.`,
 }
 
 /*
@@ -46,7 +47,7 @@ export default function AboutPage() {
               color: 'var(--graphite)',
               lineHeight: 1.7,
               maxWidth: '620px',
-              fontWeight: 300,
+              fontWeight: 400,
             }}
           >
             Most jewelry is made for display cases. Ours is made to be worn. Every piece is one of
@@ -75,9 +76,9 @@ export default function AboutPage() {
             <h2
               style={{
                 fontFamily: 'var(--font-display)',
+                fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                letterSpacing: 'var(--tracking-display)',
                 color: 'var(--ink)',
                 margin: '0 0 24px',
               }}
@@ -93,7 +94,7 @@ export default function AboutPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 300,
+                fontWeight: 400,
                 margin: '0 0 20px',
               }}
             >
@@ -108,11 +109,11 @@ export default function AboutPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 300,
+                fontWeight: 400,
               }}
             >
               We asked one question: what would jewelry look like if every piece were named by its
-              exact alloy? Healthy Jewelry is our answer — each piece described by its material
+              exact alloy? {SITE_NAME} is our answer — each piece described by its material
               specification, and nothing said about it that we cannot document.
             </p>
           </div>
@@ -183,6 +184,7 @@ export default function AboutPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: '3.5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
@@ -196,9 +198,9 @@ export default function AboutPage() {
                 <h3
                   style={{
                     fontFamily: 'var(--font-display)',
+                    fontWeight: 400,
                     fontSize: 'var(--text-xl)',
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-display)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
                   }}
@@ -212,7 +214,7 @@ export default function AboutPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.7,
-                    fontWeight: 300,
+                    fontWeight: 400,
                     margin: 0,
                   }}
                 >
@@ -239,9 +241,9 @@ export default function AboutPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-2xl)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
               margin: 0,
             }}
@@ -259,7 +261,7 @@ export default function AboutPage() {
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               lineHeight: 1.75,
-              fontWeight: 300,
+              fontWeight: 400,
               margin: 0,
             }}
           >
@@ -287,9 +289,9 @@ export default function AboutPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
+              fontWeight: 400,
               fontSize: 'var(--text-display)',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+              letterSpacing: 'var(--tracking-display)',
               color: 'var(--bg)',
               margin: 0,
             }}
@@ -303,7 +305,7 @@ export default function AboutPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--ash)',
               lineHeight: 1.6,
-              fontWeight: 300,
+              fontWeight: 400,
               maxWidth: '480px',
               margin: 0,
             }}

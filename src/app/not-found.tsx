@@ -18,6 +18,7 @@ export default function NotFound() {
       <p
         style={{
           fontFamily: 'var(--font-display)',
+          fontWeight: 400,
           fontSize: 'clamp(6rem, 20vw, 14rem)',
           color: 'var(--ash)',
           lineHeight: 1,
@@ -31,8 +32,7 @@ export default function NotFound() {
       <h1
         style={{
           fontFamily: 'var(--font-display)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
+          letterSpacing: 'var(--tracking-display)',
           fontSize: 'clamp(1.4rem, 3vw, 2rem)',
           color: 'var(--ink)',
           margin: '0 0 12px',
@@ -44,7 +44,7 @@ export default function NotFound() {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 300,
+          fontWeight: 400,
           fontSize: '0.9rem',
           color: 'var(--graphite)',
           margin: '0 0 40px',

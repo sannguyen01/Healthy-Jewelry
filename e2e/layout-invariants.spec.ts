@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { test, expect, type Page } from './support/test'
 import { OVERHANG_TOLERANCE_PX, settle } from './support/viewportFit'
 
 /**
- * Layout invariants that a visual restyle (calmer, editorial, square 1:1 crops, consistent
- * section rhythm) must not break. Written BEFORE the restyle, so every number below is
+ * Layout invariants that a visual restyle (calmer, editorial, one listing crop, consistent
+ * section rhythm) must not break. The crop was square until 2026-10-04 and is 3:4 since
+ * (ADR 044); the card probe reads it from `--ratio-product` rather than restating it. Written BEFORE the restyle, so every number below is
  * derived from reading the CSS/TSX at the time, not from a run. Where a probe is expected
  * to be red against the pre-restyle build, the comment on it says so.
  *
@@ -177,8 +180,16 @@ test.describe('images match their containers', () => {
 const CURRENCY = /[$€£¥₫]|\b(USD|EUR|GBP|VND|JPY|AUD|CAD)\b|\bprice\b|\b\d+[.,]\d{2}\b/i
 const MATERIAL = /\b(titanium|niobium|steel)\b/i
 
+/** `--ratio-product` as width / height, read from the stylesheet the cards are drawn with. */
+const LISTING_RATIO = (() => {
+  const css = readFileSync(join(__dirname, '../src/app/globals.css'), 'utf8')
+  const match = css.match(/--ratio-product:\s*([\d.]+)\s*\/\s*([\d.]+);/)
+  if (!match) throw new Error('--ratio-product is not a ratio in globals.css')
+  return Number(match[1]) / Number(match[2])
+})()
+
 test.describe('/shop product cards', () => {
-  test('are square tiles with name + material and no price', async ({ page }) => {
+  test('take the listing crop, with name + material and no price', async ({ page }) => {
     const failures: string[] = []
     for (const width of WIDTHS) {
       await visit(page, '/shop', width)
@@ -204,8 +215,10 @@ test.describe('/shop product cards', () => {
         const where = `${width}px ${card.href}`
         if (card.w === 0 || card.h === 0) {
           failures.push(`${where}: zero-size tile`)
-        } else if (Math.abs(card.w / card.h - 1) > RATIO_TOLERANCE) {
-          failures.push(`${where}: tile ${card.w.toFixed(0)}x${card.h.toFixed(0)} is not square`)
+        } else if (Math.abs(card.w / card.h - LISTING_RATIO) > RATIO_TOLERANCE) {
+          failures.push(
+            `${where}: tile ${card.w.toFixed(0)}x${card.h.toFixed(0)} is not the listing crop (${LISTING_RATIO.toFixed(3)})`
+          )
         }
         if (card.lines.length < 2)
           failures.push(
@@ -607,12 +620,31 @@ test.describe('JavaScript disabled', () => {
         // disabled under viewport emulation, which collapses the hero and everything after it
         // in the measurement without any visitor ever seeing that.
         text: (el.textContent ?? '').trim().length,
+        // Opacity, visibility and text all read normally inside a `[hidden]` ancestor, which is
+        // how this test passed while the whole page shipped in `<div hidden id="S:0">` behind
+        // the root loading.tsx fallback, and a visitor without JavaScript saw only "LOADING"
+        // (found in review, 2026-10-04; the fallback is gone). So ask the question directly.
+        hiddenAncestor: el.closest('[hidden]') !== null,
       }))
     )
     expect(sections.length, 'no sections rendered without JS').toBeGreaterThanOrEqual(7)
     expect(
-      sections.filter((s) => s.opacity !== 1 || s.visibility !== 'visible' || s.text === 0),
+      sections.filter((s) => s.opacity !== 1 || s.visibility !== 'visible' || s.text === 0 || s.hiddenAncestor),
       'a section is hidden or collapsed without JavaScript'
     ).toEqual([])
+
+    const page_ = await page.evaluate(() => ({
+      headerHidden: document.querySelector('header')?.closest('[hidden]') !== null,
+      // A loading placeholder that is actually on screen: rendered, and not inside [hidden].
+      loadingShown: [...document.querySelectorAll('body *')].some(
+        (el) =>
+          el.children.length === 0 &&
+          /^loading$/i.test((el.textContent ?? '').trim()) &&
+          el.closest('[hidden]') === null &&
+          getComputedStyle(el).display !== 'none'
+      ),
+    }))
+    expect(page_.headerHidden, 'the header is inside a hidden streamed segment without JavaScript').toBe(false)
+    expect(page_.loadingShown, 'a "Loading" placeholder is what a visitor without JavaScript sees').toBe(false)
   })
 })

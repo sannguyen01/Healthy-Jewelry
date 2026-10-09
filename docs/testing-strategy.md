@@ -333,10 +333,38 @@ place.
 - **A dead control.** The header search button rendered correctly, was keyboard-focusable, had a
   correct `aria-label`, and had no `onClick`. It shipped that way. No unit test could see it; the
   component rendered exactly as written.
-- **WCAG AA contrast failures.** `--titanium` (#9DA7AF) is 2.25:1 on `--bg` — used as 10-12px body copy
+- **WCAG AA contrast failures.** `--titanium` (#9DA7AF) is 2.18:1 on `--bg` — used as 10-12px body copy
   in nine places. Two were on the homepage, where axe found them.
 
 Neither is a crash. Both are the kind of defect that quietly costs conversions.
+
+### What the browser drew is not what the CSS asked for
+
+`e2e/glyph-coverage.spec.ts` asks whether every *character* is in the face and whether the face
+loaded. `e2e/rendered-fonts.spec.ts` asks what Chrome *used*, node by node, through
+`CSS.getPlatformFontsForNode` (the call behind the inspector's Rendered Fonts pane), and compares it
+with what the CSS requested. That is the only place a faked bold, a sheared italic or a system font
+shows, because in each the computed `font-family` is correct. It covers 16 routes (the 404 and the 410
+included) and the open menu, in both projects, and fails on a face that is not ours, a weight outside
+400 and 500, a non-normal style, or text below the label floor. Placeholders are not text nodes, so form controls
+are held to inheriting the page's family instead. Its two races, both found writing it, are the phone
+footer collapsing after hydration and a page measured before it arrived (ADR 042). See
+[ADR 050](adr/050-one-face-means-no-borrowed-ones.md).
+
+### The image optimiser is warmed before the suite, and a wait names what it waits for
+
+`e2e/global-setup.ts` runs once after the server is up and asks it for every `/_next/image` variant
+the eleven pages reference, serially, twice (cold, then warm), under a 20s ceiling per request.
+A variant the server will not answer fails *setup*, naming the URL and the pass, instead of twelve
+tests timing out twice at `networkidle` with nothing named. It is a mitigation for an intermittent,
+unexplained stall on Next 16.3.8, not a fix. [ADR 049](adr/049-a-wait-that-names-what-it-waits-for.md)
+has the evidence, what it does not prove, and the condition for removing it.
+
+Its decision is a pure function on a string and its wait is bounded, so both are tested apart from
+a browser (`src/tests/unit/image-primer.test.ts`) against a stub server that really hangs.
+`e2e/support/networkQuiet.ts` is the same idea at the test level: the wait is unchanged, but on a
+miss it reports the unfinished images, the loading fonts and the requests still in flight, and asks
+the server again for each, so a recurrence is a named URL and not a guess.
 
 ---
 
@@ -524,7 +552,7 @@ documented pairing, rather than 25 minutes into E2E against whatever happens to 
 pages the a11y spec visits.
 
 `--titanium` is the accent token: borders, tints, fills, and text on dark surfaces (7.29:1 on `--ink`).
-`--titanium-text` (#59636B, 5.64:1 on `--bg`) is what carries titanium-toned text on light surfaces.
+`--titanium-text` (#59636B, 5.47:1 on `--bg`) is what carries titanium-toned text on light surfaces.
 The test asserts that `--titanium` **fails** AA on `--bg`, so the reason the second token exists is
 itself part of the contract.
 
@@ -541,6 +569,16 @@ For visual assets specifically, `e2e/visual-assets.spec.ts` is the model. Presen
 the tiles that started this whole effort were present, requested successfully, and invisible. Assert
 that the bytes arrive (`naturalWidth > 0`), that the element occupies space, and that the **effective**
 opacity — the product of the element's own and every ancestor's — clears the legibility floor.
+
+### …and a typeface is a file, not a name
+
+A `font-family` declaration says which face to *ask* for. What renders depends on the file: which
+weights it really is, which characters it draws, whether it arrived. All three fail silently — a
+missing weight is synthesised or rounded, a missing glyph comes from the fallback face, a missing
+file leaves the fallback everywhere. So `font-files.test.ts` reads each shipped file's own tables
+(`src/lib/design/fontFile.ts`), and `e2e/glyph-coverage.spec.ts` holds the rendered text of every
+route to them and asks the browser which face each role used. See
+[ADR 043](adr/043-one-family-and-the-case-it-is-written-in.md).
 
 ### …and visibility is not legibility
 

@@ -73,17 +73,50 @@ export interface Offender {
 export type FitProbe = (page: Page) => Promise<Offender[]>
 
 /**
+ * A streamed Suspense segment React has delivered but not yet revealed. The page arrives as
+ * the root `loading.tsx` fallback plus a `<div hidden id="S:0">` holding the real content, and
+ * an inline `$RC` swaps them — but React batches reveals, so the swap can land ~250ms *after*
+ * the load event `page.goto` waits for. Measured 2026-10-04 on the production build: about
+ * 1 cold load in 40 is still on "LOADING" when `goto` resolves.
+ */
+const UNREVEALED_SEGMENT = 'div[hidden][id^="S:"]'
+
+/**
  * Guarantees a layout change has been painted before anything is measured.
  * Same double-`requestAnimationFrame` idiom `hero-legibility.spec.ts` uses
  * before its screenshots, for the same reason: one frame is not enough.
+ *
+ * It first waits for any streamed segment to be revealed. Without that, a probe measuring the
+ * header found the copy inside the hidden segment: every box zero, so nothing reached past the
+ * viewport, so the sweep passed having measured nothing. The brand-lockup probe was the first to
+ * fail loudly on it instead of passing quietly, which is how it was found.
  */
 export async function settle(page: Page): Promise<void> {
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      )
+  // One round trip, as before the reveal wait existed: the sweep calls this 141 times per test
+  // and runs close to its time budget on the mobile project, and a `waitForFunction` per width
+  // added a second round trip that, once in a few runs, stalled long enough to time a test out.
+  const unrevealed = await page.evaluate(
+    ({ selector, deadlineMs }) =>
+      new Promise<string[]>((resolve) => {
+        const started = performance.now()
+        const check = () => {
+          const pending = [...document.querySelectorAll(selector)].map((el) => el.id)
+          if (pending.length > 0 && performance.now() - started < deadlineMs) {
+            setTimeout(check, 50)
+            return
+          }
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve(pending)))
+        }
+        check()
+      }),
+    { selector: UNREVEALED_SEGMENT, deadlineMs: 10_000 }
   )
+  if (unrevealed.length > 0) {
+    throw new Error(
+      `settle: streamed segment(s) ${unrevealed.join(', ')} still unrevealed after 10s at ` +
+        `${page.viewportSize()?.width}px — the page never finished arriving.`
+    )
+  }
 }
 
 /**
@@ -104,6 +137,10 @@ export async function offendersPastViewport(
     ({ selector, tolerance }) => {
       const root = document.querySelector(selector)
       if (!root) return null
+      // A root with no box is not a root that fits: it is one that is not on screen — inside an
+      // unrevealed streamed segment, say — and everything under it would measure zero too.
+      const rootBox = root.getBoundingClientRect()
+      if (rootBox.width === 0 && rootBox.height === 0) return 'no-box' as const
 
       const viewportWidth = window.innerWidth
       const offenders: Array<{ label: string; overhangPx: number; edge: 'left' | 'right' }> = []
@@ -145,6 +182,13 @@ export async function offendersPastViewport(
       `offendersPastViewport: no element matches ${JSON.stringify(rootSelector)}. ` +
         'This probe has no default to fall back to — a missing root must fail the test, ' +
         'never silently report that nothing overflows.'
+    )
+  }
+  if (found === 'no-box') {
+    throw new Error(
+      `offendersPastViewport: ${JSON.stringify(rootSelector)} has no box — it is not laid out. ` +
+        'Measuring it would report that nothing overflows because nothing is there. Call ' +
+        'settle() after navigating, so a streamed segment is revealed before it is measured.'
     )
   }
   return found

@@ -20,7 +20,7 @@ import {
   getAllProducts,
   getAllCollections,
 } from '@/lib/catalog'
-import { SITE_DEFAULT_TITLE } from '@/config/site'
+import { SITE_DEFAULT_TITLE, SITE_NAME } from '@/config/site'
 import { dedupeInOrder } from '@/lib/utils/homepageStrips'
 
 const SITE = { kind: 'site' } as const
@@ -33,7 +33,7 @@ export function generateMetadata(): Metadata {
     openGraph: {
       title: SITE_DEFAULT_TITLE,
       description: `${claimText('brand-positioning', SITE)} No stones. No fillers. Pure material integrity.`,
-      siteName: 'Healthy Jewelry',
+      siteName: SITE_NAME,
       locale: 'en_US',
       type: 'website',
     },

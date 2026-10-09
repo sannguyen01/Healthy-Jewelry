@@ -1,4 +1,5 @@
 import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/goneResponse'
+import { SITE_NAME } from '@/config/brand'
 
 /**
  * `/checkout` — **410 Gone**, deliberately, and not a redirect.
@@ -36,7 +37,7 @@ import { AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP, goneRoute } from '@/lib/http/go
  * indexable. The reasoning above is the part worth keeping in this file; the bytes are not.
  */
 const COPY = {
-  title: 'Checkout is closed — Healthy Jewellery',
+  title: `Checkout is closed — ${SITE_NAME}`,
   heading: 'This catalogue no longer accepts online orders.',
   paragraphs: [AMBASSADOR_NEXT_STEP, BROWSE_NEXT_STEP],
 } as const

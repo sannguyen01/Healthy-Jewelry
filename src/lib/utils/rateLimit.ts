@@ -380,22 +380,25 @@ export function createRateLimiter(policy: RateLimitPolicy): RateLimiter {
  * original client; taking the whole header would bucket every request from one
  * proxy path together, and taking the last would bucket by Vercel's own edge.
  *
- * ## An unverified assumption, stated rather than implied
+ * ## The assumption, and where it was checked
  *
  * That reasoning is correct **only if the platform overwrites a client-supplied
- * `x-forwarded-for` rather than appending to it.** If it appends, the first
- * entry is attacker-controlled, and rotating it defeats every limiter in this
- * codebase — including `/api/contact`'s 5/hour guard on a paid email API.
+ * `x-forwarded-for` rather than appending to it.** If it appended, the first
+ * entry would be attacker-controlled, and rotating it would defeat every limiter
+ * in this codebase — including `/api/contact`'s 5/hour guard on a paid email API.
  *
- * As of 2026-09-15 this has **not** been checked against Vercel's documentation:
- * the sandbox that reviewed it had no public-web egress, and a trust boundary is
- * not something to settle from memory (ADR 018 — a claim about a control is not
- * a control). The behaviour below is therefore unchanged, and the open question
- * is recorded here rather than in somebody's head.
+ * Open from 2026-09-15 (the sandbox that wrote this had no public-web egress, and a
+ * trust boundary is not something to settle from memory — ADR 018). **Settled
+ * 2026-10-04 against Vercel's own documentation** (vercel.com/docs/headers/request-headers,
+ * read through the Vercel documentation connector): "Vercel overwrites this header and
+ * does not forward external IPs to prevent spoofing, unless a trusted proxy is enabled
+ * for Enterprise customers." So on this deployment the first entry is Vercel's, not
+ * the client's. The condition that would reopen it is named in that sentence: enabling
+ * a trusted proxy in front of Vercel makes the chain the proxy's to write, and this
+ * function would then have to take the entry that proxy appends.
  *
- * `rateLimit.test.ts` asserts what this function does today, in both the
- * single-entry and multi-entry cases, so whichever way the question resolves the
- * change is a one-line edit against a test that already describes the contract.
+ * `rateLimit.test.ts` asserts what this function does, in both the single-entry
+ * and multi-entry cases.
  */
 export function clientIp(headers: Headers): string {
   const forwarded = headers.get('x-forwarded-for')

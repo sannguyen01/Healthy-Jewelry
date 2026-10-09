@@ -60,6 +60,10 @@ export function HorizontalScroll({
             textTransform: 'uppercase',
             color: 'var(--graphite)',
             flexShrink: 0,
+            // A 24px hit area (WCAG 2.5.8) around a line of small type that was 19-20px tall.
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: '24px',
             transition: 'color 0.2s var(--ease)',
           }}
           onMouseEnter={(e) => {
@@ -69,7 +73,10 @@ export function HorizontalScroll({
             ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--graphite)'
           }}
         >
-          View All →
+          {/* No arrow glyph: U+2192 is outside the latin slice the brand face ships, so it
+              rendered in the fallback face mid-label (e2e/glyph-coverage.spec.ts). Songmont's
+              own "View all" carries none either. */}
+          View All
         </Link>
       </div>
 
@@ -141,17 +148,7 @@ export function HorizontalScroll({
 
             {/* Card info */}
             <div style={{ padding: '14px 0 0' }}>
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 500,
-                  fontSize: '0.9rem',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink)',
-                  margin: '0 0 4px',
-                }}
-              >
+              <p className="hj-card-name" style={{ margin: '0 0 4px' }}>
                 {product.title}
               </p>
               <p

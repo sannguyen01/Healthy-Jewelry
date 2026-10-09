@@ -28,10 +28,9 @@ export function CampaignBand({
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'var(--text-display)',
-            fontWeight: 500,
+            fontWeight: 400,
             color: 'var(--bg)',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
+            letterSpacing: 'var(--tracking-display)',
             margin: '0 0 28px',
             lineHeight: 1,
           }}
@@ -41,7 +40,7 @@ export function CampaignBand({
         <p
           style={{
             fontFamily: 'var(--font-body)',
-            fontWeight: 300,
+            fontWeight: 400,
             fontSize: 'var(--text-lg)',
             color: 'rgba(247,245,241,0.6)',
             lineHeight: 1.65,

@@ -1,22 +1,56 @@
 import type { Metadata, Viewport } from 'next'
-import { Barlow_Condensed, DM_Sans } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
-import { SITE_DEFAULT_TITLE, SITE_DESCRIPTION, SITE_URL } from '@/config/site'
+import { SITE_DEFAULT_TITLE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/config/site'
 import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
-const barlowCondensed = Barlow_Condensed({
-  weight: ['400', '500'],
-  subsets: ['latin'],
+/**
+ * One family for every role — display, UI and body — except the brand's own name, which keeps
+ * its original face (`barlowCondensed`, below). Songmont's identity sets everything in
+ * one family, the FW Tsukiji Gothic family (DESIGN.md, "Reference: Songmont"). Zen Kaku
+ * Gothic Antique is its closest openly licensed relative, an antique gothic with the same
+ * classical, brush-softened strokes.
+ *
+ * Self-hosted, and only the *latin* slice: Google serves this CJK family as 121 slices per
+ * weight, and `next/font/google` downloads every one of them at build time to serve the one
+ * a Latin page uses. The two files here are 9.7 KB each. There is no 300: weight numbers do
+ * not carry between families, and this one's 300 carries about half the ink DM Sans 300 did
+ * (globals.css, `body`), so the 300 role became 400. The characters they cover are the
+ * characters the site may render — `e2e/glyph-coverage.spec.ts` fails on any other, since a
+ * missing glyph silently renders in the fallback face. Provenance and licence:
+ * `src/app/fonts/README.md`; `font-files.test.ts` reads each file's own tables to hold the
+ * weights declared here to the weights the files actually are.
+ */
+const zenKakuGothicAntique = localFont({
+  src: [
+    { path: './fonts/zen-kaku-gothic-antique-latin-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/zen-kaku-gothic-antique-latin-500.woff2', weight: '500', style: 'normal' },
+  ],
   display: 'swap',
-  variable: '--font-bc',
+  variable: '--font-zk',
+  fallback: ['Helvetica Neue', 'Arial', 'sans-serif'],
 })
 
-const dmSans = DM_Sans({
-  weight: ['300', '400', '500'],
-  subsets: ['latin'],
+/**
+ * **The brand name keeps the typography it was given before the Songmont reference.** It is the
+ * owner's ruling (2026-10-04, ADR 048), not a lapse in "one family": Songmont is a reference
+ * for the site, not a template for the brand, and the logotype is the brand. Barlow Condensed
+ * sets the name as it did before: 500 in the header, 400 in the footer, in tracked capitals.
+ *
+ * Used by `--font-brand` and nothing else: `typography-weights.test.ts` fails if the token
+ * reaches any rule but the logotype's, so the second family cannot spread back into the
+ * site's text. Self-hosted latin slice for the same reasons as the family above; provenance,
+ * licence and hashes in `src/app/fonts/README.md`.
+ */
+const barlowCondensed = localFont({
+  src: [
+    { path: './fonts/barlow-condensed-latin-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-500.woff2', weight: '500', style: 'normal' },
+  ],
   display: 'swap',
-  variable: '--font-dm',
+  variable: '--font-bc',
+  fallback: ['Arial Narrow', 'Helvetica Neue', 'Arial', 'sans-serif'],
 })
 
 /**
@@ -36,7 +70,7 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: {
     default: SITE_DEFAULT_TITLE,
-    template: '%s — Healthy Jewelry',
+    template: `%s — ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
   keywords: [
@@ -50,15 +84,15 @@ export const metadata: Metadata = {
     'titanium necklaces',
     'grade 23 titanium',
   ],
-  authors: [{ name: 'Healthy Jewelry' }],
-  creator: 'Healthy Jewelry',
-  publisher: 'Healthy Jewelry',
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   metadataBase: new URL(SITE_URL),
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: SITE_URL,
-    siteName: 'Healthy Jewelry',
+    siteName: SITE_NAME,
     title: SITE_DEFAULT_TITLE,
     description: SITE_DESCRIPTION,
   },
@@ -83,7 +117,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#F7F5F1',
+  themeColor: '#F3F2EC',
 }
 
 /**
@@ -101,12 +135,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${barlowCondensed.variable} ${dmSans.variable}`}
+      className={`${zenKakuGothicAntique.variable} ${barlowCondensed.variable}`}
       style={
         {
-          '--font-display': 'var(--font-bc, "Barlow Condensed", sans-serif)',
-          '--font-ui': 'var(--font-dm, "DM Sans", sans-serif)',
-          '--font-body': 'var(--font-dm, "DM Sans", sans-serif)',
+          '--font-display': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
+          '--font-ui': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
+          '--font-body': 'var(--font-zk, "Zen Kaku Gothic Antique", sans-serif)',
+          '--font-brand': 'var(--font-bc, "Barlow Condensed", "Arial Narrow", sans-serif)',
         } as React.CSSProperties
       }
     >

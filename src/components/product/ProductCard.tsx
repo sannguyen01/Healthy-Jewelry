@@ -89,16 +89,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
         {/* Info bar */}
         <div style={{ padding: '16px' }}>
-          <p
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '0.95rem',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--ink)',
-              marginBottom: '4px',
-            }}
-          >
+          <p className="hj-card-name" style={{ marginBottom: '4px' }}>
             {product.title}
           </p>
 
