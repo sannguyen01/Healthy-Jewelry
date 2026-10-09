@@ -14,6 +14,9 @@ const launchOptions = chromiumExecutablePath
 
 export default defineConfig({
   testDir: './e2e',
+  // Warms the image optimiser serially and fails fast, naming the URL, if it will not answer —
+  // see e2e/support/imageVariants.ts. Runs after `webServer` is up.
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // One retry absorbs genuine flake. Two used to triple the wall-clock cost of

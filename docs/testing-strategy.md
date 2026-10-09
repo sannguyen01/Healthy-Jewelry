@@ -338,6 +338,21 @@ place.
 
 Neither is a crash. Both are the kind of defect that quietly costs conversions.
 
+### The image optimiser is warmed before the suite, and a wait names what it waits for
+
+`e2e/global-setup.ts` runs once after the server is up and asks it for every `/_next/image` variant
+the eleven pages reference, serially, twice (cold, then warm), under a 20s ceiling per request.
+A variant the server will not answer fails *setup*, naming the URL and the pass, instead of twelve
+tests timing out twice at `networkidle` with nothing named. It is a mitigation for an intermittent,
+unexplained stall on Next 16.3.8, not a fix. [ADR 049](adr/049-a-wait-that-names-what-it-waits-for.md)
+has the evidence, what it does not prove, and the condition for removing it.
+
+Its decision is a pure function on a string and its wait is bounded, so both are tested apart from
+a browser (`src/tests/unit/image-primer.test.ts`) against a stub server that really hangs.
+`e2e/support/networkQuiet.ts` is the same idea at the test level: the wait is unchanged, but on a
+miss it reports the unfinished images, the loading fonts and the requests still in flight, and asks
+the server again for each, so a recurrence is a named URL and not a guess.
+
 ---
 
 ## Gating policy

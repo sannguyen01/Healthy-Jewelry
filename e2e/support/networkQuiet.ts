@@ -40,6 +40,12 @@ export async function networkQuiet(page: Page, capMs: number = DEFAULT_CAP_MS): 
         images: [...document.images]
           .filter((img) => !img.complete)
           .map((img) => `${img.loading} ${img.currentSrc || img.src}`.slice(0, 160)),
+        // The same images, as bare URLs, to ask the server about. A request that started before
+        // this wait began is not in `inFlight` below (the map only sees what starts after it), and
+        // the run of 4806efc listed two unfinished images here with nothing in flight to re-ask.
+        imageUrls: [...document.images]
+          .filter((img) => !img.complete && (img.currentSrc || img.src))
+          .map((img) => img.currentSrc || img.src),
         fonts: [...document.fonts]
           .filter((face) => face.status === 'loading')
           .map((face) => face.family),
@@ -47,6 +53,7 @@ export async function networkQuiet(page: Page, capMs: number = DEFAULT_CAP_MS): 
       .catch(() => ({
         readyState: 'page not readable',
         images: [] as string[],
+        imageUrls: [] as string[],
         fonts: [] as string[],
       }))
     // Is the server wedged for everyone, or only for this browser? Ask it again, independently
@@ -67,11 +74,16 @@ export async function networkQuiet(page: Page, capMs: number = DEFAULT_CAP_MS): 
       }
     }
     const origin = new URL(page.url()).origin
-    const stuck = [...inFlight.values()].filter((r) => r.type === 'image').slice(0, 3)
+    const stuck = [
+      ...new Set([
+        ...[...inFlight.values()].filter((r) => r.type === 'image').map((r) => r.url),
+        ...known.imageUrls,
+      ]),
+    ].slice(0, 4)
     const reasked = await Promise.all([
       ...stuck.map(
-        async (r) =>
-          `${r.url.replace(/^https?:\/\/[^/]+/, '').slice(0, 110)} → ${await probe(r.url)}`
+        async (url) =>
+          `${url.replace(/^https?:\/\/[^/]+/, '').slice(0, 110)} → ${await probe(url)}`
       ),
       probe(`${origin}/robots.txt`).then((verdict) => `server liveness /robots.txt → ${verdict}`),
     ])

@@ -153,11 +153,27 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
     The diagnostic now also re-requests each stuck image, and `/robots.txt`, with Playwright's own
     HTTP client while the server is still up. That separates a server that never answers that URL
     from a request only the browser stalled on. Read that line first on the next failure.
-  - **Then it passed, with the same runtime code.** `56cbe4e` differs from the red `531b6eb` only in
-    the diagnostic's wait cap and in docs, and its E2E passed in full, so the stall is intermittent in CI,
-    not a deterministic failure of this Next version. On this Next version, two runs failed
-    (`434c3c9`, `531b6eb`) and one passed (`56cbe4e`). It is **not fixed and not explained**: the next
-    red run's re-request lines are the evidence to read, and a green run proves nothing about it.
+  - **Then it passed, then failed again, with the same runtime code.** `56cbe4e` differs from the red
+    `531b6eb` only in the diagnostic's wait cap and in docs, and its E2E passed in full; `4806efc`
+    (docs only again) failed the same twelve. On this Next version three of four runs failed
+    (`434c3c9`, `531b6eb`, `4806efc`) and one passed (`56cbe4e`), so the stall is intermittent in CI,
+    not a deterministic failure of this Next version. The third failure also exposed a gap: the
+    diagnostic only saw requests that started after it was called, so with two `lazy` images at
+    `w=3840` unfinished it had nothing in flight to re-ask.
+  - **Round 9 (mitigation, not a fix): the optimizer is warmed before the suite, serially.**
+    `e2e/global-setup.ts` requests every `/_next/image` variant on eleven pages, twice, under a 20s
+    ceiling, and fails setup naming the URL and the pass; `networkQuiet` now also re-asks every
+    incomplete `<img>`. Measured here on a cold cache: 43 variants, cold 35.0s, warm 0.2s, slowest
+    2.1s; the twelve tests pass beside it. I also read the 16.3.5 → 16.3.8 diff of the image path:
+    the rewrite is the **remote**-image fetch (unused here), `fetchInternalImage` and `sharp` are
+    identical, and a web search found no upstream report. [ADR 049](docs/adr/049-a-wait-that-names-what-it-waits-for.md)
+    has the evidence and how to read the next outcome: **green** is a supported inference that a cold
+    or concurrent first optimisation is the trigger (not proof, nothing about Vercel); **red at the
+    primer** is the first direct measurement and the failing URL is the upstream report. Remove it
+    when a Next release fixes the hang and three runs are green without it.
+  - **Local runs need `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium`.** This container's
+    Chromium is build 1194 and Playwright 1.63 wants 1243; without it every test dies at
+    `browserType.launch`, which looks like a wall of failures and tests nothing.
 - **Production admission is not configured, so a merge to `main` deploys whether or not CI is green.**
   Nothing about this branch should be merged while its E2E is red.
 - **Vercel project settings (owner, cosmetic):** Node.js Version reads `24.x`; set it to `22.x` to
