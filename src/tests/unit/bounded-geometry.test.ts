@@ -65,6 +65,26 @@ const ROOT = resolve(__dirname, '../../..')
  * Keyed `file | property | value`, which is stable across edits that move a line.
  */
 const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded'; why: string }> = {
+  'src/components/layout/MenuArchive.tsx | minWidth | 112': {
+    state: 'intrinsic',
+    why: 'The menu search button, in a flex row beside a `flex: 1` field. The floor stops "Search" being a sliver on a phone; the row caps the width and the label caps the button, which never grows past its text and padding.',
+  },
+  'src/app/globals.css | minHeight | 52px': {
+    state: 'intrinsic',
+    why: 'A row in the menu archive (.hj-archive-row): one line of text in a list the column bounds. The floor is the touch target (44px) with room, and a row only grows by wrapping its own label.',
+  },
+  'src/app/globals.css | minHeight | 64px': {
+    state: 'intrinsic',
+    why: 'A category in the menu archive (.hj-menu-link): one line of the title voice in a list. The floor is the board\'s 64px row; the label is the ceiling.',
+  },
+  'src/app/globals.css | minHeight | 96px': {
+    state: 'intrinsic',
+    why: 'A metal in the menu archive (.hj-archive-metal): an ordinal, a name and a specification in a three-track grid whose middle track wraps. The floor is the board\'s row; the content, not the floor, is what makes it taller.',
+  },
+  'src/app/globals.css | minHeight | 48px': {
+    state: 'intrinsic',
+    why: 'A text field (.hj-field). One line of input in a row the container bounds; the floor is the board\'s 48px control, comfortably past the 44px touch target.',
+  },
   'src/components/contact/ContactForm.tsx | minHeight | 140px': {
     state: 'intrinsic',
     why: "A <textarea>. Its height is the user's to change by dragging, and the floor only stops it opening as a single line. Capping it would fight the resize handle.",

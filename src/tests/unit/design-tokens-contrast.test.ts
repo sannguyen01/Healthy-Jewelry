@@ -67,25 +67,31 @@ const TEXT_PAIRINGS: Array<{
   background: string
   minimum: number
 }> = [
-  // Light surfaces
+  // Light surfaces. The Quiet Archive's four light grounds, each with the text roles that sit on it
+  // (ADR 051): ink for headings and the primary button, graphite for running text, ink-2 for
+  // captions and spec rows, the two accent-toned texts for eyebrows, badges and the footer.
   { label: 'ink on bg (primary text)', foreground: 'ink', background: 'bg', minimum: 4.5 },
+  { label: 'ink on subtle (alternate band)', foreground: 'ink', background: 'subtle', minimum: 4.5 },
   { label: 'ink on nacre (card text)', foreground: 'ink', background: 'nacre', minimum: 4.5 },
-  {
-    label: 'graphite on bg (secondary text)',
-    foreground: 'graphite',
-    background: 'bg',
-    minimum: 4.5,
-  },
-  {
-    label: 'graphite on nacre (secondary text on cards)',
-    foreground: 'graphite',
-    background: 'nacre',
-    minimum: 4.5,
-  },
+  { label: 'ink on bone (chip)', foreground: 'ink', background: 'bone', minimum: 4.5 },
+  { label: 'graphite on bg (running text)', foreground: 'graphite', background: 'bg', minimum: 4.5 },
+  { label: 'graphite on subtle', foreground: 'graphite', background: 'subtle', minimum: 4.5 },
+  { label: 'graphite on nacre (running text on cards)', foreground: 'graphite', background: 'nacre', minimum: 4.5 },
+  { label: 'graphite on bone', foreground: 'graphite', background: 'bone', minimum: 4.5 },
+  { label: 'ink-2 on bg (secondary text)', foreground: 'ink-2', background: 'bg', minimum: 4.5 },
+  { label: 'ink-2 on subtle', foreground: 'ink-2', background: 'subtle', minimum: 4.5 },
+  { label: 'ink-2 on nacre (captions on cards)', foreground: 'ink-2', background: 'nacre', minimum: 4.5 },
+  { label: 'ink-2 on bone (the thinnest margin, chip text)', foreground: 'ink-2', background: 'bone', minimum: 4.5 },
   {
     label: 'titanium-text on bg (metadata, eyebrows, footer)',
     foreground: 'titanium-text',
     background: 'bg',
+    minimum: 4.5,
+  },
+  {
+    label: 'titanium-text on subtle',
+    foreground: 'titanium-text',
+    background: 'subtle',
     minimum: 4.5,
   },
   {
@@ -95,7 +101,13 @@ const TEXT_PAIRINGS: Array<{
     minimum: 4.5,
   },
   {
-    label: 'sage-text on bg (cart "Free", contact success, .badge-new on the PDP)',
+    label: 'titanium-text on bone',
+    foreground: 'titanium-text',
+    background: 'bone',
+    minimum: 4.5,
+  },
+  {
+    label: 'sage-text on bg (contact success, .badge-new on the PDP)',
     foreground: 'sage-text',
     background: 'bg',
     minimum: 4.5,
@@ -120,7 +132,12 @@ const TEXT_PAIRINGS: Array<{
     background: 'ink',
     minimum: 4.5,
   },
-  { label: 'on-dark on mid (dark hover)', foreground: 'on-dark', background: 'mid', minimum: 4.5 },
+  {
+    label: 'on-dark on graphite (the primary button on hover)',
+    foreground: 'on-dark',
+    background: 'graphite',
+    minimum: 4.5,
+  },
   {
     label: 'mist on black (muted text on dark)',
     foreground: 'mist',
@@ -140,8 +157,8 @@ describe('T4 design tokens', () => {
     // Guards the whole file: a parser that silently matches nothing would make
     // every assertion below vacuous.
     expect(Object.keys(tokens).length).toBeGreaterThanOrEqual(11)
-    expect(tokens.bg).toBe('#F3F2EC')
-    expect(tokens.ink).toBe('#1A1714')
+    expect(tokens.bg).toBe('#FAF9F5')
+    expect(tokens.ink).toBe('#1A1918')
   })
 
   it('defines a text-safe titanium distinct from the titanium accent', () => {
@@ -172,6 +189,22 @@ describe('T4 design tokens', () => {
     // --ink. --on-dark and --mist are the dark-surface tokens.
     expect(contrastRatio(token('sage-text'), token('ink'))).toBeLessThan(4.5)
   })
+
+  it('keeps the control edge past the 3:1 floor on every light surface a control sits on', () => {
+    // WCAG 1.4.11: the boundary of a control must be 3:1 against what is next to it. --outline is
+    // the token for that; the board measures it at 3.48:1 on the ground.
+    for (const surface of ['bg', 'subtle'] as const) {
+      const ratio = contrastRatio(token('outline'), token(surface))
+      expect(ratio, `--outline on --${surface} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('keeps the hairline out of the control-edge role', () => {
+    // Documents *why* --outline exists. --ash is 1.32:1 on --bg: right for a divider, invisible as
+    // the edge of a button. e2e/layout-invariants.spec.ts ("control edges") measures which one each
+    // control in the browser actually uses; this is the token-level half of the same fact.
+    expect(contrastRatio(token('ash'), token('bg'))).toBeLessThan(3)
+  })
 })
 
 /**
@@ -180,8 +213,11 @@ describe('T4 design tokens', () => {
  * listed here nor covered by a pairing.
  */
 const ACCENT_ONLY = new Set([
-  'sage', // 2.36:1 on --bg — borders and tints only. See --sage-text.
-  'ash', // borders, dividers, and the decorative ordinals (WCAG 1.4.3 exempt).
+  'sage', // 2.44:1 on --bg — borders and tints only. See --sage-text.
+  'ash', // the hairline: dividers, and the decorative ordinals (WCAG 1.4.3 exempt). Never a control edge.
+  'metal-niobium', // a six-pixel provenance dot beside a metal's name (MetalDot); carries no text.
+  'metal-steel', // as above.
+  'outline', // the edge of a control: held to 3:1 by name, below (WCAG 1.4.11), not to 4.5:1 as text.
 ])
 // Everything else in the palette is already named by TEXT_PAIRINGS, as a
 // foreground or as a surface, so listing it here too would be noise.
