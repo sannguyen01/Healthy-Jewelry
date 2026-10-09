@@ -1,56 +1,42 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { Badge } from '@/components/ui/Badge'
+import { ProductBadge } from '@/components/product/ProductBadge'
 
-describe('Badge', () => {
-  it('renders "Bestseller" for variant="bestseller"', () => {
-    render(<Badge variant="bestseller" />)
+/**
+ * There is one badge: `ProductBadge`, drawn by `.badge` in globals.css, on the home strip, the listing
+ * cards and the piece page. A second one (`ui/Badge`, a tinted fill with its own padding) lived on the
+ * strip until 2026-10-09 and was deleted with its `sale` variant, which no record can carry.
+ */
+describe('ProductBadge', () => {
+  it('renders "Bestseller" for the bestseller handle', () => {
+    render(<ProductBadge badge="bestseller" />)
     expect(screen.getByText('Bestseller')).toBeInTheDocument()
   })
 
-  it('renders "New" for variant="new"', () => {
-    render(<Badge variant="new" />)
+  it('renders "New" for the new handle', () => {
+    render(<ProductBadge badge="new" />)
     expect(screen.getByText('New')).toBeInTheDocument()
   })
 
-  it('renders "Sale" for variant="sale"', () => {
-    render(<Badge variant="sale" />)
-    expect(screen.getByText('Sale')).toBeInTheDocument()
+  it('renders nothing for a piece with no badge', () => {
+    const { container } = render(<ProductBadge badge={null} />)
+    expect(container.firstChild).toBeNull()
   })
 
-  it('renders a span element', () => {
-    const { container } = render(<Badge variant="bestseller" />)
-    expect(container.firstChild?.nodeName).toBe('SPAN')
+  it('is a span carrying the shared .badge class and its variant', () => {
+    const { container } = render(<ProductBadge badge="bestseller" />)
+    const el = container.firstChild as HTMLElement
+    expect(el.nodeName).toBe('SPAN')
+    expect(el).toHaveClass('badge', 'badge-bestseller')
   })
 
-  it('applies extra className when provided', () => {
-    render(<Badge variant="new" className="custom-class" />)
-    const badge = screen.getByText('New')
-    expect(badge).toHaveClass('custom-class')
+  it('applies an extra className when provided', () => {
+    render(<ProductBadge badge="new" className="custom-class" />)
+    expect(screen.getByText('New')).toHaveClass('badge', 'badge-new', 'custom-class')
   })
 
-  it('renders text in uppercase via inline style', () => {
-    render(<Badge variant="sale" />)
-    const badge = screen.getByText('Sale')
-    expect(badge).toHaveStyle({ textTransform: 'uppercase' })
-  })
-
-  it('bestseller badge has titanium color style', () => {
-    render(<Badge variant="bestseller" />)
-    const badge = screen.getByText('Bestseller')
-    // The text-safe titanium, not the raw accent — badge copy is 4.5:1 content,
-    // and --titanium is 2.25:1 on --bg. See design-tokens-contrast.test.ts.
-    expect(badge).toHaveStyle({ color: 'var(--titanium-text)' })
-  })
-
-  it('new badge has sage color style', () => {
-    render(<Badge variant="new" />)
-    const badge = screen.getByText('New')
-    // The text-safe sage, not the raw accent — mirroring the bestseller case
-    // above and for the same reason. This asserted `var(--sage)` until
-    // 2026-08-25, faithfully pinning what shipped: 9px label copy at 2.16:1 over
-    // its own tint, which is worse than the 2.25:1 titanium case that had
-    // already motivated the split.
-    expect(badge).toHaveStyle({ color: 'var(--sage-text)' })
+  it('is set in capitals in the label voice, through inline style', () => {
+    render(<ProductBadge badge="new" />)
+    expect(screen.getByText('New')).toHaveStyle({ textTransform: 'uppercase', fontFamily: 'var(--font-ui)' })
   })
 })

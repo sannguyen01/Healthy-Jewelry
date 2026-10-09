@@ -24,7 +24,7 @@ export default async function ShopPage() {
     <>
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(BREADCRUMB_ITEMS)} />
       <Nav />
-      <main style={{ paddingTop: '64px' }}>
+      <main id="main" tabIndex={-1} style={{ paddingTop: '64px' }}>
         <Breadcrumbs items={BREADCRUMB_ITEMS} />
 
         {/* Section header */}

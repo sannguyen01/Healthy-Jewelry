@@ -65,6 +65,10 @@ const ROOT = resolve(__dirname, '../../..')
  * Keyed `file | property | value`, which is stable across edits that move a line.
  */
 const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded'; why: string }> = {
+  'src/components/layout/Footer.tsx | minHeight | 44px': {
+    state: 'intrinsic',
+    why: 'The footer\'s "Measurement preferences" button: one line of text in a flex row the bar bounds. The floor states the 44px touch target as a declaration; it was padding round a line box, which came out 42px on a phone when the type and leading moved onto their scales. The label is the ceiling, and it does not wrap.',
+  },
   'src/components/layout/MenuArchive.tsx | minWidth | 112': {
     state: 'intrinsic',
     why: 'The menu search button, in a flex row beside a `flex: 1` field. The floor stops "Search" being a sliver on a phone; the row caps the width and the label caps the button, which never grows past its text and padding.',

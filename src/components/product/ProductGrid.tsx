@@ -73,7 +73,7 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
                   key={value}
                   onClick={() => setActiveCollection(value)}
                   style={{
-                    padding: '7px 16px',
+                    padding: '8px 16px',
                     border: '1px solid var(--outline)',
                     backgroundColor: isActive ? 'var(--ink)' : 'transparent',
                     color: isActive ? 'var(--bg)' : 'var(--ink)',
@@ -114,7 +114,7 @@ export function ProductGrid({ products, showFilters = false }: ProductGridProps)
             // The type is `.hj-sort`'s: a label's on a desktop, a field's on a phone (globals.css says why).
             className="hj-sort"
             style={{
-              padding: '7px 12px',
+              padding: '8px 12px',
               border: '1px solid var(--outline)',
               backgroundColor: 'transparent',
               color: 'var(--ink)',

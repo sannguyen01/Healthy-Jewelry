@@ -16,7 +16,7 @@ export default function StoresPage() {
   return (
     <>
       <Nav />
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* Hero */}
         <section
           style={{

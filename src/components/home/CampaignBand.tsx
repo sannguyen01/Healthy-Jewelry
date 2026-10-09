@@ -43,7 +43,7 @@ export function CampaignBand({
             fontFamily: 'var(--font-body)',
             fontWeight: 300,
             fontSize: 'var(--text-lg)',
-            color: 'rgba(247,245,241,0.6)',
+            color: 'var(--mist)',
             lineHeight: 'var(--leading-text)',
             margin: '0 0 36px',
             maxWidth: '520px',

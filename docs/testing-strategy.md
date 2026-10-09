@@ -338,6 +338,20 @@ place.
 
 Neither is a crash. Both are the kind of defect that quietly costs conversions.
 
+### What a screen reader is handed is not what axe reads
+
+`axe` reads the DOM's text. A screen reader is handed the browser's **accessibility tree**, and the two
+disagreed: every piece link on the listing pages had no accessible name in Chrome's tree (an `<article>` inside
+the `<a>`) while axe passed all of them. `e2e/a11y.spec.ts` therefore does both, on every page route and in
+both projects: `axe` at every impact level (WCAG 2.1 and 2.2 AA plus best practice, with the consent notice up and
+once answered, with the menu open, with the contact form in error), and `Accessibility.getFullAXTree` through the
+protocol, failing on any link or control with no name. It also holds the skip link (the first Tab stop, landing in
+`main`) and one `<h1>` per page. The consent notice mounts after hydration, so the spec waits for it rather than
+counting once. See [ADR 053](adr/053-the-other-layers-and-the-tree-the-browser-reads.md).
+
+A function with a unit test is not a feature: `organizationJsonLd()` was tested and rendered by no page, so
+`e2e/metadata.spec.ts` reads the served home page for its structured data.
+
 ### What the browser drew is not what the CSS asked for
 
 `e2e/glyph-coverage.spec.ts` asks whether every *character* is in the face and whether the face

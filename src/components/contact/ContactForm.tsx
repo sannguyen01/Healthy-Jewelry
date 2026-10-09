@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   validateName,
   validateEmail,
@@ -58,7 +58,7 @@ const fieldErrorStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
   fontWeight: 300,
   fontSize: 'var(--text-xs)',
-  color: '#B3261E',
+  color: 'var(--error-text)',
   marginTop: '6px',
 }
 
@@ -75,6 +75,9 @@ export function ContactForm() {
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [errorMessage, setErrorMessage] = useState<string>(DEFAULT_ERROR_MESSAGE)
+  // Where focus goes when a submit finds errors: the first field that has one, so a keyboard or
+  // screen-reader user lands on the problem with its message read (WCAG 3.3.1), not on the button.
+  const controls = useRef<Record<string, HTMLElement | null>>({})
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -101,7 +104,9 @@ export function ContactForm() {
       if (error) nextErrors[key] = error
     }
     setFieldErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) {
+    const firstInvalid = (Object.keys(FIELD_VALIDATORS) as (keyof FormFields)[]).find((key) => nextErrors[key])
+    if (firstInvalid) {
+      controls.current[firstInvalid]?.focus()
       return
     }
 
@@ -131,6 +136,7 @@ export function ContactForm() {
   if (status === 'sent') {
     return (
       <div
+        role="status"
         style={{
           padding: '40px 0',
           display: 'flex',
@@ -186,6 +192,10 @@ export function ContactForm() {
             id="cf-name"
             name="name"
             type="text"
+            autoComplete="name"
+            ref={(el) => {
+              controls.current.name = el
+            }}
             required
             value={fields.name}
             onChange={handleChange}
@@ -197,7 +207,7 @@ export function ContactForm() {
             aria-describedby={fieldErrors.name ? 'cf-name-error' : undefined}
           />
           {fieldErrors.name && (
-            <p id="cf-name-error" style={fieldErrorStyle}>
+            <p id="cf-name-error" role="alert" style={fieldErrorStyle}>
               {fieldErrors.name}
             </p>
           )}
@@ -212,6 +222,10 @@ export function ContactForm() {
             id="cf-email"
             name="email"
             type="email"
+            autoComplete="email"
+            ref={(el) => {
+              controls.current.email = el
+            }}
             required
             value={fields.email}
             onChange={handleChange}
@@ -223,7 +237,7 @@ export function ContactForm() {
             aria-describedby={fieldErrors.email ? 'cf-email-error' : undefined}
           />
           {fieldErrors.email && (
-            <p id="cf-email-error" style={fieldErrorStyle}>
+            <p id="cf-email-error" role="alert" style={fieldErrorStyle}>
               {fieldErrors.email}
             </p>
           )}
@@ -237,6 +251,9 @@ export function ContactForm() {
           <select
             id="cf-subject"
             name="subject"
+            ref={(el) => {
+              controls.current.subject = el
+            }}
             value={fields.subject}
             onChange={handleChange}
             onFocus={() => setFocusedField('subject')}
@@ -249,7 +266,11 @@ export function ContactForm() {
               </option>
             ))}
           </select>
-          {fieldErrors.subject && <p style={fieldErrorStyle}>{fieldErrors.subject}</p>}
+          {fieldErrors.subject && (
+            <p role="alert" style={fieldErrorStyle}>
+              {fieldErrors.subject}
+            </p>
+          )}
         </div>
 
         {/* Message */}
@@ -260,6 +281,9 @@ export function ContactForm() {
           <textarea
             id="cf-message"
             name="message"
+            ref={(el) => {
+              controls.current.message = el
+            }}
             required
             value={fields.message}
             onChange={handleChange}
@@ -276,7 +300,7 @@ export function ContactForm() {
             aria-describedby={fieldErrors.message ? 'cf-message-error' : undefined}
           />
           {fieldErrors.message && (
-            <p id="cf-message-error" style={fieldErrorStyle}>
+            <p id="cf-message-error" role="alert" style={fieldErrorStyle}>
               {fieldErrors.message}
             </p>
           )}
@@ -285,6 +309,7 @@ export function ContactForm() {
         {/* Error state */}
         {status === 'error' && (
           <p
+            role="alert"
             style={{
               fontFamily: 'var(--font-body)',
               fontSize: 'var(--text-sm)',

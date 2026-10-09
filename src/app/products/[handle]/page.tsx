@@ -112,7 +112,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <JsonLd type="Product" data={productJsonLd(product)} />
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
-      <main style={{ paddingTop: '64px' }}>
+      <main id="main" tabIndex={-1} style={{ paddingTop: '64px' }}>
         <Breadcrumbs items={breadcrumbItems} />
 
         {/* Product detail */}

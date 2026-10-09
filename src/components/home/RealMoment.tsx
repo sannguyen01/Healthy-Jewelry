@@ -20,7 +20,7 @@ export function RealMoment() {
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
-        transition: 'opacity 0.7s var(--ease), transform 0.7s var(--ease)',
+        transition: 'opacity var(--duration-slow) var(--ease), transform var(--duration-slow) var(--ease)',
         overflow: 'hidden',
       }}
     >

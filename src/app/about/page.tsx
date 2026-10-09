@@ -27,7 +27,7 @@ export default function AboutPage() {
     <>
       <Nav />
 
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* ── 1. Hero ────────────────────────────────────────────────── */}
         <section
           style={{
@@ -183,6 +183,9 @@ export default function AboutPage() {
                 }}
               >
                 <p
+                  aria-hidden="true"
+                  className="hj-ghost-numeral"
+                  data-numeral={card.num}
                   style={{
                     fontFamily: 'var(--font-display)',
                     textTransform: 'uppercase',
@@ -193,9 +196,7 @@ export default function AboutPage() {
                     margin: '0 0 20px',
                     letterSpacing: 'var(--tracking-display)',
                   }}
-                >
-                  {card.num}
-                </p>
+                />
 
                 <h3
                   style={{

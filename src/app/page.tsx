@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Nav from '@/components/layout/Nav'
 import Footer from '@/components/layout/Footer'
+import { JsonLd, organizationJsonLd, webSiteJsonLd } from '@/components/seo/JsonLd'
 import { BrandSeal } from '@/components/layout/BrandSeal'
 import {
   Hero,
@@ -64,8 +65,13 @@ export default function HomePage() {
 
   return (
     <>
+      {/* Who the site is, for the machines that quote it. Both builders existed, were unit-tested, and
+          were rendered by no page: the Organization logo "fix" of 2026-10-04 corrected a function nothing
+          called. e2e/metadata.spec.ts reads these two blocks off the served home page. */}
+      <JsonLd type="Organization" data={organizationJsonLd()} />
+      <JsonLd type="WebSite" data={webSiteJsonLd()} />
       <Nav />
-      <main>
+      <main id="main" tabIndex={-1}>
         {/* 1. Hero */}
         <Hero headlineLines={claimLines('brand-positioning', SITE)} />
 

@@ -92,7 +92,7 @@ export default function ShippingPage() {
   return (
     <>
       <Nav />
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* Hero */}
         <section
           style={{
@@ -159,7 +159,12 @@ export default function ShippingPage() {
               Shipping is free on every piece, wherever it is going. No minimum, no handling fees.
             </p>
 
-            <div style={tableWrapStyle}>
+            <div
+              role="region"
+              aria-label="Delivery times and costs by destination"
+              tabIndex={0}
+              style={tableWrapStyle}
+            >
               <table style={tableStyle}>
                 <thead>
                   <tr>

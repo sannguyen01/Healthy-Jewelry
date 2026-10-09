@@ -705,7 +705,7 @@ export const SENTINELS = [
   {
     id: 'label-size-floor',
     runner: 'vitest',
-    file: 'src/components/ui/Badge.tsx',
+    file: 'src/components/product/ProductBadge.tsx',
     find: "fontSize: 'var(--text-xs)',",
     replace: "fontSize: '9px',",
     specs: ['src/tests/unit/type-system-floor.test.ts'],

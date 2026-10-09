@@ -29,7 +29,7 @@ export function Hero({ headlineLines }: HeroProps) {
     children.forEach((child, i) => {
       child.style.opacity = '0'
       child.style.transform = 'translateY(32px)'
-      child.style.transition = `opacity 0.7s var(--ease), transform 0.7s var(--ease)`
+      child.style.transition = `opacity var(--duration-slow) var(--ease), transform var(--duration-slow) var(--ease)`
       setTimeout(
         () => {
           child.style.opacity = '1'

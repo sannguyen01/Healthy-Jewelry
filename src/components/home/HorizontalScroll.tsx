@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import type { CatalogProduct } from '@/lib/catalog'
 import { ProductImage } from '@/components/product/ProductImage'
-import { Badge } from '@/components/ui/Badge'
+import { ProductBadge } from '@/components/product/ProductBadge'
 import { ArrowIcon } from '@/components/ui/ArrowIcon'
 import { useReveal } from '@/lib/hooks/useReveal'
 
@@ -34,7 +34,7 @@ export function HorizontalScroll({
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
-        transition: 'opacity 0.7s var(--ease), transform 0.7s var(--ease)',
+        transition: 'opacity var(--duration-slow) var(--ease), transform var(--duration-slow) var(--ease)',
       }}
     >
       <div className="hj-strip-head">
@@ -91,12 +91,12 @@ export function HorizontalScroll({
               {product.badge && (
                 <div style={{ position: 'absolute', top: '16px', left: '16px' }}>
                   {/*
-                    The badge value *is* the variant now — both are handles. The old
-                    three-way ternary mapped display strings ('Bestseller') onto variants
-                    and fell through to 'sale' for anything unrecognised, which is how an
-                    unknown badge would have rendered as a sale that did not exist.
+                    One badge for a piece, on the strip, the listing cards and the piece page
+                    alike (`ProductBadge`, `.badge` in globals.css). The strip carried a second
+                    implementation of its own, a tinted fill with a different padding, so the
+                    same "Bestseller" looked one way on the home page and another on /shop.
                   */}
-                  <Badge variant={product.badge} />
+                  <ProductBadge badge={product.badge} />
                 </div>
               )}
             </div>

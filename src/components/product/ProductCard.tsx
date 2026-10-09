@@ -1,5 +1,3 @@
-'use client'
-
 import Link from 'next/link'
 import type { CatalogProduct } from '@/lib/catalog'
 import { ProductImage } from '@/components/product/ProductImage'
@@ -10,27 +8,31 @@ interface ProductCardProps {
   className?: string
 }
 
+/**
+ * A listing card is one link whose accessible name is what is written on it: the badge, the piece's
+ * name and its metal.
+ *
+ * It was an `<article>` inside the `<a>`, and Chrome does not build a link's name through an
+ * `article`: on `/shop`, the collection pages and `/search` all 29 piece links had **no accessible
+ * name** (read from the accessibility tree, `CSS`-visible text and all). axe passed, because axe
+ * reads the DOM's text and not the tree the browser hands a screen reader. A `<div>` is name-from-
+ * content transparent. The hover specification is `aria-hidden`: it is a duplicate of what the piece
+ * page prints and, first in the DOM, it made the name begin "2 mm 1.8 g". It is revealed by CSS for a
+ * pointer *and* for keyboard focus (`.hj-card-link`), so a keyboard user is not shown less than a
+ * mouse user; no script is involved, which is why this is no longer a client component.
+ */
 export function ProductCard({ product, className }: ProductCardProps) {
   return (
     <Link
       href={`/products/${product.handle}`}
+      className="hj-card-link"
       style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
     >
-      <article
+      <div
         className={'card-tile' + (className ? ` ${className}` : '')}
         style={{
           position: 'relative',
           cursor: 'pointer',
-        }}
-        onMouseEnter={(e) => {
-          const el = e.currentTarget as HTMLElement
-          const spec = el.querySelector<HTMLElement>('[data-spec]')
-          if (spec) spec.style.opacity = '1'
-        }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget as HTMLElement
-          const spec = el.querySelector<HTMLElement>('[data-spec]')
-          if (spec) spec.style.opacity = '0'
         }}
       >
         {/* Photograph when Shopify has one, illustration when not — see ProductImage. */}
@@ -51,11 +53,13 @@ export function ProductCard({ product, className }: ProductCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
 
-          {/* Spec overlay — revealed on hover. The same datum the detail page prints under the
-              name, so the same voice (`.hj-spec`: label capitals, meta tracking) rather than
-              a tracked mixed-case line of body text. */}
+          {/* Spec overlay — revealed on hover and on keyboard focus (`.hj-card-link` in globals.css). The
+              same datum the detail page prints under the name, so the same voice (`.hj-spec`: label
+              capitals, meta tracking) rather than a tracked mixed-case line of body text. Decorative
+              to a screen reader, which has the piece page for it. */}
           <p
             data-spec
+            aria-hidden="true"
             className="hj-spec"
             style={{
               position: 'absolute',
@@ -64,8 +68,6 @@ export function ProductCard({ product, className }: ProductCardProps) {
               right: 0,
               textAlign: 'center',
               color: 'var(--graphite)',
-              opacity: 0,
-              transition: `opacity var(--duration-fast) var(--ease)`,
               pointerEvents: 'none',
             }}
           >
@@ -104,7 +106,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             conversation with an ambassador, which is what `availability` records.
           */}
         </div>
-      </article>
+      </div>
     </Link>
   )
 }

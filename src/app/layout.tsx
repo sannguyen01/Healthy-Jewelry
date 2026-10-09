@@ -162,6 +162,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="hj-build" content={buildStamp()} />
       </head>
       <body>
+        {/* WCAG 2.4.1: the first stop of every page, off screen until it takes focus. */}
+        <a href="#main" className="btn-primary hj-skip">
+          Skip to content
+        </a>
         {children}
         {/* Asks once, then never again. Nothing is measured until it is answered. */}
         <ConsentBanner />

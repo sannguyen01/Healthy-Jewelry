@@ -203,7 +203,7 @@ test.describe('/shop product cards', () => {
           const media = a.querySelector('img, svg')
           const tile =
             (media?.parentElement as HTMLElement | null) ??
-            (a.querySelector('article')?.firstElementChild as HTMLElement | null) ??
+            (a.querySelector('.card-tile')?.firstElementChild as HTMLElement | null) ??
             (a as HTMLElement)
           const box = tile.getBoundingClientRect()
           const lines = ((a as HTMLElement).innerText ?? '')

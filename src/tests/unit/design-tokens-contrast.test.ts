@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { compositeOver, contrastRatio } from '@/lib/utils/contrast'
+import { contrastRatio } from '@/lib/utils/contrast'
 
 /**
  * WCAG 2.1 contrast enforcement for the T4 palette.
@@ -119,6 +119,25 @@ const TEXT_PAIRINGS: Array<{
     minimum: 4.5,
   },
 
+  {
+    label: 'error-text on bg (a field\'s message, a failed submit)',
+    foreground: 'error-text',
+    background: 'bg',
+    minimum: 4.5,
+  },
+  {
+    label: 'error-text on subtle',
+    foreground: 'error-text',
+    background: 'subtle',
+    minimum: 4.5,
+  },
+  {
+    label: 'error-text on nacre',
+    foreground: 'error-text',
+    background: 'nacre',
+    minimum: 4.5,
+  },
+
   // Dark surfaces
   {
     label: 'on-dark on black (campaign band)',
@@ -220,7 +239,7 @@ describe('T4 design tokens', () => {
  */
 const ACCENT_ONLY = new Set([
   'sage', // 2.44:1 on --bg — borders and tints only. See --sage-text.
-  'ash', // the hairline: dividers, and the decorative ordinals (WCAG 1.4.3 exempt). Never a control edge.
+  'ash', // the hairline: dividers, and the decorative ordinals, which are generated content and so not text. Never a control edge.
   'metal-niobium', // a six-pixel provenance dot beside a metal's name (MetalDot); carries no text.
   'metal-steel', // as above.
   'outline', // the edge of a control: held to 3:1 by name, below (WCAG 1.4.11), not to 4.5:1 as text.
@@ -384,42 +403,31 @@ describe('T4 text contrast meets WCAG 2.1 AA', () => {
 })
 
 /**
- * Surfaces built by layering a translucent tint over a token. Checking the text
- * against the underlying token is not enough — and is how the bestseller badge
- * shipped at 4.39:1 while measuring 4.74:1 against bare --nacre.
+ * The badge is one opaque chip (`.badge` in globals.css): its label is checked against the chip's own
+ * ground, which is `--bg`, wherever the chip sits. It was two implementations, one translucent over a
+ * tile and one translucent over the page, and their composited tints were each asserted (the bestseller
+ * badge shipped at 4.39:1 while measuring 4.74:1 against bare --nacre). An opaque chip has no composite.
  */
-describe('Composited surfaces meet WCAG 2.1 AA', () => {
-  it('bestseller badge label on its tinted background is at least 4.5:1', () => {
-    // ProductBadge/Badge: 12% --titanium over the --nacre card tile.
-    const badgeBackground = compositeOver(token('titanium'), token('nacre'), 0.12)
-    const ratio = contrastRatio(token('titanium-text'), badgeBackground)
-    expect(
-      Number(ratio.toFixed(2)),
-      `--titanium-text on the composited badge background is ${ratio.toFixed(2)}:1`
-    ).toBeGreaterThanOrEqual(4.5)
+describe('The badge chip meets WCAG 2.1 AA', () => {
+  const css = readFileSync(path.resolve(__dirname, '../../app/globals.css'), 'utf8')
+  const rule = (selector: string) =>
+    css.match(new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+
+  it('is opaque, so what is behind it never reaches its label', () => {
+    expect(rule('.badge')).toMatch(/background:\s*var\(--bg\)/)
   })
 
-  // Two badge implementations, two grounds. ProductBadge (globals.css .badge-*)
-  // renders on a --nacre card tile; ui/Badge renders in a HorizontalScroll strip
-  // whose section background is --bg. Both are asserted because the composite is
-  // different and a single check would leave one of them unguarded — which is
-  // the shape of the original defect.
-  it('new badge label on its tint over a card tile is at least 4.5:1', () => {
-    const badgeBackground = compositeOver(token('sage'), token('nacre'), 0.12)
-    const ratio = contrastRatio(token('sage-text'), badgeBackground)
-    expect(
-      Number(ratio.toFixed(2)),
-      `--sage-text on 12% --sage over --nacre is ${ratio.toFixed(2)}:1`
-    ).toBeGreaterThanOrEqual(4.5)
+  it.each([
+    ['bestseller', 'ink'],
+    ['new', 'sage-text'],
+  ])('%s label (--%s) on the chip is at least 4.5:1', (_variant, name) => {
+    expect(rule(`.badge-${_variant}`)).toContain(`var(--${name})`)
+    const ratio = contrastRatio(token(name), token('bg'))
+    expect(Number(ratio.toFixed(2)), `--${name} on --bg is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('new badge label on its tint over the page background is at least 4.5:1', () => {
-    const badgeBackground = compositeOver(token('sage'), token('bg'), 0.12)
-    const ratio = contrastRatio(token('sage-text'), badgeBackground)
-    expect(
-      Number(ratio.toFixed(2)),
-      `--sage-text on 12% --sage over --bg is ${ratio.toFixed(2)}:1`
-    ).toBeGreaterThanOrEqual(4.5)
+  it('has no `sale` variant: no record can carry one', () => {
+    expect(css).not.toContain('.badge-sale')
   })
 })
 

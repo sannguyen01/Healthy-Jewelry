@@ -16,7 +16,7 @@ export function FollowUp() {
         textAlign: 'center',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(20px)',
-        transition: 'opacity 0.7s var(--ease), transform 0.7s var(--ease)',
+        transition: 'opacity var(--duration-slow) var(--ease), transform var(--duration-slow) var(--ease)',
       }}
     >
       <h2 className="label-eyebrow" style={{ marginBottom: '28px' }}>

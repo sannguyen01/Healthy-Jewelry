@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /api/sitemap
 Disallow: /api/
+
 Sitemap: https://healthyjewellery.com/api/sitemap

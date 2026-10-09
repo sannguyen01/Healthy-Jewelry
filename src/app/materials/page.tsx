@@ -119,7 +119,7 @@ export default function MaterialsPage() {
     <>
       <Nav />
 
-      <main style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
+      <main id="main" tabIndex={-1} style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)' }}>
         {/* ── Page header ───────────────────────────────────────────── */}
         <section
           style={{
@@ -171,6 +171,9 @@ export default function MaterialsPage() {
               {/* Left: number + title */}
               <div>
                 <p
+                  aria-hidden="true"
+                  className="hj-ghost-numeral"
+                  data-numeral={MATERIAL_NUMBERS[index]}
                   style={{
                     fontFamily: 'var(--font-display)',
                     textTransform: 'uppercase',
@@ -181,9 +184,7 @@ export default function MaterialsPage() {
                     margin: '0 0 12px',
                     letterSpacing: 'var(--tracking-display)',
                   }}
-                >
-                  {MATERIAL_NUMBERS[index]}
-                </p>
+                />
 
                 <h2
                   style={{
@@ -266,7 +267,14 @@ export default function MaterialsPage() {
             Side by Side
           </p>
 
-          <div style={{ overflowX: 'auto' }}>
+          {/* A region that scrolls sideways on a phone must be reachable and named for a keyboard
+              (WCAG 2.1.1): focusable, with a role and a label. */}
+          <div
+            role="region"
+            aria-label="The three metals compared, side by side"
+            tabIndex={0}
+            style={{ overflowX: 'auto' }}
+          >
             <table
               style={{
                 width: '100%',

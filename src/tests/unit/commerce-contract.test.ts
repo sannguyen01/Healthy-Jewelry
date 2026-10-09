@@ -94,11 +94,13 @@ const register = parseRegister(read(REGISTER_PATH))
  * server's commerce env, both WS-C. 35 on 2026-10-03, the first row *added* since the register
  * was compiled: `scripts/lib/sentinels.mjs` now names the retained webhook route, because its
  * signing secret left the project before the route did (incident PR-94) and the route's
- * fail-closed answer needed a sentinel. It is WS-F's, and leaves with the route. Recomputed by
+ * fail-closed answer needed a sentinel. It is WS-F's, and leaves with the route. A thirty-sixth
+ * row (2026-10-09) is `docs/architecture.md`, whose map has to name that route while it stands.
+ * Recomputed by
  * the integrator after each change that closes or opens a row; `pnpm verify:commerce-contract
  * --summary` prints the live figure by workstream.
  */
-const EXPECTED_REGISTER_ROWS = 35
+const EXPECTED_REGISTER_ROWS = 36
 
 /** A file that trips nothing, used as the negative case for every rule below. */
 const INERT = { path: 'src/lib/inert.ts', source: 'export const x = 1\n' }

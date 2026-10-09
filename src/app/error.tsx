@@ -14,10 +14,10 @@ export default function Error({ error, reset }: ErrorProps) {
   }, [error])
 
   return (
-    <main
+    <main id="main" tabIndex={-1}
       style={{
-        backgroundColor: 'var(--bg, #FAF9F5)',
-        color: 'var(--ink, #1A1918)',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--ink)',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -35,7 +35,7 @@ export default function Error({ error, reset }: ErrorProps) {
           fontSize: 'var(--text-xs)',
           letterSpacing: 'var(--tracking-label)',
           textTransform: 'uppercase',
-          color: 'var(--ink-2, #5F5B55)',
+          color: 'var(--ink-2)',
         }}
       >
         Something went wrong
@@ -58,7 +58,7 @@ export default function Error({ error, reset }: ErrorProps) {
           fontFamily: 'var(--font-body)',
           fontWeight: 300,
           fontSize: 'var(--text-base)',
-          color: 'var(--graphite, #3D3935)',
+          color: 'var(--graphite)',
           maxWidth: '400px',
           lineHeight: 'var(--leading-text)',
           margin: 0,

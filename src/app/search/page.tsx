@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ProductCard } from '@/components/product/ProductCard'
@@ -97,7 +98,7 @@ async function SearchResults({ query }: { query: string }) {
           event={{ name: 'search_performed', resultCount: results.length, facets: searchFacets(query) }}
         />
       )}
-      <main
+      <main id="main" tabIndex={-1}
         style={{
           backgroundColor: 'var(--bg)',
           color: 'var(--ink)',
@@ -112,9 +113,7 @@ async function SearchResults({ query }: { query: string }) {
             borderBottom: '1px solid var(--ash)',
           }}
         >
-          <p className="label-eyebrow" style={{ marginBottom: '20px' }}>
-            Search
-          </p>
+          <PageHeader title="Search" variant="compact" style={{ marginBottom: '16px' }} />
 
           <form
             method="get"
@@ -353,7 +352,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       <Suspense
         key={query}
         fallback={
-          <main
+          // Not a `<main>`, and with no `id="main"`: while the results stream, the page and this fallback
+          // are both in the document, and two main landmarks (and two ids the skip link targets) are one
+          // too many. A status region says what it is.
+          <div
+            role="status"
             style={{
               backgroundColor: 'var(--bg)',
               minHeight: '100vh',
@@ -375,7 +378,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             >
               Loading…
             </p>
-          </main>
+          </div>
         }
       >
         <SearchResults query={query} />

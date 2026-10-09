@@ -137,6 +137,10 @@ photograph stands until the owner replaces it; no filter is laid over it to imit
   (`--leading-display`, `-snug`, `-text`, `-long`); a heading is not set like a paragraph; no form
   control is set smaller than the base text size on a phone. Enforced by `src/tests/unit/typography-scale.test.ts` and
   `e2e/rendered-fonts.spec.ts` (ADR 052, "One leading scale").
+- **Every other layer is a token too** ([ADR 053](docs/adr/053-the-other-layers-and-the-tree-the-browser-reads.md)):
+  colour, motion, layers, elevation, space, shape and the breakpoints, held by
+  `src/tests/unit/design-layers.test.ts`. A new value is a token first, then a use; there is one badge, one
+  primary button and one ghost button, not a second of each.
 - **The label token is the floor.** Nothing is declared smaller than `--text-xs`'s minimum (0.7rem).
 - Page titles go through `PageHeader`. See `CLAUDE.md`, Typography.
 

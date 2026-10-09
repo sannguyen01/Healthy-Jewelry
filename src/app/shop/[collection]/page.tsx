@@ -96,7 +96,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
       />
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
-      <main style={{ paddingTop: '64px' }}>
+      <main id="main" tabIndex={-1} style={{ paddingTop: '64px' }}>
         <Breadcrumbs items={breadcrumbItems} />
 
         {/* Collection header */}
@@ -115,6 +115,8 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           {/* Decorative number — bottom-right, large, very faint */}
           <span
             aria-hidden="true"
+            className="hj-ghost-numeral"
+            data-numeral={COLLECTION_NUMBERS[handle] ?? '01'}
             style={{
               position: 'absolute',
               bottom: '-0.1em',
@@ -130,9 +132,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               pointerEvents: 'none',
               userSelect: 'none',
             }}
-          >
-            {COLLECTION_NUMBERS[handle] ?? '01'}
-          </span>
+          />
 
           <span className="label-eyebrow">{col?.description ?? 'Collection'}</span>
 

@@ -3,6 +3,31 @@
 Last run: never (scaffold not yet scheduled)
 Last refreshed by hand: 2026-10-04
 
+## Session note — 2026-10-09, night: every other layer, and the tree the browser reads
+
+The type system became one scale (ADR 052); this round asked the same question of everything else, front end to
+back end, and added the measurement type had not needed ([ADR 053](docs/adr/053-the-other-layers-and-the-tree-the-browser-reads.md),
+[`docs/architecture.md`](docs/architecture.md)).
+
+- **The finding that mattered.** Every piece link on `/shop`, the collection pages and `/search` had **no accessible
+  name** in Chrome's accessibility tree (an `<article>` inside the `<a>`), and axe passed all of them. A screen reader
+  announced "link" for each piece. `e2e/a11y.spec.ts` now reads the tree through the protocol, on every page.
+- **Also found, and fixed.** No skip link (2.4.1); two sideways tables unreachable by keyboard (2.1.1); no field purposes (1.3.5)
+  and no announced errors (4.1.3); no `<h1>` on search; a 404 with no landmarks and the home page's title; decorative numerals
+  failing contrast on four routes (now generated content, so not text). On the back end: `organizationJsonLd()` and
+  `webSiteJsonLd()` were tested and **rendered by no page** (the home page now emits both); `robots.txt` disallowed the path
+  that holds the sitemap.
+- **One of each.** One badge (an opaque chip), where the home strip had a second implementation with a second look;
+  `GhostButton` and the `sale` variant deleted.
+- **Every layer a token, with a guard** (`design-layers.test.ts`, eight of fourteen assertions failing on the previous tree):
+  an error colour that was a typed hex, twenty-two typed durations, three typed z-indexes, a typed shadow, five odd-pixel
+  paddings, and a piece page that switched at 768px beside a header that switches at 769px.
+- **What the new guards caught in their own author's work.** The first full run failed twenty-two tests: sixteen specs selected
+  `article`; the footer's "Measurement preferences" came out 42px on a phone because its 44px was padding round a line box
+  (now a stated `min-height`); one mobile drawer probe failed once under load and passed twelve of twelve alone. The
+  `visible focus indicators` probe fails locally about two attempts in three **on the previous commit too**, and passes in CI.
+- **Not done**: B5 and B6; moving the sitemap to `/sitemap.xml`; a CSP nonce; the Shopify webhook route (WS-F).
+
 ## Session note — 2026-10-09, evening: the Quiet Archive's design in the original typography
 
 Pull request #110 now carries **the Quiet Archive's design** (palette, archive menu, registry-and-index

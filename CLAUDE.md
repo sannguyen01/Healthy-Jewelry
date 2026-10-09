@@ -27,6 +27,9 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
   one gothic family, and [ADR 051](docs/adr/051-three-voices-one-archive.md) tried a third); the owner
   set both aside and the pair is back under the Quiet Archive's layout. The name keeps its face by the
   owner's ruling ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md))
+- Architecture: **`docs/architecture.md`** is the map of the whole system, front end to back end (requirements, data
+  flow, the API table, the security boundary, caching, delivery, trade-offs). Read it before adding a route,
+  a service or a layer ([ADR 053](docs/adr/053-the-other-layers-and-the-tree-the-browser-reads.md)).
 - State: **none.** This said "Zustand (cart store)" until 2026-09-20; `src/store/` and the
   dependency both went with the bag. Nothing on this site holds client state across a
   navigation, which is a property worth keeping rather than an absence to fill.
@@ -51,11 +54,12 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 | `--titanium-text` | #59636B | Titanium-toned **text** on light backgrounds |
 | `--sage` | #8CA89A | Green accent — borders, tints, fills. **Not text** |
 | `--sage-text` | #516159 | Sage-toned **text** on light backgrounds |
+| `--error-text` | #B3261E | A field's error message and a failed submit, on light surfaces |
 | `--metal-niobium` | #6F7FAE | A metal's finish as a provenance dot (anodized niobium). Decorative |
 | `--metal-steel` | #BCC1C5 | A metal's finish as a provenance dot (polished 316L). Decorative |
 | `--mist` | #A8A49E | Muted text — dark backgrounds only |
 | `--on-dark` | #F0EDE8 | Text on dark backgrounds |
-| `--black` | #0A0A0A | Campaign band dark |
+| `--black` | #0A0A0A | The ground of the two icons whose platform cannot show transparency (tab, home screen), and the unused `CampaignBand` (held by a sentinel, ADR 051). Nothing a visitor sees on the site is `--black` |
 
 **Contrast rule**: the two chromatic accents are both below the WCAG AA 4.5:1 floor on `--bg` —
 `--titanium` at 2.32:1 and `--sage` at 2.44:1 — so each has a darkened sibling for text. Use
@@ -291,7 +295,7 @@ ways, clipping, spread across ratios, buy-control position) and
 
 ## Architecture Principles
 - Server Components by default; `'use client'` only for interactive elements
-- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer), `home/` (page sections), `product/` (product components), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
+- Components: `svg/` (JewelrySVG), `ui/` (atoms), `layout/` (Nav/Footer), `home/` (page sections), `product/` (product components), `contact/` (the form), `analytics/` (the measurement-preferences control), `seo/` (JsonLd/Breadcrumbs — `Breadcrumbs` is shared across `/shop`, `/shop/[collection]`, `/products/[handle]`; each page also emits a matching `BreadcrumbList` via `breadcrumbJsonLd()`)
 - **Content**: `src/content/catalog/**` — 17 product records and 5 collection records, as
   reviewed JSON. This is the **only** product data source.
 - **Reader**: `src/lib/catalog/**` — the only runtime access layer. `schema.ts` validates
@@ -358,6 +362,8 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 - Named + default exports on all components
 - Run `pnpm lint && pnpm build` before every commit
 - Run `pnpm test` — maintain 80%+ coverage
+- When an instruction has two readings and a large revert on each, **ask before acting** (ADR 052): the owner's
+  "keep current designs, I just want to change the typography" was first read the wrong way round and reverted a design.
 - Commit format: `feat|fix|docs|style|content|test|refactor|perf|chore: description` — the same
   types `.github/PULL_REQUEST_TEMPLATE.md` lists (the two disagreed about `docs`, `refactor`
   and `perf` until 2026-10-04)
@@ -366,7 +372,7 @@ CSS classes: `.animate-hj-up`, `.animate-hj-slide`, `.animate-hj-fade`
 Full detail in **`docs/testing-strategy.md`**. In short:
 
 - **`verify`** (lint · type-check · unit · build, ~2 min) is the merge gate.
-- **`e2e`** (Playwright, both projects, ~3–5 min) runs on every PR and blocks.
+- **`e2e`** (Playwright, both projects, about seven minutes on CI) runs on every PR and blocks.
 - `vitest` coverage is scoped to `src/lib`, `src/store`, `src/config` on purpose — **E2E is the only
   automated coverage the UI layer has.** Anything a user has to see or click belongs in `e2e/`.
 - Presence is not visibility. `e2e/visual-assets.spec.ts` asserts imagery actually renders — bytes
@@ -374,6 +380,15 @@ Full detail in **`docs/testing-strategy.md`**. In short:
 - **And absence is invisible to both.** Every per-image check passes on zero images: the logo
   was missing from the header and footer for the whole redesign, and everything stayed green.
   `e2e/visual-assets.spec.ts` now asserts the marks are *there*.
+- **axe reads the DOM; a screen reader is handed the accessibility tree.** `e2e/a11y.spec.ts` scans every page at
+  every impact level, in the states a visitor reaches, **and** reads the tree through the protocol: every piece
+  link on the listing pages had no accessible name (an `<article>` inside the `<a>`) while axe passed all of them.
+  A new interactive element is checked in the tree, not only by axe ([ADR 053](docs/adr/053-the-other-layers-and-the-tree-the-browser-reads.md)).
+- **A function with a unit test is not a feature; the page's output is.** `organizationJsonLd()` was tested for weeks and
+  rendered by no page. Assert what the served page contains (`e2e/metadata.spec.ts`), not only what the builder returns.
+- **Every design layer is a token with a guard**: colour, motion, layers, elevation, space, shape and breakpoints in
+  `design-layers.test.ts`, type in `typography-*.test.ts`. A new value is a token first, then a use. When the look of
+  something changes, measure what is rendered (face, weight, size, leading, tracking) before and after.
 - **A page can be measured before it arrives.** The root `loading.tsx` fallback can still be on
   screen when `page.goto` resolves, with the real page in a hidden streamed segment; a probe that
   measured then saw zero-sized boxes and passed. `settle()` waits for the reveal, and a probe

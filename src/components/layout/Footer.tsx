@@ -36,7 +36,7 @@ const linkStyle: React.CSSProperties = {
   // 12px above and below clears the 44px touch target on a 0.85rem line.
   padding: '12px 0',
   marginBottom: 0,
-  transition: 'color 0.2s ease',
+  transition: 'color var(--duration-fast) var(--ease)',
 }
 
 export function Footer() {
@@ -185,8 +185,13 @@ export function Footer() {
               ...linkStyle,
               fontSize: 'var(--text-xs)',
               lineHeight: 'var(--leading-text)',
-              // 12px of type on a 1.5 line is 18px: 13px above and below clears the 44px target.
-              padding: '13px 0',
+              // The 44px target is stated, not left to padding plus a line box: it was 13px of padding
+              // round an 18px line until the type and the leading moved onto their scales, and the
+              // box came out 42px on a phone. A control's size is its own declaration.
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: '44px',
+              padding: '12px 0',
               color: 'var(--ink-2)',
               textDecoration: 'underline',
               textUnderlineOffset: '3px',
@@ -253,7 +258,7 @@ export function Footer() {
           .footer-icon {
             display: inline-block;
             font-size: var(--text-lg);
-            transition: transform 0.3s ease-out;
+            transition: transform var(--duration-fast) var(--ease);
             font-weight: 300;
             /* A symbol is not tracked. It inherited the summary's label tracking as a length, which
                made the glyph "running text, tracked" and left a gap after it that pulled the plus

@@ -20,9 +20,8 @@ const LABEL: Record<Badge, string> = {
  * unbadged rather than being given a badge it never earned. See
  * [ADR 034](../../../docs/adr/034-the-catalogue-is-the-source.md).
  *
- * `.badge-sale` stays in `globals.css` for now; removing a class is a separate change from
- * removing the reason to apply it, and conflating the two is how a stylesheet ends up
- * describing a system that no longer exists.
+ * The `.badge-sale` class went with it (2026-10-09): a class for a state no record can be in is a
+ * stylesheet describing a system that no longer exists.
  */
 export function ProductBadge({ badge, className }: ProductBadgeProps) {
   if (badge === null) return null

@@ -158,8 +158,8 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**124 unit spec files**',
-    claimed: '124',
+    context: '**126 unit spec files**',
+    claimed: '126',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
@@ -385,7 +385,6 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   { doc: 'CLAUDE.md', context: '184px past a 320px viewport' },
   { doc: 'CLAUDE.md', context: 'one `svgScale="70%"`' },
   { doc: 'CLAUDE.md', context: '(lint · type-check · unit · build, ~2 min)' },
-  { doc: 'CLAUDE.md', context: '(Playwright, both projects, ~3–5 min)' },
   { doc: 'docs/testing-strategy.md', context: 'desktop + mobile | ~3-5 min' },
   { doc: 'docs/testing-strategy.md', context: 'used as 10-12px body copy' },
   { doc: 'docs/testing-strategy.md', context: '| E2E wall time | 24.2 min | ~3-5 min |' },

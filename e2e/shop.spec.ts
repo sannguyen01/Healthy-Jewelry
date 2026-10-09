@@ -15,17 +15,19 @@ test.describe('Shop page', () => {
 
   test('shows product cards', async ({ page }) => {
     // At least one product card should be visible (static data fallback)
-    const articleCards = page.locator('article')
-    await expect(articleCards.first()).toBeVisible()
+    const cards = page.locator('.card-tile')
+    await expect(cards.first()).toBeVisible()
   })
 
   test('each product card links to product detail', async ({ page }) => {
-    // ProductCard renders `<Link><article>…</article></Link>`, so the link is
-    // the card's *ancestor*, not a descendant. Searching inside the <article>
-    // finds nothing and times out; filter the links by the card they contain.
+    // ProductCard renders `<Link><div class="card-tile">…</div></Link>`, so the link is
+    // the card's *ancestor*, not a descendant. Searching inside the card finds nothing
+    // and times out; filter the links by the card they contain. (It was an <article>
+    // until 2026-10-09: Chrome builds no link name through one, which left every piece
+    // link on the listing pages nameless. `a11y.spec.ts` reads the tree to hold that.)
     const cardLink = page
       .getByRole('link')
-      .filter({ has: page.locator('article') })
+      .filter({ has: page.locator('.card-tile') })
       .first()
     await expect(cardLink).toHaveAttribute('href', /\/products\//)
   })
@@ -33,7 +35,7 @@ test.describe('Shop page', () => {
   test('each product card shows what the piece is, not what it costs', async ({ page }) => {
     // A card carries a title and a material. It used to carry a price too, and this test
     // asserted the price — so it was the only thing on the card anyone had pinned.
-    const firstCard = page.locator('article').first()
+    const firstCard = page.locator('.card-tile').first()
     await expect(firstCard.getByText(/titanium|niobium|surgical steel/i).first()).toBeVisible()
     await expect(firstCard.getByText(/[$€£¥₫]\s?[\d,]+/)).toHaveCount(0)
   })
@@ -61,7 +63,7 @@ test.describe('Collection pages', () => {
     test(`/shop/${collection} loads and shows products`, async ({ page }) => {
       await page.goto(`/shop/${collection}`)
       await expect(page).toHaveURL(`/shop/${collection}`)
-      const cards = page.locator('article')
+      const cards = page.locator('.card-tile')
       await expect(cards.first()).toBeVisible()
     })
   }
