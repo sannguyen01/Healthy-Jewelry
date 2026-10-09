@@ -31,12 +31,12 @@ export default function NotFound() {
       </p>
       <h1
         style={{
-          fontFamily: 'var(--font-display)',
-          letterSpacing: 'var(--tracking-display)',
+          fontFamily: 'var(--font-title)',
+          letterSpacing: 'var(--tracking-title)',
           fontSize: 'clamp(1.4rem, 3vw, 2rem)',
           color: 'var(--ink)',
           margin: '0 0 12px',
-          fontWeight: 500,
+          fontWeight: 400,
         }}
       >
         This piece doesn&apos;t exist.

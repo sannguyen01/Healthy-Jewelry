@@ -22,12 +22,13 @@ import { SITE_NAME } from '@/config/site'
 // symptom. `opengraph-bundled-font.test.tsx` exercises the real rasteriser
 // against the characters the card actually renders today.
 //
-// Noto Sans, not the brand's Zen Kaku Gothic Antique, is a leftover of the
-// original fix — it was chosen for pan-Unicode currency coverage. The brand face
-// cannot simply be swapped in: Satori reads TTF/OTF/WOFF but not the WOFF2 the
-// site ships, and the family's full TTF is a CJK font of several megabytes per
-// weight. Putting the share card in the brand face means a Latin-subset TTF built
-// for it — a deliberate change with its own glyph-coverage question.
+// The card is set in the site's own voices (ADR 051): the piece's name in Bodoni Moda, the brand
+// name and the material in Barlow Condensed. It was Noto Sans until 2026-10-09, "a leftover of the
+// original fix": chosen for pan-Unicode currency coverage when the card carried a price, and kept
+// as a stand-in for a brand face the route could not load. Satori reads TTF, OTF and WOFF but not
+// the WOFF2 the site ships, so the card bundles the same fixed instances as TTF, byte for byte
+// from Google Fonts (`src/app/fonts/README.md`, "The share-card copies"), and
+// `opengraph-bundled-font.test.tsx` rasterises every title and material in the catalogue with them.
 //
 // **The two paths are written at the call, and must stay there.** They were a `FONT_FILES`
 // object until 2026-10-04, and Turbopack cannot resolve a path read out of an object, so it
@@ -38,13 +39,13 @@ import { SITE_NAME } from '@/config/site'
 // asks for. `scripts/audit-function-traces.mjs` fails the build if any function traces
 // repository files again (ADR 047).
 async function loadCardFonts() {
-  const [regular, bold] = await Promise.all([
-    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf')),
-    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf')),
+  const [display, label] = await Promise.all([
+    readFile(path.join(process.cwd(), 'public/fonts/bodoni-moda-96pt-400.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/barlow-condensed-500.ttf')),
   ])
   return [
-    { name: 'Noto Sans', data: regular, weight: 400 as const, style: 'normal' as const },
-    { name: 'Noto Sans', data: bold, weight: 700 as const, style: 'normal' as const },
+    { name: 'Bodoni Moda', data: display, weight: 400 as const, style: 'normal' as const },
+    { name: 'Barlow Condensed', data: label, weight: 500 as const, style: 'normal' as const },
   ]
 }
 
@@ -104,7 +105,8 @@ export default async function Image({ params }: Props) {
         padding: '80px',
         justifyContent: 'space-between',
         position: 'relative',
-        fontFamily: 'Noto Sans',
+        fontFamily: 'Barlow Condensed',
+        fontWeight: 500,
       }}
     >
       <div
@@ -120,7 +122,7 @@ export default async function Image({ params }: Props) {
       />
       <div
         style={{
-          fontSize: 14,
+          fontSize: 22,
           letterSpacing: '0.2em',
           textTransform: 'uppercase',
           color: '#9DA7AF',
@@ -134,12 +136,12 @@ export default async function Image({ params }: Props) {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div
           style={{
-            fontSize: 72,
-            fontWeight: 700,
-            letterSpacing: '0.03em',
-            textTransform: 'uppercase',
+            fontFamily: 'Bodoni Moda',
+            fontSize: 84,
+            fontWeight: 400,
+            letterSpacing: '-0.02em',
             color: '#1A1714',
-            lineHeight: 1.0,
+            lineHeight: 1.05,
             marginBottom: 28,
             display: 'flex',
           }}
@@ -154,7 +156,7 @@ export default async function Image({ params }: Props) {
               style={{
                 border: '1px solid #D8D3CB',
                 padding: '8px 16px',
-                fontSize: 12,
+                fontSize: 18,
                 letterSpacing: '0.12em',
                 color: '#4A4744',
                 display: 'flex',

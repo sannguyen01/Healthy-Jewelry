@@ -195,12 +195,12 @@ export default function FAQPage() {
                   >
                     <h2
                       style={{
-                        fontFamily: 'var(--font-display)',
+                        fontFamily: 'var(--font-title)',
                         fontSize: 'var(--text-lg, 1.1rem)',
-                        letterSpacing: 'var(--tracking-display)',
+                        letterSpacing: 'var(--tracking-title)',
                         color: 'var(--ink)',
                         margin: '0 0 14px',
-                        fontWeight: 500,
+                        fontWeight: 400,
                       }}
                     >
                       {item.q}
@@ -232,10 +232,10 @@ export default function FAQPage() {
           >
             <p
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-title)',
                 fontWeight: 400,
                 fontSize: 'var(--text-xl, 1.3rem)',
-                letterSpacing: 'var(--tracking-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: '0 0 12px',
               }}

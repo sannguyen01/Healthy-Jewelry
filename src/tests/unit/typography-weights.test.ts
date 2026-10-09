@@ -11,7 +11,9 @@ import path from 'node:path'
  * different typeface. That is exactly what shipped: `layout.tsx` loaded the
  * display family (Barlow Condensed, until 2026-10-04) at 400 and 500, while
  * eleven headings asked for 700 or 600 and one asked for 300. The same `<h1>` rendered at four different effective weights
- * across the site, and only the homepage was using a real face.
+ * across the site, and only the homepage was using a real face. Since the Quiet Archive (ADR 051)
+ * the display voice ships exactly one weight, so "which weight" has one answer for it; the
+ * body voice has two, in two files.
  *
  * Nothing catches this at runtime. It is not a type error, not a lint error,
  * and not a visual-regression failure unless someone happens to compare two
@@ -42,9 +44,9 @@ const EXEMPT = ['opengraph-image.tsx', 'global-error.tsx']
  * was not hypothetical: when display and body were two families, the body's
  * 300 made a union check wave through `--font-display` at 300 — the Materials
  * heading, rendering with no display face at 300 and silently falling back to
- * 400. Since 2026-10-04 one family serves all three tokens, so today the sets
- * are equal; the per-token resolution stays so a second family cannot
- * reintroduce the gap unseen.
+ * 400. With the Quiet Archive's three voices the sets differ again (display 400
+ * only, body 400 and, in its own file, 500), so the per-token resolution is what
+ * makes "Bodoni at 500" a failure instead of a faked bold.
  *
  * layout.tsx declares this in two hops — a loader owns a CSS variable
  * (`--font-zk`), and the `<html>` style maps a semantic token onto it
@@ -74,9 +76,9 @@ function loadedWeightsByToken(): Map<string, Set<number>> {
     byVariable.set(variable, weights)
   }
 
-  // `'--font-display': 'var(--font-bc, …)'` in the <html> style object.
+  // `'--font-display': 'var(--font-bm96, …)'` in the <html> style object.
   const byToken = new Map<string, Set<number>>()
-  for (const alias of source.matchAll(/'(--font-(?:display|ui|body|brand))':\s*'var\((--font-[\w-]+)/g)) {
+  for (const alias of source.matchAll(/'(--font-[\w-]+)':\s*'var\((--font-[\w-]+)/g)) {
     const weights = byVariable.get(alias[2])
     if (weights) byToken.set(alias[1], weights)
   }
@@ -90,7 +92,7 @@ function loadedWeightsByToken(): Map<string, Set<number>> {
  * This rule is about the app's own typography: which faces the browser will be asked for
  * and whether `next/font` downloaded them. A spec is not a surface. It declares weights to
  * *exercise* a component or, in `opengraph-bundled-font.test.tsx`, to prove that both
- * bundled Noto Sans faces rasterise — a family `layout.tsx` has never heard of, resolved by
+ * bundled card faces rasterise — families `layout.tsx` has never heard of, resolved by
  * Satori against files on disk rather than by a browser against a CSS custom property.
  *
  * Scanning it reported `weight 700 on an unresolved font (available: 300, 400, 500)`: a
@@ -189,23 +191,55 @@ describe('font loading', () => {
   it('resolves each --font-* token to the weights its loader declares', () => {
     // Guards the whole file: if either parsing hop stops matching, every
     // assertion below would pass against empty sets.
-    expect([...loadedByToken.keys()].sort()).toEqual(['--font-body', '--font-brand', '--font-display', '--font-ui'])
+    expect([...loadedByToken.keys()].sort()).toEqual([
+      '--font-body',
+      '--font-body-medium',
+      '--font-brand',
+      '--font-display',
+      '--font-title',
+      '--font-ui',
+    ])
   })
 
-  it('loads the brand name\'s two weights: 500 in the header, 400 in the footer (ADR 048)', () => {
-    expect([...(loadedByToken.get('--font-brand') ?? [])].sort()).toEqual([400, 500])
+  it('gives each voice the weights it has files for (ADR 051)', () => {
+    const weights = (token: string) => [...(loadedByToken.get(token) ?? [])].sort()
+    // Bodoni Moda ships one weight, in two optical cuts: a didone has no 500 to ask for.
+    expect(weights('--font-display')).toEqual([400])
+    expect(weights('--font-title')).toEqual([400])
+    // Running text is 400. Emphasis is the 500, its own file, reached through one token.
+    expect(weights('--font-body')).toEqual([400])
+    expect(weights('--font-body-medium')).toEqual([500])
+    // The label voice and the name: 500 in the bar and on every label, 400 in the footer (ADR 048).
+    expect(weights('--font-ui')).toEqual([400, 500])
+    expect(weights('--font-brand')).toEqual([400, 500])
   })
 
-  it('loads the 500 that PageHeader and the homepage hero depend on', () => {
-    expect(loadedByToken.get('--font-display')?.has(500)).toBe(true)
+  it('gives the two Bodoni cuts different files and the label voice and the name one', () => {
+    const source = readFileSync(LAYOUT, 'utf8')
+    const aliasOf = (token: string) => source.match(new RegExp(`'${token}':\\s*'var\\((--font-[\\w-]+)`))?.[1]
+    expect(aliasOf('--font-display')).not.toBe(aliasOf('--font-title'))
+    expect(aliasOf('--font-ui')).toBe(aliasOf('--font-brand'))
+  })
+})
+
+describe('the fallback lists are valid font-family lists', () => {
+  // next/font writes each `fallback` entry into the generated custom property as-is. A name that is
+  // not a sequence of identifiers ("Bodoni 72": a digit is not an identifier) makes the whole
+  // `font-family: var(--font-display)` invalid at computed-value time, so the element inherits the
+  // body's face. Measured 2026-10-09: every Bodoni heading and name was drawn in DM Sans, the
+  // computed style said so, and every other guard passed because DM Sans is also a shipped face.
+  const entries = [...readFileSync(LAYOUT, 'utf8').matchAll(/fallback:\s*\[([^\]]*)\]/g)].flatMap((m) =>
+    [...m[1].matchAll(/'([^']*)'/g)].map((e) => e[1])
+  )
+
+  it('finds the fallback entries it judges', () => {
+    expect(entries.length).toBeGreaterThanOrEqual(10)
   })
 
-  it('does not load a display weight heavier than 500', () => {
-    // Documents why PageHeader hardcodes 500. If a heavier face is ever added
-    // to the loader this fails, as a prompt to revisit that decision rather
-    // than leave the component silently conservative.
-    const display = loadedByToken.get('--font-display')
-    expect([...(display ?? [])].filter((weight) => weight > 500)).toEqual([])
+  it.each([...new Set(entries)])('%s is a valid unquoted family name', (name) => {
+    const quoted = /^"[^"]+"$/.test(name)
+    const identifiers = /^-?[A-Za-z_][\w-]*(?: -?[A-Za-z_][\w-]*)*$/.test(name)
+    expect(quoted || identifiers, `"${name}" would invalidate the whole font-family list`).toBe(true)
   })
 })
 
@@ -238,7 +272,7 @@ describe('no font weight is synthesised', () => {
 })
 
 /**
- * Each `--font-display` style object in a TSX file: the object literal that names the token,
+ * Each `--font-display` or `--font-title` style object in a TSX file: the object literal that names the token,
  * from the line that opens it to the line that closes it. Inline styles here are flat, so the
  * nearest `{` above and `}` below bound the object exactly — which matters, because a label
  * sitting under a heading must not be read as the heading's.
@@ -248,7 +282,7 @@ function displayStyleObjects(): { at: string; body: string }[] {
   for (const file of tsxFiles(SRC)) {
     const lines = readFileSync(file, 'utf8').split('\n')
     lines.forEach((text, index) => {
-      if (!/fontFamily:\s*'var\(--font-display\)/.test(text)) return
+      if (!/fontFamily:\s*'var\(--font-(display|title)\)/.test(text)) return
       let open = index
       while (open > 0 && !/\{\s*$/.test(lines[open])) open -= 1
       let close = index
@@ -279,16 +313,16 @@ function cssBySelector(): Map<string, Map<string, string>> {
   return merged
 }
 
-const displaySelectors = [...cssBySelector()].filter(([, props]) => props.get('font-family') === 'var(--font-display)')
+const DISPLAY_FAMILY = /^var\(--font-(display|title)\)$/
+const displaySelectors = [...cssBySelector()].filter(([, props]) => DISPLAY_FAMILY.test(props.get('font-family') ?? ''))
 
 /**
  * **The brand face sets the brand name and nothing else.**
  *
- * The owner kept the logotype in its original typography (2026-10-04, ADR 048) — an exception
- * to "one family", granted for the name alone. An exception that is not bounded spreads: the
- * next heading that wants "something with more character" reaches for the token that is
- * already there. So exactly one rule may use `--font-brand`, the logotype's, and every file
- * that mentions the token is accounted for.
+ * The owner kept the logotype in its original typography (2026-10-04, ADR 048). The Quiet Archive
+ * (ADR 051) sets its labels in the same face, through `--font-ui`; that widens who may use the
+ * *face*, not who may use the *token*. The token still names the name: exactly one rule may use
+ * `--font-brand`, the logotype's, and every file that mentions the token is accounted for.
  */
 describe('the brand face is the logotype\'s alone', () => {
   const css = readFileSync(GLOBALS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
@@ -325,7 +359,7 @@ describe('the brand face is the logotype\'s alone', () => {
  * (`--font-brand`, above), in the tracked capitals it has always had.
  */
 describe('headings and names are set in their own case', () => {
-  it('no --font-display style forces capitals', () => {
+  it('no --font-display or --font-title style forces capitals', () => {
     const offenders = [
       ...displayStyleObjects()
         .filter((o) => /textTransform:\s*'uppercase'/.test(o.body))
@@ -334,7 +368,7 @@ describe('headings and names are set in their own case', () => {
     ]
     expect(
       offenders,
-      'These --font-display styles force uppercase. Headings and names render in the case ' +
+      'These display styles force uppercase. Headings and names render in the case ' +
         'they are written in; capitals belong to small --font-ui labels (DESIGN.md, Type).'
     ).toEqual([])
   })
@@ -348,81 +382,99 @@ describe('headings and names are set in their own case', () => {
 })
 
 /**
- * **Display weight is chosen by role, not by whoever wrote the page** ([ADR 050](../../../docs/adr/050-one-face-means-no-borrowed-ones.md)).
+ * **The cut follows the size, and the weight is the one weight there is**
+ * ([ADR 051](../../../docs/adr/051-three-voices-one-archive.md), replacing the tier rule of ADR 050).
  *
- * Measured across the routes on 2026-10-09, the same tier was set at two weights depending on the
- * page: the 88px page title was 400 on `/shop`, the collections and the piece pages and 500 on
- * About, Materials and Contact; the homepage's section heading was 500 and About's equivalent
- * 400; a question heading was 500 in the FAQ and 400 in Materials; a piece's name was 400 in the
- * grid and 500 in the strip. With one family, weight is the only thing that separates a heading
- * from the body at small sizes, so it has to mean one thing:
+ * ADR 050 chose weights by size because one gothic family had two real weights and nothing else
+ * to separate a heading from body copy. Bodoni Moda ships one weight (400), so weight can no
+ * longer carry hierarchy and size and *cut* do instead. A didone's contrast is drawn for the size
+ * it is set at: at display sizes the hairlines are meant to be fine, at name sizes the same
+ * hairlines break up. Static instances make an optical size a file, so the choice is a token:
  *
- * - **h1 is 500**, always (the page title and the hero);
- * - **display text at `--text-lg` or smaller is 500**: below about 24px it competes with body
- *   copy in the same family (names, question headings, small headings);
- * - **display text above `--text-lg` is 400**: large type needs no help.
+ * - `--font-display` (the 96pt cut) is for the large size tokens, `--text-display` and `--text-hero`,
+ *   and for literals of 36px or more;
+ * - `--font-title` (the 24pt cut) is for everything smaller: `--text-2xl` and below, names, literals
+ *   under 36px.
  *
- * Keyed to the size *token*, not the computed size, because the tokens are `clamp()`s: a heading
- * is 35px on a desktop and 23px on a phone, and a weight that flipped across that boundary would
- * be a different design on each. Decorative watermarks (`aria-hidden`, `pointer-events: none`)
- * are exempt by listing, not by pattern.
+ * Keyed to the size *token*, not the computed size, because the tokens are `clamp()`s: a heading is
+ * 35px on a desktop and 23px on a phone, and a cut that flipped across that boundary would be a
+ * different design on each. The smallest display token is 38.4px, which is why 36px is the line.
  */
-describe('display weight follows the size tier', () => {
-  const DECORATIVE = ['components/home/CareSection.tsx']
-  const SMALL_TOKENS = new Set(['--text-lg', '--text-base', '--text-sm', '--text-xs'])
+describe('the cut follows the size, and the weight is 400', () => {
+  const LARGE_TOKENS = new Set(['--text-hero', '--text-display'])
+  const LARGE_PX = 36
 
-  /** 'small' when the size is the label/body/lg tokens or a literal under 1.5rem; else 'large'. */
+  /** 'large' when the size is a display token or a literal of 36px or more; 'small' for any other known size. */
   function tier(fontSize: string): 'small' | 'large' | null {
     const token = fontSize.match(/var\((--text-[\w]+)/)?.[1]
-    if (token) return SMALL_TOKENS.has(token) ? 'small' : 'large'
-    const literal = fontSize.match(/'(?:clamp\()?\s*([\d.]+)(rem|px)/)
+    if (token) return LARGE_TOKENS.has(token) ? 'large' : 'small'
+    const literal = fontSize.match(/'?(?:clamp\()?\s*([\d.]+)(rem|px)/)
     if (!literal) return null
-    return Number(literal[1]) * (literal[2] === 'rem' ? 16 : 1) < 24 ? 'small' : 'large'
+    return Number(literal[1]) * (literal[2] === 'rem' ? 16 : 1) >= LARGE_PX ? 'large' : 'small'
   }
 
-  const judged = displayStyleObjects()
-    .filter((o) => !DECORATIVE.some((d) => o.at.startsWith(d)))
-    .map((o) => ({
-      at: o.at,
-      weight: Number(o.body.match(/fontWeight:\s*(\d+)/)?.[1]),
-      size: tier(o.body.match(/fontSize:\s*([^\n]+)/)?.[1] ?? ''),
-    }))
+  const judgedObjects = displayStyleObjects().map((o) => ({
+    at: o.at,
+    token: o.body.match(/fontFamily:\s*'var\((--font-(?:display|title))\)/)?.[1] ?? null,
+    weight: Number(o.body.match(/fontWeight:\s*(\d+)/)?.[1]),
+    size: tier(o.body.match(/fontSize:\s*([^\n]+)/)?.[1] ?? ''),
+  }))
+  const judgedRules = displaySelectors.map(([selector, props]) => ({
+    at: `globals.css ${selector}`,
+    token: props.get('font-family')?.match(/--font-(?:display|title)/)?.[0] ?? null,
+    weight: Number(props.get('font-weight')),
+    size: tier(`'${props.get('font-size') ?? ''}`),
+  }))
+  const judged = [...judgedObjects, ...judgedRules]
 
   it('sees the styles it judges', () => {
-    expect(judged.length).toBeGreaterThan(20)
-    expect(judged.filter((j) => j.size === 'small').length).toBeGreaterThan(3)
+    expect(judged.length).toBeGreaterThan(30)
+    expect(judged.filter((j) => j.size === 'small').length).toBeGreaterThan(10)
     expect(judged.filter((j) => j.size === 'large').length).toBeGreaterThan(8)
+    expect(judged.filter((j) => j.size === null).map((j) => j.at), 'a display style whose size cannot be read').toEqual([])
   })
 
-  it('sets every small display style at 500 and every large one at 400, bar the h1', () => {
-    const lines = new Map<string, string[]>()
-    const isH1 = (at: string): boolean => {
-      const [file, line] = at.split(':')
-      const source = lines.get(file) ?? readFileSync(path.join(SRC, file), 'utf8').split('\n')
-      lines.set(file, source)
-      for (let i = Number(line) - 1; i >= Math.max(0, Number(line) - 6); i -= 1) {
-        if (/<h1\b/.test(source[i])) return true
-        if (/<(h[2-6]|p|span|div|a|li|button)\b/.test(source[i])) return false
-      }
-      return false
-    }
+  it('sets every display style at 400: Bodoni Moda has no other weight', () => {
+    expect(judged.filter((j) => j.weight !== 400).map((j) => `${j.at}  weight ${j.weight}`)).toEqual([])
+  })
+
+  it('uses the 96pt cut only at display sizes and the 24pt cut only below them', () => {
     const offenders = judged
-      .filter((j) => j.size !== null)
-      .filter((j) => {
-        if (isH1(j.at)) return j.weight !== 500
-        return j.weight !== (j.size === 'small' ? 500 : 400)
-      })
-      .map((j) => `${j.at}  weight ${j.weight} on a ${j.size} display style`)
+      .filter((j) => (j.size === 'large' ? j.token !== '--font-display' : j.token !== '--font-title'))
+      .map((j) => `${j.at}  ${j.token} on a ${j.size} size`)
     expect(
       offenders,
-      'One tier, one weight (ADR 050): h1 500; display text at --text-lg or smaller 500; larger 400.'
+      'A size and a cut disagree (ADR 051): --font-display is for --text-display and --text-hero and literals of ' +
+        '36px or more; --font-title is for everything smaller.'
     ).toEqual([])
   })
 
-  it('has no display class in globals.css at a weight outside the same rule', () => {
+  it('has one piece-name class, in the title cut', () => {
     const names = displaySelectors.filter(([s]) => s === '.hj-card-name')
     expect(names).toHaveLength(1)
-    expect(names[0][1].get('font-weight')).toBe('500')
+    expect(names[0][1].get('font-family')).toBe('var(--font-title)')
+  })
+})
+
+/**
+ * **Emphasis is a file of its own, reached through one rule.** DM Sans 500 is not preloaded (it
+ * is a loader call of its own so that `preload` can be off), so the 500 is requested only where
+ * it is wanted: `strong`, `b` and `th`. Running text asking for 500 would be drawn in the 400
+ * file with nothing synthesised, which is no emphasis at all, and the weight check above fails it
+ * because `--font-body` ships 400 only.
+ */
+describe('the medium body weight is for emphasis alone', () => {
+  it('only strong, b and th set their family in --font-body-medium', () => {
+    const users = [...cssBySelector()].filter(([, props]) => props.get('font-family') === 'var(--font-body-medium)').map(([s]) => s)
+    expect(users.sort()).toEqual(['b', 'strong', 'th'])
+  })
+
+  it('no component names the token', () => {
+    const named = tsxFiles(SRC)
+      .filter((file) => !file.endsWith(`${path.sep}layout.tsx`))
+      .filter((file) => readFileSync(file, 'utf8').includes('--font-body-medium'))
+      .map((file) => path.relative(SRC, file))
+    expect(named).toEqual([])
   })
 })
 
@@ -436,13 +488,13 @@ describe('display weight follows the size tier', () => {
  * weight a heading renders at must not depend on which faces happen to be loaded.
  */
 describe('display weights are declared', () => {
-  it('every --font-display style declares its weight', () => {
+  it('every --font-display and --font-title style declares its weight', () => {
     const offenders = [
       ...displayStyleObjects()
         .filter((o) => !/fontWeight:/.test(o.body))
         .map((o) => o.at),
       ...displaySelectors.filter(([, props]) => !props.has('font-weight')).map(([s]) => `globals.css ${s}`),
     ]
-    expect(offenders, 'These --font-display styles inherit their weight from the body.').toEqual([])
+    expect(offenders, 'These display styles inherit their weight from the body.').toEqual([])
   })
 })

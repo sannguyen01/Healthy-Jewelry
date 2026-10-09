@@ -36,13 +36,13 @@ export function MaterialsSection() {
           </div>
           <h2
             style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--font-title)',
               fontSize: 'var(--text-2xl)',
               fontWeight: 400,
               color: 'var(--ink)',
               margin: 0,
               lineHeight: 1.1,
-              letterSpacing: 'var(--tracking-display)',
+              letterSpacing: 'var(--tracking-title)',
             }}
           >
             Built from the inside out.
@@ -116,9 +116,9 @@ export function MaterialsSection() {
 
             <h3
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-title)',
                 fontSize: '1.2rem',
-                fontWeight: 500,
+                fontWeight: 400,
                 letterSpacing: 'var(--tracking-name)',
                 color: 'var(--ink)',
                 margin: '0 0 6px',

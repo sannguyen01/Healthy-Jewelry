@@ -30,7 +30,7 @@ export default function Error({ error, reset }: ErrorProps) {
     >
       <p
         style={{
-          fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
+          fontFamily: 'var(--font-ui)',
           fontSize: 'var(--text-xs)',
           letterSpacing: '0.22em',
           textTransform: 'uppercase',
@@ -41,8 +41,8 @@ export default function Error({ error, reset }: ErrorProps) {
       </p>
       <h1
         style={{
-          fontFamily: 'var(--font-display, "Zen Kaku Gothic Antique", sans-serif)',
-          fontWeight: 500,
+          fontFamily: 'var(--font-display)',
+          fontWeight: 400,
           fontSize: 'clamp(2.4rem, 5vw, 4rem)',
           letterSpacing: 'var(--tracking-display)',
           lineHeight: 1.1,
@@ -53,7 +53,7 @@ export default function Error({ error, reset }: ErrorProps) {
       </h1>
       <p
         style={{
-          fontFamily: 'var(--font-body, "Zen Kaku Gothic Antique", sans-serif)',
+          fontFamily: 'var(--font-body)',
           fontWeight: 400,
           fontSize: '1rem',
           color: 'var(--graphite, #4A4744)',
@@ -71,7 +71,7 @@ export default function Error({ error, reset }: ErrorProps) {
             padding: '12px 28px',
             border: '1px solid var(--ink, #1A1714)',
             backgroundColor: 'transparent',
-            fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
+            fontFamily: 'var(--font-ui)',
             fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
@@ -87,7 +87,7 @@ export default function Error({ error, reset }: ErrorProps) {
             padding: '12px 28px',
             backgroundColor: 'var(--ink, #1A1714)',
             color: 'var(--bg, #F3F2EC)',
-            fontFamily: 'var(--font-ui, "Zen Kaku Gothic Antique", sans-serif)',
+            fontFamily: 'var(--font-ui)',
             fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',

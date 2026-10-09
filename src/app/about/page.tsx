@@ -75,10 +75,10 @@ export default function AboutPage() {
 
             <h2
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-title)',
                 fontWeight: 400,
                 fontSize: 'var(--text-2xl)',
-                letterSpacing: 'var(--tracking-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
                 margin: '0 0 24px',
               }}
@@ -197,10 +197,10 @@ export default function AboutPage() {
 
                 <h3
                   style={{
-                    fontFamily: 'var(--font-display)',
+                    fontFamily: 'var(--font-title)',
                     fontWeight: 400,
                     fontSize: 'var(--text-xl)',
-                    letterSpacing: 'var(--tracking-display)',
+                    letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
                   }}
@@ -240,10 +240,10 @@ export default function AboutPage() {
 
           <h2
             style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--font-title)',
               fontWeight: 400,
               fontSize: 'var(--text-2xl)',
-              letterSpacing: 'var(--tracking-display)',
+              letterSpacing: 'var(--tracking-title)',
               color: 'var(--ink)',
               margin: 0,
             }}

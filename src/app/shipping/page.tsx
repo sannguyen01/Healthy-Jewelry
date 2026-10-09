@@ -15,10 +15,10 @@ export const metadata: Metadata = {
 }
 
 const sectionHeadStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-display)',
+  fontFamily: 'var(--font-title)',
   fontWeight: 400,
   fontSize: 'var(--text-xl, 1.4rem)',
-  letterSpacing: 'var(--tracking-display)',
+  letterSpacing: 'var(--tracking-title)',
   color: 'var(--ink)',
   margin: '0 0 16px',
 }
@@ -102,10 +102,10 @@ export default function ShippingPage() {
           <PageHeader eyebrow="Customer Service" title="Shipping & Returns" variant="compact" />
           <p
             style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--font-title)',
               fontWeight: 400,
               fontSize: 'var(--text-xl, 1.3rem)',
-              letterSpacing: 'var(--tracking-display)',
+              letterSpacing: 'var(--tracking-title)',
               color: 'var(--titanium-text)',
               margin: 0,
             }}

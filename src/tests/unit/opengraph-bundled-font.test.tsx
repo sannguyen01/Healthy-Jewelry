@@ -22,8 +22,9 @@ import { describe, it, expect } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { ImageResponse } from 'next/og'
-import { getAllProducts } from '@/lib/catalog'
+import { claimText, getAllProducts } from '@/lib/catalog'
 import { SITE_NAME } from '@/config/site'
+import { describeSfnt, uncoveredCharacters } from '@/lib/design/fontFile'
 
 /**
  * **This file was `opengraph-vnd-font.test.tsx`, and the glyph it was named for is no
@@ -33,7 +34,8 @@ import { SITE_NAME } from '@/config/site'
  * for ₫ (U+20AB DONG SIGN) in a VND price — 23 failures across 18 users, logged as "Failed
  * to load dynamic font for ₫" — while every other character rendered fine. The fix was to
  * bundle two Noto Sans files and hand Satori bytes it already has, removing the
- * request-time dependency entirely.
+ * request-time dependency entirely. Since 2026-10-09 (ADR 051) the bundle is the site's own three
+ * voices as TTF, because Satori reads TTF and not the WOFF2 the site ships.
  *
  * The card no longer renders a price, so U+20AB is not on it. Testing that specific glyph
  * would now be testing a character the route cannot produce — green forever, proving
@@ -50,25 +52,47 @@ import { SITE_NAME } from '@/config/site'
  * for real rendering. That mock would pass a font failure: the failure is in font loading,
  * which only happens when Satori actually runs. This one does not mock it.
  */
+const FILES = {
+  display: 'public/fonts/bodoni-moda-96pt-400.ttf',
+  body: 'public/fonts/dm-sans-9pt-400.ttf',
+  label: 'public/fonts/barlow-condensed-500.ttf',
+} as const
+
+async function bundled() {
+  const [display, body, label] = await Promise.all(
+    Object.values(FILES).map((file) => readFile(path.join(process.cwd(), file)))
+  )
+  return { display, body, label }
+}
+
 async function bundledFonts() {
-  const [regular, bold] = await Promise.all([
-    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-regular.ttf')),
-    readFile(path.join(process.cwd(), 'public/fonts/NotoSans-bold.ttf')),
-  ])
+  const { display, body, label } = await bundled()
   return [
-    { name: 'Noto Sans', data: regular, weight: 400 as const, style: 'normal' as const },
-    { name: 'Noto Sans', data: bold, weight: 700 as const, style: 'normal' as const },
+    { name: 'Bodoni Moda', data: display, weight: 400 as const, style: 'normal' as const },
+    { name: 'DM Sans', data: body, weight: 400 as const, style: 'normal' as const },
+    { name: 'Barlow Condensed', data: label, weight: 500 as const, style: 'normal' as const },
   ]
 }
 
-/** Every character the card can be asked to draw, from the catalogue itself. */
-function cardCharacters(): string {
-  const parts: string[] = [SITE_NAME.toUpperCase()]
-  for (const product of getAllProducts()) {
-    parts.push(product.title.toUpperCase())
-    parts.push(product.materialLabel.toUpperCase())
+/** What each voice sets on the cards: the title in Bodoni, the sentence in DM Sans, the labels in Barlow. */
+function cardText() {
+  const products = getAllProducts()
+  return {
+    display: ['Grade 23', 'Titanium', ...products.map((p) => p.title)].join('\n'),
+    body: claimText('brand-positioning', { kind: 'site' }),
+    label: [
+      SITE_NAME.toUpperCase(),
+      'GRADE 23 TITANIUM',
+      'NIOBIUM',
+      '316L SURGICAL STEEL',
+      ...products.map((p) => p.materialLabel.toUpperCase()),
+    ].join('\n'),
   }
-  return [...new Set(parts.join('').split(''))].join('')
+}
+
+/** Every character the cards can be asked to draw. */
+function cardCharacters(): string {
+  return [...new Set(Object.values(cardText()).join('').split(''))].join('')
 }
 
 describe('the OG card rasterises with the bundled font, no network', () => {
@@ -79,13 +103,27 @@ describe('the OG card rasterises with the bundled font, no network', () => {
     expect(cardCharacters().length).toBeGreaterThan(10)
   })
 
-  it('renders every character the card can carry, and produces a non-empty PNG', async () => {
+  it('has a glyph in each voice for every character that voice sets', async () => {
+    // Satori does not fail on a missing glyph: it draws .notdef, a box, and the card unfurls with
+    // a hole in a word. So coverage is read from the files' own cmap tables, voice by voice.
+    const files = await bundled()
+    const text = cardText()
+    for (const voice of ['display', 'body', 'label'] as const) {
+      const font = describeSfnt(files[voice])
+      expect(uncoveredCharacters(text[voice], font.codepoints), `${FILES[voice]} lacks glyphs the cards set in it`).toEqual([])
+    }
+  })
+
+  it('renders every character the card can carry, in all three voices, and produces a non-empty PNG', async () => {
     const fonts = await bundledFonts()
+    const text = cardText()
 
     const response = new ImageResponse(
       (
-        <div style={{ display: 'flex', fontFamily: 'Noto Sans', fontSize: 40 }}>
-          {cardCharacters()}
+        <div style={{ display: 'flex', flexDirection: 'column', fontSize: 40 }}>
+          <div style={{ display: 'flex', fontFamily: 'Bodoni Moda', fontWeight: 400 }}>{text.display}</div>
+          <div style={{ display: 'flex', fontFamily: 'DM Sans', fontWeight: 400 }}>{text.body}</div>
+          <div style={{ display: 'flex', fontFamily: 'Barlow Condensed', fontWeight: 500 }}>{text.label}</div>
         </div>
       ),
       { width: 1200, height: 630, fonts }
@@ -96,22 +134,13 @@ describe('the OG card rasterises with the bundled font, no network', () => {
     expect(bytes.byteLength).toBeGreaterThan(0)
   })
 
-  it('renders both weights, because the card uses 400 and 700', async () => {
-    // The title is `fontWeight: 700` and the eyebrow and material label are 400. A bundle
-    // missing one weight would let Satori synthesise it — the same silent substitution
-    // CLAUDE.md records for Barlow Condensed at weight 700 across nine pages.
-    const fonts = await bundledFonts()
-
-    const response = new ImageResponse(
-      (
-        <div style={{ display: 'flex', flexDirection: 'column', fontFamily: 'Noto Sans' }}>
-          <div style={{ display: 'flex', fontWeight: 400, fontSize: 14 }}>{cardCharacters()}</div>
-          <div style={{ display: 'flex', fontWeight: 700, fontSize: 72 }}>{cardCharacters()}</div>
-        </div>
-      ),
-      { width: 1200, height: 630, fonts }
-    )
-
-    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0)
+  it('ships exactly the weight each voice asks for, so Satori synthesises none', async () => {
+    // The cards ask Bodoni Moda and DM Sans for 400 and Barlow Condensed for 500, and each bundle
+    // holds that one weight. A bundle missing the weight would let Satori synthesise it, the same
+    // silent substitution CLAUDE.md records for Barlow Condensed at weight 700 across nine pages.
+    const files = await bundled()
+    expect(describeSfnt(files.display).weight).toBe(400)
+    expect(describeSfnt(files.body).weight).toBe(400)
+    expect(describeSfnt(files.label).weight).toBe(500)
   })
 })

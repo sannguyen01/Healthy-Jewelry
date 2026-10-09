@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { ImageResponse } from 'next/og'
 import { claimText } from '@/lib/catalog'
 import { SITE_DEFAULT_TITLE, SITE_NAME } from '@/config/site'
@@ -23,7 +25,28 @@ export const alt = SITE_DEFAULT_TITLE
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-export default function Image() {
+/**
+ * The card is set in the site's three voices (ADR 051): the metal in Bodoni Moda, the positioning
+ * line in DM Sans, the brand name and the material chips in Barlow Condensed. Satori reads TTF and
+ * not the WOFF2 the site ships, so the card bundles the same fixed instances as TTF, byte for byte
+ * (`src/app/fonts/README.md`, "The share-card copies"). The paths are written at the call, as in
+ * the product card, so Turbopack scopes the trace to these three files (ADR 047).
+ */
+async function loadCardFonts() {
+  const [display, body, label] = await Promise.all([
+    readFile(path.join(process.cwd(), 'public/fonts/bodoni-moda-96pt-400.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/dm-sans-9pt-400.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/barlow-condensed-500.ttf')),
+  ])
+  return [
+    { name: 'Bodoni Moda', data: display, weight: 400 as const, style: 'normal' as const },
+    { name: 'DM Sans', data: body, weight: 400 as const, style: 'normal' as const },
+    { name: 'Barlow Condensed', data: label, weight: 500 as const, style: 'normal' as const },
+  ]
+}
+
+export default async function Image() {
+  const fonts = await loadCardFonts()
   return new ImageResponse(
     (
       <div
@@ -37,29 +60,30 @@ export default function Image() {
           justifyContent: 'flex-end',
           padding: '80px',
           position: 'relative',
+          fontFamily: 'DM Sans',
         }}
       >
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: '#9DA7AF', display: 'flex' }} />
-        <div style={{ fontSize: 16, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#9DA7AF', marginBottom: 28, display: 'flex' }}>
+        <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 500, fontSize: 24, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#9DA7AF', marginBottom: 28, display: 'flex' }}>
           {SITE_NAME.toUpperCase()}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          <span style={{ fontSize: 88, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 0.95, display: 'flex' }}>GRADE 23</span>
-          <span style={{ fontSize: 88, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#1A1714', lineHeight: 0.95, display: 'flex' }}>TITANIUM</span>
+          <span style={{ fontFamily: 'Bodoni Moda', fontSize: 112, fontWeight: 400, letterSpacing: '-0.02em', color: '#1A1714', lineHeight: 1, display: 'flex' }}>Grade 23</span>
+          <span style={{ fontFamily: 'Bodoni Moda', fontSize: 112, fontWeight: 400, letterSpacing: '-0.02em', color: '#1A1714', lineHeight: 1, display: 'flex' }}>Titanium</span>
         </div>
-        <div style={{ marginTop: 36, fontSize: 22, color: '#4A4744', letterSpacing: '0.04em', display: 'flex' }}>
+        <div style={{ marginTop: 36, fontSize: 26, fontWeight: 400, color: '#4A4744', letterSpacing: '0.01em', display: 'flex' }}>
           {/* The positioning line is a pending claim; the card renders what the page does. */}
           {claimText('brand-positioning', { kind: 'site' })}
         </div>
         <div style={{ position: 'absolute', bottom: 64, right: 80, display: 'flex', gap: 12 }}>
           {['GRADE 23 TITANIUM', 'NIOBIUM', '316L SURGICAL STEEL'].map((mat) => (
-            <div key={mat} style={{ border: '1px solid #D8D3CB', padding: '8px 16px', fontSize: 11, letterSpacing: '0.12em', color: '#4A4744', display: 'flex' }}>
+            <div key={mat} style={{ fontFamily: 'Barlow Condensed', fontWeight: 500, border: '1px solid #D8D3CB', padding: '8px 16px', fontSize: 16, letterSpacing: '0.12em', color: '#4A4744', display: 'flex' }}>
               {mat}
             </div>
           ))}
         </div>
       </div>
     ),
-    { ...size }
+    { ...size, fonts }
   )
 }

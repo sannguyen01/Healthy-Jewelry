@@ -126,7 +126,7 @@ export function Hero({ headlineLines }: HeroProps) {
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-hero)',
-              fontWeight: 500,
+              fontWeight: 400,
               color: 'var(--ink)',
               lineHeight: 0.9,
               letterSpacing: 'var(--tracking-display)',

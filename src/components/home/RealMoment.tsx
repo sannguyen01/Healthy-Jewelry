@@ -26,7 +26,7 @@ export function RealMoment() {
           <h2 className="label-eyebrow" style={{ marginBottom: '40px' }}>The Moment</h2>
           <p
             style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--font-title)',
               fontWeight: 400,
               fontSize: 'clamp(32px, 4vw, 48px)',
               color: 'var(--ink)',

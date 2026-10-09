@@ -143,9 +143,9 @@ export function CollectionGrid({ tiles }: { tiles: CollectionTile[] }) {
               >
                 <h3
                   style={{
-                    fontFamily: 'var(--font-display)',
+                    fontFamily: 'var(--font-title)',
                     fontSize: '1.1rem',
-                    fontWeight: 500,
+                    fontWeight: 400,
                     letterSpacing: 'var(--tracking-name)',
                     color: 'var(--ink)',
                     margin: '0 0 4px',

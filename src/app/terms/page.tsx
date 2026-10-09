@@ -15,10 +15,10 @@ export const metadata: Metadata = {
 }
 
 const sectionHeadStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-display)',
+  fontFamily: 'var(--font-title)',
   fontWeight: 400,
   fontSize: 'var(--text-xl, 1.4rem)',
-  letterSpacing: 'var(--tracking-display)',
+  letterSpacing: 'var(--tracking-title)',
   color: 'var(--ink)',
   margin: '0 0 16px',
 }
@@ -198,11 +198,11 @@ export default function TermsPage() {
             <p
               style={{
                 ...bodyStyle,
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-title)',
                 fontSize: 'var(--text-lg, 1.1rem)',
-                letterSpacing: 'var(--tracking-display)',
+                letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
-                fontWeight: 500,
+                fontWeight: 400,
               }}
             >
               If it corrodes, we replace it — no questions asked.

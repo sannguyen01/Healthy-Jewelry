@@ -42,20 +42,30 @@
  */
 const CARD_TRACE = 'app/products/[handle]/opengraph-image/route'
 const CARD_PAGE = 'app/products/[handle]/page'
+const ROOT_CARD_TRACE = 'app/opengraph-image/route'
+const BUNDLED = 'the share card bundles its fonts rather than fetching them at request time'
+/**
+ * Every page under the root layout. The root layout's metadata imports the root card's module for
+ * its `alt` and `size`, so the card's fonts are traced into every page function, measured on the
+ * 2026-10-09 build (15 page traces carried them). A `*` in an `alsoIn` entry matches any run of
+ * characters, `/` included; a route handler or any other kind of trace does not match, so a font
+ * showing up in `app/api/…/route` is still a stray.
+ */
+const EVERY_PAGE = ['app/page', 'app/*/page']
 export const RUNTIME_READS = Object.freeze([
-  {
-    file: 'public/fonts/NotoSans-regular.ttf',
-    trace: CARD_TRACE,
-    alsoIn: [CARD_PAGE],
-    reason: 'the share card bundles its fonts rather than fetching them at request time',
-  },
-  {
-    file: 'public/fonts/NotoSans-bold.ttf',
-    trace: CARD_TRACE,
-    alsoIn: [CARD_PAGE],
-    reason: 'the share card bundles its fonts rather than fetching them at request time',
-  },
+  { file: 'public/fonts/bodoni-moda-96pt-400.ttf', trace: CARD_TRACE, alsoIn: [CARD_PAGE], reason: BUNDLED },
+  { file: 'public/fonts/barlow-condensed-500.ttf', trace: CARD_TRACE, alsoIn: [CARD_PAGE], reason: BUNDLED },
+  { file: 'public/fonts/bodoni-moda-96pt-400.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
+  { file: 'public/fonts/dm-sans-9pt-400.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
+  { file: 'public/fonts/barlow-condensed-500.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
 ])
+
+/** `*` matches any run of characters; everything else matches itself. */
+function traceMatches(pattern, name) {
+  if (!pattern.includes('*')) return pattern === name
+  const escaped = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+  return new RegExp(`^${escaped.join('.*')}$`).test(name)
+}
 
 /** A repository file, as opposed to a dependency or a build output. */
 export function isRepositoryFile(relativePath) {
@@ -89,7 +99,9 @@ export function judgeTraces(traces, runtimeReads = RUNTIME_READS) {
   const strays = []
   for (const name of names) {
     const allowed = new Set(
-      runtimeReads.filter((r) => r.trace === name || (r.alsoIn ?? []).includes(name)).map((r) => r.file)
+      runtimeReads
+        .filter((r) => r.trace === name || (r.alsoIn ?? []).some((pattern) => traceMatches(pattern, name)))
+        .map((r) => r.file)
     )
     const files = traces[name].filter((f) => isRepositoryFile(f) && !allowed.has(f)).sort()
     if (files.length > 0) strays.push({ trace: name, files, byDirectory: countByDirectory(files) })

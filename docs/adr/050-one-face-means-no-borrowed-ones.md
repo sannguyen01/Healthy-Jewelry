@@ -3,6 +3,8 @@
 **Date**: 2026-10-09
 **Status**: Accepted. The owner asked that all typography be consistently aligned across every
 page, with no face that does not follow the design principles.
+**Amended by [ADR 051](051-three-voices-one-archive.md):** the measurement, the guards for synthesis, italic, system
+faces and the label floor stand; the weight-by-size tier rule is replaced (Bodoni Moda ships one weight).
 
 ## Context
 

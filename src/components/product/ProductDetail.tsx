@@ -144,7 +144,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 500,
+              fontWeight: 400,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',

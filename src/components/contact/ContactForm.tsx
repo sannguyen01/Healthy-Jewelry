@@ -138,10 +138,10 @@ export function ContactForm() {
       >
         <span
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--font-title)',
             fontWeight: 400,
             fontSize: 'var(--text-xl)',
-            letterSpacing: 'var(--tracking-display)',
+            letterSpacing: 'var(--tracking-title)',
             // --text-xl clamps 22.4px -> 35.2px, so this crosses WCAG's 24px
             // large-text boundary mid-viewport: it is normal text needing 4.5:1
             // on a phone and large text needing 3:1 on a desktop. --sage-text

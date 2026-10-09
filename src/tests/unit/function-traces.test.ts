@@ -22,7 +22,9 @@ const { collectTraces, exitCode, main } = await import('../../../scripts/audit-f
 const ROOT = resolve(__dirname, '../../..')
 const CARD = 'app/products/[handle]/opengraph-image/route'
 const PAGE = 'app/products/[handle]/page'
-const FONTS = ['public/fonts/NotoSans-regular.ttf', 'public/fonts/NotoSans-bold.ttf']
+const ROOT_CARD = 'app/opengraph-image/route'
+const FONTS = ['public/fonts/bodoni-moda-96pt-400.ttf', 'public/fonts/barlow-condensed-500.ttf']
+const ROOT_FONTS = [...FONTS, 'public/fonts/dm-sans-9pt-400.ttf']
 const DEPENDENCIES = ['node_modules/.pnpm/next@16.3.8/node_modules/next/dist/server/next.js', '.next/server/chunks/[turbopack]_runtime.js']
 
 /** The shape of the whole-project trace, reduced: one file from each kind it swept in. */
@@ -42,14 +44,27 @@ const WHOLE_PROJECT = [
 const clean = () => ({
   [CARD]: [...DEPENDENCIES, ...FONTS],
   [PAGE]: [...DEPENDENCIES, ...FONTS],
+  [ROOT_CARD]: [...DEPENDENCIES, ...ROOT_FONTS],
   'app/faq/page': [...DEPENDENCIES],
 })
 
 describe('the verdict', () => {
-  it('passes the traces this build produces: dependencies, build output, and the two fonts where they belong', () => {
+  it('passes the traces this build produces: dependencies, build output, and the fonts where they belong', () => {
     const verdict = judgeTraces(clean())
-    expect(verdict).toMatchObject({ status: 'ok', traceCount: 3, strays: [], missing: [] })
+    expect(verdict).toMatchObject({ status: 'ok', traceCount: 4, strays: [], missing: [] })
     expect(exitCode(verdict)).toBe(0)
+  })
+
+  it('accepts the root card\'s fonts in every page trace, because the root layout imports the card', () => {
+    // Measured on the real build: the layout's metadata imports the card module for `alt` and
+    // `size`, so each of the page functions carries the three fonts (ADR 051).
+    const verdict = judgeTraces({
+      ...clean(),
+      'app/about/page': [...DEPENDENCIES, ...ROOT_FONTS],
+      'app/shop/[collection]/page': [...DEPENDENCIES, ...ROOT_FONTS],
+      'app/_not-found/page': [...DEPENDENCIES, ...ROOT_FONTS],
+    })
+    expect(verdict).toMatchObject({ status: 'ok', strays: [], missing: [] })
   })
 
   it('fails the whole-project trace, and groups what it shipped by directory', () => {
@@ -71,11 +86,12 @@ describe('the verdict', () => {
   })
 
   it('allows a runtime read only in the traces it is named for', () => {
-    // The fonts are the card's. The same files in an unrelated route mean something else
-    // started reading the repository, and are reported like any other stray.
-    const verdict = judgeTraces({ ...clean(), 'app/faq/page': [...DEPENDENCIES, FONTS[0]] })
+    // The fonts are the cards'. Pages carry them too (the root layout imports the root card), but
+    // the same files in a route handler mean something else started reading the repository, and
+    // are reported like any other stray.
+    const verdict = judgeTraces({ ...clean(), 'app/api/version/route': [...DEPENDENCIES, FONTS[0]] })
     expect(verdict.strays).toEqual([
-      { trace: 'app/faq/page', files: [FONTS[0]], byDirectory: [{ directory: 'public', count: 1 }] },
+      { trace: 'app/api/version/route', files: [FONTS[0]], byDirectory: [{ directory: 'public', count: 1 }] },
     ])
   })
 
@@ -123,7 +139,7 @@ describe('the verdict', () => {
 describe('what the reader is told', () => {
   it('names the trace, the counts, and the remedy at the call site', () => {
     const text = renderTraces(judgeTraces({ ...clean(), [CARD]: WHOLE_PROJECT })).join('\n')
-    expect(text).toContain('✗ no server function traces repository files (3 traces read)')
+    expect(text).toContain('✗ no server function traces repository files (4 traces read)')
     expect(text).toContain(`· ${CARD}: 8 repository files`)
     expect(text).toContain('tracing of the whole project')
     expect(text).toContain("readFile(path.join(process.cwd(), 'public/fonts/x.ttf'))")

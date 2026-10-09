@@ -18,7 +18,8 @@ import { brotliDecompressSync } from 'node:zlib'
  * - **What it is and under which licence** (`name`). Redistributing a font is a licence
  *   question; the file carries its own answer.
  *
- * Only WOFF2 is read, because only WOFF2 ships. The parser is the minimum the three questions
+ * WOFF2 is what the browser is sent; plain TrueType is read too, because the share cards bundle TTF
+ * (Satori reads TTF and not WOFF2). The parser is the minimum the three questions
  * need: the table directory, the Brotli stream, and the `cmap` (formats 4 and 12), `name` and
  * `OS/2` tables. It never reconstructs glyph outlines, so the transformed `glyf`/`loca`/`hmtx`
  * tables are skipped by their stored lengths without being decoded.
@@ -216,12 +217,11 @@ export function nameStrings(name: Uint8Array): Map<number, string> {
   return new Map([...mac, ...windows])
 }
 
-/** Reads a WOFF2 font's identity, weight, licence and character coverage. */
-export function describeWoff2(bytes: Uint8Array): FontDescription {
-  const tables = readWoff2Tables(bytes)
+/** Reads a font's identity, weight, licence and character coverage out of its tables. */
+function describeTables(tables: Map<string, Uint8Array>, format: string): FontDescription {
   const table = (tag: string) => {
     const found = tables.get(tag)
-    if (!found) throw new Error(`woff2: no ${tag} table`)
+    if (!found) throw new Error(`${format}: no ${tag} table`)
     return found
   }
   const names = nameStrings(table('name'))
@@ -236,6 +236,46 @@ export function describeWoff2(bytes: Uint8Array): FontDescription {
     licenseUrl: names.get(14) ?? '',
     codepoints: cmapCodepoints(table('cmap')),
   }
+}
+
+/** Reads a WOFF2 font's identity, weight, licence and character coverage. */
+export function describeWoff2(bytes: Uint8Array): FontDescription {
+  return describeTables(readWoff2Tables(bytes), 'woff2')
+}
+
+const SFNT_TRUETYPE = 0x00010000
+const SFNT_OPENTYPE_CFF = 0x4f54544f // 'OTTO'
+const SFNT_APPLE_TRUETYPE = 0x74727565 // 'true'
+
+/**
+ * Every table of a plain TrueType or OpenType file, by tag. The share cards bundle TTF rather than
+ * WOFF2 because Satori reads the former and not the latter; the table directory is not
+ * compressed, so this is the whole of the parser.
+ */
+export function readSfntTables(bytes: Uint8Array): Map<string, Uint8Array> {
+  if (bytes.length < 12) throw new Error('sfnt: file is shorter than its header')
+  const header = view(bytes)
+  const flavor = header.getUint32(0)
+  if (![SFNT_TRUETYPE, SFNT_OPENTYPE_CFF, SFNT_APPLE_TRUETYPE].includes(flavor)) {
+    throw new Error(`sfnt: not a TrueType or OpenType file (signature ${flavor.toString(16)})`)
+  }
+  const numTables = header.getUint16(4)
+  const tables = new Map<string, Uint8Array>()
+  for (let t = 0; t < numTables; t++) {
+    const at = 12 + t * 16
+    if (at + 16 > bytes.length) throw new Error('sfnt: table directory runs past the end of the file')
+    const tag = String.fromCharCode(...bytes.subarray(at, at + 4))
+    const offset = header.getUint32(at + 8)
+    const length = header.getUint32(at + 12)
+    if (offset + length > bytes.length) throw new Error(`sfnt: table ${tag} runs past the end of the file`)
+    tables.set(tag, bytes.subarray(offset, offset + length))
+  }
+  return tables
+}
+
+/** Reads a plain TrueType or OpenType font's identity, weight, licence and character coverage. */
+export function describeSfnt(bytes: Uint8Array): FontDescription {
+  return describeTables(readSfntTables(bytes), 'sfnt')
 }
 
 /**

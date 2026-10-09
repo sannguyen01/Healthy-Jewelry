@@ -9,12 +9,12 @@ import type { CSSProperties } from 'react'
  * site actually downloads. Centralising the definition is what stops that
  * recurring — a page can no longer invent a heading treatment by accident.
  *
- * Weight is deliberately fixed at 500 and not exposed as a prop.
- * `src/app/layout.tsx` loads the brand family at 300, 400 and 500 only, so anything
- * heavier is synthesised by the browser: it smears the strokes of the nearest
- * face and distorts the letterform proportions, which is why those pages read
- * as a different typeface. `src/tests/unit/typography-weights.test.ts` enforces
- * that no code asks for a weight the loader does not provide.
+ * Weight is deliberately fixed at 400 and not exposed as a prop: Bodoni Moda ships one weight,
+ * and anything else would be synthesised by the browser, smearing the strokes of the nearest
+ * face until the page reads as a different typeface. The **cut** follows the size, because a
+ * didone's hairlines are drawn for the size it is set at: the display variant is the 96pt
+ * cut, the compact variant the 24pt one (ADR 051). `typography-weights.test.ts` enforces that
+ * no code asks for a weight the loader does not provide, and that a size and a cut agree.
  */
 
 /**
@@ -39,12 +39,18 @@ interface PageHeaderProps {
 
 const VARIANT_STYLES: Record<PageHeaderVariant, CSSProperties> = {
   display: {
+    fontFamily: 'var(--font-display)',
+    fontWeight: 400,
     fontSize: 'var(--text-display)',
+    letterSpacing: 'var(--tracking-display)',
     lineHeight: 1.05,
     marginBottom: '32px',
   },
   compact: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 400,
     fontSize: 'var(--text-2xl)',
+    letterSpacing: 'var(--tracking-title)',
     lineHeight: 1.1,
     marginBottom: '24px',
   },
@@ -63,11 +69,6 @@ export function PageHeader({ title, eyebrow, variant = 'display', style }: PageH
 
       <h1
         style={{
-          fontFamily: 'var(--font-display)',
-          // 500 is the heaviest face the app loads. See the
-          // note above before changing this.
-          fontWeight: 500,
-          letterSpacing: 'var(--tracking-display)',
           color: 'var(--ink)',
           margin: 0,
           ...typeStyles,

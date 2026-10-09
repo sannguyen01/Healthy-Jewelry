@@ -1,23 +1,30 @@
 @import 'tailwindcss';
 
 /* ═══════════════════════════════════════════════════════════════
-   HEALTHY JEWELLERY — T4 DESIGN SYSTEM
-   One family, Zen Kaku Gothic Antique: 400 and 500, chosen by typographic colour
+   HEALTHY JEWELLERY — T4 DESIGN SYSTEM, QUIET ARCHIVE TYPE (ADR 051)
+   Three voices: Bodoni Moda speaks, DM Sans explains, Barlow Condensed labels
    ═══════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
     /* ── Font Families ── */
-    /* Three roles, one family (layout.tsx loads it and overrides these on <html>). The tokens
-       stay separate because they name *roles*, which the case rule below keys on: a
-       --font-display element is a heading or a name and is set in the case it is written in;
-       uppercase belongs to small --font-ui labels. These literals are only the fallback for a
-       page rendered without the root layout. */
-    --font-display: 'Zen Kaku Gothic Antique', sans-serif;
-    --font-ui:      'Zen Kaku Gothic Antique', sans-serif;
-    --font-body:    'Zen Kaku Gothic Antique', sans-serif;
-    /* The brand name's own face, kept from before the Songmont reference (ADR 048). Used by
-       the logotype (.hj-lockup-text) and by nothing else. */
+    /* Three voices, six tokens: the tokens name *roles*, and the rules below key on the role.
+       layout.tsx loads the files and overrides these on <html>; these literals are only the
+       fallback for a page rendered without the root layout.
+       - --font-display  Bodoni Moda, 96pt cut: the hero and the page titles (--text-display and up).
+       - --font-title    Bodoni Moda, 24pt cut: every other heading and every name (--text-2xl and
+                         below). A didone's hairlines are drawn for its size; the 96pt cut at
+                         card size would break up, which is why there are two files.
+       - --font-body     DM Sans 400: running text.
+       - --font-body-medium  DM Sans 500: emphasis (strong, b, th) and nothing else.
+       - --font-ui       Barlow Condensed: labels, controls, badges, metadata. The only role set
+                         in tracked capitals.
+       - --font-brand    Barlow Condensed again, for the logotype alone (ADR 048). */
+    --font-display: 'Bodoni Moda', 'Didot', serif;
+    --font-title:   'Bodoni Moda', 'Didot', serif;
+    --font-body:    'DM Sans', sans-serif;
+    --font-body-medium: 'DM Sans', sans-serif;
+    --font-ui:      'Barlow Condensed', 'Arial Narrow', sans-serif;
     --font-brand:   'Barlow Condensed', 'Arial Narrow', sans-serif;
 
     /* ── T4 Color Tokens ── */
@@ -125,11 +132,12 @@
        (.hj-product-tile, ADR 017). */
     --ratio-product: 3 / 4;
     --tracking-label: 0.14em;
-    /* Mixed-case tracking. Headings close up a hair, because a wide gothic at display sizes
-       reads loose at its default spacing; names keep a hair of air at card sizes. The
-       0.04–0.12em these replaced belonged to condensed capitals, and spread mixed case apart. */
-    --tracking-display: -0.01em;
-    --tracking-name: 0.01em;
+    /* Mixed-case tracking, by cut. A didone is drawn to be set tight at display sizes and loosens
+       as it shrinks: the Quiet Archive board gives -0.02em at 60px, -0.015em at 42px, -0.01em at
+       30px and none at the 20px name. */
+    --tracking-display: -0.02em;
+    --tracking-title: -0.01em;
+    --tracking-name: 0;
     /* A hairline instead of a shadow: the page stays flat and quiet. */
     --line: rgba(26, 23, 20, 0.08);
 
@@ -164,13 +172,12 @@
     background-color: var(--bg);
     color: var(--ink);
     font-family: var(--font-body);
-    /* 400, not the 300 DM Sans used here: weight numbers do not carry between families.
-       Measured as ink per unit of text (2026-10-04, ADR 043), Zen Kaku Gothic Antique's 300
-       lays down 43-56% of DM Sans 300's and its 400 lays down 75-95%, so 400 is the face
-       that keeps body copy and small labels as dark as they shipped. */
+    /* 400 and nothing lighter: there is no 300 file, and only the weights shipped are drawn
+       (font-synthesis above). The board sets running text with a hair of tracking. */
     font-weight: 400;
     font-size: var(--text-base);
     line-height: 1.65;
+    letter-spacing: 0.01em;
     overflow-x: hidden;
   }
 
@@ -181,8 +188,10 @@
   }
 
   /* The browser's own defaults ask for 700 and for italic, neither of which the site ships.
-     Emphasis is the 500 face, and nothing on the site is slanted (ADR 050). */
+     Emphasis is the 500 face, which is its own file (--font-body-medium), and nothing on the
+     site is slanted (ADR 050, 051). */
   strong, b, th {
+    font-family: var(--font-body-medium);
     font-weight: 500;
   }
 
@@ -503,12 +512,14 @@
 
   /* ── Piece name, on every card ──
      The strip on the homepage and the grid on /shop and /search each styled the name on
-     their own: 0.9rem at 500 in one, 0.95rem at 400 in the other. One role, one definition.
-     500 because below 24px a name competes with body text in the same family (ADR 050). */
+     their own. One role, one definition: the 24pt Bodoni cut at 400, 18-20px (the board's
+     20/26 name), with no tracking. A didone at the 15px the old gothic name used would lose its
+     hairlines, which is why the size moved with the face (ADR 051). */
   .hj-card-name {
-    font-family: var(--font-display);
-    font-weight: 500;
-    font-size: 0.95rem;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: clamp(1.125rem, 1rem + 0.4vw, 1.25rem);
+    line-height: 1.3;
     letter-spacing: var(--tracking-name);
     color: var(--ink);
   }

@@ -42,7 +42,7 @@ export function CareSection({ body }: { body: string }) {
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: 'clamp(150px, 30vw, 400px)',
-            fontWeight: 500,
+            fontWeight: 400,
             letterSpacing: '-0.05em',
             whiteSpace: 'nowrap',
             lineHeight: 1,

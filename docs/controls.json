@@ -245,7 +245,7 @@
     },
     {
       "id": "assertion-liveness",
-      "claims": "the tests protecting 58 named invariants can still fail when those invariants are broken",
+      "claims": "the tests protecting 59 named invariants can still fail when those invariants are broken",
       "status": "configured",
       "probe": "scripts/probe-assertion-liveness.mjs",
       "probeRunsIn": ".github/workflows/control-audit.yml",
@@ -567,6 +567,7 @@
     "protects. A decision is reasoning that is wrong out loud when violated."
   ],
   "decisionAdrs": {
+    "docs/adr/051-three-voices-one-archive.md": "The owner adopted the Quiet Archive in full: three voices, six tokens, fixed font instances with the Bodoni cut chosen by size. Decisions whose mechanisms are tests, not controls: typography-weights (six tokens resolved to loaders, the cut follows the size, display weight 400, the medium weight reachable only through strong/b/th, every fallback list valid), font-files (nine files each pinned by SHA-256, weight class, copyright and licence), type-system-floor (public copies byte-identical, no system face) and rendered-fonts.spec (each role drawn in its own voice, as Chrome reports it).",
     "docs/adr/050-one-face-means-no-borrowed-ones.md": "A measurement of which face Chrome drew every text node in found faked bold and italic, a system font on the 410 page, a root error boundary naming an undefined family, one tier at two weights and labels below the smallest label token. Decisions whose mechanisms are tests, not controls: type-system-floor (synthesis off, no italic, no system font, public copies byte-identical, the label floor), typography-weights (display weight by size tier) and rendered-fonts.spec (the face, weight, style and size Chrome actually used, on every route).",
     "docs/adr/049-a-wait-that-names-what-it-waits-for.md": "Twelve phone E2E tests stalled intermittently at networkidle on Next 16.3.8 with nothing named; the optimizer is now warmed serially before the suite and a hang fails setup naming the URL. A mitigation with a diagnostic, not a root cause, and it says so. The mechanism is a test, not a control: image-primer.test.ts holds the primer to its verdict and its time against a stub server that really hangs, and the setup failing is itself the visible signal.",
     "docs/adr/048-the-name-keeps-its-own-face.md": "The owner's rulings of 2026-10-04: the logo's background transparent wherever a platform can show it, Songmont a reference rather than a template, and the brand name in its original face. Decisions whose mechanisms are tests, not controls: brand-mark-asset (files), visual-assets (decoded bytes), typography-weights (the brand token bounded to the logotype), font-files and glyph-coverage.",

@@ -186,10 +186,10 @@ export default function MaterialsPage() {
 
                 <h2
                   style={{
-                    fontFamily: 'var(--font-display)',
+                    fontFamily: 'var(--font-title)',
                     fontWeight: 400,
                     fontSize: 'var(--text-2xl)',
-                    letterSpacing: 'var(--tracking-display)',
+                    letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 8px',
                     lineHeight: 1.1,
@@ -379,12 +379,12 @@ export default function MaterialsPage() {
               >
                 <h3
                   style={{
-                    fontFamily: 'var(--font-display)',
+                    fontFamily: 'var(--font-title)',
                     fontSize: 'var(--text-lg)',
-                    letterSpacing: 'var(--tracking-display)',
+                    letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
-                    fontWeight: 500,
+                    fontWeight: 400,
                   }}
                 >
                   {item.q}
