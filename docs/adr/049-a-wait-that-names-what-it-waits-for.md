@@ -74,6 +74,12 @@ serves the route from `next start`; production does not. "CI-only" is an inferen
     report. Do not loosen any assertion.
   - *Red elsewhere:* read the named cause; the stall message now lists the images, fonts and
     requests it was waiting on, and what the server says when asked again.
+- **First CI run with the primer (`23934d3`): green.** Its own line, from the E2E job: *43 variants
+  from 11 pages; cold 19.6s, warm 0.1s; slowest 885ms `charms.jpg` at `w=1080`*; then 794 passed,
+  8 skipped, in 5.0 minutes. `charms.jpg` is one of the two photographs that never answered on
+  `531b6eb`. **One green run is not evidence of a fix**: three of the four runs before it on this
+  Next version failed, and the one that passed (`56cbe4e`) had no primer. It is the first data
+  point on the supported inference, no more. Read it again when there are several.
 - **Removal condition:** a Next release that fixes it, then three green runs without the primer. The
   primer adds about 35s to a run, so it is cheap to keep until then.
 - **Local caveat:** this container's Chromium is build 1194 and Playwright 1.63 wants 1243. Local runs

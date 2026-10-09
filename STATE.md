@@ -170,7 +170,9 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
     has the evidence and how to read the next outcome: **green** is a supported inference that a cold
     or concurrent first optimisation is the trigger (not proof, nothing about Vercel); **red at the
     primer** is the first direct measurement and the failing URL is the upstream report. Remove it
-    when a Next release fixes the hang and three runs are green without it.
+    when a Next release fixes the hang and three runs are green without it. **First CI run with it
+    (`23934d3`): green** (43 variants, cold 19.6s, warm 0.1s, slowest 885ms `charms.jpg`; 794 passed
+    in 5.0 min). One green run after three reds in four proves nothing; it is the first data point.
   - **Round 9b (typography, [ADR 050](docs/adr/050-one-face-means-no-borrowed-ones.md)).** The owner
     asked that all typography be aligned across every page with no face outside the design
     principles. Chrome was asked which face drew every text node on 48 page states (2,928
