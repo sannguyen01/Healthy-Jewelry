@@ -34,7 +34,7 @@ export default function StoresPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 400,
+              fontWeight: 300,
               maxWidth: '560px',
               margin: 0,
             }}
@@ -74,6 +74,7 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
@@ -85,8 +86,9 @@ export default function StoresPage() {
             </p>
             <h2
               style={{
-                fontFamily: 'var(--font-title)',
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
@@ -103,7 +105,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 400,
+                fontWeight: 300,
                 margin: '0 0 16px',
               }}
             >
@@ -117,7 +119,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 400,
+                fontWeight: 300,
                 margin: 0,
               }}
             >
@@ -129,6 +131,7 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
@@ -140,8 +143,9 @@ export default function StoresPage() {
             </p>
             <h2
               style={{
-                fontFamily: 'var(--font-title)',
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
@@ -158,7 +162,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 400,
+                fontWeight: 300,
                 margin: '0 0 16px',
               }}
             >
@@ -171,7 +175,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 400,
+                fontWeight: 300,
                 margin: 0,
               }}
             >
@@ -200,6 +204,7 @@ export default function StoresPage() {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
                 letterSpacing: '0.22em',
                 textTransform: 'uppercase',
@@ -211,8 +216,9 @@ export default function StoresPage() {
             </p>
             <h2
               style={{
-                fontFamily: 'var(--font-title)',
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
@@ -227,7 +233,7 @@ export default function StoresPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 400,
+                fontWeight: 300,
                 margin: 0,
               }}
             >

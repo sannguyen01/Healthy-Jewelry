@@ -75,11 +75,11 @@ export function renderGonePage(copy: GoneCopy): string {
   body {
     margin: 0; min-height: 100vh; display: grid; place-items: center;
     background: #FAF9F5; color: #1A1918;
-    font-family: ${SITE_STACKS.body};
+    font-family: ${SITE_STACKS.body}; font-weight: 300;
     line-height: 1.6; padding: 24px;
   }
   main { max-width: 34rem; }
-  h1 { font-family: ${SITE_STACKS.title}; font-size: 1.75rem; font-weight: 400; line-height: 1.2; margin: 0 0 1rem; letter-spacing: -0.01em; }
+  h1 { font-family: ${SITE_STACKS.display}; font-size: 1.75rem; font-weight: 500; text-transform: uppercase; line-height: 1.2; margin: 0 0 1rem; letter-spacing: 0.04em; }
   p { margin: 0 0 1rem; color: #3D3935; }
   a { color: #59636B; }
 </style>

@@ -168,6 +168,7 @@ export default function FAQPage() {
               <p
                 style={{
                   fontFamily: 'var(--font-ui)',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xs)',
                   letterSpacing: '0.22em',
                   textTransform: 'uppercase',
@@ -195,12 +196,13 @@ export default function FAQPage() {
                   >
                     <h2
                       style={{
-                        fontFamily: 'var(--font-title)',
+                        fontFamily: 'var(--font-display)',
+                        textTransform: 'uppercase',
                         fontSize: 'var(--text-lg, 1.1rem)',
                         letterSpacing: 'var(--tracking-title)',
                         color: 'var(--ink)',
                         margin: '0 0 14px',
-                        fontWeight: 400,
+                        fontWeight: 500,
                       }}
                     >
                       {item.q}
@@ -211,7 +213,7 @@ export default function FAQPage() {
                         fontSize: 'var(--text-base)',
                         color: 'var(--graphite)',
                         lineHeight: 1.75,
-                        fontWeight: 400,
+                        fontWeight: 300,
                         margin: 0,
                       }}
                     >
@@ -232,8 +234,9 @@ export default function FAQPage() {
           >
             <p
               style={{
-                fontFamily: 'var(--font-title)',
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-xl, 1.3rem)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
@@ -248,7 +251,7 @@ export default function FAQPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.7,
-                fontWeight: 400,
+                fontWeight: 300,
                 margin: '0 0 20px',
               }}
             >

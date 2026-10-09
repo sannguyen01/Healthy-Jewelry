@@ -40,7 +40,7 @@ export default function ContactPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 400,
+              fontWeight: 300,
               maxWidth: '520px',
               margin: 0,
             }}
@@ -73,6 +73,7 @@ export default function ContactPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-ui)',
+                    fontWeight: 500,
                     fontSize: 'var(--text-xs)',
                     letterSpacing: '0.18em',
                     textTransform: 'uppercase',
@@ -87,7 +88,7 @@ export default function ContactPage() {
                     fontFamily: 'var(--font-body)',
                     fontSize: 'var(--text-base)',
                     color: 'var(--ink)',
-                    fontWeight: 400,
+                    fontWeight: 300,
                     margin: 0,
                   }}
                 >
@@ -123,8 +124,9 @@ export default function ContactPage() {
 
           <h2
             style={{
-              fontFamily: 'var(--font-title)',
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-2xl)',
               letterSpacing: 'var(--tracking-title)',
               color: 'var(--on-dark)',
@@ -141,7 +143,7 @@ export default function ContactPage() {
               fontSize: 'var(--text-base)',
               color: 'var(--on-dark)',
               lineHeight: 1.7,
-              fontWeight: 400,
+              fontWeight: 300,
               maxWidth: '460px',
               margin: 0,
             }}

@@ -140,7 +140,7 @@ async function SearchResults({ query }: { query: string }) {
                 border: '1px solid var(--outline)',
                 borderRight: 'none',
                 outline: 'none',
-                fontWeight: 400,
+                fontWeight: 300,
               }}
             />
             <button
@@ -150,6 +150,7 @@ async function SearchResults({ query }: { query: string }) {
                 backgroundColor: 'var(--ink)',
                 color: 'var(--bg)',
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
                 letterSpacing: '0.16em',
                 textTransform: 'uppercase',
@@ -168,7 +169,7 @@ async function SearchResults({ query }: { query: string }) {
                 fontFamily: 'var(--font-body)',
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
-                fontWeight: 400,
+                fontWeight: 300,
                 marginTop: '16px',
               }}
             >
@@ -197,8 +198,9 @@ async function SearchResults({ query }: { query: string }) {
             >
               <p
                 style={{
-                  fontFamily: 'var(--font-title)',
-                  fontWeight: 400,
+                  fontFamily: 'var(--font-display)',
+                  textTransform: 'uppercase',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xl)',
                   letterSpacing: 'var(--tracking-title)',
                   color: 'var(--graphite)',
@@ -212,7 +214,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 400,
+                  fontWeight: 300,
                   margin: '0 0 32px',
                 }}
               >
@@ -237,8 +239,9 @@ async function SearchResults({ query }: { query: string }) {
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <p
                 style={{
-                  fontFamily: 'var(--font-title)',
-                  fontWeight: 400,
+                  fontFamily: 'var(--font-display)',
+                  textTransform: 'uppercase',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xl)',
                   letterSpacing: 'var(--tracking-title)',
                   color: 'var(--ink)',
@@ -252,7 +255,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 400,
+                  fontWeight: 300,
                   margin: '0 0 32px',
                 }}
               >
@@ -269,8 +272,9 @@ async function SearchResults({ query }: { query: string }) {
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <p
                 style={{
-                  fontFamily: 'var(--font-title)',
-                  fontWeight: 400,
+                  fontFamily: 'var(--font-display)',
+                  textTransform: 'uppercase',
+                  fontWeight: 500,
                   fontSize: 'var(--text-xl)',
                   letterSpacing: 'var(--tracking-title)',
                   color: 'var(--ink)',
@@ -285,7 +289,7 @@ async function SearchResults({ query }: { query: string }) {
                   fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-base)',
                   color: 'var(--graphite)',
-                  fontWeight: 400,
+                  fontWeight: 300,
                   margin: '0 0 8px',
                 }}
               >
@@ -362,6 +366,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
                 letterSpacing: '0.16em',
                 textTransform: 'uppercase',

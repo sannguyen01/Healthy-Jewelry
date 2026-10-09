@@ -39,7 +39,8 @@ export default async function ShopPage() {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
@@ -58,6 +59,7 @@ export default async function ShopPage() {
                 href={collection.href}
                 style={{
                   fontFamily: 'var(--font-ui)',
+                  fontWeight: 500,
                   fontSize: '0.75rem',
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',

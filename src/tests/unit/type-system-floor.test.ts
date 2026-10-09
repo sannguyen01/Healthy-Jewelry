@@ -80,7 +80,7 @@ describe('nothing is synthesised', () => {
 
   it('asks for the shipped weight where the browser default asks for 700, in the file that has it', () => {
     expect(ruleBody('strong, b, th')).toMatch(/font-weight:\s*500/)
-    expect(ruleBody('strong, b, th')).toMatch(/font-family:\s*var\(--font-body-medium\)/)
+    expect(ruleBody('strong, b, th')).toMatch(/font-family:\s*var\(--font-body\)/)
   })
 
   it('asks for upright where the browser default asks for italic', () => {
@@ -126,7 +126,7 @@ describe('a document outside the layout names no system face', () => {
     const html = renderGonePage({ title: 'Gone', heading: 'This page is gone.', paragraphs: ['x'] })
     expect(html).toContain(SITE_FACE_FONT_FACE_CSS)
     expect(html).toContain(`font-family: ${SITE_STACKS.body}`)
-    expect(html).toContain(`h1 { font-family: ${SITE_STACKS.title}`)
+    expect(html).toContain(`h1 { font-family: ${SITE_STACKS.display}`)
     expect(html).toContain('font-synthesis: none')
     expect(html).not.toMatch(SYSTEM)
   })
@@ -136,7 +136,7 @@ describe('a document outside the layout names no system face', () => {
     expect(html).toContain('@font-face')
     for (const { family } of SITE_FACES) expect(html, family).toContain(family)
     // A <button> does not inherit a font, so it names one; the attribute is HTML-escaped.
-    expect(html).toMatch(/<button[^>]*font-family:(&quot;|")Barlow Condensed/)
+    expect(html).toMatch(/<button[^>]*font-family:(&quot;|")DM Sans/)
     expect(html).not.toMatch(SYSTEM)
   })
 })
@@ -145,8 +145,8 @@ describe('the copies those documents load are the loader\'s files', () => {
   const sha = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex')
 
   it('serves one face per voice, at a weight the site ships', () => {
-    expect(SITE_FACE_FILES.map((f) => f.voice)).toEqual(['title', 'body', 'label'])
-    expect(SITE_FACE_FILES.map((f) => f.weight)).toEqual([400, 400, 500])
+    expect(SITE_FACE_FILES.map((f) => f.voice)).toEqual(['display', 'body', 'label'])
+    expect(SITE_FACE_FILES.map((f) => f.weight)).toEqual([500, 300, 500])
     expect(SITE_FACE_FONT_FACE_CSS.match(/@font-face/g)).toHaveLength(3)
     expect(SITE_FACE_FONT_FACE_CSS).toContain('font-display:swap')
   })

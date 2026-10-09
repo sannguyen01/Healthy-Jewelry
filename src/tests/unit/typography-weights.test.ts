@@ -9,11 +9,11 @@ import path from 'node:path'
  * they *synthesise* one, algorithmically thickening the nearest face. Faux bold
  * distorts stroke contrast and letterform proportions, so the text reads as a
  * different typeface. That is exactly what shipped: `layout.tsx` loaded the
- * display family (Barlow Condensed, until 2026-10-04) at 400 and 500, while
+ * display family (Barlow Condensed) at 400 and 500, while
  * eleven headings asked for 700 or 600 and one asked for 300. The same `<h1>` rendered at four different effective weights
- * across the site, and only the homepage was using a real face. Since the Quiet Archive (ADR 051)
- * the display voice ships exactly one weight, so "which weight" has one answer for it; the
- * body voice has two, in two files.
+ * across the site, and only the homepage was using a real face. The original pair is back (ADR 052):
+ * Barlow Condensed ships 400 and 500, DM Sans 300 and 500, and a request for any other weight in
+ * either is a failure here rather than a faked bold.
  *
  * Nothing catches this at runtime. It is not a type error, not a lint error,
  * and not a visual-regression failure unless someone happens to compare two
@@ -44,9 +44,9 @@ const EXEMPT = ['opengraph-image.tsx', 'global-error.tsx']
  * was not hypothetical: when display and body were two families, the body's
  * 300 made a union check wave through `--font-display` at 300 — the Materials
  * heading, rendering with no display face at 300 and silently falling back to
- * 400. With the Quiet Archive's three voices the sets differ again (display 400
- * only, body 400 and, in its own file, 500), so the per-token resolution is what
- * makes "Bodoni at 500" a failure instead of a faked bold.
+ * 400. The two families' sets differ again (Barlow 400 and 500, DM Sans 300 and 500),
+ * so the per-token resolution is what makes "Barlow at 300" or "DM Sans at 400" a
+ * failure instead of a faked weight.
  *
  * layout.tsx declares this in two hops — a loader owns a CSS variable
  * (`--font-zk`), and the `<html>` style maps a semantic token onto it
@@ -191,34 +191,25 @@ describe('font loading', () => {
   it('resolves each --font-* token to the weights its loader declares', () => {
     // Guards the whole file: if either parsing hop stops matching, every
     // assertion below would pass against empty sets.
-    expect([...loadedByToken.keys()].sort()).toEqual([
-      '--font-body',
-      '--font-body-medium',
-      '--font-brand',
-      '--font-display',
-      '--font-title',
-      '--font-ui',
-    ])
+    expect([...loadedByToken.keys()].sort()).toEqual(['--font-body', '--font-brand', '--font-display', '--font-ui'])
   })
 
-  it('gives each voice the weights it has files for (ADR 051)', () => {
+  it('gives each family the weights it has files for (ADR 052)', () => {
     const weights = (token: string) => [...(loadedByToken.get(token) ?? [])].sort()
-    // Bodoni Moda ships one weight, in two optical cuts: a didone has no 500 to ask for.
-    expect(weights('--font-display')).toEqual([400])
-    expect(weights('--font-title')).toEqual([400])
-    // Running text is 400. Emphasis is the 500, its own file, reached through one token.
-    expect(weights('--font-body')).toEqual([400])
-    expect(weights('--font-body-medium')).toEqual([500])
-    // The label voice and the name: 500 in the bar and on every label, 400 in the footer (ADR 048).
-    expect(weights('--font-ui')).toEqual([400, 500])
+    // Barlow Condensed: 500 for every heading and name, 400 for the footer's logotype (ADR 048).
+    expect(weights('--font-display')).toEqual([400, 500])
     expect(weights('--font-brand')).toEqual([400, 500])
+    // DM Sans: 300 for running text, 500 for labels and emphasis. There is no 400 file and nothing asks for one.
+    expect(weights('--font-body')).toEqual([300, 500])
+    expect(weights('--font-ui')).toEqual([300, 500])
   })
 
-  it('gives the two Bodoni cuts different files and the label voice and the name one', () => {
+  it('maps the display voice and the name onto one loader and the body and the label voice onto the other', () => {
     const source = readFileSync(LAYOUT, 'utf8')
     const aliasOf = (token: string) => source.match(new RegExp(`'${token}':\\s*'var\\((--font-[\\w-]+)`))?.[1]
-    expect(aliasOf('--font-display')).not.toBe(aliasOf('--font-title'))
-    expect(aliasOf('--font-ui')).toBe(aliasOf('--font-brand'))
+    expect(aliasOf('--font-display')).toBe(aliasOf('--font-brand'))
+    expect(aliasOf('--font-body')).toBe(aliasOf('--font-ui'))
+    expect(aliasOf('--font-display')).not.toBe(aliasOf('--font-body'))
   })
 })
 
@@ -226,14 +217,14 @@ describe('the fallback lists are valid font-family lists', () => {
   // next/font writes each `fallback` entry into the generated custom property as-is. A name that is
   // not a sequence of identifiers ("Bodoni 72": a digit is not an identifier) makes the whole
   // `font-family: var(--font-display)` invalid at computed-value time, so the element inherits the
-  // body's face. Measured 2026-10-09: every Bodoni heading and name was drawn in DM Sans, the
-  // computed style said so, and every other guard passed because DM Sans is also a shipped face.
+  // body's face. Measured 2026-10-09: every heading and name was drawn in DM Sans, the computed
+  // style said so, and every other guard passed because DM Sans is also a shipped face.
   const entries = [...readFileSync(LAYOUT, 'utf8').matchAll(/fallback:\s*\[([^\]]*)\]/g)].flatMap((m) =>
     [...m[1].matchAll(/'([^']*)'/g)].map((e) => e[1])
   )
 
   it('finds the fallback entries it judges', () => {
-    expect(entries.length).toBeGreaterThanOrEqual(10)
+    expect(entries.length).toBeGreaterThanOrEqual(6)
   })
 
   it.each([...new Set(entries)])('%s is a valid unquoted family name', (name) => {
@@ -272,17 +263,18 @@ describe('no font weight is synthesised', () => {
 })
 
 /**
- * Each `--font-display` or `--font-title` style object in a TSX file: the object literal that names the token,
- * from the line that opens it to the line that closes it. Inline styles here are flat, so the
+ * Each style object in a TSX file that names the given family token: the object literal that
+ * names it, from the line that opens it to the line that closes it. Inline styles here are flat, so the
  * nearest `{` above and `}` below bound the object exactly — which matters, because a label
  * sitting under a heading must not be read as the heading's.
  */
-function displayStyleObjects(): { at: string; body: string }[] {
+function styleObjects(token: 'display' | 'body' | 'ui'): { at: string; body: string }[] {
   const objects: { at: string; body: string }[] = []
+  const named = new RegExp(`fontFamily:\\s*'var\\(--font-${token}\\)`)
   for (const file of tsxFiles(SRC)) {
     const lines = readFileSync(file, 'utf8').split('\n')
     lines.forEach((text, index) => {
-      if (!/fontFamily:\s*'var\(--font-(display|title)\)/.test(text)) return
+      if (!named.test(text)) return
       let open = index
       while (open > 0 && !/\{\s*$/.test(lines[open])) open -= 1
       let close = index
@@ -313,8 +305,8 @@ function cssBySelector(): Map<string, Map<string, string>> {
   return merged
 }
 
-const DISPLAY_FAMILY = /^var\(--font-(display|title)\)$/
-const displaySelectors = [...cssBySelector()].filter(([, props]) => DISPLAY_FAMILY.test(props.get('font-family') ?? ''))
+const selectorsOf = (token: 'display' | 'body' | 'ui') =>
+  [...cssBySelector()].filter(([, props]) => props.get('font-family') === `var(--font-${token})`)
 
 /**
  * **The brand face sets the brand name and nothing else.**
@@ -347,154 +339,117 @@ describe('the brand face is the logotype\'s alone', () => {
 })
 
 /**
- * **A heading or a name is set in the case it is written in.**
+ * **A heading or a name is set in tracked capitals** (ADR 052).
  *
- * Until 2026-10-04 every `--font-display` element was forced to capitals: condensed uppercase
- * was the Gentle Monster idiom the site was first drawn in. Songmont, the reference since,
- * sets everything in one gothic family and lists its pieces in Title Case ("Medium Gather
- * Bag"), and the catalogue already writes names that way — the capitals were a stylesheet
- * overriding the content. So the rule is by role: `--font-display` (headings, product and
- * collection names) never carries `text-transform: uppercase`; small `--font-ui` labels may.
- * The logotype is not an exception to this either: it is the brand name in its own face
- * (`--font-brand`, above), in the tracked capitals it has always had.
+ * The original: every `--font-display` element is Barlow Condensed in capitals, tracked looser as
+ * it gets smaller. Between 2026-10-04 and 2026-10-09 the site set names in the case they were written
+ * in, first in a gothic and then in a didone; both were a reference's idiom and neither was the
+ * brand's. A condensed face is drawn to be read in capitals, and the same words in lower case read
+ * as a different, smaller typeface, so the case is part of the voice and is declared, never inherited.
+ * The label voice (`--font-ui`) is tracked capitals too, and the body voice never is.
  */
-describe('headings and names are set in their own case', () => {
-  it('no --font-display or --font-title style forces capitals', () => {
+describe('display and label styles are set in capitals, running text is not', () => {
+  it('every --font-display and --font-ui style forces capitals', () => {
     const offenders = [
-      ...displayStyleObjects()
-        .filter((o) => /textTransform:\s*'uppercase'/.test(o.body))
-        .map((o) => o.at),
-      ...displaySelectors.filter(([, props]) => props.get('text-transform') === 'uppercase').map(([s]) => `globals.css ${s}`),
+      ...styleObjects('display'),
+      ...styleObjects('ui'),
     ]
+      .filter((o) => !/textTransform:\s*'uppercase'/.test(o.body))
+      .map((o) => o.at)
+    const rules = [...selectorsOf('display'), ...selectorsOf('ui')]
+      .filter(([selector, props]) => props.get('text-transform') !== 'uppercase' && !EXEMPT_FROM_CAPITALS.has(selector))
+      .map(([selector]) => `globals.css ${selector}`)
     expect(
-      offenders,
-      'These display styles force uppercase. Headings and names render in the case ' +
-        'they are written in; capitals belong to small --font-ui labels (DESIGN.md, Type).'
+      [...offenders, ...rules],
+      'These display or label styles do not force uppercase. Headings and names are Barlow Condensed ' +
+        'capitals and labels are DM Sans capitals; mixed case belongs to running text (CLAUDE.md, Typography).'
     ).toEqual([])
   })
 
-  it('sees the styles it judges, so neither scan is blind', () => {
-    expect(displayStyleObjects().length).toBeGreaterThan(20)
-    expect(displaySelectors.map(([s]) => s)).toContain('.hj-menu-link')
-    // And the labels keep their capitals: if this reads zero, the CSS patterns stopped matching.
-    expect([...cssBySelector().values()].filter((p) => p.get('text-transform') === 'uppercase').length).toBeGreaterThan(0)
+  it('no --font-body style forces capitals', () => {
+    const offenders = [
+      ...styleObjects('body').filter((o) => /textTransform:\s*'uppercase'/.test(o.body)).map((o) => o.at),
+      ...selectorsOf('body')
+        .filter(([, props]) => props.get('text-transform') === 'uppercase')
+        .map(([selector]) => `globals.css ${selector}`),
+    ]
+    expect(offenders, 'Running text is written in the case it is read in.').toEqual([])
+  })
+
+  it('sees the styles it judges, so no scan is blind', () => {
+    expect(styleObjects('display').length).toBeGreaterThan(20)
+    expect(styleObjects('ui').length).toBeGreaterThan(20)
+    expect(selectorsOf('display').map(([s]) => s)).toContain('.hj-menu-link')
+    expect(selectorsOf('ui').map(([s]) => s)).toContain('.label-eyebrow')
   })
 })
 
 /**
- * **The cut follows the size, and the weight is the one weight there is**
- * ([ADR 051](../../../docs/adr/051-three-voices-one-archive.md), replacing the tier rule of ADR 050).
- *
- * ADR 050 chose weights by size because one gothic family had two real weights and nothing else
- * to separate a heading from body copy. Bodoni Moda ships one weight (400), so weight can no
- * longer carry hierarchy and size and *cut* do instead. A didone's contrast is drawn for the size
- * it is set at: at display sizes the hairlines are meant to be fine, at name sizes the same
- * hairlines break up. Static instances make an optical size a file, so the choice is a token:
- *
- * - `--font-display` (the 96pt cut) is for the large size tokens, `--text-display` and `--text-hero`,
- *   and for literals of 36px or more;
- * - `--font-title` (the 24pt cut) is for everything smaller: `--text-2xl` and below, names, literals
- *   under 36px.
- *
- * Keyed to the size *token*, not the computed size, because the tokens are `clamp()`s: a heading is
- * 35px on a desktop and 23px on a phone, and a cut that flipped across that boundary would be a
- * different design on each. The smallest display token is 38.4px, which is why 36px is the line.
+ * Selectors that set `--font-ui` or `--font-display` and are *not* forced to capitals, each on
+ * purpose. A form control the visitor types into is set in the case they type; the rest of the label
+ * voice is capitals.
  */
-describe('the cut follows the size, and the weight is 400', () => {
-  const LARGE_TOKENS = new Set(['--text-hero', '--text-display'])
-  const LARGE_PX = 36
+const EXEMPT_FROM_CAPITALS = new Set<string>(['.hj-field', '.hj-archive-search label'])
 
-  /** 'large' when the size is a display token or a literal of 36px or more; 'small' for any other known size. */
-  function tier(fontSize: string): 'small' | 'large' | null {
-    const token = fontSize.match(/var\((--text-[\w]+)/)?.[1]
-    if (token) return LARGE_TOKENS.has(token) ? 'large' : 'small'
-    const literal = fontSize.match(/'?(?:clamp\()?\s*([\d.]+)(rem|px)/)
-    if (!literal) return null
-    return Number(literal[1]) * (literal[2] === 'rem' ? 16 : 1) >= LARGE_PX ? 'large' : 'small'
-  }
+/**
+ * **Each voice has one weight, and says so** ([ADR 052](../../../docs/adr/052-the-original-pair-on-the-quiet-archive.md)).
+ *
+ * - `--font-display`: **500**. Every heading, name and menu link. The 400 file is the footer's name.
+ * - `--font-ui`: **500**. Every label, control and badge. DM Sans Medium is what a small tracked
+ *   capital needs to hold its colour against the 300 beside it.
+ * - `--font-body`: **300**. Running text, as it was before the Songmont reference. Emphasis
+ *   (`strong`, `b`, `th`) is the 500 of the same family, set through its own rule below.
+ *
+ * Declared per style, never inherited: a weight that depends on which files happen to be loaded
+ * is the defect of 2026-10-04 (twenty-seven headings inherited the body's 300 and rendered at 400
+ * only because Barlow had no 300 face; a family with a real Light turned every one of them Light).
+ */
+describe('each voice has one weight, declared', () => {
+  const weightOf = (body: string) => Number(body.match(/fontWeight:\s*(\d+)/)?.[1])
 
-  const judgedObjects = displayStyleObjects().map((o) => ({
-    at: o.at,
-    token: o.body.match(/fontFamily:\s*'var\((--font-(?:display|title))\)/)?.[1] ?? null,
-    weight: Number(o.body.match(/fontWeight:\s*(\d+)/)?.[1]),
-    size: tier(o.body.match(/fontSize:\s*([^\n]+)/)?.[1] ?? ''),
-  }))
-  const judgedRules = displaySelectors.map(([selector, props]) => ({
-    at: `globals.css ${selector}`,
-    token: props.get('font-family')?.match(/--font-(?:display|title)/)?.[0] ?? null,
-    weight: Number(props.get('font-weight')),
-    size: tier(`'${props.get('font-size') ?? ''}`),
-  }))
-  const judged = [...judgedObjects, ...judgedRules]
-
-  it('sees the styles it judges', () => {
-    expect(judged.length).toBeGreaterThan(30)
-    expect(judged.filter((j) => j.size === 'small').length).toBeGreaterThan(10)
-    expect(judged.filter((j) => j.size === 'large').length).toBeGreaterThan(8)
-    expect(judged.filter((j) => j.size === null).map((j) => j.at), 'a display style whose size cannot be read').toEqual([])
+  it('every --font-display style is 500 and declares it', () => {
+    const offenders = [
+      ...styleObjects('display').filter((o) => weightOf(o.body) !== 500).map((o) => `${o.at}  weight ${weightOf(o.body) || 'inherited'}`),
+      ...selectorsOf('display')
+        .filter(([, props]) => Number(props.get('font-weight')) !== 500)
+        .map(([selector, props]) => `globals.css ${selector}  weight ${props.get('font-weight') ?? 'inherited'}`),
+    ]
+    expect(offenders).toEqual([])
   })
 
-  it('sets every display style at 400: Bodoni Moda has no other weight', () => {
-    expect(judged.filter((j) => j.weight !== 400).map((j) => `${j.at}  weight ${j.weight}`)).toEqual([])
+  it('every --font-ui style is 500 and declares it', () => {
+    const offenders = [
+      ...styleObjects('ui').filter((o) => weightOf(o.body) !== 500).map((o) => `${o.at}  weight ${weightOf(o.body) || 'inherited'}`),
+      ...selectorsOf('ui')
+        .filter(([, props]) => Number(props.get('font-weight')) !== 500)
+        .map(([selector, props]) => `globals.css ${selector}  weight ${props.get('font-weight') ?? 'inherited'}`),
+    ]
+    expect(offenders).toEqual([])
   })
 
-  it('uses the 96pt cut only at display sizes and the 24pt cut only below them', () => {
-    const offenders = judged
-      .filter((j) => (j.size === 'large' ? j.token !== '--font-display' : j.token !== '--font-title'))
-      .map((j) => `${j.at}  ${j.token} on a ${j.size} size`)
-    expect(
-      offenders,
-      'A size and a cut disagree (ADR 051): --font-display is for --text-display and --text-hero and literals of ' +
-        '36px or more; --font-title is for everything smaller.'
-    ).toEqual([])
+  it('every --font-body style is 300, or 500 for emphasis, and the page default is 300', () => {
+    const offenders = [
+      ...styleObjects('body')
+        .filter((o) => ![undefined, NaN, 300].includes(weightOf(o.body) as number | undefined) && weightOf(o.body) !== 300)
+        .map((o) => `${o.at}  weight ${weightOf(o.body)}`),
+      ...selectorsOf('body')
+        .filter(([selector, props]) => props.has('font-weight') && Number(props.get('font-weight')) !== 300 && !['strong', 'b', 'th'].includes(selector))
+        .map(([selector, props]) => `globals.css ${selector}  weight ${props.get('font-weight')}`),
+    ]
+    expect(offenders).toEqual([])
+    expect(cssBySelector().get('body')?.get('font-weight')).toBe('300')
   })
 
-  it('has one piece-name class, in the title cut', () => {
-    const names = displaySelectors.filter(([s]) => s === '.hj-card-name')
+  it('emphasis is the 500 of the body family, through one rule', () => {
+    const emphasis = cssBySelector().get('strong')
+    expect(emphasis?.get('font-family')).toBe('var(--font-body)')
+    expect(emphasis?.get('font-weight')).toBe('500')
+    expect(cssBySelector().get('th')?.get('font-weight')).toBe('500')
+  })
+
+  it('has one piece-name class, in the display voice, in capitals', () => {
+    const names = selectorsOf('display').filter(([s]) => s === '.hj-card-name')
     expect(names).toHaveLength(1)
-    expect(names[0][1].get('font-family')).toBe('var(--font-title)')
-  })
-})
-
-/**
- * **Emphasis is a file of its own, reached through one rule.** DM Sans 500 is not preloaded (it
- * is a loader call of its own so that `preload` can be off), so the 500 is requested only where
- * it is wanted: `strong`, `b` and `th`. Running text asking for 500 would be drawn in the 400
- * file with nothing synthesised, which is no emphasis at all, and the weight check above fails it
- * because `--font-body` ships 400 only.
- */
-describe('the medium body weight is for emphasis alone', () => {
-  it('only strong, b and th set their family in --font-body-medium', () => {
-    const users = [...cssBySelector()].filter(([, props]) => props.get('font-family') === 'var(--font-body-medium)').map(([s]) => s)
-    expect(users.sort()).toEqual(['b', 'strong', 'th'])
-  })
-
-  it('no component names the token', () => {
-    const named = tsxFiles(SRC)
-      .filter((file) => !file.endsWith(`${path.sep}layout.tsx`))
-      .filter((file) => readFileSync(file, 'utf8').includes('--font-body-medium'))
-      .map((file) => path.relative(SRC, file))
-    expect(named).toEqual([])
-  })
-})
-
-/**
- * **A display style states its weight; it never inherits one.**
- *
- * Twenty-seven headings and names declared no weight and inherited the body's 300. Under
- * Barlow Condensed, which had no 300 face, the browser rounded that up to 400 — so they
- * rendered at 400 by accident, and nobody had chosen it. One family with a real Light face
- * turned every one of them Light overnight (measured 2026-10-04: all 27 computed 300). The
- * weight a heading renders at must not depend on which faces happen to be loaded.
- */
-describe('display weights are declared', () => {
-  it('every --font-display and --font-title style declares its weight', () => {
-    const offenders = [
-      ...displayStyleObjects()
-        .filter((o) => !/fontWeight:/.test(o.body))
-        .map((o) => o.at),
-      ...displaySelectors.filter(([, props]) => !props.has('font-weight')).map(([s]) => `globals.css ${s}`),
-    ]
-    expect(offenders, 'These display styles inherit their weight from the body.').toEqual([])
+    expect(names[0][1].get('text-transform')).toBe('uppercase')
   })
 })

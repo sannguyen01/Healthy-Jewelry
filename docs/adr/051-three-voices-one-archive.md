@@ -1,7 +1,13 @@
 # ADR 051 — Three voices, one archive
 
 **Date**: 2026-10-09
-**Status**: Accepted. The owner chose **full adoption** of the Quiet Archive system on 2026-10-09
+**Status**: **The design stands; the typography is superseded by [ADR 052](052-the-original-pair-on-the-quiet-archive.md).**
+Bodoni Moda, the three-voice split, the cut-follows-the-size rule and the no-forced-capitals rule
+described below were replaced the same day by the brand's original pair, Barlow Condensed and DM
+Sans, on this ADR's palette, chrome and homepage. Read the typography sections as a record of what was
+tried and measured; read the palette (B2), the chrome (B3) and the homepage (B4) sections as current.
+
+Originally: Accepted. The owner chose **full adoption** of the Quiet Archive system on 2026-10-09
 ("Full adoption (Recommended)"), to be built as a fresh pull request after #104 merged. This ADR
 **supersedes [ADR 043](043-one-family-and-the-case-it-is-written-in.md)** (one family), **replaces
 the tier weight rule of [ADR 050](050-one-face-means-no-borrowed-ones.md)** (its measurement

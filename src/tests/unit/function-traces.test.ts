@@ -23,8 +23,8 @@ const ROOT = resolve(__dirname, '../../..')
 const CARD = 'app/products/[handle]/opengraph-image/route'
 const PAGE = 'app/products/[handle]/page'
 const ROOT_CARD = 'app/opengraph-image/route'
-const FONTS = ['public/fonts/bodoni-moda-96pt-400.ttf', 'public/fonts/barlow-condensed-500.ttf']
-const ROOT_FONTS = [...FONTS, 'public/fonts/dm-sans-9pt-400.ttf']
+const FONTS = ['public/fonts/barlow-condensed-500.ttf', 'public/fonts/dm-sans-9pt-500.ttf']
+const ROOT_FONTS = [...FONTS, 'public/fonts/dm-sans-9pt-300.ttf']
 const DEPENDENCIES = ['node_modules/.pnpm/next@16.3.8/node_modules/next/dist/server/next.js', '.next/server/chunks/[turbopack]_runtime.js']
 
 /** The shape of the whole-project trace, reduced: one file from each kind it swept in. */

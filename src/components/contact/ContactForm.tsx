@@ -46,6 +46,7 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontFamily: 'var(--font-ui)',
+  fontWeight: 500,
   fontSize: 'var(--text-xs)',
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
@@ -54,7 +55,8 @@ const labelStyle: React.CSSProperties = {
 }
 
 const fieldErrorStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-ui)',
+  fontFamily: 'var(--font-body)',
+  fontWeight: 300,
   fontSize: 'var(--text-xs)',
   color: '#B3261E',
   marginTop: '6px',
@@ -138,8 +140,9 @@ export function ContactForm() {
       >
         <span
           style={{
-            fontFamily: 'var(--font-title)',
-            fontWeight: 400,
+            fontFamily: 'var(--font-display)',
+            textTransform: 'uppercase',
+            fontWeight: 500,
             fontSize: 'var(--text-xl)',
             letterSpacing: 'var(--tracking-title)',
             // --text-xl clamps 22.4px -> 35.2px, so this crosses WCAG's 24px
@@ -157,7 +160,7 @@ export function ContactForm() {
             fontSize: 'var(--text-base)',
             color: 'var(--graphite)',
             lineHeight: 1.7,
-            fontWeight: 400,
+            fontWeight: 300,
             margin: 0,
           }}
         >

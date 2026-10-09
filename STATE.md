@@ -3,6 +3,27 @@
 Last run: never (scaffold not yet scheduled)
 Last refreshed by hand: 2026-10-04
 
+## Session note — 2026-10-09, evening: the Quiet Archive's design in the original typography
+
+Pull request #110 now carries **the Quiet Archive's design** (palette, archive menu, registry-and-index
+homepage; ADR 051, B2 to B4) **in the brand's original typography** (Barlow Condensed and DM Sans;
+ADR 052). The typography went Bodoni Moda → back to the pair the brand had before the Songmont
+reference, at the owner's instruction. The catalogue and piece pages (B5) were not built; they take the
+palette and the typography through the shared tokens, and nothing else of the board.
+
+- **A misreading, and its cost.** "Keep current designs, I just want to change the typography. Reverse
+  now" was read as "keep the typography, undo the design" and reverted B2 and B3. The owner's screenshots
+  of the homepage showed the opposite. The revert was reverted and the question that decides the work
+  (which typography is "original") was asked instead of guessed twice. Recorded in ADR 052.
+- **A defect found while auditing the menu.** The dark overlay it replaced failed a new vertical test
+  on eight of twelve real screens (first link under the header, last link past the viewport, a drawer
+  that could not scroll). The archive menu does not have the defect; `e2e/header-fit.spec.ts` now holds
+  it to that on twelve screens.
+- **Verified locally**: unit suite green; full Playwright suite 838 passed, none failed (six flakes, all
+  the documented local-only `visible focus indicators` probe). CI on the pushed head is the arbiter.
+- **Not done**: B5 (catalogue and piece pages), B6 (`DESIGN.md`'s rewrite). Owner actions open: merge
+  #110 when CI is green, close #101, the Vercel connector, the secrets, the production-admission gate.
+
 ## Session note — 2026-10-04
 
 **The redesign (W0–W4, #103) is on `main`; this session added the logo it had lost.** The owner

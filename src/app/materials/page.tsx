@@ -139,7 +139,7 @@ export default function MaterialsPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
-              fontWeight: 400,
+              fontWeight: 300,
               maxWidth: '580px',
             }}
           >
@@ -173,7 +173,8 @@ export default function MaterialsPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontWeight: 400,
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: '5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
@@ -186,8 +187,9 @@ export default function MaterialsPage() {
 
                 <h2
                   style={{
-                    fontFamily: 'var(--font-title)',
-                    fontWeight: 400,
+                    fontFamily: 'var(--font-display)',
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: 'var(--text-2xl)',
                     letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
@@ -201,6 +203,7 @@ export default function MaterialsPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-ui)',
+                    fontWeight: 500,
                     fontSize: 'var(--text-xs)',
                     letterSpacing: '0.18em',
                     textTransform: 'uppercase',
@@ -220,7 +223,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.75,
-                    fontWeight: 400,
+                    fontWeight: 300,
                     margin: '0 0 28px',
                   }}
                 >
@@ -284,7 +287,7 @@ export default function MaterialsPage() {
                       textTransform: 'uppercase',
                       color: 'var(--graphite)',
                       borderBottom: '2px solid var(--ash)',
-                      fontWeight: 400,
+                      fontWeight: 500,
                       minWidth: '160px',
                     }}
                   >
@@ -302,7 +305,7 @@ export default function MaterialsPage() {
                         textTransform: 'uppercase',
                         color: 'var(--ink)',
                         borderBottom: '2px solid var(--ash)',
-                        fontWeight: 400,
+                        fontWeight: 500,
                         minWidth: '160px',
                       }}
                     >
@@ -326,7 +329,7 @@ export default function MaterialsPage() {
                         textTransform: 'uppercase',
                         color: 'var(--graphite)',
                         borderBottom: '1px solid var(--ash)',
-                        fontWeight: 400,
+                        fontWeight: 500,
                       }}
                     >
                       {row.property}
@@ -338,7 +341,7 @@ export default function MaterialsPage() {
                           padding: '14px 20px',
                           color: 'var(--ink)',
                           borderBottom: '1px solid var(--ash)',
-                          fontWeight: 400,
+                          fontWeight: 300,
                         }}
                       >
                         {cell}
@@ -379,12 +382,13 @@ export default function MaterialsPage() {
               >
                 <h3
                   style={{
-                    fontFamily: 'var(--font-title)',
+                    fontFamily: 'var(--font-display)',
+                    textTransform: 'uppercase',
                     fontSize: 'var(--text-lg)',
                     letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
                     margin: '0 0 16px',
-                    fontWeight: 400,
+                    fontWeight: 500,
                   }}
                 >
                   {item.q}
@@ -395,7 +399,7 @@ export default function MaterialsPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.75,
-                    fontWeight: 400,
+                    fontWeight: 300,
                     margin: 0,
                   }}
                 >

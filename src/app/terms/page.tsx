@@ -15,8 +15,9 @@ export const metadata: Metadata = {
 }
 
 const sectionHeadStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-title)',
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  textTransform: 'uppercase',
+  fontWeight: 500,
   fontSize: 'var(--text-xl, 1.4rem)',
   letterSpacing: 'var(--tracking-title)',
   color: 'var(--ink)',
@@ -28,7 +29,7 @@ const bodyStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 400,
+  fontWeight: 300,
   margin: '0 0 16px',
 }
 
@@ -37,7 +38,7 @@ const listStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 400,
+  fontWeight: 300,
   margin: '0 0 16px',
   paddingLeft: '24px',
 }
@@ -198,11 +199,12 @@ export default function TermsPage() {
             <p
               style={{
                 ...bodyStyle,
-                fontFamily: 'var(--font-title)',
+                fontFamily: 'var(--font-display)',
+                textTransform: 'uppercase',
                 fontSize: 'var(--text-lg, 1.1rem)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
-                fontWeight: 400,
+                fontWeight: 500,
               }}
             >
               If it corrodes, we replace it — no questions asked.

@@ -18,7 +18,8 @@ export default function NotFound() {
       <p
         style={{
           fontFamily: 'var(--font-display)',
-          fontWeight: 400,
+          textTransform: 'uppercase',
+          fontWeight: 500,
           fontSize: 'clamp(6rem, 20vw, 14rem)',
           color: 'var(--ash)',
           lineHeight: 1,
@@ -31,12 +32,13 @@ export default function NotFound() {
       </p>
       <h1
         style={{
-          fontFamily: 'var(--font-title)',
+          fontFamily: 'var(--font-display)',
+          textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-title)',
           fontSize: 'clamp(1.4rem, 3vw, 2rem)',
           color: 'var(--ink)',
           margin: '0 0 12px',
-          fontWeight: 400,
+          fontWeight: 500,
         }}
       >
         This piece doesn&apos;t exist.
@@ -44,7 +46,7 @@ export default function NotFound() {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 400,
+          fontWeight: 300,
           fontSize: '0.9rem',
           color: 'var(--graphite)',
           margin: '0 0 40px',
@@ -62,6 +64,7 @@ export default function NotFound() {
           backgroundColor: 'var(--ink)',
           color: 'var(--bg)',
           fontFamily: 'var(--font-ui)',
+          fontWeight: 500,
           fontSize: '0.72rem',
           letterSpacing: '0.18em',
           textTransform: 'uppercase',

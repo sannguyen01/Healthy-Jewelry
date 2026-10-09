@@ -144,7 +144,8 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
@@ -167,6 +168,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
             <p
               style={{
                 fontFamily: 'var(--font-ui)',
+                fontWeight: 500,
                 fontSize: 'var(--text-xs)',
                 color: 'var(--graphite)',
                 letterSpacing: '0.1em',
@@ -181,7 +183,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
           <p
             style={{
               fontFamily: 'var(--font-body)',
-              fontWeight: 400,
+              fontWeight: 300,
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               lineHeight: 1.7,
@@ -248,6 +250,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
 const NOTE_STYLE: React.CSSProperties = {
   fontFamily: 'var(--font-ui)',
+  fontWeight: 500,
   fontSize: 'var(--text-xs)',
   color: 'var(--titanium-text)',
   letterSpacing: '0.16em',

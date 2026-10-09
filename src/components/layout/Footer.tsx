@@ -29,7 +29,7 @@ const columnHeadStyle: React.CSSProperties = {
 const linkStyle: React.CSSProperties = {
   display: 'block',
   fontFamily: 'var(--font-body)',
-  fontWeight: 400,
+  fontWeight: 300,
   fontSize: 'var(--text-sm)',
   color: 'var(--graphite)',
   textDecoration: 'none',
@@ -87,7 +87,7 @@ export function Footer() {
             <p
               style={{
                 fontFamily: 'var(--font-body)',
-                fontWeight: 400,
+                fontWeight: 300,
                 fontSize: 'var(--text-sm)',
                 color: 'var(--graphite)',
                 maxWidth: '280px',
@@ -196,6 +196,7 @@ export function Footer() {
           <span
             style={{
               fontFamily: 'var(--font-ui)',
+              fontWeight: 500,
               fontSize: 'var(--text-xs)',
               letterSpacing: 'var(--tracking-label)',
               textTransform: 'uppercase',
@@ -253,7 +254,7 @@ export function Footer() {
             display: inline-block;
             font-size: 1.2rem;
             transition: transform 0.3s ease-out;
-            font-weight: 400;
+            font-weight: 300;
           }
           
           .footer-group-inner {

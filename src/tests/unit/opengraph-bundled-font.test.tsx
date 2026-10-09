@@ -53,9 +53,9 @@ import { describeSfnt, uncoveredCharacters } from '@/lib/design/fontFile'
  * which only happens when Satori actually runs. This one does not mock it.
  */
 const FILES = {
-  display: 'public/fonts/bodoni-moda-96pt-400.ttf',
-  body: 'public/fonts/dm-sans-9pt-400.ttf',
-  label: 'public/fonts/barlow-condensed-500.ttf',
+  display: 'public/fonts/barlow-condensed-500.ttf',
+  body: 'public/fonts/dm-sans-9pt-300.ttf',
+  label: 'public/fonts/dm-sans-9pt-500.ttf',
 } as const
 
 async function bundled() {
@@ -68,20 +68,30 @@ async function bundled() {
 async function bundledFonts() {
   const { display, body, label } = await bundled()
   return [
-    { name: 'Bodoni Moda', data: display, weight: 400 as const, style: 'normal' as const },
-    { name: 'DM Sans', data: body, weight: 400 as const, style: 'normal' as const },
-    { name: 'Barlow Condensed', data: label, weight: 500 as const, style: 'normal' as const },
+    { name: 'Barlow Condensed', data: display, weight: 500 as const, style: 'normal' as const },
+    { name: 'DM Sans', data: body, weight: 300 as const, style: 'normal' as const },
+    { name: 'DM Sans', data: label, weight: 500 as const, style: 'normal' as const },
   ]
 }
 
-/** What each voice sets on the cards: the title in Bodoni, the sentence in DM Sans, the labels in Barlow. */
+/**
+ * What each voice sets on the cards (ADR 052): the title and the brand name in Barlow Condensed
+ * capitals, the sentence in DM Sans 300, the material chips in DM Sans 500. The display text is
+ * checked in both cases: the cards write `textTransform: 'uppercase'`, and a glyph missing from the
+ * capital forms is as visible as one missing from the written ones.
+ */
 function cardText() {
   const products = getAllProducts()
   return {
-    display: ['Grade 23', 'Titanium', ...products.map((p) => p.title)].join('\n'),
+    display: [
+      SITE_NAME.toUpperCase(),
+      'Grade 23',
+      'Titanium',
+      ...products.map((p) => p.title),
+      ...products.map((p) => p.title.toUpperCase()),
+    ].join('\n'),
     body: claimText('brand-positioning', { kind: 'site' }),
     label: [
-      SITE_NAME.toUpperCase(),
       'GRADE 23 TITANIUM',
       'NIOBIUM',
       '316L SURGICAL STEEL',
@@ -114,16 +124,16 @@ describe('the OG card rasterises with the bundled font, no network', () => {
     }
   })
 
-  it('renders every character the card can carry, in all three voices, and produces a non-empty PNG', async () => {
+  it('renders every character the card can carry, in all three roles, and produces a non-empty PNG', async () => {
     const fonts = await bundledFonts()
     const text = cardText()
 
     const response = new ImageResponse(
       (
         <div style={{ display: 'flex', flexDirection: 'column', fontSize: 40 }}>
-          <div style={{ display: 'flex', fontFamily: 'Bodoni Moda', fontWeight: 400 }}>{text.display}</div>
-          <div style={{ display: 'flex', fontFamily: 'DM Sans', fontWeight: 400 }}>{text.body}</div>
-          <div style={{ display: 'flex', fontFamily: 'Barlow Condensed', fontWeight: 500 }}>{text.label}</div>
+          <div style={{ display: 'flex', fontFamily: 'Barlow Condensed', fontWeight: 500 }}>{text.display}</div>
+          <div style={{ display: 'flex', fontFamily: 'DM Sans', fontWeight: 300 }}>{text.body}</div>
+          <div style={{ display: 'flex', fontFamily: 'DM Sans', fontWeight: 500 }}>{text.label}</div>
         </div>
       ),
       { width: 1200, height: 630, fonts }
@@ -135,12 +145,12 @@ describe('the OG card rasterises with the bundled font, no network', () => {
   })
 
   it('ships exactly the weight each voice asks for, so Satori synthesises none', async () => {
-    // The cards ask Bodoni Moda and DM Sans for 400 and Barlow Condensed for 500, and each bundle
-    // holds that one weight. A bundle missing the weight would let Satori synthesise it, the same
-    // silent substitution CLAUDE.md records for Barlow Condensed at weight 700 across nine pages.
+    // The cards ask Barlow Condensed for 500, DM Sans for 300 (the sentence) and 500 (the chips), and
+    // each bundle holds that one weight. A bundle missing the weight would let Satori synthesise it,
+    // the same silent substitution CLAUDE.md records for Barlow Condensed at weight 700 across nine pages.
     const files = await bundled()
-    expect(describeSfnt(files.display).weight).toBe(400)
-    expect(describeSfnt(files.body).weight).toBe(400)
+    expect(describeSfnt(files.display).weight).toBe(500)
+    expect(describeSfnt(files.body).weight).toBe(300)
     expect(describeSfnt(files.label).weight).toBe(500)
   })
 })

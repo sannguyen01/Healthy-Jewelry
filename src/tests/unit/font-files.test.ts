@@ -6,14 +6,13 @@ import { describeSfnt, describeWoff2, uncoveredCharacters } from '@/lib/design/f
 import { SITE_NAME } from '@/config/brand'
 
 /**
- * The typefaces are six files in the repository, so what they are is checkable — read out of
+ * The typefaces are four files in the repository, so what they are is checkable — read out of
  * their own tables, not taken from their names. See `src/app/fonts/README.md` for why the site
  * self-hosts one latin slice of each family, and `src/lib/design/fontFile.ts` for the reader.
  *
- * Three voices (ADR 051), each a family of static instances:
- * - **Bodoni Moda** speaks: the 96pt cut for display sizes, the 24pt cut for names and titles;
- * - **DM Sans** explains: 400 for running text, 500 for emphasis;
- * - **Barlow Condensed** labels, and sets the brand name (ADR 048).
+ * The original pair (ADR 052), each a family of static instances:
+ * - **Barlow Condensed** is the display voice, 500, and sets the brand name, 400 and 500 (ADR 048);
+ * - **DM Sans** is everything else: 300 for running text, 500 for labels and emphasis.
  *
  * Each block here answers a question no other gate asks:
  * - is each file the weight `layout.tsx` tells the browser it is (a mislabelled file renders
@@ -29,17 +28,7 @@ const README = readFileSync(path.join(FONTS, 'README.md'), 'utf8')
 
 /** Each family the site ships, keyed by its files' prefix. */
 const FAMILIES = {
-  // A static instance files itself under the optical size it was cut at ("Bodoni Moda 96pt").
-  'bodoni-moda-96pt': {
-    family: 'Bodoni Moda 96pt',
-    copyright: /^Copyright \d{4} The Bodoni Moda Project Authors/,
-    licence: 'OFL-BodoniModa.txt',
-  },
-  'bodoni-moda-24pt': {
-    family: 'Bodoni Moda 24pt',
-    copyright: /^Copyright \d{4} The Bodoni Moda Project Authors/,
-    licence: 'OFL-BodoniModa.txt',
-  },
+  // A static instance files itself under the optical size it was cut at ("DM Sans 9pt").
   'dm-sans-9pt': {
     family: 'DM Sans 9pt',
     copyright: /^Copyright \d{4} The DM Sans Project Authors/,
@@ -77,9 +66,7 @@ describe('the font files are what layout.tsx says they are', () => {
     expect(declared.map((d) => `${familyOf(d.file)} ${d.weight}`).sort()).toEqual([
       'barlow-condensed 400',
       'barlow-condensed 500',
-      'bodoni-moda-24pt 400',
-      'bodoni-moda-96pt 400',
-      'dm-sans-9pt 400',
+      'dm-sans-9pt 300',
       'dm-sans-9pt 500',
     ])
   })
@@ -137,19 +124,19 @@ describe('the share-card copies are the same faces as TrueType', () => {
   // Satori reads TTF and not WOFF2, so the cards bundle these (README, "The share-card copies").
   const PUBLIC = path.join(ROOT, 'public/fonts')
   const CARD_FONTS = [
-    { file: 'bodoni-moda-96pt-400.ttf', family: /^Bodoni Moda/, weight: 400, key: 'bodoni-moda-96pt' as FamilyKey },
-    { file: 'dm-sans-9pt-400.ttf', family: /^DM Sans/, weight: 400, key: 'dm-sans-9pt' as FamilyKey },
     { file: 'barlow-condensed-500.ttf', family: /^Barlow Condensed/, weight: 500, key: 'barlow-condensed' as FamilyKey },
+    { file: 'dm-sans-9pt-300.ttf', family: /^DM Sans/, weight: 300, key: 'dm-sans-9pt' as FamilyKey },
+    { file: 'dm-sans-9pt-500.ttf', family: /^DM Sans/, weight: 500, key: 'dm-sans-9pt' as FamilyKey },
   ]
 
   it('public/fonts holds exactly the three TrueType cards and the three WOFF2 copies, nothing else', () => {
     expect(readdirSync(PUBLIC).sort()).toEqual([
       'barlow-condensed-500.ttf',
       'barlow-condensed-latin-500.woff2',
-      'bodoni-moda-24pt-latin-400.woff2',
-      'bodoni-moda-96pt-400.ttf',
-      'dm-sans-9pt-400.ttf',
-      'dm-sans-9pt-latin-400.woff2',
+      'dm-sans-9pt-300.ttf',
+      'dm-sans-9pt-500.ttf',
+      'dm-sans-9pt-latin-300.woff2',
+      'dm-sans-9pt-latin-500.woff2',
     ])
   })
 

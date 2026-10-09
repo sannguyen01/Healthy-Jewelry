@@ -39,7 +39,7 @@ export function BrowseOnlyNotice() {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 400,
+          fontWeight: 300,
           fontSize: 'var(--text-base)',
           lineHeight: 1.7,
           color: 'var(--ink)',
@@ -51,6 +51,7 @@ export function BrowseOnlyNotice() {
       <p
         style={{
           fontFamily: 'var(--font-ui)',
+          fontWeight: 500,
           fontSize: 'var(--text-xs)',
           letterSpacing: '0.12em',
           textTransform: 'uppercase',

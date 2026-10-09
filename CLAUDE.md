@@ -20,10 +20,13 @@ Materials: Grade 23 Titanium · Niobium (anodized) · 316L Surgical Steel
 ## Tech Stack
 - Framework: Next.js 16, App Router, TypeScript (strict mode)
 - Styling: Tailwind CSS v4 + CSS custom properties (T4 tokens in `src/app/globals.css`, Quiet Archive values)
-- Fonts: Zen Kaku Gothic Antique for every role of the site's text, and Barlow Condensed for the
-  brand name alone, both self-hosted (latin slice) from `src/app/fonts/`. Barlow Condensed + DM
-  Sans set everything until 2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md));
-  the name kept its face by the owner's ruling ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md))
+- Fonts: **the original pair**, self-hosted (latin slice) from `src/app/fonts/`: Barlow Condensed
+  for the display voice and the brand name, DM Sans for everything else
+  ([ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md)). They set everything until
+  2026-10-04 ([ADR 043](docs/adr/043-one-family-and-the-case-it-is-written-in.md) replaced them with
+  one gothic family, and [ADR 051](docs/adr/051-three-voices-one-archive.md) tried a third); the owner
+  set both aside and the pair is back under the Quiet Archive's layout. The name keeps its face by the
+  owner's ruling ([ADR 048](docs/adr/048-the-name-keeps-its-own-face.md))
 - State: **none.** This said "Zustand (cart store)" until 2026-09-20; `src/store/` and the
   dependency both went with the bag. Nothing on this site holds client state across a
   navigation, which is a property worth keeping rather than an absence to fill.
@@ -78,15 +81,15 @@ option, because "unclassified" is how `--sage` shipped as 9–13px text at 1.97:
 - `--ease: cubic-bezier(0.16, 1, 0.3, 1)` (smooth spring)
 - `--ease-sharp: cubic-bezier(0.00, 0.00, 0.30, 1.00)` (sharp snap)
 
-### Typography
-One family sets every role of the site's text. The three tokens stay separate because they name
-**roles**, and the case rule keys on the role:
-- `--font-display` → headings, product and collection names, collection numbers, the menu
-  overlay's links. **Set in the case they are written in** (the catalogue writes Title Case),
-  **at a declared weight**, tracked with `--tracking-display` / `--tracking-name`.
-- `--font-ui` → nav controls, eyebrows, buttons, badges, metadata, the logotype. Small, and the
-  only role that may be set in tracked capitals.
-- `--font-body` → body text and descriptions.
+### Typography — the original pair (ADR 052)
+Two families, four tokens. The tokens name **roles**, and the case and weight rules key on the role:
+- `--font-display` → Barlow Condensed 500: headings, page titles, product, collection and metal
+  names, collection numbers, the menu's links. **Tracked capitals, at a declared weight**, tracked
+  with `--tracking-display` / `--tracking-title` / `--tracking-name` (looser as it gets smaller).
+- `--font-ui` → DM Sans 500: nav controls, eyebrows, buttons, badges, metadata. Small, and tracked
+  capitals too.
+- `--font-body` → DM Sans 300: body text and descriptions. Emphasis (`strong`, `b`, `th`) is the 500
+  of the same family. Never capitals.
 - `--font-brand` → **the brand name, and nothing else**: the logotype in the header and the
   footer, in Barlow Condensed, the typography it had before the Songmont reference — 500 in the
   header, 400 in the footer, in tracked capitals. The owner's ruling (2026-10-04,
@@ -98,13 +101,12 @@ One family sets every role of the site's text. The three tokens stay separate be
 
 | Token | Font | Weights available |
 |-------|------|-------------------|
-| `--font-display` / `--font-ui` / `--font-body` | Zen Kaku Gothic Antique | **400, 500** |
-| `--font-brand` (the brand name only) | Barlow Condensed | **400, 500** |
+| `--font-display` / `--font-brand` | Barlow Condensed | **400, 500** |
+| `--font-ui` / `--font-body` | DM Sans | **300, 500** |
 
-There is deliberately **no 300**. Weight numbers do not carry between families: measured as ink
-per unit of text, this family's 300 lays down about half of what the DM Sans 300 it replaced did,
-and its 400 nearly all of it. Body copy and small labels are therefore 400, which is what keeps
-them as dark as they shipped (`src/app/fonts/README.md`).
+There is deliberately **no 400 in DM Sans**, and a request for one is not ignored: the nearest-weight
+rule answers it with the 500, so running text would be set in Medium with nothing in the stylesheet to
+say so. The test below fails on it. Running text is 300, as it was; labels and emphasis are 500.
 
 A weight with no downloaded face is not ignored — the browser *synthesises* it,
 smearing the strokes of the nearest face and distorting the letterforms, so the text reads as a
@@ -113,12 +115,12 @@ homepage's real 500. Enforced by `src/tests/unit/typography-weights.test.ts`, wh
 `--font-*` token back to its loader and fails on any weight that font does not ship. To use a heavier
 face, add its file to the `localFont` call in `src/app/layout.tsx` first.
 
-The same test fails a `--font-display` style that forces capitals or that **inherits** its weight.
-The second is not pedantry: twenty-seven headings inherited the body's 300 and rendered at 400
-only because Barlow Condensed had no 300 face; the first family with a real Light turned every
-one of them Light.
+The same test fails a `--font-display` or `--font-ui` style that does not force capitals, one that
+**inherits** its weight, and a `--font-body` style that forces capitals. The second is not pedantry:
+twenty-seven headings inherited the body's 300 and rendered at 400 only because Barlow Condensed had
+no 300 face; the first family with a real Light turned every one of them Light.
 
-**The face draws 219 characters, and nothing else renders in it.** Only the latin slice ships, so
+**The faces draw a little over two hundred characters, and nothing else renders in them.** Only the latin slice ships, so
 a character outside it — an arrow, a check mark — is drawn by the fallback face mid-line. Use what
 the slice has (`src/app/fonts/README.md`), or ship the slice that has it. Enforced over
 `src/content/**` by `font-files.test.ts` (which also reads each file's own weight class, licence
@@ -130,29 +132,29 @@ which face drew every text node on 48 page states: the faces were right, but the
 `<strong>` and `<th>` asked for 700 (faked bold), the footer tagline was italic on every page (a
 sheared upright gothic), the 410 page was set in `system-ui`, and one heading tier had two weights.
 So: `font-synthesis: none` on `<html>`; `strong, b, th` are 500 and `em, i, …` are upright; **nothing is
-italic**; **h1 is 500, display text at `--text-lg` or smaller is 500, larger display text is 400**
-(by size *token*, not computed size, because the tokens are `clamp()`s); a piece's name is
-`.hj-card-name`; **nothing is declared below `--text-xs`'s minimum** (0.7rem), so use the token; and a
-document outside the layout (the 410 page, `global-error.tsx`) declares the face itself from
-`src/lib/design/siteFace.ts`, whose two files in `public/fonts/` are the loader's, byte for byte.
-Enforced by `type-system-floor.test.ts`, the tier rule in `typography-weights.test.ts`, and
-`e2e/rendered-fonts.spec.ts`, which reads Chrome's own report of the face, weight, style and size used.
+italic**; **every display and label style is 500 and every running-text style 300**, declared;
+a piece's name is `.hj-card-name`; **nothing is declared below `--text-xs`'s minimum** (0.7rem), so
+use the token; and a document outside the layout (the 410 page, `global-error.tsx`) declares the faces
+itself from `src/lib/design/siteFace.ts`, whose files in `public/fonts/` are the loader's, byte for byte.
+Enforced by `type-system-floor.test.ts`, the weight and case rules in `typography-weights.test.ts`, and
+`e2e/rendered-fonts.spec.ts`, which reads Chrome's own report of the face, weight, style, size and case used.
 
 **Page titles use `PageHeader`** (`src/components/ui/PageHeader.tsx`) — never a hand-rolled `<h1>`.
 Two variants, chosen by what the page is for: `display` for brand/marketing routes (Our Story, Contact,
 Materials, Stores) and `compact` for utility/legal routes (FAQ, Shipping, Terms, Privacy, Legal). The
 homepage hero is the one exception, since it owns `--text-hero`.
 
-### Architecture — quiet editorial, referenced to Songmont
-The design reference is Songmont (the owner's choice, 2026-10-04; it was Gentle Monster before).
-**A reference, not a template** (the owner's ruling, 2026-10-04): take what suits Healthy
-Jewellery and leave what does not; much of it would not. Its typeface is not studied further,
-and the brand name keeps its own. What was verified about it, what was adopted, and what was
-decided from the language without the live page is in `DESIGN.md`, "Reference: Songmont" — read
-that before changing a token, a section or a card.
+### Architecture — the Quiet Archive, in the original typography
+The layout, palette and chrome are the Quiet Archive's ([ADR 051](docs/adr/051-three-voices-one-archive.md):
+a gallery ground, hairline structure, the archive menu, the registry-and-index homepage); the
+typography is the brand's original pair ([ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md)).
+Songmont, the reference before it (the owner's choice, 2026-10-04), was **a reference, not a template**
+(the owner's ruling, 2026-10-04): take what suits Healthy Jewellery and leave what does not. What was
+verified about it, what was adopted, and what was decided from the language without the live page is
+in `DESIGN.md`, "Reference: Songmont" — read that before changing a token, a section or a card.
 - Horizontal scroll strips on homepage (no product grids), each with a "View All" link
-- The Pampas ground (`--bg`) everywhere, with `--graphite` carrying secondary text in the
-  Tundora role
+- The alabaster ground (`--bg`) everywhere, with `--ink-2` carrying secondary text and
+  `--graphite` running text
 - Single dark interruption: the Care band (`CareSection`, ADR 040). The campaign band it
   replaced is gone
 - Nav: transparent over the hero → solid `--bg` with a hairline (scrollY > 60). Flat: no blur,
@@ -409,5 +411,5 @@ Full detail in **`docs/testing-strategy.md`**. In short:
 - ~~Stones, gemstones, crystals, chakras~~ — this is a titanium brand
 - ~~Healing, mystical, spiritual copy~~
 - ~~"HealingBadge", "StoneCard"~~ — use Badge, ProductCard
-- ~~Dark background as default~~ — the Pampas ground (`--bg`) is dominant
+- ~~Dark background as default~~ — the alabaster ground (`--bg`) is dominant
 - ~~Product grids on homepage~~ — horizontal scroll strips only

@@ -31,6 +31,7 @@ export default function Error({ error, reset }: ErrorProps) {
       <p
         style={{
           fontFamily: 'var(--font-ui)',
+          fontWeight: 500,
           fontSize: 'var(--text-xs)',
           letterSpacing: '0.22em',
           textTransform: 'uppercase',
@@ -42,7 +43,8 @@ export default function Error({ error, reset }: ErrorProps) {
       <h1
         style={{
           fontFamily: 'var(--font-display)',
-          fontWeight: 400,
+          textTransform: 'uppercase',
+          fontWeight: 500,
           fontSize: 'clamp(2.4rem, 5vw, 4rem)',
           letterSpacing: 'var(--tracking-display)',
           lineHeight: 1.1,
@@ -54,7 +56,7 @@ export default function Error({ error, reset }: ErrorProps) {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 400,
+          fontWeight: 300,
           fontSize: '1rem',
           color: 'var(--graphite, #3D3935)',
           maxWidth: '400px',
@@ -72,6 +74,7 @@ export default function Error({ error, reset }: ErrorProps) {
             border: '1px solid var(--ink, #1A1918)',
             backgroundColor: 'transparent',
             fontFamily: 'var(--font-ui)',
+            fontWeight: 500,
             fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
@@ -88,6 +91,7 @@ export default function Error({ error, reset }: ErrorProps) {
             backgroundColor: 'var(--ink, #1A1918)',
             color: 'var(--bg, #FAF9F5)',
             fontFamily: 'var(--font-ui)',
+            fontWeight: 500,
             fontSize: 'var(--text-xs)',
             letterSpacing: '0.16em',
             textTransform: 'uppercase',

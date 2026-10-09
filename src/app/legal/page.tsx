@@ -11,8 +11,9 @@ export const metadata: Metadata = {
 }
 
 const sectionHeadStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-title)',
-  fontWeight: 400,
+  fontFamily: 'var(--font-display)',
+  textTransform: 'uppercase',
+  fontWeight: 500,
   fontSize: 'var(--text-xl, 1.4rem)',
   letterSpacing: 'var(--tracking-title)',
   color: 'var(--ink)',
@@ -24,7 +25,7 @@ const bodyStyle: React.CSSProperties = {
   fontSize: 'var(--text-base)',
   color: 'var(--graphite)',
   lineHeight: 1.75,
-  fontWeight: 400,
+  fontWeight: 300,
   margin: '0 0 16px',
 }
 

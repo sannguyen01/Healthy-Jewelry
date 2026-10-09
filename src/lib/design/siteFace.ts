@@ -18,32 +18,32 @@
  * loader's own are content-hashed per build). Those files are the loader's, byte for byte;
  * `type-system-floor.test.ts` compares them, so a copy cannot drift from the source.
  *
- * **Three voices, one file each** (ADR 051): the 24pt Bodoni Moda cut for the heading, DM Sans for
- * running text, Barlow Condensed 500 for the label and the button. Only what these two documents
- * set, and `font-synthesis: none` so nothing is drawn that was not shipped (ADR 050).
+ * **The original pair, one file per role** (ADR 052): Barlow Condensed 500 for the heading, DM Sans
+ * 300 for running text, DM Sans 500 for the label and the button. Only what these two documents set,
+ * and `font-synthesis: none` so nothing is drawn that was not shipped (ADR 050).
  */
 
-export type SiteVoice = 'title' | 'body' | 'label'
+export type SiteVoice = 'display' | 'body' | 'label'
 
 export interface SiteFace {
   readonly voice: SiteVoice
   readonly family: string
-  readonly weight: 400 | 500
+  readonly weight: 300 | 500
   /** The loader's file in `src/app/fonts/`; the public copy has the same name. */
   readonly file: string
 }
 
 export const SITE_FACES: readonly SiteFace[] = [
-  { voice: 'title', family: 'Bodoni Moda', weight: 400, file: 'bodoni-moda-24pt-latin-400.woff2' },
-  { voice: 'body', family: 'DM Sans', weight: 400, file: 'dm-sans-9pt-latin-400.woff2' },
-  { voice: 'label', family: 'Barlow Condensed', weight: 500, file: 'barlow-condensed-latin-500.woff2' },
+  { voice: 'display', family: 'Barlow Condensed', weight: 500, file: 'barlow-condensed-latin-500.woff2' },
+  { voice: 'body', family: 'DM Sans', weight: 300, file: 'dm-sans-9pt-latin-300.woff2' },
+  { voice: 'label', family: 'DM Sans', weight: 500, file: 'dm-sans-9pt-latin-500.woff2' },
 ]
 
 /** One stack per voice, each ending in a generic keyword and naming no installed font. */
 export const SITE_STACKS: Readonly<Record<SiteVoice, string>> = {
-  title: '"Bodoni Moda", serif',
+  display: '"Barlow Condensed", sans-serif',
   body: '"DM Sans", sans-serif',
-  label: '"Barlow Condensed", sans-serif',
+  label: '"DM Sans", sans-serif',
 }
 
 /** Public URL of each face. */

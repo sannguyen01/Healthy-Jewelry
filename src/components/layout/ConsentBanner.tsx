@@ -119,7 +119,7 @@ export function ConsentBanner() {
       <p
         style={{
           fontFamily: 'var(--font-body)',
-          fontWeight: 400,
+          fontWeight: 300,
           fontSize: 'var(--text-sm)',
           lineHeight: 1.65,
           color: 'var(--ink)',
@@ -152,7 +152,8 @@ export function ConsentBanner() {
         <p
           data-testid="consent-current"
           style={{
-            fontFamily: 'var(--font-ui)',
+            fontFamily: 'var(--font-body)',
+            fontWeight: 300,
             fontSize: 'var(--text-xs, 0.75rem)',
             color: 'var(--graphite)',
             margin: 0,

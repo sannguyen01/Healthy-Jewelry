@@ -26,22 +26,22 @@ export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
 /**
- * The card is set in the site's three voices (ADR 051): the metal in Bodoni Moda, the positioning
- * line in DM Sans, the brand name and the material chips in Barlow Condensed. Satori reads TTF and
- * not the WOFF2 the site ships, so the card bundles the same fixed instances as TTF, byte for byte
- * (`src/app/fonts/README.md`, "The share-card copies"). The paths are written at the call, as in
- * the product card, so Turbopack scopes the trace to these three files (ADR 047).
+ * The card is set in the site's original pair (ADR 052): the metal, the brand name in Barlow
+ * Condensed capitals; the positioning line in DM Sans 300 and the material chips in DM Sans 500.
+ * Satori reads TTF and not the WOFF2 the site ships, so the card bundles the same fixed instances
+ * as TTF, byte for byte (`src/app/fonts/README.md`, "The share-card copies"). The paths are written
+ * at the call, as in the product card, so Turbopack scopes the trace to these three files (ADR 047).
  */
 async function loadCardFonts() {
   const [display, body, label] = await Promise.all([
-    readFile(path.join(process.cwd(), 'public/fonts/bodoni-moda-96pt-400.ttf')),
-    readFile(path.join(process.cwd(), 'public/fonts/dm-sans-9pt-400.ttf')),
     readFile(path.join(process.cwd(), 'public/fonts/barlow-condensed-500.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/dm-sans-9pt-300.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/dm-sans-9pt-500.ttf')),
   ])
   return [
-    { name: 'Bodoni Moda', data: display, weight: 400 as const, style: 'normal' as const },
-    { name: 'DM Sans', data: body, weight: 400 as const, style: 'normal' as const },
-    { name: 'Barlow Condensed', data: label, weight: 500 as const, style: 'normal' as const },
+    { name: 'Barlow Condensed', data: display, weight: 500 as const, style: 'normal' as const },
+    { name: 'DM Sans', data: body, weight: 300 as const, style: 'normal' as const },
+    { name: 'DM Sans', data: label, weight: 500 as const, style: 'normal' as const },
   ]
 }
 
@@ -68,16 +68,16 @@ export default async function Image() {
           {SITE_NAME.toUpperCase()}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          <span style={{ fontFamily: 'Bodoni Moda', fontSize: 112, fontWeight: 400, letterSpacing: '-0.02em', color: '#1A1918', lineHeight: 1, display: 'flex' }}>Grade 23</span>
-          <span style={{ fontFamily: 'Bodoni Moda', fontSize: 112, fontWeight: 400, letterSpacing: '-0.02em', color: '#1A1918', lineHeight: 1, display: 'flex' }}>Titanium</span>
+          <span style={{ fontFamily: 'Barlow Condensed', fontSize: 124, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.01em', color: '#1A1918', lineHeight: 1, display: 'flex' }}>Grade 23</span>
+          <span style={{ fontFamily: 'Barlow Condensed', fontSize: 124, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.01em', color: '#1A1918', lineHeight: 1, display: 'flex' }}>Titanium</span>
         </div>
-        <div style={{ marginTop: 36, fontSize: 26, fontWeight: 400, color: '#3D3935', letterSpacing: '0.01em', display: 'flex' }}>
+        <div style={{ marginTop: 36, fontSize: 26, fontWeight: 300, color: '#3D3935', display: 'flex' }}>
           {/* The positioning line is a pending claim; the card renders what the page does. */}
           {claimText('brand-positioning', { kind: 'site' })}
         </div>
         <div style={{ position: 'absolute', bottom: 64, right: 80, display: 'flex', gap: 12 }}>
           {['GRADE 23 TITANIUM', 'NIOBIUM', '316L SURGICAL STEEL'].map((mat) => (
-            <div key={mat} style={{ fontFamily: 'Barlow Condensed', fontWeight: 500, border: '1px solid #DFDACF', padding: '8px 16px', fontSize: 16, letterSpacing: '0.12em', color: '#5F5B55', display: 'flex' }}>
+            <div key={mat} style={{ fontFamily: 'DM Sans', fontWeight: 500, border: '1px solid #DFDACF', padding: '8px 16px', fontSize: 16, letterSpacing: '0.12em', color: '#5F5B55', display: 'flex' }}>
               {mat}
             </div>
           ))}

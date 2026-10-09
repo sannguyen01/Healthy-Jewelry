@@ -22,8 +22,8 @@ import { SITE_NAME } from '@/config/site'
 // symptom. `opengraph-bundled-font.test.tsx` exercises the real rasteriser
 // against the characters the card actually renders today.
 //
-// The card is set in the site's own voices (ADR 051): the piece's name in Bodoni Moda, the brand
-// name and the material in Barlow Condensed. It was Noto Sans until 2026-10-09, "a leftover of the
+// The card is set in the site's own pair (ADR 052): the piece's name and the brand name in Barlow
+// Condensed capitals, the material in DM Sans 500. It was Noto Sans until 2026-10-09, "a leftover of the
 // original fix": chosen for pan-Unicode currency coverage when the card carried a price, and kept
 // as a stand-in for a brand face the route could not load. Satori reads TTF, OTF and WOFF but not
 // the WOFF2 the site ships, so the card bundles the same fixed instances as TTF, byte for byte
@@ -40,12 +40,12 @@ import { SITE_NAME } from '@/config/site'
 // repository files again (ADR 047).
 async function loadCardFonts() {
   const [display, label] = await Promise.all([
-    readFile(path.join(process.cwd(), 'public/fonts/bodoni-moda-96pt-400.ttf')),
     readFile(path.join(process.cwd(), 'public/fonts/barlow-condensed-500.ttf')),
+    readFile(path.join(process.cwd(), 'public/fonts/dm-sans-9pt-500.ttf')),
   ])
   return [
-    { name: 'Bodoni Moda', data: display, weight: 400 as const, style: 'normal' as const },
-    { name: 'Barlow Condensed', data: label, weight: 500 as const, style: 'normal' as const },
+    { name: 'Barlow Condensed', data: display, weight: 500 as const, style: 'normal' as const },
+    { name: 'DM Sans', data: label, weight: 500 as const, style: 'normal' as const },
   ]
 }
 
@@ -136,10 +136,11 @@ export default async function Image({ params }: Props) {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div
           style={{
-            fontFamily: 'Bodoni Moda',
-            fontSize: 84,
-            fontWeight: 400,
-            letterSpacing: '-0.02em',
+            fontFamily: 'Barlow Condensed',
+            fontSize: 92,
+            fontWeight: 500,
+            textTransform: 'uppercase',
+            letterSpacing: '0.02em',
             color: '#1A1918',
             lineHeight: 1.05,
             marginBottom: 28,
@@ -154,6 +155,8 @@ export default async function Image({ params }: Props) {
           {material !== '' && (
             <div
               style={{
+                fontFamily: 'DM Sans',
+                fontWeight: 500,
                 border: '1px solid #DFDACF',
                 padding: '8px 16px',
                 fontSize: 18,

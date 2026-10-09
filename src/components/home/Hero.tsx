@@ -138,8 +138,9 @@ export function Hero({ headlineLines }: HeroProps) {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
               fontSize: 'var(--text-hero)',
-              fontWeight: 400,
+              fontWeight: 500,
               color: 'var(--ink)',
               // 0.9 until the hero moved from 136px to 60px: a didone's ascenders and descenders
               // clear each other at 1.1, and at this size the leading is what the eye reads.
@@ -161,7 +162,7 @@ export function Hero({ headlineLines }: HeroProps) {
           <p
             style={{
               fontFamily: 'var(--font-body)',
-              fontWeight: 400,
+              fontWeight: 300,
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               margin: '0 0 40px',

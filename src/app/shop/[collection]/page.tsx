@@ -120,7 +120,8 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               bottom: '-0.1em',
               right: 'var(--space-gutter)',
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'clamp(8rem, 20vw, 18rem)',
               letterSpacing: '-0.02em',
               color: 'var(--ash)',
@@ -138,7 +139,8 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           <h1
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--ink)',
@@ -157,7 +159,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               lineHeight: 1.6,
-              fontWeight: 400,
+              fontWeight: 300,
               margin: 0,
               maxWidth: '480px',
               position: 'relative',
@@ -180,6 +182,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           <span
             style={{
               fontFamily: 'var(--font-ui)',
+              fontWeight: 500,
               fontSize: 'var(--text-xs)',
               letterSpacing: '0.14em',
               textTransform: 'uppercase',

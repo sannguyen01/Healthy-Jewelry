@@ -6,73 +6,35 @@ import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
 
 /**
- * **Three voices, four loaders** — the Quiet Archive system (ADR 051): Bodoni Moda speaks, DM Sans
- * explains, Barlow Condensed labels, and the brand name keeps the label voice it was already set
- * in (ADR 048). Provenance, licence and hashes for every file: `src/app/fonts/README.md`.
+ * **The original pair, self-hosted** (ADR 052): Barlow Condensed for the display voice and the brand
+ * name, DM Sans for everything else. It is the typography the brand had before the Songmont
+ * reference (ADR 043) and before the Quiet Archive's first trial of three voices (ADR 051), which
+ * the owner set aside on 2026-10-09: the design stays, the typography goes back. Provenance,
+ * licence and hashes for every file: `src/app/fonts/README.md`.
  *
- * Each file is a *fixed instance* of a variable family, as Google Fonts serves them through
- * `css2` (`opsz,wght@96,400`): static, one weight, latin slice only, about 14 KB. The variable
- * files are 45 KB (Bodoni Moda) and 61 KB (DM Sans) and would ship axes the site never sets. The
- * price of static instances is that an optical size is a *file*, so Bodoni Moda is two loaders:
- * the 96pt cut for display sizes, where its hairlines are meant to be fine, and the 24pt cut for
- * names and titles, where the same hairlines would break up. Which cut a rule uses is a function
- * of its size token, and `typography-weights.test.ts` holds every `--font-display` use to the
- * large tokens and every `--font-title` use to the small ones.
+ * - **Barlow Condensed, 400 and 500** (`--font-display`, `--font-brand`): headings, page titles,
+ *   piece and collection names, the menu's links and the logotype, set in tracked capitals. The
+ *   500 is the display weight; the 400 is the footer's name (ADR 048).
+ * - **DM Sans, 300 and 500** (`--font-body`, `--font-ui`): running text at 300, as it always was,
+ *   and every label, control and badge at 500. There is no 400 file and nothing asks for one:
+ *   `typography-weights.test.ts` fails on a weight these files are not, because a weight with no
+ *   face is not ignored, it is faked.
  *
- * Only the latin slice, and only the characters it draws: `e2e/glyph-coverage.spec.ts` fails on
- * any other, since a missing glyph silently renders in the fallback face. `font-files.test.ts`
- * reads each file's own tables to hold the weights declared here to the weights the files are.
+ * Each file is a *fixed instance* of a variable family, as Google Fonts serves them through `css2`
+ * (`opsz,wght@14,300`): static, one weight, latin slice only, about 14 KB. Only the characters the
+ * slice draws: `e2e/glyph-coverage.spec.ts` fails on any other, since a missing glyph silently
+ * renders in the fallback face. `font-files.test.ts` reads each file's own tables to hold the
+ * weights declared here to the weights the files are.
  *
  * **Fallback names are written into the CSS unquoted**, so a name with a digit in it ("Bodoni 72")
  * is not an identifier sequence and invalidates the whole `font-family` list at computed-value
- * time. Every `var(--font-display)` then computes to `unset` and the heading inherits the body's
- * face, silently and with nothing in the stylesheet to say so (ADR 051). Every name below is plain
- * identifiers; `typography-weights.test.ts` holds that, and `rendered-fonts.spec.ts` holds each
- * role to its voice.
+ * time: every `var(--font-display)` then computes to `unset` and the heading inherits the body's
+ * face, silently, with nothing in the stylesheet to say so (measured 2026-10-09). Every name below
+ * is plain identifiers; `typography-weights.test.ts` holds that, and `rendered-fonts.spec.ts`
+ * holds each role to its face.
  *
- * What is preloaded is what the first paint needs: the 96pt display cut (the hero), DM Sans
- * (all running text) and Barlow Condensed (the bar and every label). The 24pt cut loads when a
- * name or a title is laid out. `preload` is per call, not per file, which is why the lighter
- * DM Sans weight is a call of its own.
- */
-const bodoniDisplay = localFont({
-  src: [{ path: './fonts/bodoni-moda-96pt-latin-400.woff2', weight: '400', style: 'normal' }],
-  display: 'swap',
-  variable: '--font-bm96',
-  fallback: ['Didot', 'Georgia', 'serif'],
-})
-
-const bodoniTitle = localFont({
-  src: [{ path: './fonts/bodoni-moda-24pt-latin-400.woff2', weight: '400', style: 'normal' }],
-  display: 'swap',
-  preload: false,
-  variable: '--font-bm24',
-  fallback: ['Didot', 'Georgia', 'serif'],
-})
-
-const dmSans = localFont({
-  src: [{ path: './fonts/dm-sans-9pt-latin-400.woff2', weight: '400', style: 'normal' }],
-  display: 'swap',
-  variable: '--font-dm',
-  fallback: ['Helvetica Neue', 'Arial', 'sans-serif'],
-})
-
-/** The one emphasis weight (`strong`, `b`, `th`): its own call so that it is not preloaded. */
-const dmSansMedium = localFont({
-  src: [{ path: './fonts/dm-sans-9pt-latin-500.woff2', weight: '500', style: 'normal' }],
-  display: 'swap',
-  preload: false,
-  variable: '--font-dm500',
-  fallback: ['Helvetica Neue', 'Arial', 'sans-serif'],
-})
-
-/**
- * **The label voice, and the brand name's own face.** The owner's ruling (2026-10-04, ADR 048)
- * kept the name in the typography it had before the Songmont reference: Barlow Condensed, 500 in
- * the header and 400 in the footer, in tracked capitals. The Quiet Archive system sets its labels
- * in the same voice (ADR 051 widens the ruling), so `--font-ui` and `--font-brand` now name one
- * face. They stay two tokens because they name two *roles*: `typography-weights.test.ts` fails if
- * `--font-brand` reaches any rule but the logotype's.
+ * Everything is preloaded: the bar and the hero need both families on the first paint, and the
+ * total is smaller than the pair it replaces.
  */
 const barlowCondensed = localFont({
   src: [
@@ -82,6 +44,16 @@ const barlowCondensed = localFont({
   display: 'swap',
   variable: '--font-bc',
   fallback: ['Arial Narrow', 'Helvetica Neue', 'Arial', 'sans-serif'],
+})
+
+const dmSans = localFont({
+  src: [
+    { path: './fonts/dm-sans-9pt-latin-300.woff2', weight: '300', style: 'normal' },
+    { path: './fonts/dm-sans-9pt-latin-500.woff2', weight: '500', style: 'normal' },
+  ],
+  display: 'swap',
+  variable: '--font-dm',
+  fallback: ['Helvetica Neue', 'Arial', 'sans-serif'],
 })
 
 /**
@@ -166,14 +138,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={[bodoniDisplay, bodoniTitle, dmSans, dmSansMedium, barlowCondensed].map((f) => f.variable).join(' ')}
+      className={[barlowCondensed, dmSans].map((f) => f.variable).join(' ')}
       style={
         {
-          '--font-display': 'var(--font-bm96, "Bodoni Moda", "Didot", serif)',
-          '--font-title': 'var(--font-bm24, "Bodoni Moda", "Didot", serif)',
+          '--font-display': 'var(--font-bc, "Barlow Condensed", "Arial Narrow", sans-serif)',
           '--font-body': 'var(--font-dm, "DM Sans", sans-serif)',
-          '--font-body-medium': 'var(--font-dm500, "DM Sans", sans-serif)',
-          '--font-ui': 'var(--font-bc, "Barlow Condensed", "Arial Narrow", sans-serif)',
+          '--font-ui': 'var(--font-dm, "DM Sans", sans-serif)',
           '--font-brand': 'var(--font-bc, "Barlow Condensed", "Arial Narrow", sans-serif)',
         } as React.CSSProperties
       }

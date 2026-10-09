@@ -53,11 +53,11 @@ const BUNDLED = 'the share card bundles its fonts rather than fetching them at r
  */
 const EVERY_PAGE = ['app/page', 'app/*/page']
 export const RUNTIME_READS = Object.freeze([
-  { file: 'public/fonts/bodoni-moda-96pt-400.ttf', trace: CARD_TRACE, alsoIn: [CARD_PAGE], reason: BUNDLED },
   { file: 'public/fonts/barlow-condensed-500.ttf', trace: CARD_TRACE, alsoIn: [CARD_PAGE], reason: BUNDLED },
-  { file: 'public/fonts/bodoni-moda-96pt-400.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
-  { file: 'public/fonts/dm-sans-9pt-400.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
+  { file: 'public/fonts/dm-sans-9pt-500.ttf', trace: CARD_TRACE, alsoIn: [CARD_PAGE], reason: BUNDLED },
   { file: 'public/fonts/barlow-condensed-500.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
+  { file: 'public/fonts/dm-sans-9pt-300.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
+  { file: 'public/fonts/dm-sans-9pt-500.ttf', trace: ROOT_CARD_TRACE, alsoIn: EVERY_PAGE, reason: BUNDLED },
 ])
 
 /** `*` matches any run of characters; everything else matches itself. */

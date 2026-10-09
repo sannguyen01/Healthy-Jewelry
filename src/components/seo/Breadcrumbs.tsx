@@ -28,6 +28,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
           gap: '8px',
           flexWrap: 'wrap',
           fontFamily: 'var(--font-ui)',
+          fontWeight: 500,
           fontSize: 'var(--text-xs)',
           color: 'var(--graphite)',
           letterSpacing: '0.1em',

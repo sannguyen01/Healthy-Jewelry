@@ -8,10 +8,10 @@ interface GlobalErrorProps {
 }
 
 /**
- * Rendered in place of the root layout, so the loader's face and tokens are not here. It declares
- * the site face itself (`src/lib/design/siteFace.ts`) rather than naming a family nothing
- * defines, which fell to plain `sans-serif`, and so sizes are literals instead of tokens. A `<button>` does not inherit a font by default, so it names
- * the label voice itself.
+ * Rendered in place of the root layout, so the loader's faces and tokens are not here. It declares
+ * the site's faces itself (`src/lib/design/siteFace.ts`) rather than naming a family nothing
+ * defines, which fell to plain `sans-serif`, and so sizes are literals instead of tokens. A
+ * `<button>` does not inherit a font by default, so it names the label voice itself.
  */
 export default function GlobalError({ reset }: GlobalErrorProps) {
   return (
@@ -51,10 +51,11 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
         </p>
         <h1
           style={{
-            fontFamily: SITE_STACKS.title,
+            fontFamily: SITE_STACKS.display,
             fontSize: '2.5rem',
-            fontWeight: 400,
-            letterSpacing: '-0.015em',
+            fontWeight: 500,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
             margin: 0,
           }}
         >

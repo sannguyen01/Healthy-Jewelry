@@ -47,7 +47,7 @@ export default function AboutPage() {
               color: 'var(--graphite)',
               lineHeight: 1.7,
               maxWidth: '620px',
-              fontWeight: 400,
+              fontWeight: 300,
             }}
           >
             Most jewelry is made for display cases. Ours is made to be worn. Every piece is one of
@@ -75,8 +75,9 @@ export default function AboutPage() {
 
             <h2
               style={{
-                fontFamily: 'var(--font-title)',
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 fontSize: 'var(--text-2xl)',
                 letterSpacing: 'var(--tracking-title)',
                 color: 'var(--ink)',
@@ -94,7 +95,7 @@ export default function AboutPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 400,
+                fontWeight: 300,
                 margin: '0 0 20px',
               }}
             >
@@ -109,7 +110,7 @@ export default function AboutPage() {
                 fontSize: 'var(--text-base)',
                 color: 'var(--graphite)',
                 lineHeight: 1.75,
-                fontWeight: 400,
+                fontWeight: 300,
               }}
             >
               We asked one question: what would jewelry look like if every piece were named by its
@@ -184,7 +185,8 @@ export default function AboutPage() {
                 <p
                   style={{
                     fontFamily: 'var(--font-display)',
-                    fontWeight: 400,
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: '3.5rem',
                     color: 'var(--ash)',
                     lineHeight: 1,
@@ -197,8 +199,9 @@ export default function AboutPage() {
 
                 <h3
                   style={{
-                    fontFamily: 'var(--font-title)',
-                    fontWeight: 400,
+                    fontFamily: 'var(--font-display)',
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
                     fontSize: 'var(--text-xl)',
                     letterSpacing: 'var(--tracking-title)',
                     color: 'var(--ink)',
@@ -214,7 +217,7 @@ export default function AboutPage() {
                     fontSize: 'var(--text-base)',
                     color: 'var(--graphite)',
                     lineHeight: 1.7,
-                    fontWeight: 400,
+                    fontWeight: 300,
                     margin: 0,
                   }}
                 >
@@ -240,8 +243,9 @@ export default function AboutPage() {
 
           <h2
             style={{
-              fontFamily: 'var(--font-title)',
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-2xl)',
               letterSpacing: 'var(--tracking-title)',
               color: 'var(--ink)',
@@ -261,7 +265,7 @@ export default function AboutPage() {
               fontSize: 'var(--text-base)',
               color: 'var(--graphite)',
               lineHeight: 1.75,
-              fontWeight: 400,
+              fontWeight: 300,
               margin: 0,
             }}
           >
@@ -289,7 +293,8 @@ export default function AboutPage() {
           <h2
             style={{
               fontFamily: 'var(--font-display)',
-              fontWeight: 400,
+              textTransform: 'uppercase',
+              fontWeight: 500,
               fontSize: 'var(--text-display)',
               letterSpacing: 'var(--tracking-display)',
               color: 'var(--bg)',
@@ -305,7 +310,7 @@ export default function AboutPage() {
               fontSize: 'var(--text-lg)',
               color: 'var(--on-dark)',
               lineHeight: 1.6,
-              fontWeight: 400,
+              fontWeight: 300,
               maxWidth: '480px',
               margin: 0,
             }}

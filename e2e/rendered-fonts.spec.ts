@@ -4,7 +4,7 @@ import { settle } from './support/viewportFit'
 /**
  * **Every piece of text on every page is drawn in a face the site shipped, at a weight and a
  * style it shipped, at a size it means.** ([ADR 050](../docs/adr/050-one-face-means-no-borrowed-ones.md),
- * extended to three voices by [ADR 051](../docs/adr/051-three-voices-one-archive.md))
+ * restated for the original pair by [ADR 052](../docs/adr/052-the-original-pair-on-the-quiet-archive.md))
  *
  * `glyph-coverage.spec.ts` asks whether the *characters* are in the face and whether the face
  * loaded. This asks what Chrome actually used, node by node, which is the only place the
@@ -50,23 +50,18 @@ const ROUTES = [
 ]
 
 /**
- * The three families the loaders ship, and the weights each has a file for. A platform font
- * reports the file's own name (weight and optical size included: "Bodoni Moda 96pt", "DM Sans
- * 9pt Medium"), so {@link family} reduces it to the family before it is looked up here.
+ * The two families the loaders ship, and the weights each has a file for. A platform font
+ * reports the file's own name (weight and optical size included: "DM Sans 9pt Medium", "Barlow
+ * Condensed Medium"), so {@link family} reduces it to the family before it is looked up here.
+ * There is no 400 in DM Sans: a request for one is answered with the 500, and the weight check
+ * below is what turns that from a quiet substitution into a failure.
  */
 const SHIPPED: Record<string, number[]> = {
-  'Bodoni Moda': [400],
-  'DM Sans': [400, 500],
+  'DM Sans': [300, 500],
   'Barlow Condensed': [400, 500],
 }
 /** `--text-xs`'s minimum, 0.7rem: the smallest text the site sets (unit test: type-system-floor). */
 const FLOOR_PX = 11
-/**
- * The 96pt Bodoni cut is drawn for display sizes, where its hairlines are meant to be fine; below
- * this the same hairlines break up and the 24pt cut is the right one. The smallest display size
- * token is 38.4px, so a 96pt cut under 36px is a heading that took the wrong token (ADR 051).
- */
-const DISPLAY_CUT_MIN_PX = 36
 
 interface Drawn {
   tag: string
@@ -75,6 +70,7 @@ interface Drawn {
   weight: number
   style: string
   size: number
+  transform: string
   fonts: { familyName: string; isCustomFont: boolean }[]
 }
 
@@ -82,11 +78,6 @@ const family = (platformName: string) =>
   platformName
     .replace(/\s+(Regular|Medium|Bold|Light|Italic|Book)$/i, '')
     .replace(/\s+\d+pt$/i, '')
-/** The optical size a platform name carries ("Bodoni Moda 96pt Regular" → 96), or null. */
-const opticalSize = (platformName: string): number | null => {
-  const match = platformName.match(/\s(\d+)pt(?:\s|$)/i)
-  return match ? Number(match[1]) : null
-}
 
 /** What Chrome drew every text-bearing element in, with what its CSS asked for. */
 async function drawn(page: Page): Promise<Drawn[]> {
@@ -117,6 +108,7 @@ async function drawn(page: Page): Promise<Drawn[]> {
         weight: Number(cs.fontWeight),
         style: cs.fontStyle,
         size: Number.parseFloat(cs.fontSize),
+        transform: cs.textTransform,
       })
     }
     return out
@@ -155,20 +147,22 @@ async function drawn(page: Page): Promise<Drawn[]> {
 }
 
 /**
- * **Each role is drawn in its own voice, not merely in a face the site ships.** The first rule of
+ * **Each role is drawn in its own face, not merely in a face the site ships.** The first rule of
  * {@link judge} cannot see a heading drawn in the wrong *allowed* face: on 2026-10-09 an unquoted
  * fallback name with a digit in it ("Bodoni 72") invalidated every `font-family: var(--font-display)`,
  * the browser fell back to the inherited family, and every heading and name on the site was drawn in
- * DM Sans. Every other guard passed, because DM Sans is a shipped face. These are the roles whose
- * voice is not in doubt; anything not listed is held only to "a shipped face".
+ * DM Sans. Every other guard passed, because DM Sans is a shipped face. These are the roles whose face
+ * is not in doubt; anything not listed is held only to "a shipped face". `capitals` roles are also
+ * held to the case they are drawn in, because a condensed face set in lower case is a different
+ * typeface to read (ADR 052).
  */
-const VOICES: { match: (r: Drawn) => boolean; family: string; role: string }[] = [
-  { match: (r) => r.tag === 'h1', family: 'Bodoni Moda', role: 'a page title' },
-  { match: (r) => r.cls === 'hj-card-name', family: 'Bodoni Moda', role: 'a piece\'s name' },
-  { match: (r) => r.cls === 'hj-menu-link', family: 'Bodoni Moda', role: 'a menu category' },
-  { match: (r) => r.cls === 'hj-archive-metal-name', family: 'Bodoni Moda', role: 'a metal\'s name in the menu' },
-  { match: (r) => r.cls === 'label-eyebrow', family: 'Barlow Condensed', role: 'an eyebrow label' },
-  { match: (r) => r.cls === 'hj-lockup-text', family: 'Barlow Condensed', role: 'the brand name' },
+const VOICES: { match: (r: Drawn) => boolean; family: string; role: string; capitals?: true }[] = [
+  { match: (r) => r.tag === 'h1', family: 'Barlow Condensed', role: 'a page title', capitals: true },
+  { match: (r) => r.cls === 'hj-card-name', family: 'Barlow Condensed', role: 'a piece\'s name', capitals: true },
+  { match: (r) => r.cls === 'hj-menu-link', family: 'Barlow Condensed', role: 'a menu link', capitals: true },
+  { match: (r) => ['hj-h2', 'hj-registry-name', 'hj-coll-name', 'hj-moment-line'].includes(r.cls), family: 'Barlow Condensed', role: 'a heading', capitals: true },
+  { match: (r) => r.cls === 'hj-lockup-text', family: 'Barlow Condensed', role: 'the brand name', capitals: true },
+  { match: (r) => ['label-eyebrow', 'hj-label', 'hj-spec', 'btn-primary', 'btn-ghost', 'btn-ghost-dark'].includes(r.cls), family: 'DM Sans', role: 'a label or a button', capitals: true },
   // Not `th`: the shipping and materials tables set their column heads as labels, on purpose.
   { match: (r) => ['strong', 'b'].includes(r.tag), family: 'DM Sans', role: 'emphasis' },
 ]
@@ -185,13 +179,13 @@ function judge(rows: Drawn[]): string[] {
       }
       if (!SHIPPED[name].includes(r.weight))
         findings.push(`${where}: asks ${name} for weight ${r.weight}; it ships ${SHIPPED[name].join(' and ')}`)
-      if (name === 'Bodoni Moda' && opticalSize(f.familyName) === 96 && r.size < DISPLAY_CUT_MIN_PX)
-        findings.push(`${where}: ${r.size}px in the 96pt cut; below ${DISPLAY_CUT_MIN_PX}px it is the 24pt cut's size`)
     }
     if (r.fonts.length === 0) findings.push(`${where}: Chrome reports no face drew it`)
     for (const voice of VOICES) {
       if (voice.match(r) && r.fonts.some((f) => family(f.familyName) !== voice.family))
         findings.push(`${where}: ${voice.role} is ${voice.family}, drawn in ${r.fonts.map((f) => `"${f.familyName}"`).join(', ')}`)
+      if (voice.match(r) && voice.capitals && r.transform !== 'uppercase')
+        findings.push(`${where}: ${voice.role} is set in capitals, drawn with text-transform ${r.transform}`)
     }
     if (r.style !== 'normal') findings.push(`${where}: asks for font-style ${r.style}; the site ships no italic`)
     if (r.size < FLOOR_PX) findings.push(`${where}: ${r.size}px, below the ${FLOOR_PX}px label floor`)
@@ -200,9 +194,9 @@ function judge(rows: Drawn[]): string[] {
 }
 
 const EXPLAIN =
-  'The site ships Bodoni Moda (400), DM Sans (400, 500) and Barlow Condensed (400, 500), and nothing ' +
-  'else. A request for a weight or style outside that is faked by the browser, and a system font is ' +
-  'a different typeface on every visitor\'s machine (ADR 050, 051).'
+  'The site ships DM Sans (300, 500) and Barlow Condensed (400, 500), and nothing else. A request for a ' +
+  'weight or style outside that is faked by the browser, and a system font is a different typeface on ' +
+  'every visitor\'s machine (ADR 050, 052).'
 
 test.describe('rendered fonts', () => {
   for (const { path, status, min } of ROUTES) {
@@ -237,7 +231,7 @@ test.describe('rendered fonts', () => {
         // Each loader sets its family on <html>; a control is in the site's faces when its first
         // family is one of those, and in the browser's own (Arial) when it is not.
         const ours = new Set(
-          ['--font-bm96', '--font-bm24', '--font-dm', '--font-dm500', '--font-bc'].map((v) => first(root.getPropertyValue(v)))
+          ['--font-dm', '--font-bc'].map((v) => first(root.getPropertyValue(v)))
         )
         return {
           ours: [...ours],
@@ -248,7 +242,7 @@ test.describe('rendered fonts', () => {
           })),
         }
       })
-      expect(controls.ours.length, 'the loaders set their families on <html>').toBe(5)
+      expect(controls.ours.length, 'the loaders set their families on <html>').toBe(2)
       expect(controls.controls.length, `${path} has controls`).toBeGreaterThan(1)
       expect(
         controls.controls.filter((c) => !c.ours).map((c) => `${path} <${c.tag}> ${c.name}`),

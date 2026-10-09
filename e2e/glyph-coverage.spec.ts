@@ -16,11 +16,10 @@ import { describeWoff2, uncoveredCharacters } from '../src/lib/design/fontFile'
  * And the faces have to arrive. A typeface that 404s, or a loader the stylesheet no longer
  * points at, leaves every page in the fallback and every check above still green, because the
  * characters are measured against the file rather than against the screen. So the second test
- * asks the browser which face it used for each of the three voices (ADR 051), and whether it
- * loaded.
+ * asks the browser which face it used for each role (ADR 052), and whether it loaded.
  *
- * The brand name keeps Barlow Condensed (the owner's ruling, ADR 048), now the label voice as
- * well. The third test holds the logotype to it in both of its places, at the weights it was
+ * The brand name keeps Barlow Condensed (the owner's ruling, ADR 048), which is also the display
+ * voice. The third test holds the logotype to it in both of its places, at the weights it was
  * given: 500 in the header, 400 in the footer.
  */
 
@@ -29,9 +28,7 @@ import { describeWoff2, uncoveredCharacters } from '../src/lib/design/fontFile'
  * on some page, so the safe set is the intersection, not the union.
  */
 const FACE_FILES = [
-  'bodoni-moda-96pt-latin-400.woff2',
-  'bodoni-moda-24pt-latin-400.woff2',
-  'dm-sans-9pt-latin-400.woff2',
+  'dm-sans-9pt-latin-300.woff2',
   'dm-sans-9pt-latin-500.woff2',
   'barlow-condensed-latin-400.woff2',
   'barlow-condensed-latin-500.woff2',
@@ -92,25 +89,23 @@ test.describe('glyph coverage', () => {
     ).toEqual([])
   })
 
-  test('each voice is drawn by its own face, and each face loaded', async ({ page }) => {
+  test('each role is drawn by its own family, and each face loaded', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/')
     await page.evaluate(() => document.fonts.ready)
     const report = await page.evaluate(() => {
       const first = (el: Element | null) => (el ? getComputedStyle(el).fontFamily.split(',')[0].trim().replace(/["']/g, '') : null)
-      // next/font names each face after its loader (`bodoniDisplay`), so the family is read from
-      // the variable the loader sets on <html> rather than spelled here.
+      // next/font names each face after its loader, so the family is read from the variable the
+      // loader sets on <html> rather than spelled here.
       const family = (variable: string) =>
         getComputedStyle(document.documentElement).getPropertyValue(variable).split(',')[0].trim().replace(/["']/g, '')
       const expected = {
-        display: family('--font-bm96'),
-        title: family('--font-bm24'),
+        display: family('--font-bc'),
         body: family('--font-dm'),
-        label: family('--font-bc'),
       }
       const roles = {
         display: first(document.querySelector('h1')),
-        title: first(document.querySelector('.hj-card-name')),
+        name: first(document.querySelector('.hj-card-name')),
         body: first(document.querySelector('main p')),
         label: first(document.querySelector('.label-eyebrow')),
         nav: first(document.querySelector('header .hj-icon-btn, header .hj-menu-btn')),
@@ -123,19 +118,18 @@ test.describe('glyph coverage', () => {
 
     expect(Object.values(report.expected).every(Boolean), `a loader set no family: ${JSON.stringify(report.expected)}`).toBe(true)
     expect(Object.values(report.roles), 'a role found no element to measure').not.toContain(null)
-    expect(report.roles.display, 'the hero heading is the 96pt cut').toBe(report.expected.display)
-    expect(report.roles.title, 'a piece name is the 24pt cut').toBe(report.expected.title)
+    expect(report.roles.display, 'the hero heading is Barlow Condensed').toBe(report.expected.display)
+    expect(report.roles.name, 'a piece name is Barlow Condensed').toBe(report.expected.display)
     expect(report.roles.body, 'running text is DM Sans').toBe(report.expected.body)
-    expect(report.roles.label, 'an eyebrow is Barlow Condensed').toBe(report.expected.label)
-    expect(report.roles.nav, 'the bar\'s controls are Barlow Condensed').toBe(report.expected.label)
+    expect(report.roles.label, 'an eyebrow is DM Sans').toBe(report.expected.body)
+    expect(report.roles.nav, 'the bar\'s controls are DM Sans').toBe(report.expected.body)
 
     const weightsOf = (name: string) => report.loaded.filter((face) => face.family === name).map((face) => face.weight).sort()
-    expect(weightsOf(report.expected.display), `display faces loaded: ${JSON.stringify(report.loaded)}`).toEqual(['400'])
-    expect(weightsOf(report.expected.title), `title faces loaded: ${JSON.stringify(report.loaded)}`).toEqual(['400'])
-    expect(weightsOf(report.expected.body), `body faces loaded: ${JSON.stringify(report.loaded)}`).toEqual(['400'])
+    expect(weightsOf(report.expected.display), `display faces loaded: ${JSON.stringify(report.loaded)}`).toEqual(['400', '500'])
+    expect(weightsOf(report.expected.body), `body faces loaded: ${JSON.stringify(report.loaded)}`).toEqual(['300', '500'])
   })
 
-  test('the brand name is set in the label voice at the weights it was given, and both weights loaded', async ({ page }) => {
+  test('the brand name is set in Barlow Condensed at the weights it was given, and both weights loaded', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/')
     await page.evaluate(() => document.fonts.ready)
@@ -154,7 +148,7 @@ test.describe('glyph coverage', () => {
       return { brandFamily, names, loaded }
     })
 
-    expect(report.brandFamily, 'the label loader\'s family').toMatch(/barlow/i)
+    expect(report.brandFamily, 'the display loader\'s family').toMatch(/barlow/i)
     expect(report.names.map((n) => n.family), 'the header and footer logotypes').toEqual([report.brandFamily, report.brandFamily])
     // As the name was set before the Songmont reference: 500 in the header, 400 in the footer.
     expect(report.names.map((n) => n.weight)).toEqual(['500', '400'])

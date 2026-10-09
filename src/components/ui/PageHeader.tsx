@@ -9,12 +9,12 @@ import type { CSSProperties } from 'react'
  * site actually downloads. Centralising the definition is what stops that
  * recurring — a page can no longer invent a heading treatment by accident.
  *
- * Weight is deliberately fixed at 400 and not exposed as a prop: Bodoni Moda ships one weight,
+ * Weight is deliberately fixed at 500 and not exposed as a prop: it is the display weight,
  * and anything else would be synthesised by the browser, smearing the strokes of the nearest
- * face until the page reads as a different typeface. The **cut** follows the size, because a
- * didone's hairlines are drawn for the size it is set at: the display variant is the 96pt
- * cut, the compact variant the 24pt one (ADR 051). `typography-weights.test.ts` enforces that
- * no code asks for a weight the loader does not provide, and that a size and a cut agree.
+ * face until the page reads as a different typeface. Both variants are Barlow Condensed in
+ * tracked capitals (ADR 052); they differ in size and tracking, not in face.
+ * `typography-weights.test.ts` enforces that no code asks for a weight the loader does not
+ * provide and that every display style declares its weight and its case.
  */
 
 /**
@@ -40,15 +40,17 @@ interface PageHeaderProps {
 const VARIANT_STYLES: Record<PageHeaderVariant, CSSProperties> = {
   display: {
     fontFamily: 'var(--font-display)',
-    fontWeight: 400,
+    textTransform: 'uppercase',
+    fontWeight: 500,
     fontSize: 'var(--text-display)',
     letterSpacing: 'var(--tracking-display)',
     lineHeight: 1.05,
     marginBottom: '32px',
   },
   compact: {
-    fontFamily: 'var(--font-title)',
-    fontWeight: 400,
+    fontFamily: 'var(--font-display)',
+    textTransform: 'uppercase',
+    fontWeight: 500,
     fontSize: 'var(--text-2xl)',
     letterSpacing: 'var(--tracking-title)',
     lineHeight: 1.1,
