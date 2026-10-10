@@ -53,8 +53,12 @@ like the catalogue and the claims, so a malformed one fails the build, and it is
 **3. Provenance is a field, and its rules are enforced.** A `photographed` image must name real catalogue pieces and
 every handle must exist. An `ai-generated` image names none, because it cannot depict a real piece. An `approved` rights or
 consent state needs a reviewer and a date. **No agent writes an `approved` state.** The current record says what the bytes
-say: `ai-generated`, rights `unreviewed`. It is an interim; replacing it with photography of the actual pieces is one
-record edit and at most two files, and is an owner gate in `STATE.md`.
+say: `ai-generated`, rights `unreviewed`. It is an interim; replacing it with photography of the actual pieces is a
+record edit and at most two files **and a re-measure**: the hero's floor, the copy veil's strength and the short-phone
+bounds are values in `globals.css` that were set by measuring this photograph, not fields of the record, so a new
+photograph moves them and the rendered-pixel and edge-viewport specs are what say where. It is an owner gate in `STATE.md`.
+(Carrying them per crop in the record would make the swap one edit; that was weighed and deferred, because they have to be
+measured again with the new image either way.)
 
 **4. The card is a variant, not a doctrine.** `variant: "card"` keeps ADR 013's opaque, bounded card
 (`--hj-hero-card-max-ratio`) for a crop whose photograph has no safe zone for copy; `variant: "overlay"` lays the copy on
@@ -69,7 +73,7 @@ strength is a token (`--hj-veil-bar` for the header's, `--hj-veil-copy` for the 
 
 **6. The header's tone is data, its veil is its own, and its state comes from the hero.** `headerTone` is `light` (light
 type on a darkened band) or `dark` (ink on a light band of the page ground). The band is drawn by the header itself
-(`.hj-header::before`, only while it overlays the hero), at the viewport's top edge wherever the page is scrolled, in
+(its own background, only while it overlays the hero), at the viewport's top edge wherever the page is scrolled, in
 the type's opposite colour, at a strength that clears AA over pure black and over pure white (`header-veil.test.ts`
 computes it for both tones), because the bar cannot know what is under it. The rendered-pixel test measures the worst
 pixel behind the bar's own type (MENU, the brand name, SEARCH, CONTACT), its search glyph (3:1) and its focus ring, at
@@ -94,7 +98,9 @@ control is never hidden by it (WCAG 2.4.11). Its copy and its logic are unchange
 moved its copy by the notice's whole height a few hundred milliseconds after a first visit's first paint. A script at the
 top of `<body>` (`CONSENT_PREPAINT_SCRIPT`, in `consent.ts`, held equal to `readConsent` by `consent-prepaint.test.ts`)
 therefore reserves an estimate (`--hj-consent-reserve`, by width) when nobody has answered, and the notice replaces it with
-its real height or gives it back.
+its real height or gives it back. It does so on the home page only: the script is in the root layout and so in every
+document, but only `/` lays a hero above the notice, and elsewhere its storage read would sit ahead of the first paint for
+a room nothing uses (those pages get the notice's own figure after hydration, as they did before it existed).
 
 **10. The frame floor becomes a subject floor.** ADR 021's "at least half of the source frame" is replaced by: at every
 width the record's subject box is at least 90% visible after the cover crop, and none of it lies under the copy. It is
@@ -181,9 +187,12 @@ What the numbers decided:
 - **The focal points** are 80% by 40% for the narrow crop and 69% by 45% for the wide one; the subject (face and hair) is the
   box from 62% to 84% across and 4% to 36% down. At 390×844 the narrow crop shows about a quarter of the photograph's width,
   and the whole subject is inside it.
-- **The consent notice's room is its layout position, not its painted one.** Read from the painted box it was 23px short
-  while the notice was still in its entrance animation, and nothing resizes when the animation ends, so the observer never
-  corrected it; an action sat 21px under the notice at 375×667. `offsetTop` does not move.
+- **The consent notice's room is its layout height plus the gap beneath it, not its painted position.** Read from the painted
+  box it was 23px short while the notice was still in its entrance animation, and nothing resizes when the animation ends,
+  so the observer never corrected it; an action sat 21px under the notice at 375×667. `offsetHeight` and the computed
+  `bottom` do not move with the animation, nor with how far the page is scrolled, and they do not depend on what an engine
+  says the offset of a fixed box is relative to (the CSSOM names the initial containing block; only Chromium's answer was
+  checked), which an earlier reading of `offsetTop` did.
 - **A test's own sampler was wrong twice, and both looked like the page's fault**: a ghost button's own light border, curving
   through the sampled corner at 2.625 device pixels per CSS pixel, was read as the backdrop of light type (found at 900px on
   a phone, missed at 390px by which pixels a stride of three landed on); and a focus ring was measured against itself because

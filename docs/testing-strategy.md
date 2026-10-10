@@ -673,7 +673,7 @@ where the two used to diverge. What it asks, and why each could not be asked bef
   a transform animation, so its painted top is lower than its layout top until the animation ends, and
   nothing resizes when it does. Its published height was 23px short, and a hero action sat under the
   notice on a short phone. `analytics.test.ts` makes `getBoundingClientRect` lie by the animation's
-  offset so that only `offsetTop` can pass.
+  offset so that only the layout height and the computed `bottom` can pass.
 
 ### …and legibility is not composition
 

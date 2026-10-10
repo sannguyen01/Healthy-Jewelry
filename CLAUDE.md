@@ -172,7 +172,7 @@ in `DESIGN.md`, "Reference: Songmont" — read that before changing a token, a s
 - Nav: three states, and the state is a fact about the page, not a distance scrolled
   ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)). `hero-overlay` lies over the hero, on `/`
   alone (`<Nav heroTone=… />`), with light type on a darkened band or ink on a light one as the hero
-  record's `headerTone` says (the band is the bar's own, `.hj-header::before`, strong enough for any
+  record's `headerTone` says (the band is the bar's own background, strong enough for any
   backdrop and to hide what scrolls under it: `header-veil.test.ts`); `solid` is `--bg` with a hairline, which every other page is from its
   first byte and `/` becomes once the hero's own end marker (`[data-hero-end]`, read by
   `useHeroOverlay`) has passed the top; `menu-open` is the flat bar over the archive, with `main` and
@@ -253,8 +253,9 @@ change all three together.
      image's provenance. The provenance rules are in the schema: a photographed image names real
      pieces, an AI-origin one names none, an approval names a person and a date, and no agent writes an
      `approved` state. The current photograph is an **interim** (its embedded manifest says an
-     algorithm made it, and it shows jewellery that is not ours); replacing it is one record edit and
-     an owner gate in `STATE.md`.
+     algorithm made it, and it shows jewellery that is not ours); replacing it is a record edit,
+     a re-measure (the hero's floor, the copy veil's strength and the short-phone bounds are tokens and media
+     queries in `globals.css`, tuned to this photograph) and an owner gate in `STATE.md`.
    - Variants: `overlay` lays the copy on a veil as tall as the copy plus a fade (light type, a
      ground-coloured primary button, a light focus ring: an `--ink` ring and button vanish on a dark
      surface); `card` is the opaque, hairlined, bounded card of

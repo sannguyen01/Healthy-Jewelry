@@ -33,6 +33,13 @@ user-visible or architecturally significant changes.
   the space around its sentence and its buttons (its words and its buttons are untouched). The shortest phones (320×568, and a
   360-wide screen under about 634px) still lose part of the actions to the notice until it is answered.
 
+- **After a simplification review**: the bar's veil is the bar's own background (no pseudo-element, and the change to and
+  from the solid state now fades); the page reserves the notice's room before the first paint only on the home page, where
+  a hero rides above it, and the room is the notice's height plus the gap beneath it, a measure that does not depend on how
+  an engine reports the offset of a fixed box; the hero record takes its date, reviewer and handle rules from the claims
+  schema instead of copying them; running text on all fourteen pages is held to the same last-line rule as the home page,
+  with the two legal-page exceptions on record; and the browser specs share their helpers instead of pasting them.
+
 ## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
 
 - **The merge gate is proven.** The repaired ruleset read back conclusive. Then the v2 canary

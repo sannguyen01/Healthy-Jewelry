@@ -18,7 +18,8 @@ once, and the consent notice publishes the room it takes so the copy rides above
   signed manifest from Google naming a trained-algorithmic source, and the hero shows gold shell and sun necklaces, rings
   and bangles, not titanium, niobium or 316L pieces. The record states what the bytes state (`origin: ai-generated`, rights
   `unreviewed`). Replacing it with photography of the actual pieces (a landscape and a portrait, rights and consent
-  recorded, product handles named) is one record edit and at most two files; **until then a phone shows a quarter of
+  recorded, product handles named) is a record edit, at most two files and a re-measure of the hero's floor, veil and short-phone bounds (they are in
+  `globals.css`, tuned to this photograph); **until then a phone shows a quarter of
   a 1376-pixel-wide landscape, scaled over three times**. The other three images carry the same marker and have no record
   yet.
 - **Rights and consent states are yours to write.** The schema refuses an approval with no named person and no date, and
