@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   CONSENT_OPEN_EVENT,
+  CONSENT_ROOM_PROPERTY,
   readConsent,
   writeConsent,
   shouldAskForConsent,
@@ -31,9 +32,6 @@ import {
  * the banner and then hiding it would flash it at every returning visitor who
  * already answered — so it stays null until the stored choice has been read.
  */
-/** The custom property the notice writes on the root while it is showing; the hero and the document read it. */
-const CONSENT_ROOM_PROPERTY = '--hj-consent-h'
-
 export function ConsentBanner() {
   const [consent, setConsent] = useState<ConsentState | null>(null)
   // How many times "Measurement preferences" has asked for the prompt since it last closed:
@@ -73,15 +71,24 @@ export function ConsentBanner() {
   // much (`--hj-consent-h`) and the document's `scroll-padding-bottom` keeps a focused control clear of it
   // (WCAG 2.4.11). Measured from the notice's layout top edge to the bottom of the screen, so the gap beneath it
   // counts; rounded up, so the room is never under-reserved. Taken back the moment the notice goes.
+  //
+  // Before this runs the page has already reserved an estimate when nobody had answered
+  // (`CONSENT_PREPAINT_SCRIPT`, so the hero does not move when the notice arrives), and this replaces it with the
+  // real figure. Once the stored answer has been read and nobody is being asked, any estimate is given back.
   useEffect(() => {
-    const el = dialog.current
-    if (!showing || !el) return
     const root = document.documentElement
+    const el = dialog.current
+    if (!showing || !el) {
+      if (consent !== null) root.style.removeProperty(CONSENT_ROOM_PROPERTY)
+      return
+    }
     const publish = () => {
       // `offsetTop`, not `getBoundingClientRect().top`: the notice enters with a `translateY` animation, so its
       // painted top is 24px low until the animation ends, and nothing resizes when it does, so the observer
       // never re-reads it. The layout position is the one that does not move (measured: the room was
-      // published 23px short, and the hero's action sat 21px under the notice at 375×667).
+      // published 23px short, and the hero's action sat 21px under the notice at 375×667). It is the notice's
+      // place in the viewport also once the page has scrolled and the prompt is reopened from the footer
+      // (analytics.spec.ts reopens it there and compares the figure with where the browser put the notice).
       const room = Math.max(0, Math.ceil(window.innerHeight - el.offsetTop))
       root.style.setProperty(CONSENT_ROOM_PROPERTY, `${room}px`)
     }
@@ -94,7 +101,7 @@ export function ConsentBanner() {
       window.removeEventListener('resize', publish)
       root.style.removeProperty(CONSENT_ROOM_PROPERTY)
     }
-  }, [showing])
+  }, [showing, consent])
 
   if (consent === null || !showing) return null
 

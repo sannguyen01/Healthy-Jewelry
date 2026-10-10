@@ -152,6 +152,14 @@
     /* The space left under the copy, before the consent notice's own height is added. */
     --hj-hero-pad-b: clamp(32px, 4vw, 64px);
 
+    /* The consent notice's room (its height plus the gap beneath it), estimated, for the moment before it has measured
+       itself. A script at the top of <body> reserves this when nobody has answered (CONSENT_PREPAINT_SCRIPT) so the hero
+       does not move when the notice arrives after hydration; the notice then replaces it with the real figure. One
+       value per band the notice wraps differently in, from the measured room at 320 to 1440px (264 at 320, 243 from 340
+       to 375, 221 to 225 from 390 to 600, 242 at 768, 249 at 900, 254 to 260 above): within about ten pixels of the real
+       one at every width, which e2e/analytics.spec.ts holds to by measuring the copy's travel. */
+    --hj-consent-reserve: 258px;
+
     /* How strongly the veils darken (or lighten) what is behind them at their strongest edge. A veil is a
        legibility device, not a palette filter (ADR 054): its strength is set by the lowest contrast measured
        under the text it protects, by e2e/hero-legibility.spec.ts, and not by eye.
@@ -242,6 +250,20 @@
        The site is flat (a hairline, not a shadow). The one thing that floats, the consent notice, has
        this: ink at 8%, derived from the token so a palette change moves it. */
     --shadow-float: 0 8px 40px color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+
+  /* The consent notice's estimated room, by band (see --hj-consent-reserve). */
+  @media (max-width: 900px) {
+    :root { --hj-consent-reserve: 250px; }
+  }
+  @media (max-width: 768px) {
+    :root { --hj-consent-reserve: 242px; }
+  }
+  @media (max-width: 600px) {
+    :root { --hj-consent-reserve: 232px; }
+  }
+  @media (max-width: 359px) {
+    :root { --hj-consent-reserve: 254px; }
   }
 
   /* ── Base Reset ── */

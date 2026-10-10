@@ -4,6 +4,7 @@ import './globals.css'
 import { SITE_DEFAULT_TITLE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/config/site'
 import { buildStamp } from '@/config/build-info'
 import { ConsentBanner } from '@/components/layout/ConsentBanner'
+import { CONSENT_PREPAINT_SCRIPT } from '@/lib/analytics/consent'
 
 /**
  * **The original pair, self-hosted** (ADR 052): Barlow Condensed for the display voice and the brand
@@ -137,6 +138,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
+      // A script in the body writes one custom property on this element before the first paint
+      // (CONSENT_PREPAINT_SCRIPT), which React did not render.
+      suppressHydrationWarning
       data-scroll-behavior="smooth"
       className={[barlowCondensed, dmSans].map((f) => f.variable).join(' ')}
       style={
@@ -162,6 +166,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="hj-build" content={buildStamp()} />
       </head>
       <body>
+        {/*
+          Before anything the hero is part of is painted: when nobody has answered the consent notice, reserve the
+          room it will take, so the hero's copy does not move when the notice arrives after hydration. A fixed,
+          static string (no user input), read from consent.ts, the same file that decides who is asked.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: CONSENT_PREPAINT_SCRIPT }} />
         {/* WCAG 2.4.1: the first stop of every page, off screen until it takes focus. */}
         <a href="#main" className="btn-primary hj-skip">
           Skip to content

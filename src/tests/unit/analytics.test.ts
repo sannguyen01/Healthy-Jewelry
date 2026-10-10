@@ -498,6 +498,23 @@ describe('the notice publishes the room it takes (ADR 054)', () => {
     expect(published()).toBe('100px')
   })
 
+  it('replaces the estimate the page reserved before first paint with the real figure', () => {
+    // CONSENT_PREPAINT_SCRIPT reserves an estimate (a reference to the token) when nobody has answered; the notice's
+    // own measurement takes its place, so the hero is trimmed to the notice, not left at a guess.
+    document.documentElement.style.setProperty(PROPERTY, 'var(--hj-consent-reserve)')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+  })
+
+  it('gives the estimate back when the stored answer says nobody is being asked', () => {
+    // The page reserved a room because it could not tell, the answer turns out to be stored: the room goes, rather
+    // than staying as an empty band above the bottom of the hero for a visitor who will never see a notice.
+    writeConsent(localStorage, 'denied')
+    document.documentElement.style.setProperty(PROPERTY, 'var(--hj-consent-reserve)')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('')
+  })
+
   it('publishes it when the prompt is reopened from the footer, and takes it back after', () => {
     writeConsent(localStorage, 'granted')
     render(createElement(ConsentBanner))
