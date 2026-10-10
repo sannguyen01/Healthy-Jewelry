@@ -508,22 +508,67 @@ test.describe('Hero — conditions a visitor brings', () => {
   test.describe('forced colours', () => {
     test.use({ contextOptions: { reducedMotion: 'reduce', forcedColors: 'active' } })
 
-    test('the copy sits on an opaque surface when the browser drops gradients and backgrounds', async ({ page }) => {
+    /**
+     * What the copy is set on, in forced colours. The browser drops gradients and most backgrounds, so the veil
+     * under the copy is gone and the photograph is directly behind it; the copy must bring an opaque surface of
+     * its own. The search stops *below* the section: `.hj-hero` itself has an opaque ground (`--bg`) that is not
+     * behind the copy at all, because the photograph is a sibling layer between them. The first version of this
+     * test walked every ancestor up to the body, found that section, and could not fail.
+     */
+    const copySurface = (page: Page) =>
+      page.evaluate(() => {
+        const h1 = document.querySelector('main > section h1')
+        const section = h1?.closest('section')
+        if (!h1 || !section) throw new Error('no hero headline')
+        const parse = (value: string) => {
+          const m = value.match(/rgba?\(([^)]+)\)/)
+          const parts = m ? m[1].split(',').map((x) => Number.parseFloat(x)) : [0, 0, 0, 0]
+          return { alpha: parts[3] ?? 1, colour: `rgb(${parts[0]}, ${parts[1]}, ${parts[2]})` }
+        }
+        let surface: Element | null = null
+        for (let n: Element | null = h1; n && n !== section; n = n.parentElement) {
+          if (parse(getComputedStyle(n).backgroundColor).alpha >= 0.99) { surface = n; break }
+        }
+        const copy = [
+          h1,
+          ...Array.from(section.querySelectorAll('.label-eyebrow, p, a')),
+        ]
+        return {
+          surface: surface ? { colour: parse(getComputedStyle(surface).backgroundColor).colour, name: String(surface.className) } : null,
+          text: getComputedStyle(h1).color,
+          everyNodeInside: surface ? copy.every((node) => surface!.contains(node)) : false,
+          sectionAlpha: parse(getComputedStyle(section).backgroundColor).alpha,
+        }
+      })
+
+    test('the copy sits on an opaque surface of its own when the browser drops gradients and backgrounds', async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await page.goto('/')
       await settleHero(page)
-      const surfaces = await page.evaluate(() => {
-        const h1 = document.querySelector('main > section h1')
-        const out: Array<{ tag: string; alpha: number }> = []
-        for (let n: Element | null = h1; n && n.tagName !== 'BODY'; n = n.parentElement) {
-          const m = getComputedStyle(n).backgroundColor.match(/rgba?\(([^)]+)\)/)
-          const parts = m ? m[1].split(',').map((s) => Number.parseFloat(s)) : [0, 0, 0, 0]
-          out.push({ tag: n.tagName.toLowerCase() + (n.className ? '.' + String(n.className).split(' ')[0] : ''), alpha: parts[3] ?? 1 })
-        }
-        return out
+      const found = await copySurface(page)
+      expect(found.surface, 'an opaque ancestor of the headline, inside the section').not.toBeNull()
+      expect(found.everyNodeInside, 'the headline, eyebrow, sentence and both actions are all on that surface').toBe(true)
+      const ratio = contrastRatioFromLuminance(
+        relativeLuminance(parseCssColor(found.text)),
+        relativeLuminance(parseCssColor(found.surface!.colour))
+      )
+      expect(ratio, `${found.text} on ${found.surface!.colour} (the system's own pair)`).toBeGreaterThanOrEqual(4.5)
+    })
+
+    test('the check above can fail: with the copy\'s own surface removed it finds none, though the section is opaque', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto('/')
+      await settleHero(page)
+      await page.addStyleTag({
+        content: '@media (forced-colors: active) { .hj-hero-content, .hj-hero-copy { background-color: transparent !important; } }',
       })
-      const opaque = surfaces.find((s) => s.alpha >= 0.99)
-      expect(opaque, `no ancestor of the headline has an opaque background in forced colours: ${JSON.stringify(surfaces)}`).toBeTruthy()
+      // Two frames: the style change is a change of computed value, and a computed value read in the frame it was
+      // made can still be the old one when anything on the element transitions.
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+      const found = await copySurface(page)
+      // The section's own ground is opaque: that is exactly what let the first version of the test pass for ever.
+      expect(found.sectionAlpha, 'the section has an opaque ground that is not behind the copy').toBeGreaterThanOrEqual(0.99)
+      expect(found.surface, 'no surface of the copy\'s own once the rule is neutralised').toBeNull()
     })
   })
 
