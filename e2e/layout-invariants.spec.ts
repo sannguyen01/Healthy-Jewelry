@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test, expect, type Page } from './support/test'
-import { OVERHANG_TOLERANCE_PX, settle } from './support/viewportFit'
+import { afterPaint, OVERHANG_TOLERANCE_PX, settle } from './support/viewportFit'
 
 /**
  * Layout invariants that a visual restyle (calmer, editorial, one listing crop, consistent
@@ -376,8 +376,17 @@ interface Indicator {
   boxShadow: string
 }
 
-/** Reads the focused element's own computed indicator. globals.css: `:focus-visible` = 2px solid ink, 3px offset. */
+/**
+ * Reads the focused element's own computed indicator. globals.css: `:focus-visible` = 2px solid ink, 3px offset.
+ *
+ * It waits for the focus to be painted first. This file runs under reduced motion, which turns every transition into a
+ * 0.01ms one, and a computed style read in the same task as `focus()` still holds the value from before the change: in
+ * the Chromium this container ships (1194), a product card's link read an outline of 0 at the instant of focus and
+ * passed a frame later, so the case failed about two attempts in three here and never in CI, on `main` as on this
+ * branch (STATE.md). What is asked is what a visitor sees once the page has drawn, so the read waits for the draw.
+ */
 async function activeIndicator(page: Page): Promise<Indicator> {
+  await afterPaint(page)
   return page.evaluate(() => {
     const el = document.activeElement as HTMLElement
     const s = getComputedStyle(el)
