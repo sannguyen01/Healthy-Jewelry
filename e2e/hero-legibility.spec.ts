@@ -46,14 +46,15 @@ import { heroMedia } from '../src/lib/catalog'
  * two compositions used to diverge, so the pair is the regression test for it.
  *
  * `clearsNotice` is declared, not measured: whether the header, the copy and the consent notice can share the screen
- * at scroll 0. On the two shortest phones they cannot, however the hero is built: the notice is fixed to the bottom of
- * the viewport and the copy is not, and their copy alone (about 350px with the sentence on two lines) is taller than the
- * room they have between the header and the notice (about 260 and 310px). At 375×667 they can, and since 2026-10-10 they
- * do: the hero's floor used to put its bottom, and the copy anchored above it, 53px below that screen's fold, and the gaps
- * between the lines were fixed; on a screen 600 to 700px tall the floor goes and the gaps close up (globals.css, the
- * short-phone block), which leaves the copy 24px clear of the notice. Deriving the expectation from the measurement it
- * judges would make the strict check unfalsifiable, so a hero that stopped lifting its copy would quietly be tested by
- * the weaker one.
+ * at scroll 0. On the shortest phones they cannot, however the hero and the notice are built: the notice is fixed to the
+ * bottom of the viewport and the copy is not, and the copy alone (about 350px with the sentence on two lines) plus the
+ * header and the notice's own sentence and buttons need more than 568px (320 wide) or about 634px (360 wide). At 375×667
+ * and 360×640 they can, and since 2026-10-10 they do. The hero's floor used to put its bottom, and the copy anchored above
+ * it, 53px below a 667px screen's fold, and the gaps between the lines were fixed; on a screen 600 to 700px tall the floor
+ * goes and the gaps close up, and on one 700px or less the notice tightens its own padding (not its sentence or its
+ * buttons), by about 26px (globals.css: the short-phone block and the notice's short-screen block). That leaves the copy 24px
+ * clear of the notice at 375×667 and 6px clear at 360×640. Deriving the expectation from the measurement it judges would
+ * make the strict check unfalsifiable, so a hero that stopped lifting its copy would quietly be tested by the weaker one.
  */
 const VIEWPORTS = [
   { label: '320×568 — smallest phone', width: 320, height: 568, clearsNotice: false },
@@ -62,7 +63,7 @@ const VIEWPORTS = [
   // already has, so these are still eleven widths.
   { label: '360×599 — one pixel under the short-phone block', width: 360, height: 599, clearsNotice: false },
   { label: '360×600 — the short-phone block\'s lower edge', width: 360, height: 600, clearsNotice: false },
-  { label: '360×640 — small Android', width: 360, height: 640, clearsNotice: false },
+  { label: '360×640 — small Android', width: 360, height: 640, clearsNotice: true },
   { label: '375×667 — iPhone SE', width: 375, height: 667, clearsNotice: true },
   { label: '390×700 — the short-phone block\'s upper edge', width: 390, height: 700, clearsNotice: true },
   { label: '390×701 — one pixel over the short-phone block', width: 390, height: 701, clearsNotice: true },
@@ -496,17 +497,17 @@ test.describe('Hero — the bar over the extremes', () => {
 })
 
 /**
- * **What scrolls under the bar shows through at most 12%**, so the band reads as flat. Legible type on a band that is
+ * **What scrolls under the bar shows through at most 6%**, so the band reads as flat. Legible type on a band that is
  * visibly not flat is still a defect: with the veil at 72% (the strength AA alone asks for) the hero's sentence passing
  * under the bar printed through the brand mark on a phone. The measure needs no photograph and no copy: it puts pure white
  * and then pure black under the bar and compares the two renders pixel by pixel. Whatever the veil lets through is the
  * most any backdrop can change a pixel, glyph pixels included (they are opaque in both renders, so they differ by nothing).
  * header-veil.test.ts holds the token to the same figure; this holds what the browser drew.
  */
-test.describe('Hero — what scrolls under the bar shows through at most 12%', () => {
+test.describe('Hero — what scrolls under the bar shows through at most 6%', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
-  const SHOW_THROUGH_MAX = 0.12
+  const SHOW_THROUGH_MAX = 0.06
   /** Two levels of slack for the colour mix's rounding. */
   const SLACK_LEVELS = 2
 
@@ -558,6 +559,38 @@ test.describe('Hero — what scrolls under the bar shows through at most 12%', (
         ).toBeLessThanOrEqual(allowed)
       })
     }
+  }
+})
+
+/**
+ * **The bar's veil ends where the bar does.** It used to fade out over two more bar-heights below the bar, to soften its edge.
+ * That fade is painted over whatever lies under it, the hero's copy included, so on a short phone, where the copy rests just
+ * under the bar, the eyebrow sat inside it and was drawn at about a third of its contrast. The worst-pixel test could not see
+ * that: it measures the pixels *behind* a word against the word's own colour, and a veil painted over the word attenuates the
+ * word itself. A band that ends with the bar cannot reach anything the copy-below-the-bar check has already kept clear of it,
+ * so this asserts the extent of what is drawn, in the browser.
+ */
+test.describe('Hero — the bar\'s veil ends where the bar does', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  for (const viewport of [
+    { width: 360, height: 640 },
+    { width: 390, height: 844 },
+    { width: 1280, height: 900 },
+  ]) {
+    test(`${viewport.width}×${viewport.height}: the veil is no taller than the bar`, async ({ page, context }) => {
+      await denyConsent(context)
+      await page.setViewportSize(viewport)
+      await page.goto('/')
+      await settleHero(page)
+      const { veil, bar, state } = await header(page).evaluate((el) => ({
+        veil: Number.parseFloat(getComputedStyle(el, '::before').height),
+        bar: el.getBoundingClientRect().height,
+        state: el.getAttribute('data-state'),
+      }))
+      expect(state, 'the bar is over the hero').toBe('hero-overlay')
+      expect(veil, `the veil is ${veil}px tall and the bar ${bar}px: the rest is painted over the copy under it`).toBeLessThanOrEqual(bar + 0.5)
+    })
   }
 })
 

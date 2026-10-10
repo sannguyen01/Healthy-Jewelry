@@ -177,16 +177,24 @@
        one at every width, which e2e/analytics.spec.ts holds to by measuring the copy's travel. */
     --hj-consent-reserve: 258px;
 
+    /* The notice's own spacing: its padding, the gap between its sentence and its buttons, and its distance from the
+       bottom of the screen. Tokens so that a screen too short to share with the hero's copy can tighten them (the
+       short-screen block below the estimates); the sentence and the buttons are the same size everywhere. */
+    --hj-consent-pad: clamp(18px, 3vw, 24px);
+    --hj-consent-gap: 14px;
+    --hj-consent-bottom: clamp(16px, 3vw, 32px);
+
     /* How strongly the veils darken (or lighten) what is behind them at their strongest edge. A veil is a
        legibility device, not a palette filter (ADR 054): its strength is set by the lowest contrast measured
        under the text it protects, by e2e/hero-legibility.spec.ts, and not by eye.
        The first is the header's own. The bar cannot know what scrolls under it, so it must clear AA over black
        and over white (src/tests/unit/header-veil.test.ts proves it for both tones: 60% cleared the dark tone
        and not the light), and it must hide what is under it: at 72%, the figure AA alone asked for, 28% of the
-       hero's sentence came through and printed across the brand mark on a phone. So no more than 12% may show
-       through (88%), held in the browser by e2e/hero-legibility.spec.ts. The second is the hero copy's, set
+       hero's sentence came through and printed across the brand mark on a phone, and at 88% (12%) it was still
+       faintly there over "MENU" and the logo on a dark photograph. So no more than 6% may show through (94%), held
+       in the browser by e2e/hero-legibility.spec.ts. The second is the hero copy's, set
        against the photograph it lies on. */
-    --hj-veil-bar: 88%;
+    --hj-veil-bar: 94%;
     --hj-veil-copy: 72%;
 
     /* The step between one hero line's entrance and the next. */
@@ -284,6 +292,30 @@
   }
   @media (max-width: 359px) {
     :root { --hj-consent-reserve: 254px; }
+  }
+
+  /* The notice on a screen too short to share with the hero's copy (ADR 054). On a 640px phone the header, the copy and the
+     notice need 20px more than the screen has, and the notice covered the end of the copy ("Our story") until it was
+     answered. Its sentence and its buttons are untouched (consent copy and logic are not this change's); only the
+     space around them tightens, by about 26px, which leaves the copy clear with room to spare on a 640px phone. */
+  @media (max-width: 900px) and (max-height: 700px) {
+    :root {
+      --hj-consent-pad: 12px;
+      --hj-consent-gap: 8px;
+      --hj-consent-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+      /* Its estimated room, by band, as it is now (measured at 320 to 900px: 238 at 320, 217 at 340 to 360, 195 to 197
+         from 375 to 600, 197 to 200 above): within the 16px the first-visit shift test allows at every width. */
+      --hj-consent-reserve: 200px;
+    }
+  }
+  @media (max-width: 768px) and (max-height: 700px) {
+    :root { --hj-consent-reserve: 198px; }
+  }
+  @media (max-width: 600px) and (max-height: 700px) {
+    :root { --hj-consent-reserve: 206px; }
+  }
+  @media (max-width: 359px) and (max-height: 700px) {
+    :root { --hj-consent-reserve: 228px; }
   }
 
   /* ── Base Reset ── */
@@ -798,10 +830,13 @@
   /* The bar over the hero carries its own veil (ADR 054). It is an overlay for as long as any of the hero is under
      it, not only at the top of the page: after the first screen it lies over the hero's copy and the veil beneath
      it, and a veil the hero provided at its own top edge was gone by then. So the surface is the bar's, drawn at the
-     viewport's top edge wherever the page is scrolled: full strength through the bar's height, fading out below it.
+     viewport's top edge wherever the page is scrolled: one flat band exactly as tall as the bar, with no fade below it. It
+     faded out over two more bar-heights once, to soften its edge, and a fade is painted over whatever is under it, the
+     hero's copy included: on a short phone the eyebrow rests just under the bar and was drawn at about a third of its
+     contrast, which no pixel-behind-the-word test can see (hero-legibility.spec.ts measures the veil's extent instead).
      Its colour is the type's opposite, ink under light type (`light` tone) and the ground under ink (`dark`), and
      its strength is the worst case, AA over black and over white (header-veil.test.ts), because the bar does not
-     know what is under it, and strong enough that no more than 12% of what scrolls under it shows through, so the
+     know what is under it, and strong enough that no more than 6% of what scrolls under it shows through, so the
      band reads as flat (the same test; the browser half is in hero-legibility.spec.ts). Gone once the header is
      solid, which has a ground of its own. */
   .hj-header[data-bar-tone="light"] {
@@ -815,13 +850,9 @@
     left: 0;
     right: 0;
     z-index: -1;
-    height: calc(var(--header-height) * 3);
+    height: var(--header-height);
     pointer-events: none;
-    background-image: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--hj-bar-veil) var(--hj-veil-bar), transparent) var(--header-height),
-      transparent
-    );
+    background-color: color-mix(in srgb, var(--hj-bar-veil) var(--hj-veil-bar), transparent);
   }
 
   /* The type follows the tone: light type on a darkened band for a `light` tone, ink on a light one for `dark`.

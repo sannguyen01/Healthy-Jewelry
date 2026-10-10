@@ -23,13 +23,15 @@ user-visible or architecturally significant changes.
   The old "half the frame" floor became a subject floor. The narrow crop is always an overlay.
 - **Found on the way**: the interim photograph carries a trained-algorithmic provenance marker and shows jewellery that is not
   ours; it is recorded and gated, not hidden.
-- **After a design review**: the bar no longer lets the hero's copy print across the brand mark (no more than an eighth of
-  what scrolls under it shows through; held by a unit test on the token and a browser test on the rendered bar), and
+- **After a design review**: the bar no longer lets the hero's copy print across the brand mark (no more than 6% of what
+  scrolls under it shows through; held by a unit test on the token and a browser test on the rendered bar), its veil is one
+  flat band as tall as the bar (a fade below it was painted over the copy resting under the bar on the shortest phones), and
   headings, the eyebrow and running text ask the browser not to leave a word alone on a last line (`text-wrap`, measured
   on the rendered words at six widths).
-- **The consent notice no longer covers "Our story" on an iPhone SE** (375×667): on a screen 600 to 700px tall the hero
-  is the screen and not 53px more, and the gaps between its lines close up. The two shorter phones, whose copy alone is
-  taller than the room they have, still lose part of the actions to the notice until it is answered.
+- **The consent notice no longer covers "Our story" on an iPhone SE or a 360×640 phone**: on a screen 600 to 700px tall the
+  hero is the screen and not 53px more and the gaps between its lines close up, and on one 700px or less the notice tightens
+  the space around its sentence and its buttons (its words and its buttons are untouched). The shortest phones (320×568, and a
+  360-wide screen under about 634px) still lose part of the actions to the notice until it is answered.
 
 ## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
 

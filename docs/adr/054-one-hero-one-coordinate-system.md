@@ -188,11 +188,11 @@ What the numbers decided:
   through the sampled corner at 2.625 device pixels per CSS pixel, was read as the backdrop of light type (found at 900px on
   a phone, missed at 390px by which pixels a stride of three landed on); and a focus ring was measured against itself because
   the capture beat the repaint that hid it.
-- **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (the two shortest:
-  320×568 and 360×640) the actions cannot all be above it. The requirement there is the honest one: a focused action is not
-  hidden, its centre is clear of the notice (WCAG 2.4.11 asks that it not be entirely hidden), and answering the notice returns
-  the room. The third short phone, 375×667 (an iPhone SE), was first listed with them, on the claim that no hero construction
-  could clear the notice there. That was wrong, and it is corrected under "After the design review" below.
+- **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (320×568, and a 360-wide
+  screen under about 634px) the actions cannot all be above it. The requirement there is the honest one: a focused action is
+  not hidden, its centre is clear of the notice (WCAG 2.4.11 asks that it not be entirely hidden), and answering the notice
+  returns the room. 375×667 (an iPhone SE) and 360×640 were first listed with them, on the claim that no hero construction could
+  clear the notice there. That was wrong, and it is corrected under "After the design review" below.
 
 ## After the independent review
 
@@ -250,7 +250,7 @@ image and no undersized target. It found the page's edges disagreeing with thems
   misalignment, and are the designer's to change; the follow-up band is centred where the others are left-aligned.
 
 The bar's legibility is also measured now over pure white and pure black in both tones (eight cases), so it no longer depends on the
-interim photograph; whether the copy can clear the consent notice is declared per viewport (the two shortest phones cannot)
+interim photograph; whether the copy can clear the consent notice is declared per viewport (the shortest phones cannot)
 and asserted, where it had been derived from the measurement it judged; and the evidence script gained the state the first
 matrix never visited, the headline under the bar.
 
@@ -271,11 +271,19 @@ this change's own scope that the earlier passes had accepted or not seen.
   behind the type, and at the strength it asked for more than a quarter of whatever scrolled under the bar came through, so
   on a phone the hero's sentence passing under it lay across the lockup, legible type on a band that was not flat. The
   earlier note called it an accepted trade-off. It is a defect with a cheap fix, and the fix is a second statement about the
-  same token: no more than an eighth of the backdrop may show through (`--hj-veil-bar` is 88%). The unit test holds the token to
+  same token: no more than 6% of the backdrop may show through (`--hj-veil-bar` is 94%; the first figure was an eighth, 88%,
+  and the sentence was still faintly there over "MENU" and the logo on a dark photograph). The unit test holds the token to
   it, and the browser test holds what was drawn: it puts pure white and then pure black under the bar and compares the two
   renders pixel by pixel (the most a backdrop can change a pixel is what the veil lets through; the test failed at 71 of 255
-  before and passes now, in both tones, at 390 and 1280, in both projects). The fade below the bar was left at its length: a
-  shorter one drew a band edge across the subject's hair.
+  before and passes now, in both tones, at 390 and 1280, in both projects).
+- **The veil's fade was painted over the copy.** The bar's veil faded out over two more bar-heights below the bar, to soften
+  its edge. A fade is painted over whatever is under it, and on a short phone (360×640, 320×568) the hero's copy rests just
+  under the bar, so the eyebrow sat inside it and was drawn at about a third of its contrast. No pixel test saw it: the
+  worst-pixel check measures what is *behind* a word against the word's own colour, and a veil painted over the word
+  attenuates the word itself. It was latent from the first version of the bar's veil and the 88% made it worse. The veil is
+  now one flat band exactly as tall as the bar, and the browser test reads the extent of what is drawn (the veil's height
+  against the bar's: 192px against 64px before, equal now). An earlier note here said a shorter fade drew a band edge across
+  the subject's hair; with no fade the edge is the bar's own, at its bottom, above the hair.
 - **Lines ended on one word.** Nothing in the stylesheet asked the browser to care where a line ends, so at 390px the
   hero's eyebrow broke after "316L" and left "STEEL" alone, and sentences left "specification.", "relationship.", "steel."
   and "piece." on their own lines (a dozen across six widths). Headings and the eyebrow now ask for `balance`, running text
@@ -288,13 +296,16 @@ this change's own scope that the earlier passes had accepted or not seen.
 Left to the owner, because each is a decision and not a defect: the photographs show gold and shell jewellery rather than the three
 metals, and the phone crop is a visible upscale; the care band shows the claims gate's neutral fallback as its only emphatic
 text (claims are a named reviewer's, never an agent's); the phone overlay's veil makes the lower half of the first screen
-perceptually dark where the desktop card is alabaster; the first-visit consent notice covers part of the hero's actions on
-the two shortest phones (the notice's own layout or copy would have to change, and consent is outside this change); a badge
-on every card of the strip carries no signal; and the materials' chips repeat their subtitles.
+perceptually dark where the desktop card is alabaster (prototyped: an alabaster veil with ink type washes the photograph out and
+leaves the eyebrow nearly illegible where the veil fades in, so it is not a drop-in and needs a different veil and probably a
+different photograph); the first-visit consent notice covers part of the hero's actions on 320×568 and on a 360-wide screen
+under about 634px (the sentence and the buttons the notice must show, with the header and the copy, need more than those screens
+have; only a shorter consent copy or a smaller body sentence would change it, and those are not this change's); a badge on every
+card of the strip carries no signal; and the materials' chips repeat their subtitles.
 
 One of the items first left to the owner turned out not to be one, and the earlier claim behind it was wrong.
 
-- **The notice covered "Our story" at 375×667, and the hero could be built so that it did not.** The hero was at least 720px
+- **The notice covered "Our story" at 375×667 and 360×640, and the page could be built so that it did not.** The hero was at least 720px
   tall, so on a 667px screen its bottom, and the copy anchored 275px above it, lay 53px below the fold: the copy ended at
   445px while the notice, fixed to the screen's bottom, began at 424px. The earlier text said no construction of the hero could
   clear it. For this screen one can: on a screen 600 to 700px tall the floor is dropped (the hero is the screen, and still
@@ -303,4 +314,10 @@ One of the items first left to the owner turned out not to be one, and the earli
   48px, fits above the notice with 24px to spare, and the declaration for that viewport flipped to "clears" (it failed
   first: "declared to fit above the notice and does not"). The block is bounded below at 600px on a measurement: with it,
   320×568 put the eyebrow across 223×13px of the subject's face, the failure the floor's own comment recorded when the
-  first brief's 640 did the same on the two narrowest phones. The two phones whose copy alone exceeds the room are unchanged.
+  first brief's 640 did the same on the two narrowest phones. 360×640 needed more than the hero could give: its copy ends 19px
+  below the notice's top. So the notice, on a screen 700px tall or less, tightens the space around its sentence and its
+  buttons (padding 12px, gap 8px, 8px from the bottom edge, and the bottom edge's safe-area inset where there is one: about
+  26px in all). Its words and its buttons are untouched, and consent's logic is not read or written. That clears 360×640 by
+  6px (it failed first: the declaration flipped, then the first-visit shift test failed at 375×667, 37px, until the pre-paint
+  estimates followed the shorter notice: 200, 198, 206 and 228px by width band, measured at 320 to 900px). 320×568 and a
+  360-wide screen under about 634px are unchanged: the sentence, the buttons, the header and the copy need more than they have.
