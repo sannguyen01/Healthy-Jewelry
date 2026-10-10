@@ -37,6 +37,7 @@ describe('the pre-paint reservation', () => {
   })
   afterEach(() => {
     vi.restoreAllMocks()
+    window.history.pushState({}, '', '/')
     localStorage.clear()
     root().style.removeProperty(CONSENT_ROOM_PROPERTY)
   })
@@ -82,6 +83,23 @@ describe('the pre-paint reservation', () => {
     expect(() => run(CONSENT_PREPAINT_SCRIPT)).not.toThrow()
     expect(shouldAskForConsent(readConsent(window.localStorage))).toBe(true)
     expect(reserved()).toBe('var(--hj-consent-reserve)')
+  })
+
+  it('does nothing off the home page, where no hero rides above the notice and the read would only delay the first paint', () => {
+    // `/` is the one page whose first screen is laid out above the notice; every other route gets the real figure from the
+    // notice after hydration, exactly as before the reservation existed. The read is not made at all, not made and ignored.
+    const read = vi.spyOn(Storage.prototype, 'getItem')
+    for (const path of ['/shop', '/shop/rings', '/products/arc-hoops-titanium', '/about', '/this-page-does-not-exist']) {
+      window.history.pushState({}, '', path)
+      root().style.removeProperty(CONSENT_ROOM_PROPERTY)
+      run(CONSENT_PREPAINT_SCRIPT)
+      expect(reserved(), `on ${path}`).toBe('')
+    }
+    expect(read, 'no storage read off the home page').not.toHaveBeenCalled()
+    window.history.pushState({}, '', '/?utm_source=mail')
+    run(CONSENT_PREPAINT_SCRIPT)
+    expect(reserved(), 'the home page with a query string is still the home page').toBe('var(--hj-consent-reserve)')
+    window.history.pushState({}, '', '/')
   })
 
   it('does not throw where there is no storage object at all', () => {

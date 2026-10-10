@@ -26,14 +26,9 @@
  */
 
 import { z } from 'zod'
+import { isoDate, productHandle, reviewer } from './claims-schema'
 
 const unit = z.number().min(0).max(1)
-const isoDate = z.iso.date()
-const reviewer = z.string().trim().min(3)
-
-const productHandle = z
-  .string()
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'a product handle is a lowercase kebab-case slug')
 
 /**
  * The least a subject box may span, on each axis, as a fraction of the source. The browser tests hold a crop to

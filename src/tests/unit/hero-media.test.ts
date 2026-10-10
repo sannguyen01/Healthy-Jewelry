@@ -74,18 +74,22 @@ describe('the committed hero record', () => {
     expect(heroMedia()).toEqual(loadHeroMedia(rawHeroMedia, known))
   })
 
+  // Both crops may name one file (today they do); it is read once.
+  const bytesBySrc = new Map<string, Buffer>()
+  const bytesOf = (src: string): Buffer => {
+    if (!bytesBySrc.has(src)) bytesBySrc.set(src, readFileSync(resolve(ROOT, 'public' + src)))
+    return bytesBySrc.get(src)!
+  }
+
   it('declares the width and height of the file each crop names', () => {
     for (const crop of [heroMedia().desktop, heroMedia().mobile]) {
-      const bytes = readFileSync(resolve(ROOT, 'public' + crop.src))
-      expect({ width: crop.width, height: crop.height }, crop.src).toEqual(imageSize(bytes))
+      expect({ width: crop.width, height: crop.height }, crop.src).toEqual(imageSize(bytesOf(crop.src)))
     }
   })
 
   it('does not call an image photographed when the manifest inside its bytes says an algorithm made it', () => {
     for (const crop of [heroMedia().desktop, heroMedia().mobile]) {
-      const bytes = readFileSync(resolve(ROOT, 'public' + crop.src))
-      const algorithmic = Buffer.from(bytes).includes('trainedAlgorithmicMedia')
-      if (algorithmic) {
+      if (bytesOf(crop.src).includes('trainedAlgorithmicMedia')) {
         expect(heroMedia().provenance.origin, `${crop.src} carries an algorithmic-source manifest`).toBe('ai-generated')
       }
     }

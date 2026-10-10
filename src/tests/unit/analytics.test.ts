@@ -15,6 +15,7 @@ import {
   analyticsAllowed,
   shouldAskForConsent,
   CONSENT_STORAGE_KEY,
+  CONSENT_ROOM_PROPERTY,
   CONSENT_OPEN_EVENT,
   openConsentPreferences,
   type AnalyticsEvent,
@@ -416,27 +417,41 @@ describe('consent can be withdrawn from the site', () => {
 
 describe('the notice publishes the room it takes (ADR 054)', () => {
   // The hero's copy rides above a bottom-anchored notice, so the page needs to know how much of the screen the
-  // notice occupies: from its top edge (its layout position, which an entrance transform does not move) to the
-  // bottom of the viewport, which includes the gap beneath it.
-  const PROPERTY = '--hj-consent-h'
+  // notice occupies: its own height plus the gap beneath it (its `bottom`). Both are layout facts that do not depend
+  // on where the page is scrolled or on how an engine reports the offset of a fixed box, and neither moves while the
+  // notice's entrance transform plays (measured: reading the painted top published a room 23px short).
+  const PROPERTY = CONSENT_ROOM_PROPERTY
   const published = () => document.documentElement.style.getPropertyValue(PROPERTY)
 
-  let top = 600
+  let height = 200
+  let bottom = 44
   let resizeCallback: (() => void) | undefined
 
   beforeEach(() => {
     localStorage.removeItem(CONSENT_STORAGE_KEY)
     document.documentElement.style.removeProperty(PROPERTY)
-    top = 600
+    height = 200
+    bottom = 44
     resizeCallback = undefined
-    Object.defineProperty(window, 'innerHeight', { value: 844, configurable: true })
-    // The layout position, not the painted one: the notice enters with a `translateY` animation, and a box
-    // measured mid-entrance is 24px low (the published room was 23px short when it read getBoundingClientRect).
-    // So the rect is made to lie about where the notice is, and only `offsetTop` tells the truth.
+    // The painted box is made to lie (24px low, as it is mid-entrance, and nowhere near its layout place), so only the
+    // layout height and the computed `bottom` tell the truth, and the figure cannot come from the rect.
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-      () => ({ top: top + 24, bottom: top + 224, height: 200, left: 0, right: 0, width: 0, x: 0, y: top + 24, toJSON: () => ({}) }) as DOMRect
+      () => ({ top: 999, bottom: 1199, height: 200, left: 0, right: 0, width: 0, x: 0, y: 999, toJSON: () => ({}) }) as DOMRect
     )
-    vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(() => top)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => height)
+    const computedStyle = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const style = computedStyle(element, pseudo)
+      // jsdom does not resolve `var()`, so the notice's `bottom` (a token) is told to it as the browser would resolve it.
+      if (!(element instanceof HTMLElement) || element.getAttribute('role') !== 'dialog') return style
+      return new Proxy(style, {
+        get: (target, property) => {
+          if (property === 'bottom') return `${bottom}px`
+          const value = Reflect.get(target, property, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+    })
     vi.stubGlobal(
       'ResizeObserver',
       class {
@@ -456,7 +471,7 @@ describe('the notice publishes the room it takes (ADR 054)', () => {
     document.documentElement.style.removeProperty(PROPERTY)
   })
 
-  it('writes the space from the notice\'s top edge to the bottom of the screen while it is showing', () => {
+  it('writes the notice\'s height plus the gap beneath it while it is showing', () => {
     render(createElement(ConsentBanner))
     expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeTruthy()
     expect(published()).toBe('244px')
@@ -484,18 +499,41 @@ describe('the notice publishes the room it takes (ADR 054)', () => {
 
   it('follows the notice when its size changes (a longer line, a rotated phone)', () => {
     render(createElement(ConsentBanner))
-    top = 500
+    height = 300
     act(() => resizeCallback?.())
     expect(published()).toBe('344px')
   })
 
-  it('follows the window when it is resized', () => {
+  it('follows the gap beneath the notice when the window is resized (a rotated phone has a different inset)', () => {
     render(createElement(ConsentBanner))
-    Object.defineProperty(window, 'innerHeight', { value: 700, configurable: true })
+    bottom = 20
     act(() => {
       window.dispatchEvent(new Event('resize'))
     })
-    expect(published()).toBe('100px')
+    expect(published()).toBe('220px')
+  })
+
+  it('does not depend on the height of the screen, which a bottom-anchored box does not move with', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 844, configurable: true })
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+    Object.defineProperty(window, 'innerHeight', { value: 520, configurable: true })
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(published()).toBe('244px')
+  })
+
+  it('never publishes less than the room it measured, even from a fractional gap', () => {
+    bottom = 8.4
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('209px')
+  })
+
+  it('publishes the height alone where the gap cannot be read (a stylesheet that does not resolve it)', () => {
+    bottom = Number.NaN
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('200px')
   })
 
   it('replaces the estimate the page reserved before first paint with the real figure', () => {

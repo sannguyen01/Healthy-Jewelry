@@ -25,7 +25,7 @@ interface HeroProps {
 const percent = (n: number): string => `${Math.round(n * 10000) / 100}%`
 
 /** The corner the copy sits in, as a grid alignment. */
-const gridEdge = (zone: 'bottom-start' | 'bottom-end'): string => (zone === 'bottom-end' ? 'end' : 'start')
+const gridEdge = (zone: HeroMedia['desktop']['copyZone']): string => (zone === 'bottom-end' ? 'end' : 'start')
 
 /**
  * The copy card's ceiling (ADR 013): a fraction of the photograph it sits on, so that the protection that

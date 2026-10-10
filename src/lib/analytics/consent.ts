@@ -93,9 +93,15 @@ export const CONSENT_ROOM_PROPERTY = '--hj-consent-h'
  *
  * The notice itself decides what is shown. If this reserved a room and the notice finds an answer, the notice gives
  * it back (`ConsentBanner`), so a disagreement costs a shift, never a stuck gap.
+ *
+ * It does nothing off the home page. The script is in the root layout, so it is in every document, but only `/` lays
+ * a hero above the notice; elsewhere the read would be a synchronous storage access ahead of the first paint for a
+ * room nothing uses. Those routes get the real figure from the notice after hydration, as they did before. A visitor
+ * who arrives on another page and navigates to `/` has the notice's own figure by then (the notice is in the layout,
+ * so it outlives the navigation), and React does not run a script it creates on the client.
  */
 export const CONSENT_PREPAINT_SCRIPT =
-  '(function(){var r=document.documentElement,p=' +
+  "(function(){if(location.pathname!=='/')return;var r=document.documentElement,p=" +
   JSON.stringify(CONSENT_ROOM_PROPERTY) +
   ',v;try{v=window.localStorage.getItem(' +
   JSON.stringify(CONSENT_STORAGE_KEY) +

@@ -69,8 +69,8 @@ export function ConsentBanner() {
   // While the notice is up, tell the page how much of the screen it takes (ADR 054). It is anchored to the
   // bottom, and the hero's copy sits in the lower part of its first screen, so the hero rides above it by this
   // much (`--hj-consent-h`) and the document's `scroll-padding-bottom` keeps a focused control clear of it
-  // (WCAG 2.4.11). Measured from the notice's layout top edge to the bottom of the screen, so the gap beneath it
-  // counts; rounded up, so the room is never under-reserved. Taken back the moment the notice goes.
+  // (WCAG 2.4.11). The room is the notice's own height plus the gap beneath it (its `bottom`), rounded up, so the
+  // room is never under-reserved. Taken back the moment the notice goes.
   //
   // Before this runs the page has already reserved an estimate when nobody had answered
   // (`CONSENT_PREPAINT_SCRIPT`, so the hero does not move when the notice arrives), and this replaces it with the
@@ -84,13 +84,13 @@ export function ConsentBanner() {
     }
     let published = -1
     const publish = () => {
-      // `offsetTop`, not `getBoundingClientRect().top`: the notice enters with a `translateY` animation, so its
-      // painted top is 24px low until the animation ends, and nothing resizes when it does, so the observer
-      // never re-reads it. The layout position is the one that does not move (measured: the room was
-      // published 23px short, and the hero's action sat 21px under the notice at 375×667). It is the notice's
-      // place in the viewport also once the page has scrolled and the prompt is reopened from the footer
-      // (analytics.spec.ts reopens it there and compares the figure with where the browser put the notice).
-      const room = Math.max(0, Math.ceil(window.innerHeight - el.offsetTop))
+      // Height and gap, not a position: `offsetHeight` and the computed `bottom` are layout facts, so neither moves
+      // while the notice's entrance `translateY` plays (reading the painted top published a room 23px short, and the
+      // hero's action sat 21px under the notice at 375×667), and neither depends on how far the page has scrolled or on
+      // what an engine says `offsetTop` of a fixed box is relative to (the CSSOM names the initial containing block, and
+      // only Chromium's answer has been checked). A `bottom` that does not resolve to a length counts as no gap.
+      const gap = Number.parseFloat(window.getComputedStyle(el).bottom)
+      const room = Math.max(0, Math.ceil(el.offsetHeight + (Number.isFinite(gap) ? gap : 0)))
       // An unchanged figure is not written: the property is inherited by the whole document, so a write restyles it,
       // and the observer's first callback and a phone's toolbar resizing both arrive with the number already right.
       if (room === published) return
