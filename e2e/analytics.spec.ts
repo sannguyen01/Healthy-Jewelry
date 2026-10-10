@@ -285,6 +285,7 @@ test.describe('Analytics consent', () => {
         // emit (the Pixel 7 emulation reported none for a hero that had visibly moved); a box that moved, moved.
         w.__copyTop = { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY }
         const sample = () => {
+          if ((w as unknown as { __stopSampling?: boolean }).__stopSampling) return
           const el = document.querySelector('.hj-hero-content')
           if (el) {
             const top = el.getBoundingClientRect().top + window.scrollY
@@ -309,12 +310,23 @@ test.describe('Analytics consent', () => {
       await page.goto('/')
       await expect(consentNotice(page)).toBeVisible()
       await animationsFinished(page)
-      await page.waitForTimeout(1500)
+      // Settled means the things that can still move the page have happened, not that a fixed time has gone by (it was a
+      // 1500ms sleep: dead time across six widths and two projects on a fast runner, and a shift later than that unseen on a
+      // slow one). Fonts have swapped in, the photograph has decoded, and two frames have drawn since the notice arrived and
+      // trimmed its estimate to its measured height.
+      await page.evaluate(async () => {
+        await document.fonts.ready
+        const photograph = document.querySelector<HTMLImageElement>('.hj-hero-media img')
+        if (photograph) await photograph.decode().catch(() => undefined)
+      })
+      await afterPaint(page)
       const { total, shifts, travelled } = await page.evaluate(() => {
         const w = window as unknown as {
           __shifts: Array<{ value: number; at: number; moved: string[] }>
           __copyTop: { min: number; max: number }
+          __stopSampling?: boolean
         }
+        w.__stopSampling = true // the per-frame sampler has what it was for
         return {
           total: w.__shifts.reduce((sum, s) => sum + s.value, 0),
           shifts: w.__shifts,
