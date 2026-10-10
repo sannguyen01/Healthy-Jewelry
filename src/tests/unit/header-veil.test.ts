@@ -87,24 +87,18 @@ describe('the header\'s veil over the hero', () => {
     ).toBeLessThanOrEqual(SHOW_THROUGH_MAX + 1e-9) // 1 - 0.94 is 0.06000000000000005 in floating point
   })
 
-  it('is drawn by the header itself, only while it overlays the hero, behind the bar\'s own content', () => {
-    const rule = css.match(/\.hj-header\[data-state="hero-overlay"\]::before \{([^}]*)\}/)
-    expect(rule, 'a ::before on the overlay header').not.toBeNull()
-    const body = rule![1]
-    expect(body).toMatch(/content:\s*""/)
-    expect(body).toMatch(/position:\s*absolute/)
-    expect(body).toMatch(/z-index:\s*-1/)
-    expect(body).toMatch(/pointer-events:\s*none/)
-    expect(body).toMatch(/var\(--hj-bar-veil\)\s+var\(--hj-veil-bar\)/)
+  it('is the overlay header\'s own background, so it is as tall as the bar and no taller', () => {
+    // It was a pseudo-element with the bar's own box once the fade below the bar was taken out; a surface that is
+    // exactly its owner's box is its owner's background. Doing it that way also lets the state change fade, because the
+    // header already transitions `background-color`, which a pseudo-element appearing and disappearing did not.
+    const rule = css.match(/\.hj-header\[data-state="hero-overlay"\] \{([^}]*)\}/)
+    expect(rule, 'a rule for the overlay header').not.toBeNull()
+    expect(rule![1]).toMatch(/background-color:\s*color-mix\(in srgb,\s*var\(--hj-bar-veil\)\s+var\(--hj-veil-bar\),\s*transparent\)/)
+    expect(css, 'nothing is drawn by a pseudo-element of the header').not.toMatch(/\.hj-header[^{,]*::(?:before|after)/)
   })
 
   it('takes its colour from the header\'s own tone, ground for dark type and ink for light', () => {
     expect(css).toMatch(/\.hj-header \{[^}]*--hj-bar-veil:\s*var\(--bg\)/)
     expect(css).toMatch(/\.hj-header\[data-bar-tone="light"\] \{[^}]*--hj-bar-veil:\s*var\(--ink\)/)
-  })
-
-  it('is no longer drawn by the hero, which has nothing to say about the bar', () => {
-    expect(css).not.toMatch(/--hj-top-veil/)
-    expect(css).not.toMatch(/data-header-tone/)
   })
 })

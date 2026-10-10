@@ -819,7 +819,7 @@
   }
 
   .hj-header[data-state="hero-overlay"] {
-    background-color: transparent;
+    background-color: color-mix(in srgb, var(--hj-bar-veil) var(--hj-veil-bar), transparent);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     border-bottom: none;
@@ -827,32 +827,20 @@
     color: var(--ink);
   }
 
-  /* The bar over the hero carries its own veil (ADR 054). It is an overlay for as long as any of the hero is under
-     it, not only at the top of the page: after the first screen it lies over the hero's copy and the veil beneath
-     it, and a veil the hero provided at its own top edge was gone by then. So the surface is the bar's, drawn at the
-     viewport's top edge wherever the page is scrolled: one flat band exactly as tall as the bar, with no fade below it. It
-     faded out over two more bar-heights once, to soften its edge, and a fade is painted over whatever is under it, the
-     hero's copy included: on a short phone the eyebrow rests just under the bar and was drawn at about a third of its
-     contrast, which no pixel-behind-the-word test can see (hero-legibility.spec.ts measures the veil's extent instead).
-     Its colour is the type's opposite, ink under light type (`light` tone) and the ground under ink (`dark`), and
-     its strength is the worst case, AA over black and over white (header-veil.test.ts), because the bar does not
-     know what is under it, and strong enough that no more than 6% of what scrolls under it shows through, so the
-     band reads as flat (the same test; the browser half is in hero-legibility.spec.ts). Gone once the header is
-     solid, which has a ground of its own. */
+  /* The bar over the hero carries its own veil (ADR 054): its background, above. It is an overlay for as long as any of
+     the hero is under it, not only at the top of the page: after the first screen it lies over the hero's copy and the
+     veil beneath it, and a veil the hero provided at its own top edge was gone by then. So the surface is the bar's,
+     at the viewport's top edge wherever the page is scrolled, one flat band exactly as tall as the bar and with nothing
+     below it. A fade below the bar was tried and is painted over whatever is under it, the hero's copy included: on a
+     short phone the eyebrow rests just under the bar and was drawn at about a third of its contrast, which no
+     pixel-behind-the-word test can see. Being the bar's own background is what rules it out (hero-legibility.spec.ts
+     asserts that nothing else is drawn). Its colour is the type's opposite, ink under light type (`light` tone) and the
+     ground under ink (`dark`), and its strength is the worst case, AA over black and over white (header-veil.test.ts),
+     because the bar does not know what is under it, and strong enough that no more than 6% of what scrolls under it
+     shows through, so the band reads as flat (the same test; the browser half is in hero-legibility.spec.ts). The
+     header's `background-color` transition makes the change to and from `solid` a fade. */
   .hj-header[data-bar-tone="light"] {
     --hj-bar-veil: var(--ink);
-  }
-
-  .hj-header[data-state="hero-overlay"]::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: -1;
-    height: var(--header-height);
-    pointer-events: none;
-    background-color: color-mix(in srgb, var(--hj-bar-veil) var(--hj-veil-bar), transparent);
   }
 
   /* The type follows the tone: light type on a darkened band for a `light` tone, ink on a light one for `dark`.
@@ -1378,7 +1366,7 @@
      e2e/homepage-composition.spec.ts holds every light-to-light seam to it. The dark band draws none:
      its edge is the change of ground. The last band draws none either, because the footer's own
      hairline is the seam below it. A band is laid on a twelve-column grid whose gap and ceiling are
-     the board's (40px, --hj-container), which collapses to one column at the same 900px the hero stacks at. */
+     the board's (40px, --hj-container), which collapses to one column at the 900px where the hero takes its narrow crop. */
   .hj-band {
     background-color: var(--bg);
     padding: var(--space-section) var(--space-gutter);
@@ -1965,7 +1953,7 @@
      rendered-pixel test. It lies under the copy and the clearance below it, plus a fade above, so it is as tall as the
      copy whatever size the copy is (large text, a longer line, a smaller phone): a veil of fixed height cannot do
      that, and the eyebrow, at the top of the copy, ended up on the part of it that had already faded. The bar's
-     own belongs to the bar (.hj-header::before). */
+     own belongs to the bar (its background, .hj-header[data-state="hero-overlay"]). */
   .hj-hero-veil {
     --hj-veil-fade: 8rem;
     grid-row: 2 / 4;
