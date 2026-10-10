@@ -217,3 +217,45 @@ describe('the breakpoints are the documented ones', () => {
     expect([...css.matchAll(/@media[^{]*\((?:max|min)-width:\s*\d+px\)/g)].length).toBeGreaterThan(8)
   })
 })
+
+describe('the heights are the documented ones too', () => {
+  /**
+   * A short phone is a different problem from a narrow one: the first screen is as tall as the screen, and the consent
+   * notice is a fixed fraction of it (ADR 054). Two height conditions exist, both combined with `max-width: 900px`, and
+   * they are a pair: the notice tightens its own padding on a screen up to MAX_HEIGHT tall, and the hero closes its
+   * rhythm up the same height and down to MIN_HEIGHT, a floor chosen from the shortest phone where dropping the hero's
+   * minimum put the eyebrow on the subject's face. The hero's range must lie inside the notice's, or the hero compacts
+   * where the notice has not, and the copy lands on the notice again.
+   */
+  const MIN_HEIGHT = [600]
+  const MAX_HEIGHT = [700]
+
+  const heightQueries = (css: string) =>
+    [...css.matchAll(/@media([^{]*\((?:max|min)-height:\s*\d+px\)[^{]*)\{/g)].map((m) => ({
+      query: m[0].replace(/\s*\{$/, ''),
+      min: Number(/min-height:\s*(\d+)px/.exec(m[1])?.[1] ?? NaN),
+      max: Number(/max-height:\s*(\d+)px/.exec(m[1])?.[1] ?? NaN),
+    }))
+
+  it('uses only those heights', () => {
+    const outside = heightQueries(stylesheet()).filter(
+      (q) => (!Number.isNaN(q.min) && !MIN_HEIGHT.includes(q.min)) || (!Number.isNaN(q.max) && !MAX_HEIGHT.includes(q.max))
+    )
+    expect(outside.map((q) => q.query), `Heights are min ${MIN_HEIGHT.join(', ')} and max ${MAX_HEIGHT.join(', ')}.`).toEqual([])
+  })
+
+  it('would notice a height that is not registered (the check can fail)', () => {
+    const rogue = heightQueries('@media (max-width: 900px) and (max-height: 650px) { .x { color: red } }')
+    expect(rogue).toHaveLength(1)
+    expect(MAX_HEIGHT.includes(rogue[0].max)).toBe(false)
+  })
+
+  it('compacts the hero only where the notice has compacted too', () => {
+    const queries = heightQueries(stylesheet())
+    const notice = queries.find((q) => Number.isNaN(q.min))
+    const hero = queries.find((q) => !Number.isNaN(q.min))
+    expect(notice, 'a max-height-only block that tightens the notice').toBeDefined()
+    expect(hero, 'a min- and max-height block that compacts the hero').toBeDefined()
+    expect(hero!.max, `the hero's range (${hero!.query}) must end where the notice's (${notice!.query}) does or sooner`).toBeLessThanOrEqual(notice!.max)
+  })
+})

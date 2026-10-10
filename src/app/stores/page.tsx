@@ -20,7 +20,7 @@ export default function StoresPage() {
         {/* Hero */}
         <section
           style={{
-            paddingTop: '120px',
+            paddingTop: 'calc(var(--header-height) + 56px)',
             paddingBottom: 'clamp(64px, 8vw, 120px)',
             paddingLeft: 'clamp(24px, 6vw, 120px)',
             paddingRight: 'clamp(24px, 6vw, 120px)',

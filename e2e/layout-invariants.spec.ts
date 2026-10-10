@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test, expect, type Page } from './support/test'
-import { OVERHANG_TOLERANCE_PX, settle } from './support/viewportFit'
+import { afterPaint, OVERHANG_TOLERANCE_PX, settle } from './support/viewportFit'
 
 /**
  * Layout invariants that a visual restyle (calmer, editorial, one listing crop, consistent
@@ -376,20 +376,44 @@ interface Indicator {
   boxShadow: string
 }
 
-/** Reads the focused element's own computed indicator. globals.css: `:focus-visible` = 2px solid ink, 3px offset. */
+/** Whether the reading shows an indicator a visitor can see: a drawn outline, or a shadow standing in for one. */
+const showsIndicator = (ind: Indicator): boolean =>
+  (ind.outlineStyle !== 'none' && ind.outlineWidth > 0) || ind.boxShadow !== 'none'
+
+/**
+ * Reads the focused element's own computed indicator. globals.css: `:focus-visible` = 2px solid ink, 3px offset.
+ *
+ * It waits for the ring to be drawn, not for a fixed number of frames. This file runs under reduced motion, which turns
+ * every transition into a 0.01ms one, and a computed style read in the same task as `focus()` still holds the value from
+ * before the change: in the Chromium this container ships (1194), a product card's link read an outline of 0 at the instant
+ * of focus and passed a frame later, so the case failed about two attempts in three here and never in CI, on `main` as on
+ * this branch (STATE.md). Waiting two frames made it rare, about one run in a hundred, and a flake that rare is the worst
+ * kind to leave. A reading taken on a transition's first frame is not what a visitor sees, so the read is repeated, a frame
+ * at a time, until an indicator shows, up to a deadline; a ring that never appears (or appears only after seconds) still
+ * fails, on the last reading, which is what is reported.
+ */
 async function activeIndicator(page: Page): Promise<Indicator> {
-  return page.evaluate(() => {
-    const el = document.activeElement as HTMLElement
-    const s = getComputedStyle(el)
-    return {
-      tag: el.tagName.toLowerCase(),
-      label: (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 30),
-      focusVisible: el.matches(':focus-visible'),
-      outlineStyle: s.outlineStyle,
-      outlineWidth: parseFloat(s.outlineWidth) || 0,
-      boxShadow: s.boxShadow,
-    }
-  })
+  const read = () =>
+    page.evaluate(() => {
+      const el = document.activeElement as HTMLElement
+      const s = getComputedStyle(el)
+      return {
+        tag: el.tagName.toLowerCase(),
+        label: (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 30),
+        focusVisible: el.matches(':focus-visible'),
+        outlineStyle: s.outlineStyle,
+        outlineWidth: parseFloat(s.outlineWidth) || 0,
+        boxShadow: s.boxShadow,
+      }
+    })
+  const deadline = Date.now() + 2_000
+  await afterPaint(page)
+  let reading = await read()
+  while (!showsIndicator(reading) && Date.now() < deadline) {
+    await afterPaint(page)
+    reading = await read()
+  }
+  return reading
 }
 
 function expectIndicator(ind: Indicator, where: string): void {
@@ -397,10 +421,8 @@ function expectIndicator(ind: Indicator, where: string): void {
     ind.focusVisible,
     `${where}: element did not match :focus-visible (keyboard modality lost): ${JSON.stringify(ind)}`
   ).toBe(true)
-  const hasOutline = ind.outlineStyle !== 'none' && ind.outlineWidth > 0
-  const hasShadow = ind.boxShadow !== 'none'
   expect(
-    hasOutline || hasShadow,
+    showsIndicator(ind),
     `${where}: no visible focus indicator ${JSON.stringify(ind)}`
   ).toBe(true)
 }

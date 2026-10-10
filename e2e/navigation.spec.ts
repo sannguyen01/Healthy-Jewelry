@@ -1,5 +1,8 @@
 import { test, expect, type Locator, type Page } from './support/test'
 import { SITE_NAME } from '../src/config/site'
+import { heroMedia } from '../src/lib/catalog'
+import { denyConsent } from './support/consent'
+import { header, hero } from './support/hero'
 
 /**
  * The search control lives in two places depending on width, and these tests run
@@ -73,8 +76,11 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL('/')
   })
 
-  test('Collection nav link navigates to /shop', async ({ page }) => {
-    const link = page.getByRole('link', { name: /collection/i }).first()
+  test('the hero\'s primary action navigates to the pieces at /shop', async ({ page }) => {
+    // It was "Collection nav link", and resolved to the hero's "Shop Collection" button by accident of its
+    // label: the header has no such link. The control it meant is the hero's primary action (ADR 054 names it
+    // "Explore the pieces"; the label itself is pinned by Hero.test.tsx).
+    const link = hero(page).getByRole('link', { name: /explore the pieces/i })
     await link.click()
     await expect(page).toHaveURL(/\/shop/)
   })
@@ -167,5 +173,80 @@ test.describe('Navigation — mobile menu', () => {
     await page.getByRole('button', { name: /open menu/i }).click()
     await page.getByRole('button', { name: /close menu/i }).click()
     await expect(page.getByRole('dialog', { name: /mobile navigation/i })).not.toBeVisible()
+  })
+})
+
+/**
+ * **The header's state follows the hero it sits over, not a distance scrolled** (ADR 054).
+ *
+ * It read `scrollY > 60` on every route. That is wrong twice: a page with no hero was transparent for its
+ * first 60px, and a hero taller than 60px went solid while the photograph was still under the bar. The state
+ * now comes from the hero's own end marker, so these assert it at the moments the threshold got wrong.
+ */
+test.describe('Header — state follows the hero', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  test.beforeEach(async ({ page, context }) => {
+    await denyConsent(context)
+    await page.setViewportSize({ width: 390, height: 844 })
+  })
+
+  test('on the home page it overlays the hero at the top', async ({ page }) => {
+    await page.goto('/')
+    await expect(header(page)).toHaveAttribute('data-state', 'hero-overlay')
+  })
+
+  test('it says which tone the hero needs, as the record does', async ({ page }) => {
+    await page.goto('/')
+    await expect(header(page)).toHaveAttribute('data-bar-tone', heroMedia().headerTone)
+  })
+
+  test('it is still an overlay well past the old 60px threshold, while the photograph is under it', async ({ page }) => {
+    await page.goto('/')
+    await expect(header(page)).toHaveAttribute('data-state', 'hero-overlay')
+    const reach = await hero(page).evaluate((el) => el.getBoundingClientRect().bottom + window.scrollY)
+    expect(reach, 'the hero is taller than the old threshold plus the header').toBeGreaterThan(300)
+    await page.evaluate(() => window.scrollTo(0, 200))
+    await expect(header(page), 'at 200px the photograph is still behind the bar').toHaveAttribute('data-state', 'hero-overlay')
+  })
+
+  test('it turns solid once the hero has passed', async ({ page }) => {
+    await page.goto('/')
+    const reach = await hero(page).evaluate((el) => el.getBoundingClientRect().bottom + window.scrollY)
+    await page.evaluate((y) => window.scrollTo(0, y + 40), reach)
+    await expect(header(page)).toHaveAttribute('data-state', 'solid')
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await expect(header(page), 'and back to an overlay at the top').toHaveAttribute('data-state', 'hero-overlay')
+  })
+
+  test('a hero taller than the screen does not start solid', async ({ page }) => {
+    // The hero's marker is below the fold here, so "not visible" is not "passed".
+    await page.setViewportSize({ width: 390, height: 480 })
+    await page.goto('/')
+    await expect(header(page)).toHaveAttribute('data-state', 'hero-overlay')
+  })
+
+  test('a page with no hero is solid from the first paint, not after 60px', async ({ page }) => {
+    await page.goto('/about')
+    await expect(header(page)).toHaveAttribute('data-state', 'solid')
+    await expect(header(page)).not.toHaveAttribute('data-bar-tone', /.+/)
+  })
+
+  test('with the menu open it is menu-open, and it returns to the hero state when closed', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: /open menu/i }).click()
+    await expect(header(page)).toHaveAttribute('data-state', 'menu-open')
+    await page.keyboard.press('Escape')
+    await expect(header(page)).toHaveAttribute('data-state', 'hero-overlay')
+  })
+
+  test('while the menu is open the page behind it is inert, so the dialog is a true modal', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.locator('main')).not.toHaveAttribute('inert', /.*/)
+    await page.getByRole('button', { name: /open menu/i }).click()
+    await expect(page.locator('main'), 'main is inert while the menu is open').toHaveAttribute('inert', /.*/)
+    await expect(page.locator('footer').first()).toHaveAttribute('inert', /.*/)
+    await page.keyboard.press('Escape')
+    await expect(page.locator('main'), 'and it is restored when the menu closes').not.toHaveAttribute('inert', /.*/)
   })
 })

@@ -4,6 +4,43 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-10-10 — One hero, one coordinate system (ADR 054)
+
+- **The phone hero opens as the photograph**, not as a page header over it: one image-led composition on every width,
+  with the header and the copy layered inside it. The crop for a wide screen and a narrow one, the box the subject
+  occupies, the copy corner and the variant are a validated record (`src/content/hero/home.json`), and the record states
+  where the photograph came from. The hero is a server component; its entrance is CSS.
+- **The header's state follows the hero**, not `scrollY > 60`: over the hero on the home page, solid from the first byte
+  everywhere else, inert page behind the open menu. `--header-height` is written once.
+- **The consent notice publishes the room it takes**, so the hero's copy rides above it and a focused control is never
+  hidden by it. A script at the top of `<body>` reserves an estimate before the first paint when nobody has answered, so a
+  first visit's hero does not move when the notice arrives (it moved by the notice's whole height before).
+- **The header carries its own veil**, so it is legible wherever the hero is under it, not only at the top of the page (the
+  first version proved it at scroll 0 and nowhere else).
+- **Measured, not asserted**: eleven widths (900 and 901 both), worst-pixel contrast for the copy and the header (at several
+  depths of the hero) with the photograph present and blocked, the subject in frame and clear of the copy, a card that holds
+  its copy, no layout shift on a first visit, and no motion, no script, forced colours, large text and the consent notice.
+  The old "half the frame" floor became a subject floor. The narrow crop is always an overlay.
+- **Found on the way**: the interim photograph carries a trained-algorithmic provenance marker and shows jewellery that is not
+  ours; it is recorded and gated, not hidden.
+- **After a design review**: the bar no longer lets the hero's copy print across the brand mark (it hides what
+  scrolls under it entirely, after a translucent band at 94% still ghosted a line of the eyebrow across the logo on a phone;
+  held by a unit test on the token and a browser test on the rendered bar), its veil is one
+  flat band as tall as the bar (a fade below it was painted over the copy resting under the bar on the shortest phones), and
+  headings, the eyebrow and running text ask the browser not to leave a word alone on a last line (`text-wrap`, measured
+  on the rendered words at six widths).
+- **The consent notice no longer covers "Our story" on an iPhone SE or a 360×640 phone**: on a screen 600 to 700px tall the
+  hero is the screen and not 53px more and the gaps between its lines close up, and on one 700px or less the notice tightens
+  the space around its sentence and its buttons (its words and its buttons are untouched). The shortest phones (320×568, and a
+  360-wide screen under about 634px) still lose part of the actions to the notice until it is answered.
+
+- **After a simplification review**: the bar's veil is the bar's own background (no pseudo-element, and the change to and
+  from the solid state now fades); the page reserves the notice's room before the first paint only on the home page, where
+  a hero rides above it, and the room is the notice's height plus the gap beneath it, a measure that does not depend on how
+  an engine reports the offset of a fixed box; the hero record takes its date, reviewer and handle rules from the claims
+  schema instead of copying them; running text on all fourteen pages is held to the same last-line rule as the home page,
+  with the two legal-page exceptions on record; and the browser specs share their helpers instead of pasting them.
+
 ## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
 
 - **The merge gate is proven.** The repaired ruleset read back conclusive. Then the v2 canary

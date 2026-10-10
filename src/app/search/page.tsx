@@ -103,7 +103,7 @@ async function SearchResults({ query }: { query: string }) {
           backgroundColor: 'var(--bg)',
           color: 'var(--ink)',
           minHeight: '100vh',
-          paddingTop: '100px',
+          paddingTop: 'calc(var(--header-height) + 36px)',
         }}
       >
         {/* ── Search header ───────────────────────────────────────────── */}
@@ -360,7 +360,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             style={{
               backgroundColor: 'var(--bg)',
               minHeight: '100vh',
-              paddingTop: '100px',
+              paddingTop: 'calc(var(--header-height) + 36px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

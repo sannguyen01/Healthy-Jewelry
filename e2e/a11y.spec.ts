@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './support/test'
+import { animationsFinished } from './support/viewportFit'
 import AxeBuilder from '@axe-core/playwright'
 
 /**
@@ -51,23 +52,6 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-prac
 test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
 /**
- * The hero additionally drives its stagger from JS timers, so its children pass through opacity 0 before
- * landing on 1 even with transitions collapsed. axe skips fully transparent elements, so that is harmless
- * — but waiting for them makes the scan deterministic rather than dependent on when axe happens to run.
- * Scoped to the hero: a blanket "nothing is at opacity 0" wait never resolves, because plenty of elements
- * are legitimately transparent — hover-only specifications, closed drawers.
- */
-async function waitForHeroToSettle(page: Page): Promise<void> {
-  const heroContent = page.locator('.hj-hero-content')
-  if ((await heroContent.count()) === 0) return
-  await page.waitForFunction(() => {
-    const content = document.querySelector('.hj-hero-content')
-    if (!content) return true
-    return Array.from(content.children).every((child) => getComputedStyle(child).opacity === '1')
-  })
-}
-
-/**
  * The consent notice is part of what a first-time visitor sees, so the scans run with it up and with it
  * answered. It renders after hydration (the answer lives in localStorage, which the server cannot read), so
  * "is it there?" is asked by waiting for it, not by counting once: counting raced the mount in two of 112 runs
@@ -98,7 +82,10 @@ test.describe('Accessibility — every page, any impact', () => {
       const response = await page.goto(path)
       if (status) expect(response?.status()).toBe(status)
       await expect(page.locator('main#main')).toBeVisible()
-      await waitForHeroToSettle(page)
+      // The hero enters on a CSS stagger and the consent notice and the scroll-reveal sections animate too. axe skips fully
+      // transparent elements, so that is harmless, but "no animation is running" (which resolves on every page, where a
+      // blanket "nothing is at opacity 0" never does) makes the scan deterministic and not dependent on when axe runs.
+      await animationsFinished(page)
 
       await awaitConsentNotice(page)
       expect(await scan(page), `${name}, consent notice showing`).toEqual([])
