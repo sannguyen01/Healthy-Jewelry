@@ -13,10 +13,14 @@ user-visible or architecturally significant changes.
 - **The header's state follows the hero**, not `scrollY > 60`: over the hero on the home page, solid from the first byte
   everywhere else, inert page behind the open menu. `--header-height` is written once.
 - **The consent notice publishes the room it takes**, so the hero's copy rides above it and a focused control is never
-  hidden by it.
-- **Measured, not asserted**: eleven widths (900 and 901 both), worst-pixel contrast for the copy and the header with the
-  photograph present and blocked, the subject in frame and clear of the copy, and no motion, no script, forced colours,
-  large text and the consent notice. The old "half the frame" floor became a subject floor.
+  hidden by it. A script at the top of `<body>` reserves an estimate before the first paint when nobody has answered, so a
+  first visit's hero does not move when the notice arrives (it moved by the notice's whole height before).
+- **The header carries its own veil**, so it is legible wherever the hero is under it, not only at the top of the page (the
+  first version proved it at scroll 0 and nowhere else).
+- **Measured, not asserted**: eleven widths (900 and 901 both), worst-pixel contrast for the copy and the header (at several
+  depths of the hero) with the photograph present and blocked, the subject in frame and clear of the copy, a card that holds
+  its copy, no layout shift on a first visit, and no motion, no script, forced colours, large text and the consent notice.
+  The old "half the frame" floor became a subject floor. The narrow crop is always an overlay.
 - **Found on the way**: the interim photograph carries a trained-algorithmic provenance marker and shows jewellery that is not
   ours; it is recorded and gated, not hidden.
 

@@ -236,8 +236,8 @@ test.describe('Homepage composition', () => {
     //     band still draws one, because a component cannot know what follows it. That is
     //     the cost of the divider living on a section, and it is why this rule is written
     //     about pairs.)
-    //   - The hero. It terminates in the photograph at every width — full-bleed above
-    //     900px, a 16:9 band below it — so the image edge is the seam. This one was found
+    //   - The hero. It terminates in the photograph at every width (one image-led composition,
+    //     ADR 054), so the image edge is the seam. This one was found
     //     by writing the assertion: the rule as first drafted flagged Hero → BESTSELLING
     //     alongside the real defect, and the honest answer was that the hero is genuinely
     //     different rather than that the rule should be loosened until it stopped

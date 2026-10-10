@@ -172,7 +172,8 @@ in `DESIGN.md`, "Reference: Songmont" — read that before changing a token, a s
 - Nav: three states, and the state is a fact about the page, not a distance scrolled
   ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)). `hero-overlay` lies over the hero, on `/`
   alone (`<Nav overHero />`), with light type on a darkened band or ink on a light one as the hero
-  record's `headerTone` says; `solid` is `--bg` with a hairline, which every other page is from its
+  record's `headerTone` says (the band is the bar's own, `.hj-header::before`, strong enough for any
+  backdrop: `header-veil.test.ts`); `solid` is `--bg` with a hairline, which every other page is from its
   first byte and `/` becomes once the hero's own end marker (`[data-hero-end]`, read by
   `useHeroOverlay`) has passed the top; `menu-open` is the flat bar over the archive, with `main` and
   the footer inert. It read `scrollY > 60` on every route until 2026-10-10, so a page with no hero was
@@ -242,7 +243,9 @@ change all three together.
      and fills the first screen (`--hj-hero-min` is the floor, `--hj-hero-max` the ceiling, `svh` the
      unit). The header, the copy and the actions are layered inside it, in a safe zone defined from
      `--header-height`, the record's copy corner and the consent notice's published height
-     (`--hj-consent-h`, written by `ConsentBanner` while it is up). Nothing opaque sits between the
+     (`--hj-consent-h`, written by `ConsentBanner` while it is up, and estimated before the first paint by
+     `CONSENT_PREPAINT_SCRIPT` when nobody has answered, so a first visit's hero does not move when the
+     notice arrives). Nothing opaque sits between the
      visitor and the photograph unless the record asks for a card.
    - **Art direction is data**: `src/content/hero/home.json`, read through `heroMedia()`. For a wide
      screen and a narrow one it holds the source, the focal point, the subject box, the copy corner and
@@ -256,10 +259,12 @@ change all three together.
      ground-coloured primary button, a light focus ring: an `--ink` ring and button vanish on a dark
      surface); `card` is the opaque, hairlined, bounded card of
      [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md), capped at
-     `--hj-hero-card-max-ratio` (0.55) of the photograph's own rendered box. Which applies is per crop.
+     `--hj-hero-card-max-ratio` (0.55) of the photograph's own rendered box. The wide crop may be
+     either; the narrow crop is always an overlay, and the schema refuses a card there.
      Under an overlay `.hj-hero-copy` is `display: contents`, so the card's bound has no box to bound.
    - A veil is a legibility device, not a palette filter: its strength is a token
-     (`--hj-veil-top`, `--hj-veil-bottom`) set by the rendered-pixel test, never by eye. The page's
+     (`--hj-veil-top`, `--hj-veil-bottom`) set by the rendered-pixel test, never by eye. The hero has one
+     veil, the copy's; the bar's belongs to the bar (below). The page's
      single dark band is still the Care band: the hero section keeps `--bg`, and the dark fallback
      the veils composite on lives on `.hj-hero-media`.
    - The entrance is CSS (`hjSlideUp`, staggered by `--stagger`) and is removed under
@@ -267,7 +272,9 @@ change all three together.
      `opacity: 0` after hydration is why it was not.
    - Enforced by `e2e/hero-legibility.spec.ts` at eleven widths, 900 and 901 both: the photograph is
      the first screen, nothing overlaps, the copy stays in its safe area, the worst pixel behind each
-     word and each header control clears AA with the photograph present and blocked, the subject is
+     word and each of the bar's own controls clears AA with the photograph present and blocked, for
+     the bar at several depths of the hero (it stays over the hero while it scrolls; the logotype, a
+     logo, is exempt), the subject is
      in frame and clear of the copy, and it holds with no motion, no script, forced colours, large
      text and the consent notice up. Never lay copy on the photograph without a veil or a card.
    - History, superseded by ADR 054. The hero used to be **two compositions**. **≥901px**: full-bleed,

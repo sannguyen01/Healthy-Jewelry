@@ -58,19 +58,28 @@ record edit and at most two files, and is an owner gate in `STATE.md`.
 
 **4. The card is a variant, not a doctrine.** `variant: "card"` keeps ADR 013's opaque, bounded card
 (`--hj-hero-card-max-ratio`) for a crop whose photograph has no safe zone for copy; `variant: "overlay"` lays the copy on
-a bottom veil. Desktop keeps the card and the phone takes the overlay for the current photograph. The first screen is one
-composition either way: the photograph, the header over it, the copy inside it.
+a bottom veil. The wide crop may be either, and desktop keeps the card for the current photograph; the narrow crop is
+always an overlay, and the schema refuses a card there, because a card bounded to a fraction of the photograph is a column
+too narrow for a sentence at a phone's width and nothing rendered or tested it. The first screen is one composition either
+way: the photograph, the header over it, the copy inside it.
 
 **5. A veil is a legibility device, not a filter.** ADR 044 forbids a filter that imitates a palette. A gradient whose
 strength is set by the lowest contrast measured under the text it protects does not imitate one, and is allowed. Its
 strength is a token (`--hj-veil-top`, `--hj-veil-bottom`) and is set by the rendered-pixel test, not by eye.
 
-**6. The header's tone is data, and its state comes from the hero.** `headerTone` is `light` (light type on a darkened
-top veil) or `dark` (ink on a light veil of the page ground). The test proves 4.5:1 for text and 3:1 for the icon, the mark
-and the focus ring, at every width, over the rendered photograph and with the photograph blocked. The header's state
-is `hero-overlay`, `solid` or `menu-open`, and it is derived from the hero's own sentinel, not from a scroll distance: a
-page without a hero is `solid` from its first byte, and a sentinel below the fold is still overlay. While the menu is
-open `main` and the footer are inert, so the dialog is a true modal.
+**6. The header's tone is data, its veil is its own, and its state comes from the hero.** `headerTone` is `light` (light
+type on a darkened band) or `dark` (ink on a light band of the page ground). The band is drawn by the header itself
+(`.hj-header::before`, only while it overlays the hero), at the viewport's top edge wherever the page is scrolled, in
+the type's opposite colour, at a strength that clears AA over pure black and over pure white (`header-veil.test.ts`
+computes it for both tones), because the bar cannot know what is under it. The rendered-pixel test measures the worst
+pixel behind the bar's own type (MENU, the brand name, SEARCH, CONTACT), its search glyph (3:1) and its focus ring, at
+five depths of the hero at four widths and with the photograph blocked. The **logotype is exempt**: the knot and the name
+as a mark are a logo, which WCAG 1.4.3 and 1.4.11 do not hold to a ratio, and are not measured. What is guaranteed is the
+bar's legibility; the copy that scrolls under the bar is faintly visible through its band, which is the cost of a
+translucent bar and was judged better than an opaque one over a photograph. The header's state is `hero-overlay`, `solid`
+or `menu-open`, and it is derived from the hero's own sentinel, not from a scroll distance: a page without a hero is
+`solid` from its first byte, and a sentinel below the fold is still overlay. While the menu is open `main` and the footer
+are inert, so the dialog is a true modal.
 
 **7. One number for the header.** `--header-height` is declared once. The bar, the drawer's top edge, the hero's safe
 zone and the page offsets read it.
@@ -80,11 +89,18 @@ zone and the page offsets read it.
 
 **9. The consent notice publishes its height.** While it is showing it writes its measured height to
 `--hj-consent-h`, the hero's bottom padding adds it, and the document's `scroll-padding-bottom` reads it, so a focused
-control is never hidden by it (WCAG 2.4.11). Its copy and its logic are unchanged.
+control is never hidden by it (WCAG 2.4.11). Its copy and its logic are unchanged. Whether anyone is asked is in
+`localStorage`, which the server cannot read, so a hero that reserved the room only after the notice had measured itself
+moved its copy by the notice's whole height a few hundred milliseconds after a first visit's first paint. A script at the
+top of `<body>` (`CONSENT_PREPAINT_SCRIPT`, in `consent.ts`, held equal to `readConsent` by `consent-prepaint.test.ts`)
+therefore reserves an estimate (`--hj-consent-reserve`, by width) when nobody has answered, and the notice replaces it with
+its real height or gives it back.
 
 **10. The frame floor becomes a subject floor.** ADR 021's "at least half of the source frame" is replaced by: at every
 width the record's subject box is at least 90% visible after the cover crop, and none of it lies under the copy. It is
-computed from the record by `coverVisibleRect` and checked against the browser's own boxes.
+computed from the record by `coverVisibleRect` and checked against the browser's own boxes. The box must span at least
+5% of the image on each axis (`MIN_SUBJECT_SPAN`), because a tiny box is trivially in frame and clear of the copy and
+would make both checks pass for any crop.
 
 ## Consequences
 
@@ -96,7 +112,10 @@ computed from the record by `coverVisibleRect` and checked against the browser's
 | `hero-overlay.test.ts`, `Nav.test.tsx` | the sentinel predicate, including a sentinel below the fold; the three header states; the modal's inert background |
 | `hero-legibility.spec.ts` | eleven widths, including 900 and 901: first viewport, no overlap, safe area, worst-pixel contrast for the copy and the header (photograph present and blocked), subject visibility, reduced motion, no JavaScript, forced colours, 200% text, a short phone with the notice up |
 | `navigation.spec.ts` | the header's state on `/`, after the hero, on a page without one, and with the menu open |
-| `header-height-token.test.ts` | the bar's height is written once |
+| `header-height-token.test.ts` | the bar's height is written once, including inside a `calc()` and in the scroll offsets |
+| `header-veil.test.ts` | the bar's own veil is strong enough for any backdrop, in both tones |
+| `consent-prepaint.test.ts` | the pre-paint reservation agrees with the notice about who is asked, over every stored value and a storage that throws |
+| `analytics.spec.ts` | a first visit shifts nothing when the notice arrives (the browser's score and the copy's own travel), and the published room is the notice's place on screen, also after a scrolled reopen from the footer |
 
 What it found on the way:
 
@@ -142,6 +161,11 @@ and the hero's eyebrow, headline, sentence and two actions. AA asks 4.5:1 of thi
 | 1280×900 | card | 900 | 14.7 | 6.4 |
 | 1440×900 | card | 900 | 14.5 | 6.4 |
 
+**These header figures are the first measurement, and they were taken at scroll 0 only**, with the bar's veil drawn by the
+hero at the top edge of the photograph. They are kept as the record and not as a claim about the finished page: the
+independent review found the bar illegible while the hero scrolled under it (see "After the independent review"), and the
+test now measures five depths per width.
+
 What the numbers decided:
 
 - **Header tone is `dark` for this photograph.** Light type on a top veil measured about 3.2:1 on its sky and needs about
@@ -167,3 +191,34 @@ What the numbers decided:
 - **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (the narrowest two) the
   actions cannot all be above it. The requirement there is the honest one: a focused action is not hidden, its centre is clear
   of the notice (WCAG 2.4.11 asks that it not be entirely hidden), and answering the notice returns the room.
+
+## After the independent review
+
+A reviewer with no context read the branch against its contract and found what this record had overclaimed.
+
+- **The bar was illegible once the hero scrolled under it.** The table above says "AA at every width" from scroll 0, where
+  the photograph's sky is behind the bar. The bar stays an overlay for as long as any of the hero is under it, so after
+  the first screen it lay over the hero's own copy and the veil beneath it: at 320×568 the primary action's label printed
+  through the brand mark. The new test measured it first (the worst pixel behind MENU was 1.00 to 1.11:1, and 5 of 5 cases
+  failed), and passed after the veil moved to the bar. Both a measurement taken only where it was convenient and a claim
+  written from it were the defect; the matrix of screenshots gained an `under-bar` state for the same reason.
+- **The forced-colours check could not fail.** It walked from the headline to the body and found the section's own ground,
+  which is not behind the copy at all (the photograph is a sibling layer). It now searches below the section, requires
+  all the copy inside the surface it finds, and has a twin that removes the surface and requires the same predicate to find
+  none. The twin first failed for a reason that was the harness's (a computed value read in the frame it changed, on an
+  element that transitions), found by reading the chain in the browser.
+- **The consent notice moved the page on a first visit.** The reviewer inferred it and it was measured: layout shift 0.39 at
+  320×568, 0.36 at 375×667 and 0.23 at 390×844, the copy travelling 221 to 258px, none for a returning visitor. The browser's
+  own score was not reported at all on the Pixel 7 emulation for the same movement, so the test also samples the copy's
+  position in every frame. After the pre-paint reservation: at most 0.016 across twelve widths, the copy's travel at most
+  11px. The reviewer's other claim, that the published room is wrong once the page has scrolled, did not reproduce on
+  either project (reopening the prompt from the footer of a scrolled page publishes the figure the browser's own box
+  implies); the tests that showed it stay.
+- **Smaller:** a two-file picture is asked to load at once (`loading` defaults to lazy and `fetchPriority` does not undo
+  it); a narrow card is refused by the schema; the card must hold all of its copy; a subject box has a floor; `Nav`'s
+  props are a union; the scanners see a literal in a `calc()`; 200% text is checked on two phones.
+- **Not done, on purpose:** the phone floor leaves the primary action below the fold at 320×568 (the header, the copy and
+  the notice do not share 568px); non-hero pages now show the bar's hairline at scroll 0; the interim photograph is a
+  3.3× upscale on a phone and is AI-origin. The first is a design trade-off for the owner; the others are the gated
+  photography.
+

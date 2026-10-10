@@ -136,8 +136,8 @@ async function lockupState(page: Page): Promise<LockupState> {
 }
 
 test.describe('Header fit', () => {
-  // The nav crossfades its background at scrollY > 60 and the hero staggers its
-  // children in. Neither moves the header's own box, but measuring 141 widths
+  // The nav changes state (overlay, solid) as the hero's end marker passes the top, and the hero
+  // staggers its children in with CSS. Neither moves the header's own box, but measuring 141 widths
   // through live transitions invites a torn frame for no benefit — and
   // `globals.css` already collapses every transition under reduced motion, so
   // this exercises a path the site ships.
