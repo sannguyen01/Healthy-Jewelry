@@ -253,8 +253,8 @@ export interface Segment {
  */
 export const LAYOUT_SEGMENTS: Segment[] = [
   { label: 'mobile nav (<=768px)', lo: 320, hi: 768 },
-  { label: 'desktop nav, full-bleed hero (769-900px)', lo: 769, hi: 900 },
-  { label: 'desktop nav, split hero (>=901px)', lo: 901, hi: 1440 },
+  { label: 'desktop nav, narrow-crop hero (769-900px)', lo: 769, hi: 900 },
+  { label: 'desktop nav, wide-crop hero (>=901px)', lo: 901, hi: 1440 },
 ]
 
 /**

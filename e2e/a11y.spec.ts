@@ -51,20 +51,16 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-prac
 test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
 /**
- * The hero additionally drives its stagger from JS timers, so its children pass through opacity 0 before
- * landing on 1 even with transitions collapsed. axe skips fully transparent elements, so that is harmless
- * — but waiting for them makes the scan deterministic rather than dependent on when axe happens to run.
- * Scoped to the hero: a blanket "nothing is at opacity 0" wait never resolves, because plenty of elements
- * are legitimately transparent — hover-only specifications, closed drawers.
+ * The hero enters on a CSS stagger, so its children pass through opacity 0 on the way to 1 unless motion is
+ * reduced — and the consent notice and the scroll-reveal sections animate too. axe skips fully transparent
+ * elements, so that is harmless, but waiting for the animations to finish makes the scan deterministic
+ * rather than dependent on when axe happens to run. "No animation is running" resolves on every page; a
+ * blanket "nothing is at opacity 0" never does, because plenty of elements are legitimately transparent —
+ * hover-only specifications, closed drawers. (This waited for the hero's inline JS `transition` until
+ * ADR 054 made the entrance CSS.)
  */
 async function waitForHeroToSettle(page: Page): Promise<void> {
-  const heroContent = page.locator('.hj-hero-content')
-  if ((await heroContent.count()) === 0) return
-  await page.waitForFunction(() => {
-    const content = document.querySelector('.hj-hero-content')
-    if (!content) return true
-    return Array.from(content.children).every((child) => getComputedStyle(child).opacity === '1')
-  })
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
 }
 
 /**

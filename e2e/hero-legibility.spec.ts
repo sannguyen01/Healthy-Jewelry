@@ -1,431 +1,598 @@
-import { test, expect, type Locator, type Page } from './support/test'
 import { PNG } from 'pngjs'
-import {
-  contrastRatioFromLuminance,
-  parseCssColor,
-  relativeLuminance,
-  requiredContrast,
-  type Rgb,
-} from '../src/lib/utils/contrast'
-// Shared with e2e/header-fit.spec.ts. Both specs ask geometric questions about
-// the same rendered boxes, and two copies of `intersection` would be two
-// tolerances to keep in step.
+import { test, expect, type Locator, type Page } from './support/test'
 import { intersection, OVERLAP_TOLERANCE_PX, type Box } from './support/viewportFit'
+import { describeVerdicts, worstContrast, type Verdict } from './support/backdropContrast'
+import { contrastRatioFromLuminance, parseCssColor, relativeLuminance } from '../src/lib/utils/contrast'
+import { coverVisibleRect, visibleFraction } from '../src/lib/layout/coverCrop'
+import { heroMedia } from '../src/lib/catalog'
 
 /**
- * Hero legibility across viewport widths.
+ * The home page's first screen, across the widths that matter (ADR 054).
  *
- * `visual-assets.spec.ts` proves the hero photograph *renders*. It passed on a
- * homepage where the mobile hero showed only a rock wall with the body copy
- * lying on top of it, unreadable — because "the image is present, sized, and
- * opaque" says nothing about whether the words over it can be read.
+ * `visual-assets.spec.ts` proves the hero photograph *renders*. This asks the questions that proof
+ * cannot: is the photograph the first screen, can everything over it be read, is the subject still in
+ * frame, does anything overlap anything, and does the page survive the conditions a real visitor brings
+ * (no motion, no script, forced colours, large text, a blocked image, a short phone with the consent
+ * notice up). axe cannot answer these either: it returns *incomplete* for text over an image, because it
+ * cannot know what the pixels are. So this measures them.
  *
- * axe does not close this gap either: its `color-contrast` rule returns
- * *incomplete*, not *violation*, when the backdrop is an image, precisely
- * because it cannot know what the pixels are. So this measures them.
+ * ## What is read, and from where
  *
- * Independent checks, because they fail in different ways:
+ * - **The record.** The art direction (crop, focal point, subject box, variant, header tone) is data in
+ *   `src/content/hero/home.json`, read here through the catalogue reader. The tests check that the
+ *   *browser's* boxes and styles agree with it, not that the CSS agrees with itself.
+ * - **The browser's own boxes**, taken after fonts and the image have settled and with every animation
+ *   finished, because measuring a moving target is how a button's backdrop gets reported as the page
+ *   behind where the button used to be.
+ * - **Rendered pixels**, with only the glyphs removed (`support/backdropContrast.ts`).
  *
- *   1. Geometry — hero copy must not sit on the photograph at all. Cheap,
- *      deterministic, and it encodes the actual design rule.
- *   2. Rendered contrast — for every hero text node, screenshot the true
- *      backdrop and assert the worst pixel behind it still clears WCAG AA. This
- *      is what catches pale text on a pale patch of an otherwise dark photo,
- *      which crosses no boundary and so passes every geometric check.
- *   3. A bound on the protection itself — the card that makes 1 and 2 pass is
- *      sized by its own content, and both of those checks are satisfied *better*
- *      the larger it gets. Left alone they license the card growing until the
- *      photograph is decoration behind a floating memo, with every test green
- *      the whole way. So the card is also capped as a fraction of the
- *      photograph's rendered box.
- *   4. Framing — how much of the source image survives object-fit cropping,
- *      which is a different question from how much of it a reader can see.
+ * ## How it is located
+ *
+ * By structure the old composition shares with the new one (`main > section`, the first image, the
+ * header, text and role), not by the class names the new one introduces, so a failure on the old page is
+ * a *geometric* failure ("the photograph begins 468px down") and not "a selector is missing".
+ *
+ * ## The old floor, replaced
+ *
+ * "At least half of the source frame is visible" (ADR 021) cannot hold for a viewport-filling phone hero:
+ * a 1376×768 photograph shows 25.8% of its width at 390×844. What must survive the crop is the subject, so
+ * that floor is now "the record's subject box is at least 90% visible and clear of the copy".
  */
 
 /**
- * Widths worth defending: small Android, iPhone, large phone, tablet portrait,
- * small laptop, desktop. The hero's split layout is only correct above ~866px,
- * so the matrix has to straddle that rather than test two arbitrary devices.
+ * The eleven widths of ADR 054. 900 and 901 are both here on purpose: the breakpoint itself is where the
+ * two compositions used to diverge, so the pair is the regression test for it.
  */
 const VIEWPORTS = [
-  { label: '360px — small Android', width: 360, height: 800 },
-  { label: '390px — iPhone', width: 390, height: 844 },
-  { label: '414px — large phone', width: 414, height: 896 },
-  { label: '768px — tablet portrait', width: 768, height: 1024 },
-  // The narrowest width that still gets the split layout, and so the width at
-  // which the copy card is largest relative to the photograph behind it. The
-  // matrix previously jumped 768 -> 1024 with nothing in between, which meant
-  // the worst case for every split-layout invariant was never measured.
-  { label: '901px — split-layout floor', width: 901, height: 900 },
-  { label: '1024px — small laptop', width: 1024, height: 768 },
-  { label: '1440px — desktop', width: 1440, height: 900 },
+  { label: '320×568 — smallest phone', width: 320, height: 568 },
+  { label: '360×640 — small Android', width: 360, height: 640 },
+  { label: '375×667 — iPhone SE', width: 375, height: 667 },
+  { label: '390×844 — iPhone', width: 390, height: 844 },
+  { label: '430×932 — large phone', width: 430, height: 932 },
+  { label: '768×1024 — tablet portrait', width: 768, height: 1024 },
+  { label: '900×900 — last narrow width', width: 900, height: 900 },
+  { label: '901×900 — first wide width', width: 901, height: 900 },
+  { label: '1024×768 — small laptop', width: 1024, height: 768 },
+  { label: '1280×900 — laptop', width: 1280, height: 900 },
+  { label: '1440×900 — desktop', width: 1440, height: 900 },
 ]
 
-/** Device pixels trimmed from each edge of a sampled region — see sampleBackdrop. */
-const SAMPLE_INSET_PX = 4
+const CONSENT_KEY = 'hj-analytics-consent'
+const MOBILE_QUERY = '(max-width: 900px)'
+const media = heroMedia()
 
-/**
- * The text nodes the hero's message depends on. Targeted by content rather than
- * by a test id so the check keeps working if the markup is restructured — and
- * so a failure names the copy a visitor could not read.
- */
-async function heroTextNodes(page: Page): Promise<Array<{ label: string; locator: Locator }>> {
-  const hero = page.locator('section').first()
+// ── Locators ─────────────────────────────────────────────────────────────────
+
+const hero = (page: Page): Locator => page.locator('main > section').first()
+const heroPhoto = (page: Page): Locator => hero(page).locator('img').first()
+const header = (page: Page): Locator => page.locator('header.hj-header')
+
+type Labelled = { label: string; locator: Locator }
+
+/** The text the hero's message depends on, found by content so a failure names what a visitor lost. */
+function copyNodes(page: Page): Labelled[] {
+  const h = hero(page)
   return [
-    // "Implant-Grade Titanium" until 2026-09-26; the eyebrow now names the metals by specification.
-    { label: 'eyebrow', locator: hero.getByText(/grade 23 titanium · niobium · 316l steel/i) },
-    { label: 'headline', locator: hero.getByRole('heading', { level: 1 }) },
-    { label: 'body copy', locator: hero.getByText(/no stones\. no fillers/i) },
-    { label: 'Shop Collection CTA', locator: hero.getByRole('link', { name: /shop collection/i }) },
-    { label: 'Our Story CTA', locator: hero.getByRole('link', { name: /our story/i }) },
+    { label: 'eyebrow', locator: h.getByText(/grade 23 titanium · niobium · 316l steel/i) },
+    { label: 'headline', locator: h.getByRole('heading', { level: 1 }) },
+    { label: 'body copy', locator: h.getByText(/no stones\. no fillers/i) },
+    // By position, not by label: the labels are pinned by Hero.test.tsx, and a geometry test that fails
+    // because a label changed has reported the label, not the geometry.
+    { label: 'primary action', locator: h.getByRole('link').first() },
+    { label: 'secondary action', locator: h.getByRole('link').nth(1) },
   ]
 }
 
-/** The hero photograph's rendered box. */
-function heroPhoto(page: Page): Locator {
-  return page.locator('section').first().locator('img').first()
-}
+/** The header's controls. Visible ones only: below 769px CONTACT leaves the bar, below 360px the name does. */
+async function headerNodes(page: Page): Promise<Array<Labelled & { kind: 'text' | 'graphic' }>> {
+  const bar = header(page)
+  const nodes: Array<Labelled & { kind: 'text' | 'graphic' }> = [
+    { label: 'MENU control', locator: bar.locator('.hj-menu-btn'), kind: 'text' },
+    { label: 'brand name', locator: bar.locator('.hj-lockup-text'), kind: 'text' },
+    { label: 'CONTACT link', locator: bar.getByRole('link', { name: /contact/i }), kind: 'text' },
+  ]
+  const search = bar.getByRole('button', { name: 'Search' })
+  // The same button is a word at 769px and up and a magnifying glass below, and the two are held to
+  // different ratios (WCAG 1.4.3 for text, 1.4.11 for a graphic).
+  const asWord = await search.locator('.hj-desktop-text').isVisible()
+  nodes.push({ label: 'search control', locator: search, kind: asWord ? 'text' : 'graphic' })
 
-/**
- * Captures what is actually behind a text node.
- *
- * Only the *glyphs* are removed — `color: transparent` on the node itself —
- * rather than hiding the element or its column. That distinction matters: a CTA
- * supplies its own opaque background, so hiding the whole element would sample
- * the page behind the button and report a false failure for light-on-dark button
- * copy. Making the letters transparent leaves backgrounds, borders and the
- * photograph exactly as composited, so the capture is precisely "everything the
- * reader sees except the words".
- */
-async function sampleBackdrop(page: Page, locator: Locator): Promise<Rgb[]> {
-  const setGlyphsTransparent = (transparent: boolean) =>
-    locator.evaluate((el, isTransparent) => {
-      const node = el as HTMLElement
-      node.style.color = isTransparent ? 'transparent' : ''
-      node.style.textShadow = isTransparent ? 'none' : ''
-    }, transparent)
-
-  await setGlyphsTransparent(true)
-  // Guarantee the style change has been painted before capturing. Without this
-  // the screenshot can race the repaint, sample the glyphs themselves, and
-  // report a perfect 1.00:1 "failure" that is really a harness artefact.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      )
-  )
-  // Element screenshot, not `page.screenshot({ clip })`. Under mobile emulation
-  // the two disagree: `boundingBox()` reports layout-viewport CSS pixels while
-  // the clip is resolved against the visual viewport, so at a fractional device
-  // pixel ratio (2.625 on a Pixel 7) the captured region drifts off the element
-  // entirely — sampling the photograph below a button and reporting it as the
-  // button's backdrop. Letting Playwright resolve the element removes the whole
-  // class of coordinate error.
-  const buffer = await locator.screenshot()
-  await setGlyphsTransparent(false)
-
-  const png = PNG.sync.read(buffer)
-  // Trim the outermost device pixels: a fractional border box leaves an
-  // anti-aliased rim of whatever sits just outside the element, and for a CTA
-  // with its own dark fill that rim is page background — the exact colour of
-  // the button's label, which would read as a perfect 1.00:1 failure.
-  //
-  // The same is true of a rounded corner (ADR 051 gave the buttons a 4px radius): outside the arc, and
-  // inside the element's box, is whatever sits under it, which for the filled CTA is the card's
-  // `--bg`, the exact colour of its label. A corner pixel is not what the label is read against, so
-  // the inset also clears the arc: r * dpr * (1 - 1/sqrt2) along the diagonal, a pixel for the rim
-  // and a pixel for the rounding of the screenshot's box. Found on the mobile project only, where
-  // the 2.625 device pixel ratio makes the 4px radius 10.5 device pixels and the default inset of 4
-  // lands on the arc (1.00:1 at every width from 390px up).
-  const { radius, dpr } = await locator.evaluate((el) => ({
-    radius: Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0,
-    dpr: window.devicePixelRatio,
-  }))
-  const cornerInset = Math.ceil(radius * dpr * (1 - Math.SQRT1_2)) + 2
-  const inset = Math.min(
-    Math.max(SAMPLE_INSET_PX, cornerInset),
-    Math.floor(Math.min(png.width, png.height) / 4)
-  )
-  const pixels: Rgb[] = []
-  // Every 3rd pixel in each axis: ~9x fewer samples, and a contrast failure over
-  // a photograph is never a single isolated pixel.
-  for (let y = inset; y < png.height - inset; y += 3) {
-    for (let x = inset; x < png.width - inset; x += 3) {
-      const index = (png.width * y + x) << 2
-      pixels.push({ r: png.data[index], g: png.data[index + 1], b: png.data[index + 2] })
-    }
+  const visible: typeof nodes = []
+  for (const node of nodes) {
+    if (await node.locator.first().isVisible()) visible.push(node)
   }
-  return pixels
+  return visible
 }
+
+async function boxOf(locator: Locator, label: string): Promise<Box> {
+  const box = await locator.first().boundingBox({ timeout: 5_000 }).catch(() => null)
+  if (!box) throw new Error(`${label} has no box: it is not on the page (or not visible)`)
+  return box
+}
+
+async function copyBoxes(page: Page): Promise<Array<{ label: string; box: Box }>> {
+  const out: Array<{ label: string; box: Box }> = []
+  for (const { label, locator } of copyNodes(page)) out.push({ label, box: await boxOf(locator, label) })
+  return out
+}
+
+/** Everything is placed and still: fonts loaded, the photograph decoded, no animation running. */
+async function settleHero(page: Page): Promise<void> {
+  await expect(heroPhoto(page)).toBeVisible()
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    const img = document.querySelector<HTMLImageElement>('main > section img')
+    if (img && !img.complete) await new Promise<void>((r) => { img.onload = img.onerror = () => r() })
+    if (img) await img.decode().catch(() => undefined)
+  })
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+  await page.evaluate(
+    () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+  )
+}
+
+const px = (value: string): number => Number.parseFloat(value)
+
+async function isNarrow(page: Page): Promise<boolean> {
+  return page.evaluate((q) => matchMedia(q).matches, MOBILE_QUERY)
+}
+
+/** The width the visitor's own gutter is, resolved by the browser rather than copied from the stylesheet. */
+async function gutterPx(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const probe = document.createElement('div')
+    probe.style.cssText = 'position:absolute;visibility:hidden;width:var(--space-gutter)'
+    document.body.append(probe)
+    const width = probe.getBoundingClientRect().width
+    probe.remove()
+    return width
+  })
+}
+
+async function consentBox(page: Page): Promise<Box | null> {
+  const banner = page.getByRole('dialog', { name: /analytics consent/i })
+  if ((await banner.count()) === 0 || !(await banner.isVisible())) return null
+  return boxOf(banner, 'consent notice')
+}
+
+// ── The matrix ───────────────────────────────────────────────────────────────
 
 for (const viewport of VIEWPORTS) {
-  test.describe(`Hero legibility — ${viewport.label}`, () => {
-    // The hero fades and translates its children in on a stagger. Measuring
-    // against a moving target is the difference between reading the button and
-    // reading the page behind where the button used to be, so the animation is
-    // collapsed rather than waited out. `globals.css` already honours
-    // `prefers-reduced-motion` by reducing every transition to 0.01ms, so this
-    // exercises a code path the site genuinely ships instead of inventing a
-    // test-only one.
-    // Via `contextOptions` — in this Playwright version `reducedMotion` is not
-    // a top-level `use` option.
+  test.describe(`Hero — ${viewport.label}`, () => {
+    // Via `contextOptions` — in this Playwright version `reducedMotion` is not a top-level `use` option.
+    // The site genuinely ships this path (every transition collapses under `prefers-reduced-motion`), so the
+    // measurement is of something real, not of a test-only mode. The motion tests below leave it on too:
+    // they ask what a person who asked for no motion is shown.
     test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, context }) => {
+      // The consent notice has its own tests below. Here it would cover the lower part of a phone's hero
+      // and every measurement would be of the notice.
+      await context.addInitScript(([key]) => {
+        try { localStorage.setItem(key, 'denied') } catch { /* private mode: the notice shows, and the tests say so */ }
+      }, [CONSENT_KEY])
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await page.goto('/')
       await expect(page.locator('main')).toBeVisible()
-      await expect(heroPhoto(page)).toBeVisible()
-      // The hero staggers its children in with a JS transition, and each one
-      // settles at a different time. Waiting only for the headline is not
-      // enough: the CTA row is still translating when the headline lands, so a
-      // clip taken from its bounding box lands where the button *was* and
-      // samples the page behind it — which is void-white, exactly the colour of
-      // the button's label, and reports a perfect 1.00:1 that is pure artefact.
-      // Wait for every child to reach full opacity and its final position.
-      //
-      // Checking opacity alone is not enough either, and subtly so: the effect
-      // applies its starting values *after* mount, so a check that runs first
-      // sees untouched children — opacity 1, no transform — and reports settled
-      // before the animation has begun. The inline `transition` the effect
-      // writes is the proof it has run, so it is part of the condition.
-      await page.waitForFunction(() => {
-        const content = document.querySelector('.hj-hero-content')
-        if (!content) return false
-        return Array.from(content.children).every((child) => {
-          const element = child as HTMLElement
-          if (!element.style.transition) return false
-          const style = getComputedStyle(element)
-          const settled =
-            style.transform === 'none' || style.transform === 'matrix(1, 0, 0, 1, 0, 0)'
-          return style.opacity === '1' && settled
-        })
-      })
+      await settleHero(page)
     })
 
-    test('no hero copy strays past the backdrop that protects it', async ({ page }) => {
-      // Two layouts, one invariant: copy must sit on something opaque.
-      //
-      // Stacked (narrow): the photo is in normal flow below the text, so the
-      // requirement is simply that nothing overlaps it.
-      //
-      // Split (wide): the photo is `inset: 0` and spans the whole section, so
-      // geometric overlap with the <img> is by design and means nothing. What
-      // matters is whether the text sits fully inside the scrim's own box —
-      // the card is fully opaque and sized to wrap its content (see Hero.tsx),
-      // so there is no fade region to account for; full containment is the
-      // whole check.
-      //
-      // Mode is read from the scrim's *computed background*, not DOM
-      // visibility. `.hj-hero-scrim` is unconditionally rendered at every
-      // width — the <=900px media query only changes its background/padding/
-      // margin via `!important`, it never sets `display: none` — so
-      // `isVisible()` is true at every viewport and can't tell the two modes
-      // apart. Background is the actual signal the CSS uses to say "I'm
-      // protecting something here" vs. "there's nothing behind me to protect
-      // against."
-      const scrim = page.locator('.hj-hero-scrim')
-      const scrimBackground = await scrim
-        .first()
-        .evaluate((el) => getComputedStyle(el).backgroundColor)
-      const scrimOpaque =
-        scrimBackground !== 'rgba(0, 0, 0, 0)' && scrimBackground !== 'transparent'
+    test('the photograph is the first screen, with nothing opaque between it and the visitor', async ({ page }) => {
+      const heroBox = await boxOf(hero(page), 'hero')
+      const photo = await boxOf(heroPhoto(page), 'hero photograph')
+      const bar = await boxOf(header(page), 'header')
 
-      const offenders: string[] = []
+      expect(heroBox.y, 'the hero begins at the top of the page, under the fixed header').toBeCloseTo(0, 0)
+      expect(photo.y, `the photograph begins ${Math.round(photo.y)}px down; it should begin at the top`).toBeCloseTo(0, 0)
+      expect(photo.width, 'the photograph spans the viewport').toBeCloseTo(viewport.width, 0)
+      const floor = px(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--hj-hero-min')))
+      expect(floor, '--hj-hero-min must resolve to a length on :root').toBeGreaterThan(0)
+      const wanted = Math.min(viewport.height, floor)
+      expect(
+        photo.height,
+        `the photograph is ${Math.round(photo.height)}px tall at ${viewport.width}×${viewport.height}; the first screen is at least ${wanted}px`
+      ).toBeGreaterThanOrEqual(wanted * 0.98)
 
-      if (!scrimOpaque) {
-        const photoBox = await heroPhoto(page).boundingBox()
-        expect(photoBox).not.toBeNull()
-        for (const { label, locator } of await heroTextNodes(page)) {
-          const box = await locator.boundingBox()
-          if (!box) continue
-          const overlap = intersection(box, photoBox as Box)
-          if (overlap) {
-            offenders.push(
-              `${label}: ${Math.round(overlap.width)}x${Math.round(overlap.height)}px over the photo`
-            )
-          }
+      // What is *painted* just under the header: the photograph, perhaps with a veil over it, never a panel.
+      const verdict = await page.evaluate(
+        ({ x, y }) => {
+          const photo = document.querySelector('main > section img')
+          const stack = document.elementsFromPoint(x, y)
+          const at = photo ? stack.indexOf(photo) : -1
+          if (at < 0) return { found: false, blockers: [] as string[] }
+          const blockers = stack.slice(0, at).filter((el) => {
+            const style = getComputedStyle(el)
+            const m = style.backgroundColor.match(/rgba?\(([^)]+)\)/)
+            const alpha = m ? (m[1].split(',')[3] === undefined ? 1 : Number.parseFloat(m[1].split(',')[3])) : 0
+            // A veil is a gradient (a background image); a panel is a colour.
+            return alpha > 0.05 && style.backgroundImage === 'none'
+          })
+          return { found: true, blockers: blockers.map((el) => el.className || el.tagName) }
+        },
+        { x: viewport.width / 2, y: bar.y + bar.height + 1 }
+      )
+      expect(verdict.found, 'the photograph is under the first row below the header').toBe(true)
+      expect(verdict.blockers, 'nothing opaque sits between the visitor and the photograph there').toEqual([])
+    })
+
+    test('no copy overlaps other copy or the header', async ({ page }) => {
+      const boxes = await copyBoxes(page)
+      const bar = await boxOf(header(page), 'header')
+      const problems: string[] = []
+
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const hit = intersection(boxes[i].box, boxes[j].box)
+          if (hit) problems.push(`${boxes[i].label} overlaps ${boxes[j].label} by ${Math.round(hit.width)}×${Math.round(hit.height)}px`)
         }
-      } else {
-        const scrimBox = await scrim.first().boundingBox()
-        expect(scrimBox).not.toBeNull()
-        const scrimRight = (scrimBox as Box).x + (scrimBox as Box).width
+        const underBar = intersection(boxes[i].box, bar)
+        if (underBar) problems.push(`${boxes[i].label} is under the header by ${Math.round(underBar.height)}px`)
+      }
+      expect(problems, `Hero copy collides at ${viewport.width}px:\n  ${problems.join('\n  ')}`).toEqual([])
+    })
 
-        for (const { label, locator } of await heroTextNodes(page)) {
-          const box = await locator.boundingBox()
-          if (!box) continue
-          const overhang = box.x + box.width - scrimRight
-          if (overhang > OVERLAP_TOLERANCE_PX) {
-            offenders.push(
-              `${label}: extends ${Math.round(overhang)}px past the opaque scrim (ends at ${Math.round(scrimRight)}px)`
-            )
-          }
+    test('the copy stays inside the safe area', async ({ page }) => {
+      const boxes = await copyBoxes(page)
+      const bar = await boxOf(header(page), 'header')
+      const heroBox = await boxOf(hero(page), 'hero')
+      const gutter = await gutterPx(page)
+      const problems: string[] = []
+
+      for (const { label, box } of boxes) {
+        if (box.x < gutter - 1) problems.push(`${label} starts ${Math.round(box.x)}px from the left; the gutter is ${Math.round(gutter)}px`)
+        if (box.x + box.width > viewport.width - gutter + 1) {
+          problems.push(`${label} ends at ${Math.round(box.x + box.width)}px; the right gutter begins at ${Math.round(viewport.width - gutter)}px`)
         }
+        if (box.y < bar.y + bar.height - 0.5) problems.push(`${label} begins above the bottom of the header`)
+        if (box.y + box.height > heroBox.y + heroBox.height + 0.5) problems.push(`${label} runs past the bottom of the hero`)
+      }
+      expect(problems, `Hero copy leaves its safe area at ${viewport.width}px:\n  ${problems.join('\n  ')}`).toEqual([])
+    })
+
+    test('the header and the copy clear WCAG AA against the pixels behind them', async ({ page }) => {
+      const verdicts: Verdict[] = []
+      for (const { label, locator, kind } of await headerNodes(page)) {
+        verdicts.push(await worstContrast(page, `header: ${label}`, locator, kind))
+      }
+      for (const { label, locator } of copyNodes(page)) {
+        verdicts.push(await worstContrast(page, `copy: ${label}`, locator))
+      }
+      const failures = describeVerdicts(verdicts)
+      expect(failures, `Unreadable at ${viewport.width}×${viewport.height}:\n  ${failures.join('\n  ')}`).toEqual([])
+    })
+
+    test('the same, with the photograph blocked: the dark fallback behind the veil carries the copy', async ({ page }) => {
+      await page.route('**/_next/image**', (route) => route.abort())
+      await page.reload()
+      await expect(hero(page)).toBeVisible()
+      await page.evaluate(async () => { await document.fonts.ready })
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+
+      const verdicts: Verdict[] = []
+      for (const { label, locator, kind } of await headerNodes(page)) {
+        verdicts.push(await worstContrast(page, `header: ${label}`, locator, kind))
+      }
+      for (const { label, locator } of copyNodes(page)) {
+        verdicts.push(await worstContrast(page, `copy: ${label}`, locator))
+      }
+      const failures = describeVerdicts(verdicts)
+      expect(failures, `Unreadable with no photograph at ${viewport.width}px:\n  ${failures.join('\n  ')}`).toEqual([])
+    })
+
+    test('the subject stays in frame and clear of the copy, as the record says', async ({ page }) => {
+      const narrow = await isNarrow(page)
+      const crop = narrow ? media.mobile : media.desktop
+      const photo = heroPhoto(page)
+      const photoBox = await boxOf(photo, 'hero photograph')
+      const style = await photo.evaluate((el) => {
+        const s = getComputedStyle(el)
+        const img = el as HTMLImageElement
+        return { fit: s.objectFit, position: s.objectPosition, naturalW: img.naturalWidth, naturalH: img.naturalHeight }
+      })
+
+      expect(style.fit, 'the photograph covers its box').toBe('cover')
+      // `next/image` serves a resized variant, so the decoded size is not the source's. The aspect ratio is.
+      expect(style.naturalW / style.naturalH).toBeCloseTo(crop.width / crop.height, 1)
+
+      // The record's focal point is what the browser applies: `object-position: <x*100>% <y*100>%`.
+      const [fx, fy] = style.position.split(' ').map((v) => px(v) / 100)
+      expect(fx, `object-position "${style.position}" must apply the record's focal point`).toBeCloseTo(crop.focal.x, 2)
+      expect(fy).toBeCloseTo(crop.focal.y, 2)
+
+      const visible = coverVisibleRect(
+        { w: crop.width, h: crop.height },
+        { w: photoBox.width, h: photoBox.height },
+        { x: fx, y: fy }
+      )
+      const share = visibleFraction(crop.subject, visible)
+      expect(
+        share,
+        `${Math.round(share * 100)}% of the subject is in frame at ${viewport.width}×${viewport.height}; it must be at least 90%`
+      ).toBeGreaterThanOrEqual(0.9)
+
+      // The subject's place on the page, from where the browser put the photograph.
+      const toX = (n: number) => photoBox.x + ((n - visible.x0) / (visible.x1 - visible.x0)) * photoBox.width
+      const toY = (n: number) => photoBox.y + ((n - visible.y0) / (visible.y1 - visible.y0)) * photoBox.height
+      const subject: Box = {
+        x: toX(crop.subject.x0),
+        y: toY(crop.subject.y0),
+        width: toX(crop.subject.x1) - toX(crop.subject.x0),
+        height: toY(crop.subject.y1) - toY(crop.subject.y0),
       }
 
-      expect(
-        offenders,
-        `Hero copy left unprotected at ${viewport.width}px:\n  ${offenders.join('\n  ')}`
-      ).toEqual([])
+      const covers: Array<{ label: string; box: Box }> =
+        crop.variant === 'card'
+          ? [{ label: 'the copy card', box: await boxOf(page.locator('.hj-hero-copy'), 'the copy card') }]
+          : await copyBoxes(page)
+      const hits = covers
+        .map(({ label, box }) => ({ label, hit: intersection(subject, box, OVERLAP_TOLERANCE_PX) }))
+        .filter((c) => c.hit)
+        .map((c) => `${c.label} covers ${Math.round(c.hit!.width)}×${Math.round(c.hit!.height)}px of the subject`)
+      expect(hits, `The copy is on the subject at ${viewport.width}×${viewport.height}:\n  ${hits.join('\n  ')}`).toEqual([])
     })
 
-    test('the copy card never outgrows the photograph it sits on', async ({ page }) => {
-      // The check above and this one pull in opposite directions, which is the
-      // point. "Is the copy protected?" is satisfied better by every increase in
-      // the card's size, so on its own it licenses the card growing until the
-      // photograph is a rim around a memo — and nothing else here objects. The
-      // "usable portion of the frame" test below measures how much of the source
-      // survives object-fit cropping, not how much of it a reader can still see;
-      // a card covering 95% of a perfectly framed photo scores 100% there.
-      //
-      // So this is the counter-pressure: the card is bounded as a fraction of
-      // the photograph's own rendered box. Self-relative because an absolute
-      // pixel cap cannot mean the same thing across a 3x width range — the
-      // 848px cap this replaced was a third of a 2560px photo and 94% of a
-      // 901px one. See docs/adr/013-a-protection-that-can-only-grow.md.
-      //
-      // What this adds over the CSS that already enforces it, since a test that
-      // only re-measures its own `max-width` would be decoration. Three things,
-      // and the width ratio is the least of them:
-      //   - the token going missing. `max-width: calc(var(--missing) * 100%)`
-      //     is invalid at computed-value time, so the property falls back to
-      //     its initial value: measured, computed `max-width` becomes `none`
-      //     and the card is unbounded again. And because the cap is not binding
-      //     today (463px of an allowed 540px at 901px), the card's rendered
-      //     width does not change by a pixel at the moment the guardrail
-      //     evaporates — there is no visible symptom for anyone to notice. The
-      //     parse assertion below is the only thing that would.
-      //   - height. `max-width` says nothing about it, so a card that stays
-      //     narrow and grows downward is unconstrained by CSS entirely; only
-      //     the area ratio sees it.
-      //   - the enforcement being replaced. A future absolute-positioned,
-      //     fixed-width or inline-overridden card would still be measured here.
-      const scrim = page.locator('.hj-hero-scrim').first()
+    test('the hero carries the record\'s variants and header tone', async ({ page }) => {
+      // Both, not the active one: the server cannot know the viewport, and the stylesheet picks by breakpoint.
+      await expect(hero(page), 'data-variant-wide').toHaveAttribute('data-variant-wide', media.desktop.variant)
+      await expect(hero(page), 'data-variant-narrow').toHaveAttribute('data-variant-narrow', media.mobile.variant)
+      await expect(hero(page), 'data-header-tone').toHaveAttribute('data-header-tone', media.headerTone)
+    })
 
-      // Same discriminator as the test above, for the same reason: `.hj-hero-scrim`
-      // is rendered at every width, so only its computed background says which
-      // layout is in play.
-      const scrimBackground = await scrim.evaluate((el) => getComputedStyle(el).backgroundColor)
-      const scrimOpaque =
-        scrimBackground !== 'rgba(0, 0, 0, 0)' && scrimBackground !== 'transparent'
-      // Skipped, not silently passed: in the stacked layout the photograph is a
-      // band in normal flow below the copy, so the card overlaps none of it and
-      // the ratio has nothing to measure. A skip says that in the report; an
-      // early `return` would look like a passing assertion that never ran.
-      test.skip(
-        !scrimOpaque,
-        `stacked layout at ${viewport.width}px — the card sits beside the photograph, not on it`
-      )
+    test('a card, where the record asks for one, never outgrows the photograph it sits on', async ({ page }) => {
+      const narrow = await isNarrow(page)
+      const crop = narrow ? media.mobile : media.desktop
+      // Skipped with its reason, not silently passed: an overlay has no card to bound.
+      test.skip(crop.variant !== 'card', `the record asks for an overlay at ${viewport.width}px: there is no card to bound`)
 
-      // Read the ceiling from the token that also enforces it, so the test and
-      // the CSS cannot drift apart. The failure this guards against is specific
-      // and has happened here: an earlier version of this file read
-      // `--hj-hero-fade`, which had been deleted along with the gradient model,
-      // got NaN, fell back to 0, and kept passing. Hence the assertion before
-      // the use — a missing token has to fail this test, never disable it.
-      const declared = await scrim.evaluate((el) =>
+      // ADR 013: the protection that makes the copy legible is the very thing that would otherwise grow
+      // until the photograph is a rim around a memo, with every other check satisfied better the larger it
+      // got. So the card is also a fraction of the photograph's box, read from the token that enforces it.
+      const card = page.locator('.hj-hero-copy').first()
+      const declared = await card.evaluate((el) =>
         getComputedStyle(el).getPropertyValue('--hj-hero-card-max-ratio').trim()
       )
       const ceiling = Number.parseFloat(declared)
       expect(
         Number.isFinite(ceiling) && ceiling > 0 && ceiling < 1,
-        `--hj-hero-card-max-ratio must resolve to a fraction in (0, 1) on .hj-hero-scrim; got ` +
-          `${JSON.stringify(declared)}. Define it in src/app/globals.css — this test measures the ` +
-          `card against that token and has no default to fall back to.`
+        `--hj-hero-card-max-ratio must resolve to a fraction in (0, 1) on the card; got ${JSON.stringify(declared)}`
       ).toBe(true)
 
-      const cardBox = await scrim.boundingBox()
-      const photoBox = await heroPhoto(page).boundingBox()
-      expect(cardBox).not.toBeNull()
-      expect(photoBox).not.toBeNull()
-      const card = cardBox as Box
-      const photo = photoBox as Box
-
-      const widthRatio = card.width / photo.width
-      // Area as well as width, because they fail differently. Width is the half
-      // CSS can enforce via max-width; area is the honest answer to "how much
-      // picture is left", and it is the only one that would catch a card that
-      // stays narrow but grows to the full height of the section. The
-      // containment check above cannot see that either — it compares one edge.
-      const overlap = intersection(card, photo)
-      const areaRatio = overlap
-        ? (overlap.width * overlap.height) / (photo.width * photo.height)
-        : 0
-
+      const cardBox = await boxOf(card, 'the copy card')
+      const photoBox = await boxOf(heroPhoto(page), 'hero photograph')
+      const widthRatio = cardBox.width / photoBox.width
+      const overlap = intersection(cardBox, photoBox)
+      const areaRatio = overlap ? (overlap.width * overlap.height) / (photoBox.width * photoBox.height) : 0
       const verdict = (what: string, measured: number) =>
-        `Hero copy card ${what} ${(measured * 100).toFixed(1)}% of the photograph at ` +
-        `${viewport.width}px — ceiling is ${(ceiling * 100).toFixed(0)}% ` +
-        `(${((ceiling - measured) * 100).toFixed(1)} points of headroom left). The card is sized ` +
-        `by its widest child, so this usually means the headline, the type scale, or the loaded ` +
-        `face grew. Either shorten the copy or make the larger card a deliberate, reviewed change ` +
-        `to --hj-hero-card-max-ratio in src/app/globals.css.`
-
+        `The copy card ${what} ${(measured * 100).toFixed(1)}% of the photograph at ${viewport.width}px; the ceiling is ${(ceiling * 100).toFixed(0)}%.`
       expect(widthRatio, verdict('spans', widthRatio)).toBeLessThanOrEqual(ceiling)
       expect(areaRatio, verdict('covers', areaRatio)).toBeLessThanOrEqual(ceiling)
     })
-
-    test('every hero text node clears WCAG AA against what is actually behind it', async ({
-      page,
-    }) => {
-      const failures: string[] = []
-
-      for (const { label, locator } of await heroTextNodes(page)) {
-        const box = await locator.boundingBox()
-        if (!box) continue
-
-        const { color, fontSize, fontWeight } = await locator.evaluate((el) => {
-          const style = getComputedStyle(el)
-          return {
-            color: style.color,
-            fontSize: Number.parseFloat(style.fontSize),
-            fontWeight: Number.parseInt(style.fontWeight, 10) || 400,
-          }
-        })
-
-        const pixels = await sampleBackdrop(page, locator)
-        const textLuminance = relativeLuminance(parseCssColor(color))
-        let worst = Number.POSITIVE_INFINITY
-        for (const pixel of pixels) {
-          const ratio = contrastRatioFromLuminance(textLuminance, relativeLuminance(pixel))
-          if (ratio < worst) worst = ratio
-        }
-
-        const minimum = requiredContrast(fontSize, fontWeight)
-        if (worst < minimum) {
-          failures.push(
-            `${label} (${color}, ${fontSize}px/${fontWeight}) — worst ${worst.toFixed(2)}:1, needs ${minimum}:1`
-          )
-        }
-      }
-
-      expect(
-        failures,
-        `Hero copy unreadable against its backdrop at ${viewport.width}px:\n  ${failures.join('\n  ')}`
-      ).toEqual([])
-    })
-
-    test('the hero photograph shows a usable portion of the frame', async ({ page }) => {
-      // The mobile bug cropped a 1.79 landscape source down to its rightmost
-      // 26% — the subject was gone and only background rock remained. Cropping
-      // is fine; discarding most of the frame is not.
-      const visibleFraction = await heroPhoto(page).evaluate((el) => {
-        const img = el as HTMLImageElement
-        const box = img.getBoundingClientRect()
-        if (!img.naturalWidth || !img.naturalHeight || !box.width || !box.height) return 0
-        const scale = Math.max(box.width / img.naturalWidth, box.height / img.naturalHeight)
-        const renderedWidth = img.naturalWidth * scale
-        const renderedHeight = img.naturalHeight * scale
-        return (
-          (Math.min(box.width, renderedWidth) / renderedWidth) *
-          (Math.min(box.height, renderedHeight) / renderedHeight)
-        )
-      })
-
-      expect(
-        Number((visibleFraction * 100).toFixed(1)),
-        `Only ${(visibleFraction * 100).toFixed(1)}% of the hero image is in frame at ${viewport.width}px`
-      ).toBeGreaterThanOrEqual(50)
-    })
   })
 }
+
+// ── What a visitor can bring with them ───────────────────────────────────────
+
+test.describe('Hero — conditions a visitor brings', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.addInitScript(([key]) => {
+      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
+    }, [CONSENT_KEY])
+  })
+
+  test.describe('no motion preference', () => {
+    test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+    test('the copy is never transparent, at any frame, for a visitor who asked for no motion', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      // Sampled every frame from before the page's own script runs: a check made once, after the page
+      // settled, would pass a hero that hides its copy for 440ms and then reveals it.
+      await page.addInitScript(() => {
+        const w = window as unknown as { __minOpacity: number }
+        w.__minOpacity = 1
+        const start = performance.now()
+        const tick = () => {
+          const h1 = document.querySelector('main > section h1')
+          const content = h1?.parentElement
+          if (content) {
+            for (const child of Array.from(content.children)) {
+              const o = Number.parseFloat(getComputedStyle(child).opacity)
+              if (o < w.__minOpacity) w.__minOpacity = o
+            }
+          }
+          if (performance.now() - start < 1500) requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      })
+      await page.goto('/')
+      await page.waitForTimeout(1600)
+      const min = await page.evaluate(() => (window as unknown as { __minOpacity: number }).__minOpacity)
+      expect(min, 'the lowest opacity any hero copy element had, at any frame').toBe(1)
+    })
+  })
+
+  test.describe('no script', () => {
+    test.use({ javaScriptEnabled: false })
+
+    test('the copy and both actions are present and fully opaque with JavaScript off', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto('/')
+      for (const { label, locator } of copyNodes(page)) {
+        await expect(locator, `${label} is in the served HTML`).toBeVisible()
+        const opacity = await locator.evaluate((el) => {
+          let o = 1
+          for (let n: Element | null = el; n; n = n.parentElement) o *= Number.parseFloat(getComputedStyle(n).opacity)
+          return o
+        })
+        // CSS animations run without script, so the copy may be mid-entrance for a moment; it is never
+        // *waiting for* one. Allow it to land.
+        await expect.poll(async () =>
+          locator.evaluate((el) => {
+            let o = 1
+            for (let n: Element | null = el; n; n = n.parentElement) o *= Number.parseFloat(getComputedStyle(n).opacity)
+            return o
+          })
+        , { message: `${label} must reach full opacity with JavaScript off (was ${opacity})` }).toBe(1)
+      }
+    })
+  })
+
+  test.describe('forced colours', () => {
+    test.use({ contextOptions: { reducedMotion: 'reduce', forcedColors: 'active' } })
+
+    test('the copy sits on an opaque surface when the browser drops gradients and backgrounds', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto('/')
+      await settleHero(page)
+      const surfaces = await page.evaluate(() => {
+        const h1 = document.querySelector('main > section h1')
+        const out: Array<{ tag: string; alpha: number }> = []
+        for (let n: Element | null = h1; n && n.tagName !== 'BODY'; n = n.parentElement) {
+          const m = getComputedStyle(n).backgroundColor.match(/rgba?\(([^)]+)\)/)
+          const parts = m ? m[1].split(',').map((s) => Number.parseFloat(s)) : [0, 0, 0, 0]
+          out.push({ tag: n.tagName.toLowerCase() + (n.className ? '.' + String(n.className).split(' ')[0] : ''), alpha: parts[3] ?? 1 })
+        }
+        return out
+      })
+      const opaque = surfaces.find((s) => s.alpha >= 0.99)
+      expect(opaque, `no ancestor of the headline has an opaque background in forced colours: ${JSON.stringify(surfaces)}`).toBeTruthy()
+    })
+  })
+
+  test.describe('large text', () => {
+    test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+    test('at 200% text the copy neither overflows nor collides, on the narrowest phone', async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 568 })
+      await page.goto('/')
+      await settleHero(page)
+      await page.evaluate(() => { document.documentElement.style.fontSize = '200%' })
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+
+      const boxes = await copyBoxes(page)
+      const bar = await boxOf(header(page), 'header')
+      const heroBox = await boxOf(hero(page), 'hero')
+      const problems: string[] = []
+      for (let i = 0; i < boxes.length; i++) {
+        const { label, box } = boxes[i]
+        if (box.x < -0.5 || box.x + box.width > 320 + 0.5) problems.push(`${label} is cut by the viewport edge`)
+        if (box.y + box.height > heroBox.y + heroBox.height + 0.5) problems.push(`${label} is cut off by the hero's bottom`)
+        if (intersection(box, bar)) problems.push(`${label} is under the header`)
+        for (let j = i + 1; j < boxes.length; j++) {
+          if (intersection(box, boxes[j].box)) problems.push(`${label} overlaps ${boxes[j].label}`)
+        }
+      }
+      expect(problems, `At 200% text:\n  ${problems.join('\n  ')}`).toEqual([])
+    })
+  })
+})
+
+// ── With the consent notice up ───────────────────────────────────────────────
+
+test.describe('Hero — with the consent notice up', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  for (const viewport of VIEWPORTS) {
+    test(`${viewport.label}: the notice never hides the actions, or the visitor can reach them`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
+      await page.goto('/')
+      const notice = page.getByRole('dialog', { name: /analytics consent/i })
+      await expect(notice).toBeVisible()
+      await settleHero(page)
+      // The notice publishes its height and the hero's copy rides above it: give that one frame to land.
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+
+      const bannerBox = (await consentBox(page)) as Box
+      const boxes = await copyBoxes(page)
+      const bar = await boxOf(header(page), 'header')
+      const lowest = Math.max(...boxes.map((b) => b.box.y + b.box.height))
+      const copyTop = Math.min(...boxes.map((b) => b.box.y))
+      // Does the hero's copy fit *above* the notice at all? On a 320×568 phone it cannot: the header, the
+      // copy and a 260px notice do not share 568px. There the requirement is different, and honest: the
+      // actions must be reachable, and a focused one must not be hidden by the notice (WCAG 2.4.11).
+      const fits = lowest <= bannerBox.y + 0.5 && copyTop >= bar.y + bar.height - 0.5
+      const covered = boxes.filter(({ box }) => intersection(box, bannerBox))
+
+      if (fits) {
+        expect(
+          covered.map((c) => c.label),
+          `the notice covers ${covered.map((c) => c.label).join(', ')} at ${viewport.width}×${viewport.height}, where the copy fits above it`
+        ).toEqual([])
+        return
+      }
+
+      // Does not fit: every action the notice covers must scroll clear of it when focused.
+      for (const action of ['primary action', 'secondary action']) {
+        const target = copyNodes(page).find((n) => n.label === action)!.locator
+        await target.focus()
+        await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+        const after = await boxOf(target, action)
+        const stillCovered = intersection(after, bannerBox)
+        expect(
+          stillCovered,
+          `the focused ${action} is still under the consent notice at ${viewport.width}×${viewport.height}`
+        ).toBeNull()
+      }
+    })
+  }
+})
+
+// ── The focus ring on a veil ─────────────────────────────────────────────────
+
+test.describe('Hero — the focus ring where the copy lies on the photograph', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  test('the ring is drawn in a colour that can be seen against what surrounds the action', async ({ page, context }) => {
+    await context.addInitScript(([key]) => {
+      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
+    }, [CONSENT_KEY])
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await settleHero(page)
+    test.skip(media.mobile.variant !== 'overlay', 'the phone crop is a card: its ring sits on an opaque surface')
+
+    const action = copyNodes(page).find((n) => n.label === 'primary action')!.locator
+    await page.keyboard.press('Tab')
+    for (let i = 0; i < 12; i++) {
+      if (await action.evaluate((el) => el === document.activeElement)) break
+      await page.keyboard.press('Tab')
+    }
+    await expect(action).toBeFocused()
+
+    const ring = await action.evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { color: s.outlineColor, width: Number.parseFloat(s.outlineWidth), style: s.outlineStyle, offset: Number.parseFloat(s.outlineOffset) }
+    })
+    expect(ring.style).not.toBe('none')
+    expect(ring.width).toBeGreaterThanOrEqual(2)
+
+    // What surrounds the action, with the copy hidden: the band the ring is drawn on.
+    const target = await boxOf(action, 'primary action')
+    const heroEl = hero(page)
+    const heroBox = await boxOf(heroEl, 'hero')
+    await page.locator('.hj-hero-copy').evaluate((el) => { (el as HTMLElement).style.visibility = 'hidden' })
+    const png = PNG.sync.read(await heroEl.screenshot())
+    await page.locator('.hj-hero-copy').evaluate((el) => { (el as HTMLElement).style.visibility = '' })
+
+    const dpr = png.width / heroBox.width
+    const reach = ring.width + Math.max(0, ring.offset) + 1
+    const x0 = Math.floor((target.x - reach - heroBox.x) * dpr)
+    const x1 = Math.ceil((target.x + target.width + reach - heroBox.x) * dpr)
+    const y0 = Math.floor((target.y - reach - heroBox.y) * dpr)
+    const y1 = Math.ceil((target.y + target.height + reach - heroBox.y) * dpr)
+    const inner = {
+      x0: Math.ceil((target.x - heroBox.x) * dpr), x1: Math.floor((target.x + target.width - heroBox.x) * dpr),
+      y0: Math.ceil((target.y - heroBox.y) * dpr), y1: Math.floor((target.y + target.height - heroBox.y) * dpr),
+    }
+    const ringLuminance = relativeLuminance(parseCssColor(ring.color))
+    let worst = Number.POSITIVE_INFINITY
+    for (let y = Math.max(0, y0); y < Math.min(png.height, y1); y += 2) {
+      for (let x = Math.max(0, x0); x < Math.min(png.width, x1); x += 2) {
+        if (x >= inner.x0 && x < inner.x1 && y >= inner.y0 && y < inner.y1) continue // the action's own face
+        const i = (png.width * y + x) << 2
+        const ratio = contrastRatioFromLuminance(ringLuminance, relativeLuminance({ r: png.data[i], g: png.data[i + 1], b: png.data[i + 2] }))
+        if (ratio < worst) worst = ratio
+      }
+    }
+    expect(worst, `the focus ring (${ring.color}) is ${worst.toFixed(2)}:1 against what surrounds the action; WCAG 1.4.11 needs 3:1`).toBeGreaterThanOrEqual(3)
+  })
+})

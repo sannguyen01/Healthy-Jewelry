@@ -159,46 +159,57 @@ test.describe('Analytics consent', () => {
   })
 
   /**
-   * **The banner must not sit on top of anything a customer came to click.**
+   * **The banner must not sit on top of anything a visitor came to read or click in the hero.**
    *
-   * This started as a Checkout-button-only check, and `hero-legibility.spec.ts`
-   * promptly caught the banner covering both hero CTAs at 1024px — reporting
-   * 1.00:1 contrast, because the pixels behind "Shop Collection" *were* the
-   * banner. Guarding one button and not the others is how a class of bug survives
-   * being fixed, so this asserts the property across the widths the hero is known
-   * to change shape at.
+   * This started as a Checkout-button-only check, and `hero-legibility.spec.ts` promptly caught the banner
+   * covering both hero CTAs at 1024px — reporting 1.00:1 contrast, because the pixels behind the button
+   * *were* the banner. Guarding one button and not the others is how a class of bug survives being fixed, so
+   * this asserts the property across the widths the hero is known to change shape at, and for every piece of
+   * the hero's copy, not only the actions: since ADR 054 the copy sits in the lower part of a phone's first
+   * screen, exactly where a bottom-anchored notice lands, so the hero rides above the notice's published
+   * height. (The matrix over all eleven widths, including the phones too short for both, is in
+   * `hero-legibility.spec.ts`.)
    */
   for (const width of [1440, 1024, 900, 390]) {
-    test(`the banner clears the hero CTAs at ${width}px`, async ({ page }) => {
+    test(`the banner clears the hero's copy and actions at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/')
 
       const banner = page.getByRole('dialog', { name: /analytics consent/i })
       await expect(banner).toBeVisible()
+      // The hero rides above the notice's height once the notice has published it.
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
       const bannerBox = await banner.boundingBox()
       expect(bannerBox).not.toBeNull()
 
-      const ctas = page.locator('main a').filter({ hasText: /shop collection|our story/i })
-      const count = await ctas.count()
-      // A hero with no CTAs would make the loop vacuous — the shape of green that
-      // proves nothing.
-      expect(count).toBeGreaterThan(0)
+      const hero = page.locator('main > section').first()
+      const nodes = [
+        hero.getByText(/grade 23 titanium · niobium · 316l steel/i),
+        hero.getByRole('heading', { level: 1 }),
+        hero.getByText(/no stones\. no fillers/i),
+        hero.getByRole('link'),
+      ]
+      let measured = 0
+      for (const node of nodes) {
+        const count = await node.count()
+        for (let i = 0; i < count; i++) {
+          const target = node.nth(i)
+          const box = await target.boundingBox()
+          if (!box) continue
+          measured++
 
-      for (let i = 0; i < count; i++) {
-        const cta = ctas.nth(i)
-        const box = await cta.boundingBox()
-        if (!box) continue
+          const overlaps =
+            box.x < bannerBox!.x + bannerBox!.width &&
+            box.x + box.width > bannerBox!.x &&
+            box.y < bannerBox!.y + bannerBox!.height &&
+            box.y + box.height > bannerBox!.y
 
-        const overlaps =
-          box.x < bannerBox!.x + bannerBox!.width &&
-          box.x + box.width > bannerBox!.x &&
-          box.y < bannerBox!.y + bannerBox!.height &&
-          box.y + box.height > bannerBox!.y
-
-        expect(overlaps, `consent banner overlaps "${await cta.innerText()}" at ${width}px`).toBe(
-          false
-        )
+          expect(overlaps, `consent banner overlaps "${(await target.innerText()).trim()}" at ${width}px`).toBe(false)
+        }
       }
+      // A hero with nothing to measure would make the loop vacuous — the shape of green that proves nothing.
+      expect(measured).toBeGreaterThanOrEqual(5)
     })
   }
 
