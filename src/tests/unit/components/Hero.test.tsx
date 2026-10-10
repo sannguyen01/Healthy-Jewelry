@@ -10,8 +10,20 @@ vi.mock('next/image', () => ({
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={alt} className={className} />
   ),
-  getImageProps: ({ src, alt }: { src: string; alt: string }) => ({
-    props: { src, alt, srcSet: `${src} 1x` },
+  // The real one defaults `loading` to "lazy" unless it is asked for something else (get-img-props.js: `isLazy`), and
+  // returns what it was given as props. The mock says the same, so a test sees what the browser would be handed.
+  getImageProps: ({
+    src,
+    alt,
+    loading,
+    fetchPriority,
+  }: {
+    src: string
+    alt: string
+    loading?: 'lazy' | 'eager'
+    fetchPriority?: 'high' | 'low' | 'auto'
+  }) => ({
+    props: { src, alt, srcSet: `${src} 1x`, loading: loading ?? 'lazy', fetchPriority },
   }),
 }))
 
@@ -108,6 +120,18 @@ describe('Hero — one composition (ADR 054)', () => {
     expect(picture.querySelector('source')?.getAttribute('media')).toBe('(max-width: 900px)')
     expect(picture.querySelector('source')?.getAttribute('srcset')).toContain('hero-portrait.jpg')
     expect(picture.querySelector('img')?.getAttribute('src')).toContain('hero-banner.jpg')
+  })
+
+  it('asks for the picture\'s file at once and at high priority, not lazily, when it has to be a picture', () => {
+    // A preload would fetch both files and defeat the art direction, so the one <img> must say it is the first
+    // screen. Left alone the framework defaults it to loading="lazy": the browser then holds the request until layout
+    // says the box is in view, a delay on the largest thing on the page.
+    const { container } = render(
+      <Hero media={record((m) => { m.mobile.src = '/images/lifestyle/hero-portrait.jpg' })} headlineLines={LINES} />
+    )
+    const img = container.querySelector('picture img') as HTMLImageElement
+    expect(img.getAttribute('loading')).toBe('eager')
+    expect(img.getAttribute('fetchpriority')).toBe('high')
   })
 
   it('bounds the card by the token, and only when some crop is a card', () => {

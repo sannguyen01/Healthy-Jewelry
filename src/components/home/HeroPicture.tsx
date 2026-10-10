@@ -11,7 +11,7 @@ import type { HeroMedia } from '@/lib/catalog'
  *
  * **Two files** is what real photography brings: a landscape for a wide screen and a portrait for a phone.
  * Then the browser must choose which file to fetch, and only a `<source media>` can say so; a preload cannot
- * (it would fetch both, which defeats art direction), so the `<img>` asks for high priority instead. The
+ * (it would fetch both, which defeats art direction), so the `<img>` asks to load at once and at high priority instead. The
  * breakpoint is the 900px of every other hero rule and is one of the sizes `design-layers` allows. The
  * `<picture>` is a block that fills the media wrapper exactly, because a `display: contents` or inline parent
  * would make `layout-invariants.spec.ts` compare the image's box with the wrong container.
@@ -25,14 +25,17 @@ export function HeroPicture({ media }: { media: HeroMedia }) {
     return <Image className="hj-hero-photo" src={desktop.src} alt={alt} fill preload sizes="100vw" />
   }
 
-  const common = { alt, fill: true as const, sizes: '100vw' }
+  // `loading: 'eager'` is asked for, not assumed: without `priority` or `preload` the framework answers every image
+  // with `loading="lazy"`, and a lazy <img> is held back until layout has put its box in view, which is a delay on the
+  // largest thing on the first screen. `fetchPriority` alone does not undo it.
+  const common = { alt, fill: true as const, sizes: '100vw', loading: 'eager' as const, fetchPriority: 'high' as const }
   const wide = getImageProps({ ...common, src: desktop.src }).props
   const narrow = getImageProps({ ...common, src: mobile.src }).props
 
   return (
     <picture className="hj-hero-picture">
       <source media="(max-width: 900px)" srcSet={narrow.srcSet} />
-      <img {...wide} alt={alt} className="hj-hero-photo" fetchPriority="high" />
+      <img {...wide} alt={alt} className="hj-hero-photo" />
     </picture>
   )
 }
