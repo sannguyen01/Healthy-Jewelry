@@ -31,6 +31,9 @@ import {
  * the banner and then hiding it would flash it at every returning visitor who
  * already answered — so it stays null until the stored choice has been read.
  */
+/** The custom property the notice writes on the root while it is showing; the hero and the document read it. */
+const CONSENT_ROOM_PROPERTY = '--hj-consent-h'
+
 export function ConsentBanner() {
   const [consent, setConsent] = useState<ConsentState | null>(null)
   // How many times "Measurement preferences" has asked for the prompt since it last closed:
@@ -63,7 +66,37 @@ export function ConsentBanner() {
     if (openRequests > 0) dialog.current?.querySelector('button')?.focus()
   }, [openRequests])
 
-  if (consent === null || (!shouldAskForConsent(consent) && !reopened)) return null
+  const showing = consent !== null && (shouldAskForConsent(consent) || reopened)
+
+  // While the notice is up, tell the page how much of the screen it takes (ADR 054). It is anchored to the
+  // bottom, and the hero's copy sits in the lower part of its first screen, so the hero rides above it by this
+  // much (`--hj-consent-h`) and the document's `scroll-padding-bottom` keeps a focused control clear of it
+  // (WCAG 2.4.11). Measured from the notice's layout top edge to the bottom of the screen, so the gap beneath it
+  // counts; rounded up, so the room is never under-reserved. Taken back the moment the notice goes.
+  useEffect(() => {
+    const el = dialog.current
+    if (!showing || !el) return
+    const root = document.documentElement
+    const publish = () => {
+      // `offsetTop`, not `getBoundingClientRect().top`: the notice enters with a `translateY` animation, so its
+      // painted top is 24px low until the animation ends, and nothing resizes when it does, so the observer
+      // never re-reads it. The layout position is the one that does not move (measured: the room was
+      // published 23px short, and the hero's action sat 21px under the notice at 375×667).
+      const room = Math.max(0, Math.ceil(window.innerHeight - el.offsetTop))
+      root.style.setProperty(CONSENT_ROOM_PROPERTY, `${room}px`)
+    }
+    publish()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish)
+    observer?.observe(el)
+    window.addEventListener('resize', publish)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', publish)
+      root.style.removeProperty(CONSENT_ROOM_PROPERTY)
+    }
+  }, [showing])
+
+  if (consent === null || !showing) return null
 
   const choose = (next: 'granted' | 'denied') => {
     writeConsent(window.localStorage, next)
@@ -86,21 +119,21 @@ export function ConsentBanner() {
 
           It was a centred 620px bar, and `hero-legibility.spec.ts` caught it
           sitting directly on top of both hero CTAs at 1024px — reporting 1.00:1
-          contrast, because the pixels behind "Shop Collection" were the banner's
+          contrast, because the pixels behind the primary action were the banner's
           own `--bg`. A consent notice covering the two primary calls to action on
           the landing page is a conversion bug caused by a compliance control, and
           it is the failure `analytics.spec.ts` now guards across four widths.
           Guarding one control and not the others is how a class of bug survives
           being fixed.
 
-          Right-hand side because the hero is a split at ≥901px: copy and CTAs
-          left, photograph right. Overlapping part of a photograph is a cost worth
-          paying; overlapping the buttons is not.
+          Right-hand side because the hero's copy sits at the start edge of the
+          photograph (ADR 054): overlapping part of a photograph is a cost worth
+          paying; overlapping the buttons is not. And the hero rides above the
+          notice by the room it publishes (`--hj-consent-h`), so on a phone, where
+          the notice is nearly full width, the copy still clears it.
         */
         position: 'fixed',
         right: 'var(--space-gutter)',
-        // `left` only below the split, where the hero stacks and full width reads
-        // better than a floating card.
         left: 'auto',
         bottom: 'clamp(16px, 3vw, 32px)',
         zIndex: 'var(--z-consent)',

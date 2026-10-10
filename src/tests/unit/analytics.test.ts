@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement } from 'react'
@@ -411,5 +411,107 @@ describe('consent can be withdrawn from the site', () => {
         },
       })
     ).not.toThrow()
+  })
+})
+
+describe('the notice publishes the room it takes (ADR 054)', () => {
+  // The hero's copy rides above a bottom-anchored notice, so the page needs to know how much of the screen the
+  // notice occupies: from its top edge (its layout position, which an entrance transform does not move) to the
+  // bottom of the viewport, which includes the gap beneath it.
+  const PROPERTY = '--hj-consent-h'
+  const published = () => document.documentElement.style.getPropertyValue(PROPERTY)
+
+  let top = 600
+  let resizeCallback: (() => void) | undefined
+
+  beforeEach(() => {
+    localStorage.removeItem(CONSENT_STORAGE_KEY)
+    document.documentElement.style.removeProperty(PROPERTY)
+    top = 600
+    resizeCallback = undefined
+    Object.defineProperty(window, 'innerHeight', { value: 844, configurable: true })
+    // The layout position, not the painted one: the notice enters with a `translateY` animation, and a box
+    // measured mid-entrance is 24px low (the published room was 23px short when it read getBoundingClientRect).
+    // So the rect is made to lie about where the notice is, and only `offsetTop` tells the truth.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: top + 24, bottom: top + 224, height: 200, left: 0, right: 0, width: 0, x: 0, y: top + 24, toJSON: () => ({}) }) as DOMRect
+    )
+    vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(() => top)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          resizeCallback = cb
+        }
+        observe() {}
+        disconnect() {}
+      }
+    )
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    cleanup()
+    document.documentElement.style.removeProperty(PROPERTY)
+  })
+
+  it('writes the space from the notice\'s top edge to the bottom of the screen while it is showing', () => {
+    render(createElement(ConsentBanner))
+    expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeTruthy()
+    expect(published()).toBe('244px')
+  })
+
+  it('writes nothing while the notice is not showing', () => {
+    writeConsent(localStorage, 'denied')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('')
+  })
+
+  it('takes it back the moment the visitor answers', () => {
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
+    expect(published()).toBe('')
+  })
+
+  it('takes it back when the notice unmounts', () => {
+    const { unmount } = render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+    unmount()
+    expect(published()).toBe('')
+  })
+
+  it('follows the notice when its size changes (a longer line, a rotated phone)', () => {
+    render(createElement(ConsentBanner))
+    top = 500
+    act(() => resizeCallback?.())
+    expect(published()).toBe('344px')
+  })
+
+  it('follows the window when it is resized', () => {
+    render(createElement(ConsentBanner))
+    Object.defineProperty(window, 'innerHeight', { value: 700, configurable: true })
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(published()).toBe('100px')
+  })
+
+  it('publishes it when the prompt is reopened from the footer, and takes it back after', () => {
+    writeConsent(localStorage, 'granted')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('')
+    act(() => openConsentPreferences())
+    expect(published()).toBe('244px')
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }))
+    expect(published()).toBe('')
+  })
+
+  it('does not throw where ResizeObserver does not exist', () => {
+    vi.unstubAllGlobals()
+    vi.stubGlobal('ResizeObserver', undefined)
+    expect(() => render(createElement(ConsentBanner))).not.toThrow()
+    expect(published()).toBe('244px')
   })
 })

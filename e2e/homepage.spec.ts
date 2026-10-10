@@ -15,9 +15,12 @@ test.describe('Homepage', () => {
     await expect(hero).toBeVisible()
   })
 
-  test('hero contains CTA link to shop', async ({ page }) => {
-    const shopLink = page.getByRole('link', { name: /shop/i }).first()
-    await expect(shopLink).toBeVisible()
+  test('the hero\'s primary action leads to the pieces', async ({ page }) => {
+    // It matched the first link anywhere whose name said "shop", which was the hero's "Shop Collection" until
+    // the label stopped saying it (nothing here can be bought). The control it meant is the hero's first action.
+    const action = page.locator('main > section').first().getByRole('link').first()
+    await expect(action).toBeVisible()
+    await expect(action).toHaveAttribute('href', '/shop')
   })
 
   test('the dark care band is present (ADR 040)', async ({ page }) => {

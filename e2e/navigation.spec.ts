@@ -74,8 +74,11 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL('/')
   })
 
-  test('Collection nav link navigates to /shop', async ({ page }) => {
-    const link = page.getByRole('link', { name: /collection/i }).first()
+  test('the hero\'s primary action navigates to the pieces at /shop', async ({ page }) => {
+    // It was "Collection nav link", and resolved to the hero's "Shop Collection" button by accident of its
+    // label: the header has no such link. The control it meant is the hero's primary action (ADR 054 names it
+    // "Explore the pieces"; the label itself is pinned by Hero.test.tsx).
+    const link = page.locator('main > section').first().getByRole('link', { name: /explore the pieces/i })
     await link.click()
     await expect(page).toHaveURL(/\/shop/)
   })

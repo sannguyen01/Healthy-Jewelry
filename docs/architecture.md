@@ -75,7 +75,7 @@ is out of reach by construction, which for this site is a feature.
 | Pages | `src/app/**/page.tsx` own their `<main id="main">`, call `Nav` and `Footer`, and emit their own metadata and JSON-LD | `e2e/a11y.spec.ts` (every page has the skip link's target), `e2e/metadata.spec.ts` |
 | Components | `layout/` chrome, `home/` the seven beats ([ADR 040](adr/040-seven-beats-one-strip.md)), `product/`, `ui/` atoms, `seo/`, `contact/`, `svg/` | `homepage-composition-contract.test.ts` |
 | Styling | Tailwind v4 for the reset and utilities; the design system is CSS custom properties in `globals.css` | §4.1 |
-| Imagery | local files through `next/image`; no `remotePatterns`; transparent lossless brand mark | `brand-mark-asset.test.ts`, `visual-assets.spec.ts` |
+| Imagery | local files through `next/image`; no `remotePatterns`; transparent lossless brand mark; the home hero's art direction (crop, focal point, subject box, variant, provenance) is a validated record read through the catalogue reader ([ADR 054](adr/054-one-hero-one-coordinate-system.md)) | `brand-mark-asset.test.ts`, `visual-assets.spec.ts`, `hero-media.test.ts`, `cover-crop.test.ts`, `hero-legibility.spec.ts` |
 | Structured data | Organization and WebSite on the home page, Product and BreadcrumbList on pieces and listings, **no** `offers`, `price` or `availability` | `e2e/metadata.spec.ts`, `price-absence-contract.test.tsx` |
 | Fonts | two self-hosted families, four static files, 70.6 KB preloaded | `font-files.test.ts`, `typography-weights.test.ts` ([ADR 052](adr/052-the-original-pair-on-the-quiet-archive.md)) |
 

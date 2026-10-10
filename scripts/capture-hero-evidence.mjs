@@ -98,29 +98,48 @@ async function startServer(port) {
   throw new Error(`next start did not answer on ${url} within 30s (did you run pnpm build?)`)
 }
 
-/** Everything a reviewer needs to trust the picture: fonts settled, every image decoded. */
+/**
+ * An image a visitor can see in the first screen. Lazy images below the fold never load until scrolled
+ * to, so waiting for *every* image would wait forever; the picture only has to be true of what is on it.
+ */
+const IN_VIEWPORT = `(img) => {
+  const r = img.getBoundingClientRect()
+  return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight
+}`
+
+/** Everything a reviewer needs to trust the picture: fonts settled, every visible image decoded. */
 async function settle(page) {
   await page.waitForLoadState('load')
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
-  await page.evaluate(async () => {
-    await document.fonts.ready
-    await Promise.all(
-      [...document.images].map((img) => (img.complete ? null : new Promise((r) => { img.onload = img.onerror = r }))),
-    )
-  })
+  await page.evaluate(
+    async (inViewport) => {
+      const visible = new Function(`return ${inViewport}`)()
+      await document.fonts.ready
+      const pending = [...document.images]
+        .filter(visible)
+        .filter((img) => !img.complete)
+        .map((img) => new Promise((r) => { img.onload = img.onerror = r }))
+      // A ceiling, not a wait: an image that never answers is reported by `imagesLoaded: false`, not hung on.
+      await Promise.race([Promise.all(pending), new Promise((r) => setTimeout(r, 10000))])
+    },
+    IN_VIEWPORT,
+  )
   await page.evaluate(
     () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
   )
 }
 
 const loadState = (page) =>
-  page.evaluate(() => ({
-    fontsLoaded: document.fonts.status === 'loaded',
-    imagesLoaded: [...document.images].every((i) => i.complete && i.naturalWidth > 0),
-    headerState: document.querySelector('.hj-header')?.getAttribute('data-state') ?? null,
-    headerTone: document.querySelector('.hj-header')?.getAttribute('data-tone') ?? null,
-    scrollY: Math.round(window.scrollY),
-  }))
+  page.evaluate((inViewport) => {
+    const visible = new Function(`return ${inViewport}`)()
+    return {
+      fontsLoaded: document.fonts.status === 'loaded',
+      imagesLoaded: [...document.images].filter(visible).every((i) => i.complete && i.naturalWidth > 0),
+      headerState: document.querySelector('.hj-header')?.getAttribute('data-state') ?? null,
+      headerTone: document.querySelector('.hj-header')?.getAttribute('data-tone') ?? null,
+      scrollY: Math.round(window.scrollY),
+    }
+  }, IN_VIEWPORT)
 
 async function main() {
   const args = parseArgs(process.argv.slice(2))

@@ -52,14 +52,23 @@ export async function sampleBackdrop(page: Page, locator: Locator): Promise<Rgb[
   await setGlyphsTransparent(false)
 
   const png = PNG.sync.read(buffer)
-  // Trim the outermost device pixels (an anti-aliased rim of whatever sits just outside) and the arc of a
-  // rounded corner: a corner pixel is not what a label is read against. r * dpr * (1 - 1/sqrt2) along the
-  // diagonal, a pixel for the rim and one for the rounding of the screenshot's box.
-  const { radius, dpr } = await locator.evaluate((el) => ({
-    radius: Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0,
-    dpr: window.devicePixelRatio,
-  }))
-  const cornerInset = Math.ceil(radius * dpr * (1 - Math.SQRT1_2)) + 2
+  // Trim the outermost device pixels (an anti-aliased rim of whatever sits just outside) and the control's own
+  // edge: a corner pixel, or a pixel of the control's border, is not what its label is read against. Along the
+  // diagonal of a rounded corner the border's inner edge is at r(1 - 1/sqrt2) + b/sqrt2 from each side, in CSS
+  // pixels, so that, times the device pixel ratio, plus a pixel for the rim and one for the rounding of the
+  // screenshot's box. The border term matters: at 2.625 device pixels per CSS pixel a ghost button's 1px light
+  // border is 2.6 device pixels thick and curves through a region that looked clear of it, and the sampler read
+  // the border (a --mist pixel, 2.1:1 against light type) as the backdrop. Which pixels a stride of three
+  // happened to land on decided whether it was seen, so it passed at 390px and failed at 900px.
+  const { radius, border, dpr } = await locator.evaluate((el) => {
+    const style = getComputedStyle(el)
+    return {
+      radius: Number.parseFloat(style.borderTopLeftRadius) || 0,
+      border: Number.parseFloat(style.borderTopWidth) || 0,
+      dpr: window.devicePixelRatio,
+    }
+  })
+  const cornerInset = Math.ceil((radius * (1 - Math.SQRT1_2) + border * Math.SQRT1_2) * dpr) + 2
   const inset = Math.min(
     Math.max(SAMPLE_INSET_PX, cornerInset),
     Math.floor(Math.min(png.width, png.height) / 4)

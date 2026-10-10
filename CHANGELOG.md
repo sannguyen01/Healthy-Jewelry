@@ -4,6 +4,22 @@ Dated record of what shipped, derived from PR and commit history. Newest first.
 Not every commit is listed — see `git log` for full detail; this tracks
 user-visible or architecturally significant changes.
 
+## 2026-10-10 — One hero, one coordinate system (ADR 054)
+
+- **The phone hero opens as the photograph**, not as a page header over it: one image-led composition on every width,
+  with the header and the copy layered inside it. The crop for a wide screen and a narrow one, the box the subject
+  occupies, the copy corner and the variant are a validated record (`src/content/hero/home.json`), and the record states
+  where the photograph came from. The hero is a server component; its entrance is CSS.
+- **The header's state follows the hero**, not `scrollY > 60`: over the hero on the home page, solid from the first byte
+  everywhere else, inert page behind the open menu. `--header-height` is written once.
+- **The consent notice publishes the room it takes**, so the hero's copy rides above it and a focused control is never
+  hidden by it.
+- **Measured, not asserted**: eleven widths (900 and 901 both), worst-pixel contrast for the copy and the header with the
+  photograph present and blocked, the subject in frame and clear of the copy, and no motion, no script, forced colours,
+  large text and the consent notice. The old "half the frame" floor became a subject floor.
+- **Found on the way**: the interim photograph carries a trained-algorithmic provenance marker and shows jewellery that is not
+  ours; it is recorded and gated, not hidden.
+
 ## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
 
 - **The merge gate is proven.** The repaired ruleset read back conclusive. Then the v2 canary

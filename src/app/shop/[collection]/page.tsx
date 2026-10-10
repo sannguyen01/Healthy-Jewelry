@@ -96,7 +96,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
       />
       <JsonLd type="BreadcrumbList" data={breadcrumbJsonLd(breadcrumbItems)} />
       <Nav />
-      <main id="main" tabIndex={-1} style={{ paddingTop: '64px' }}>
+      <main id="main" tabIndex={-1} style={{ paddingTop: 'var(--header-height)' }}>
         <Breadcrumbs items={breadcrumbItems} />
 
         {/* Collection header */}

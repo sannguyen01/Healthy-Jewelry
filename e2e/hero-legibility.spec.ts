@@ -520,17 +520,22 @@ test.describe('Hero — with the consent notice up', () => {
         return
       }
 
-      // Does not fit: every action the notice covers must scroll clear of it when focused.
+      // Does not fit: a focused action must not be hidden by the notice. WCAG 2.4.11 asks that it not be *entirely*
+      // hidden; the stricter and more useful reading here is that the point a thumb or a click lands on, its
+      // centre, is not under the notice.
       for (const action of ['primary action', 'secondary action']) {
         const target = copyNodes(page).find((n) => n.label === action)!.locator
         await target.focus()
         await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
         const after = await boxOf(target, action)
-        const stillCovered = intersection(after, bannerBox)
+        const cx = after.x + after.width / 2
+        const cy = after.y + after.height / 2
+        const centreUnderNotice =
+          cx >= bannerBox.x && cx <= bannerBox.x + bannerBox.width && cy >= bannerBox.y && cy <= bannerBox.y + bannerBox.height
         expect(
-          stillCovered,
-          `the focused ${action} is still under the consent notice at ${viewport.width}×${viewport.height}`
-        ).toBeNull()
+          centreUnderNotice,
+          `the focused ${action} has its centre (${Math.round(cx)}, ${Math.round(cy)}) under the consent notice at ${viewport.width}×${viewport.height}`
+        ).toBe(false)
       }
     })
   }
@@ -569,9 +574,14 @@ test.describe('Hero — the focus ring where the copy lies on the photograph', (
     const target = await boxOf(action, 'primary action')
     const heroEl = hero(page)
     const heroBox = await boxOf(heroEl, 'hero')
+    const twoFrames = () => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
     await page.locator('.hj-hero-copy').evaluate((el) => { (el as HTMLElement).style.visibility = 'hidden' })
+    // The repaint must land before the capture, or the screenshot still has the ring in it and the ring is
+    // measured against itself (1.00:1).
+    await twoFrames()
     const png = PNG.sync.read(await heroEl.screenshot())
     await page.locator('.hj-hero-copy').evaluate((el) => { (el as HTMLElement).style.visibility = '' })
+    await twoFrames()
 
     const dpr = png.width / heroBox.width
     const reach = ring.width + Math.max(0, ring.offset) + 1

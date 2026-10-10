@@ -637,6 +637,44 @@ meets imagery:
   averaging hides a light word sitting on one pale patch of an otherwise dark photo, which is exactly
   the failure worth catching.
 
+### …and the crop is a decision, so the test reads it from the record (ADR 054)
+
+Everything above was written for a hero that was two compositions. Since
+[ADR 054](adr/054-one-hero-one-coordinate-system.md) it is one, and the questions changed with it:
+`hero-legibility.spec.ts` now runs eleven widths, 900 and 901 both, because the breakpoint itself is
+where the two used to diverge. What it asks, and why each could not be asked before:
+
+- **Is the photograph the first screen?** The old spec asked whether copy strayed onto the photograph;
+  a hero that begins a third of the way down the page passes that. This asks where the photograph
+  *begins*, and what is painted between the visitor and it.
+- **Is the subject in frame, and clear of the copy?** "At least half the source frame is visible" could
+  not hold for a viewport-filling phone hero (a landscape source shows about a quarter of its width
+  there), and as a floor it said nothing about *what* survived. The crop is now data
+  (`src/content/hero/home.json`: a focal point and the box the subject occupies, for each of two
+  crops), and the test computes the visible region with `coverVisibleRect` from the record and checks it
+  against the box and `object-position` the browser actually used. The arithmetic has its own unit
+  tests (`cover-crop.test.ts`); the browser test is what checks the CSS applies the record.
+- **Can the header be read over the photograph?** Nothing measured it: the spec sampled five hero text
+  nodes. The sampler moved to `e2e/support/backdropContrast.ts` so the header's controls and the copy
+  are held to the same worst-pixel measurement, with the photograph present and with it blocked (the
+  dark floor behind the veil must carry the copy by itself).
+- **Locate by what two compositions share.** The geometry tests find the photograph, the header and the
+  actions by structure (`main > section`, the first image, the first two links), not by class names the
+  new composition introduces, so on the old page they fail as *geometry* ("the photograph begins 536px
+  down") and not as "a selector is missing". The labels are pinned once, by `Hero.test.tsx`.
+- **A test's own sampler can be wrong, and the failure looks like the page's.** The first run of the
+  new header and copy checks failed at 900px on a phone and passed at 390px: the sampler's inset cleared
+  a rounded corner but not the control's own border, which at 2.625 device pixels per CSS pixel curves
+  through the corner region, and a light border read as the backdrop of light type. Which pixels a
+  stride of three landed on decided whether it was seen. A second failure was 1.00:1 on a focus ring: the
+  screenshot was taken before the repaint that hid the ring, so the ring was measured against itself.
+  Both were found by looking at the pixels, not by loosening the threshold.
+- **Measure the layout box, not the painted one, for a published size.** The consent notice enters with
+  a transform animation, so its painted top is lower than its layout top until the animation ends, and
+  nothing resizes when it does. Its published height was 23px short, and a hero action sat under the
+  notice on a short phone. `analytics.test.ts` makes `getBoundingClientRect` lie by the animation's
+  offset so that only `offsetTop` can pass.
+
 ### …and legibility is not composition
 
 `hero-legibility.spec.ts` can be perfect while the page around it says the same thing three times.

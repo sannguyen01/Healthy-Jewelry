@@ -158,8 +158,8 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     // real 1913, and nothing compared it to anything — the fix at the time was prose telling
     // readers not to trust it. This is the comparison that prose stood in for.
     doc: CONVENTIONS,
-    context: '**128 unit spec files**',
-    claimed: '128',
+    context: '**131 unit spec files**',
+    claimed: '131',
     actual: () => String(countFiles('src/tests', (f) => /\.test\.tsx?$/.test(f))),
   },
   {
@@ -279,8 +279,10 @@ const LIVE: Array<{ doc: string; context: string; claimed: string; actual: () =>
     doc: 'CLAUDE.md',
     context: 'breakpoint at 900px',
     claimed: '900px',
+    // The width at which the hero takes its narrow crop (ADR 054): the stylesheet's own rule for it, which
+    // was a `<style>` inside Hero.tsx until the hero stopped being two compositions.
     actual: () =>
-      `${read('src/components/home/Hero.tsx').match(/@media \(max-width: (\d+)px\)/)?.[1]}px`,
+      `${read('src/app/globals.css').match(/@media \(max-width: (\d+)px\) \{\s*\.hj-hero \{/)?.[1]}px`,
   },
   {
     doc: 'CLAUDE.md',
@@ -394,6 +396,12 @@ const HISTORICAL: Array<{ doc: string; context: string }> = [
   { doc: 'docs/testing-strategy.md', context: 'Testing at 390px and 1280px' },
   { doc: 'docs/testing-strategy.md', context: '1280px and 1440px would have missed it' },
   { doc: 'docs/testing-strategy.md', context: 'not just a width either side of the boundary. 901p' },
+  // ADR 054's measurements, recorded as they were taken (2026-10-10): what the new hero specs reported on the
+  // old page, and the two defects in the specs' own sampling that the first run found.
+  { doc: 'docs/testing-strategy.md', context: 'the photograph begins 536px' },
+  { doc: 'docs/testing-strategy.md', context: 'failed at 900px on a phone and passed at 390px' },
+  { doc: 'docs/testing-strategy.md', context: 'A second failure was 1.00:1 on a focus ring' },
+  { doc: 'docs/testing-strategy.md', context: 'Its published height was 23px short' },
 ]
 
 describe('the sweep found documents to sweep', () => {

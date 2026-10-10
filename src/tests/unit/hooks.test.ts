@@ -1,83 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { useScrolled } from '@/lib/hooks/useScrolled'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook } from '@testing-library/react'
 import { useMedia, useIsMobile, useIsTablet } from '@/lib/hooks/useMedia'
 
-// ── useScrolled ────────────────────────────────────────────────────────────
-
-const setScrollY = (value: number) => {
-  Object.defineProperty(window, 'scrollY', {
-    value,
-    writable: true,
-    configurable: true,
-  })
-}
-
-describe('useScrolled', () => {
-  afterEach(() => {
-    setScrollY(0)
-  })
-
-  it('returns false when scrollY is 0 (default threshold 60)', () => {
-    setScrollY(0)
-    const { result } = renderHook(() => useScrolled())
-    expect(result.current).toBe(false)
-  })
-
-  it('returns true when scrollY exceeds the 60px default threshold', () => {
-    setScrollY(61)
-    const { result } = renderHook(() => useScrolled())
-    expect(result.current).toBe(true)
-  })
-
-  it('returns false when scrollY exactly equals the threshold (strict >)', () => {
-    setScrollY(60)
-    const { result } = renderHook(() => useScrolled(60))
-    expect(result.current).toBe(false)
-  })
-
-  it('respects a custom threshold', () => {
-    setScrollY(25)
-    const { result } = renderHook(() => useScrolled(20))
-    expect(result.current).toBe(true)
-  })
-
-  it('transitions to true when a scroll event fires', () => {
-    setScrollY(0)
-    const { result } = renderHook(() => useScrolled(60))
-    expect(result.current).toBe(false)
-
-    act(() => {
-      setScrollY(80)
-      window.dispatchEvent(new Event('scroll'))
-    })
-
-    expect(result.current).toBe(true)
-  })
-
-  it('transitions back to false when scroll returns below threshold', () => {
-    setScrollY(80)
-    const { result } = renderHook(() => useScrolled(60))
-    expect(result.current).toBe(true)
-
-    act(() => {
-      setScrollY(20)
-      window.dispatchEvent(new Event('scroll'))
-    })
-
-    expect(result.current).toBe(false)
-  })
-
-  it('cleans up the scroll listener on unmount', () => {
-    const removeSpy = vi.spyOn(window, 'removeEventListener')
-    const { unmount } = renderHook(() => useScrolled(60))
-    unmount()
-    expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function))
-    removeSpy.mockRestore()
-  })
-})
-
 // ── useMedia ───────────────────────────────────────────────────────────────
+// (`useScrolled` was here until ADR 054: the header's state now follows the hero's end marker; see hero-overlay.test.ts.)
 
 type MockMQ = {
   matches: boolean

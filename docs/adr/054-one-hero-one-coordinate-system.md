@@ -108,7 +108,7 @@ What it found on the way:
 - Every page's header was transparent for its first 60px, whether or not the page had a hero.
 - The photograph's own provenance was written down nowhere in the repository.
 
-Measured values (veil strengths, focal points, subject box, header tone) are recorded under "Integration" below.
+Measured values (veil strengths, focal points, subject box, header tone, the phone floor) are recorded under "Integration" below.
 
 ## What this does not do
 
@@ -123,4 +123,47 @@ Measured values (veil strengths, focal points, subject box, header tone) are rec
 
 ## Integration
 
-Recorded after the rendered-pixel run (see the pull request for the matrix and the receipt).
+Recorded after the rendered-pixel run on a local production build (2026-10-10; the screenshot matrix and its manifest
+are `scripts/capture-hero-evidence.mjs`, and the pull request has the receipt). Worst pixel behind each node, as
+`e2e/support/backdropContrast.ts` samples it: the header's MENU control, brand name, search control and CONTACT link,
+and the hero's eyebrow, headline, sentence and two actions. AA asks 4.5:1 of this small type.
+
+| Viewport | Variant | Hero height | Header, worst | Copy, worst |
+|---|---|---|---|---|
+| 320×568 | overlay | 720 | 14.8 | 6.2 |
+| 360×640 | overlay | 720 | 8.4 | 6.0 |
+| 375×667 | overlay | 720 | 11.0 | 6.2 |
+| 390×844 | overlay | 844 | 12.9 | 6.1 |
+| 430×932 | overlay | 932 | 13.9 | 6.1 |
+| 768×1024 | overlay | 1024 | 14.7 | 6.1 |
+| 900×900 | overlay | 900 | 14.7 | 5.9 |
+| 901×900 | card | 900 | 14.8 | 6.4 |
+| 1024×768 | card | 768 | 14.7 | 6.4 |
+| 1280×900 | card | 900 | 14.7 | 6.4 |
+| 1440×900 | card | 900 | 14.5 | 6.4 |
+
+What the numbers decided:
+
+- **Header tone is `dark` for this photograph.** Light type on a top veil measured about 3.2:1 on its sky and needs about
+  two thirds of the sky darkened to reach 4.5:1; ink on a veil of the page ground clears 8:1 everywhere. The record can
+  flip to `light` for a darker photograph with no code change; the test decides whether it may.
+- **The bottom veil is 72%, and it is deliberately not lower.** Over the brightest pixels of this photograph (white foam, a
+  cream garment) 64% would sit at the edge of 4.5:1, and the local Chromium is not the one CI uses. The headroom is the
+  cost of that. A veil of fixed height failed first: the eyebrow, at the top of the copy, sat on the part of it that had
+  already faded (2.1:1). The veil is now in the copy's own grid row, as tall as the copy plus a fade above it.
+- **The phone floor is 720, not the 640 the brief proposed.** At the two narrowest phones the sentence wraps and the copy is
+  400px tall; with the header above it and the face clear of it the hero needs about 713px. At 640 the eyebrow landed on the
+  face by 22px. One floor for every width, so the override under the breakpoint is gone.
+- **The focal points** are 80% by 40% for the narrow crop and 69% by 45% for the wide one; the subject (face and hair) is the
+  box from 62% to 84% across and 4% to 36% down. At 390×844 the narrow crop shows about a quarter of the photograph's width,
+  and the whole subject is inside it.
+- **The consent notice's room is its layout position, not its painted one.** Read from the painted box it was 23px short
+  while the notice was still in its entrance animation, and nothing resizes when the animation ends, so the observer never
+  corrected it; an action sat 21px under the notice at 375×667. `offsetTop` does not move.
+- **A test's own sampler was wrong twice, and both looked like the page's fault**: a ghost button's own light border, curving
+  through the sampled corner at 2.625 device pixels per CSS pixel, was read as the backdrop of light type (found at 900px on
+  a phone, missed at 390px by which pixels a stride of three landed on); and a focus ring was measured against itself because
+  the capture beat the repaint that hid it.
+- **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (the narrowest two) the
+  actions cannot all be above it. The requirement there is the honest one: a focused action is not hidden, its centre is clear
+  of the notice (WCAG 2.4.11 asks that it not be entirely hidden), and answering the notice returns the room.

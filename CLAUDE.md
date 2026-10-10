@@ -169,8 +169,15 @@ in `DESIGN.md`, "Reference: Songmont" — read that before changing a token, a s
   `--graphite` running text
 - Single dark interruption: the Care band (`CareSection`, ADR 040). The campaign band it
   replaced is gone
-- Nav: transparent over the hero → solid `--bg` with a hairline (scrollY > 60). Flat: no blur,
-  no shadow (`design-consistency.test.ts`). It said "frosted glass" until 2026-10-04.
+- Nav: three states, and the state is a fact about the page, not a distance scrolled
+  ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)). `hero-overlay` lies over the hero, on `/`
+  alone (`<Nav overHero />`), with light type on a darkened band or ink on a light one as the hero
+  record's `headerTone` says; `solid` is `--bg` with a hairline, which every other page is from its
+  first byte and `/` becomes once the hero's own end marker (`[data-hero-end]`, read by
+  `useHeroOverlay`) has passed the top; `menu-open` is the flat bar over the archive, with `main` and
+  the footer inert. It read `scrollY > 60` on every route until 2026-10-10, so a page with no hero was
+  transparent for its first stretch. Flat: no blur, no shadow (`design-consistency.test.ts`). It said
+  "frosted glass" until 2026-10-04. The bar's height is `--header-height`, written once.
 - Cards: image + name + material — never a price (see "No prices, anywhere"). Listing cards crop
   3:4 (`--ratio-product`), the same crop as the homepage's collection and material tiles; the
   product detail tile alone is square ([ADR 044](docs/adr/044-decided-from-the-language-not-the-page.md))
@@ -228,31 +235,48 @@ Seven beats, decided in [ADR 040](docs/adr/040-seven-beats-one-strip.md) (the ea
 sequence — three strips and a campaign band — is superseded). Pinned in source order by
 `homepage-composition-contract.test.ts` and in rendered order by `e2e/homepage-composition.spec.ts`;
 change all three together.
-1. Hero — **two compositions, breakpoint at 900px**:
-   - **≥901px**: full-bleed. The "Euro Summer" lifestyle photo fills the entire section
-     (`object-position: right center`), and the copy sits in its own opaque `--bg` card
-     (`.hj-hero-scrim`, a hairline and the frame radius, at the foot of the photograph) sized to wrap
-     the text plus padding — not a section-spanning rectangle.
-     Because the card wraps its own content instead of being measured/positioned independently,
-     there is no separate width to keep in sync with the text column, which is what caused the
-     scrim-drift regressions in commits a4cfb9c/b1e5178/c55962a. The card is opaque rather than
-     translucent on purpose: every text/backdrop pairing here is only proven against a flat `--bg`,
-     and a blurred semi-transparent card would reopen the "pale text over a pale patch of photo"
-     failure mode `e2e/hero-legibility.spec.ts` exists to catch. No decorative overlay on the photo
-     itself — the ring-arc SVG background ornament was removed (2026-08-03): it sat directly on top
-     of the photograph at `right: -120px` and read as a distorted double-overlay.
-   - **≤900px**: stacked. Copy on `--bg` (card becomes transparent — nothing overlaps the photo down
-     here to protect against), photo as a full-width 16:9 band beneath it, `object-position: center`.
-     The full-bleed treatment cannot survive here: at 390px the `right center` crop discards 75% of
-     the frame including the subject, which is why the layout changes to a stacked band instead of
-     shrinking the same composition.
-   - Enforced across seven widths by `e2e/hero-legibility.spec.ts`. Never place hero copy over the
-     photograph without the card behind it.
-   - The card is also **bounded**: `--hj-hero-card-max-ratio` (0.55) caps it at a fraction of the
-     photograph's own rendered box, because every other guardrail here is satisfied better the
-     larger the card gets and so none of them push back. Enforced as `max-width` and asserted as
-     both a width and an occluded-area ratio. See
-     [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md) before widening it.
+1. Hero — **one composition on every width**
+   ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)); the crop changes at the
+   breakpoint at 900px, the composition does not:
+   - The photograph is the hero's geometry. It begins at the top of the page, under the fixed header,
+     and fills the first screen (`--hj-hero-min` is the floor, `--hj-hero-max` the ceiling, `svh` the
+     unit). The header, the copy and the actions are layered inside it, in a safe zone defined from
+     `--header-height`, the record's copy corner and the consent notice's published height
+     (`--hj-consent-h`, written by `ConsentBanner` while it is up). Nothing opaque sits between the
+     visitor and the photograph unless the record asks for a card.
+   - **Art direction is data**: `src/content/hero/home.json`, read through `heroMedia()`. For a wide
+     screen and a narrow one it holds the source, the focal point, the subject box, the copy corner and
+     the variant (`overlay` or `card`); it also holds the header tone, the literal alt text and the
+     image's provenance. The provenance rules are in the schema: a photographed image names real
+     pieces, an AI-origin one names none, an approval names a person and a date, and no agent writes an
+     `approved` state. The current photograph is an **interim** (its embedded manifest says an
+     algorithm made it, and it shows jewellery that is not ours); replacing it is one record edit and
+     an owner gate in `STATE.md`.
+   - Variants: `overlay` lays the copy on a veil as tall as the copy plus a fade (light type, a
+     ground-coloured primary button, a light focus ring: an `--ink` ring and button vanish on a dark
+     surface); `card` is the opaque, hairlined, bounded card of
+     [ADR 013](docs/adr/013-a-protection-that-can-only-grow.md), capped at
+     `--hj-hero-card-max-ratio` (0.55) of the photograph's own rendered box. Which applies is per crop.
+     Under an overlay `.hj-hero-copy` is `display: contents`, so the card's bound has no box to bound.
+   - A veil is a legibility device, not a palette filter: its strength is a token
+     (`--hj-veil-top`, `--hj-veil-bottom`) set by the rendered-pixel test, never by eye. The page's
+     single dark band is still the Care band: the hero section keeps `--bg`, and the dark fallback
+     the veils composite on lives on `.hj-hero-media`.
+   - The entrance is CSS (`hjSlideUp`, staggered by `--stagger`) and is removed under
+     `prefers-reduced-motion`; the hero is a server component. A timer that set every child to
+     `opacity: 0` after hydration is why it was not.
+   - Enforced by `e2e/hero-legibility.spec.ts` at eleven widths, 900 and 901 both: the photograph is
+     the first screen, nothing overlaps, the copy stays in its safe area, the worst pixel behind each
+     word and each header control clears AA with the photograph present and blocked, the subject is
+     in frame and clear of the copy, and it holds with no motion, no script, forced colours, large
+     text and the consent notice up. Never lay copy on the photograph without a veil or a card.
+   - History, superseded by ADR 054. The hero used to be **two compositions**. **≥901px**: full-bleed,
+     with the copy in an opaque card (`.hj-hero-scrim`) at the foot of the photograph; no decorative
+     overlay on the photo, because the ring-arc SVG ornament removed on 2026-08-03 sat on the
+     photograph at `right: -120px` and read as a distorted double-overlay. **≤900px**: stacked, copy
+     on `--bg` and the photo as a 16:9 band beneath it, because
+     at 390px the `right center` crop discards 75% of the frame including the subject. That answered
+     the crop by moving the photograph off the first screen; the fix is a crop per width, as data.
 2. MaterialsSection — a **registry** of the three metals (Grade 23 Ti / Niobium / 316L Steel): a left
    column with a link to `/materials`, and on the right one ruled row per metal (ordinal and
    provenance dot, name and designation, description and specification chips, all from `hjMaterials`).
@@ -334,7 +358,7 @@ and over HTTP by `scripts/verify-browse-only.mjs`.
 
 ### Animations
 Keyframes defined in `globals.css`:
-- `hjSlideUp` — fade + translate up (Hero stagger, section entrances)
+- `hjSlideUp` — fade + translate up (the hero's entrance, section entrances)
 - `hjFadeDown` — subtle fade + translate down
 - `hjSlideIn` — fade + translate right
 - `hjFadeIn` — simple opacity fade

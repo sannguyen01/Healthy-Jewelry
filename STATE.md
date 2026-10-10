@@ -3,6 +3,49 @@
 Last run: never (scaffold not yet scheduled)
 Last refreshed by hand: 2026-10-04
 
+## Session note — 2026-10-10: one hero, one coordinate system
+
+The phone hero used to be a different object from the desktop one: a column of copy with the photograph beneath it,
+so the first screen of a phone was a page header with a picture under it. It is now **one image-led composition on
+every width** ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)): the photograph begins under the header and
+fills the first screen, and the header, the copy and the actions are layered inside it. The crop is **data**
+(`src/content/hero/home.json`), the header's state follows the hero's own end marker, `--header-height` is written
+once, and the consent notice publishes the room it takes so the copy rides above it.
+
+**Owner gates (these are yours; nothing here can close them):**
+
+- **The hero photograph is an interim, and the repository now says so.** All four lifestyle and collection JPEGs carry a
+  signed manifest from Google naming a trained-algorithmic source, and the hero shows gold shell and sun necklaces, rings
+  and bangles, not titanium, niobium or 316L pieces. The record states what the bytes state (`origin: ai-generated`, rights
+  `unreviewed`). Replacing it with photography of the actual pieces (a landscape and a portrait, rights and consent
+  recorded, product handles named) is one record edit and at most two files; **until then a phone shows a quarter of
+  a 1376-pixel-wide landscape, scaled over three times**. The other three images carry the same marker and have no record
+  yet.
+- **Rights and consent states are yours to write.** The schema refuses an approval with no named person and no date, and
+  no agent writes one (`AGENTS.md`).
+- **Production read-back.** Merging deploys. After a merge, read the live hero at a phone width and a desktop width, and
+  `Production admission`; the sandbox cannot reach the live site. The screenshot matrix and its manifest are
+  `scripts/capture-hero-evidence.mjs` (a local production build, not a deployment).
+
+**Decisions taken this round** (the owner's three answers, then the measurements):
+
+- The photograph is an **interim behind an owner gate**; the header's tone is **data proven by a pixel test**, not a taste
+  (`dark` for this photograph: light type on a darkened band measures about 3.2:1 on its sky, where AA needs 4.5:1); the
+  consent notice **publishes its height**.
+- The phone floor is **720** like desktop, not the brief's 640: at the two narrowest phones the copy is 400px tall and the
+  eyebrow landed on the face. Measured, not guessed.
+- The desktop crop keeps the bounded card (ADR 013) as a data-selected variant, so its sentinels and control rows are untouched.
+- **A visible side effect to look at:** every page other than `/` is now `solid` from its first byte, so a hairline shows at
+  the very top of each page where it used to appear only after a short scroll.
+
+**What the new tests found in their own author's work:** a sampler that read a ghost button's own light border as the
+backdrop of light type (found at 900px on a phone, missed at 390px by the luck of a stride); a focus ring measured against
+itself because the screenshot beat the repaint; a published height 23px short because it read the painted box of an
+element still in an entrance animation; a header-height constant typed about thirty times. See `docs/testing-strategy.md`.
+
+**Not done:** B5 and B6; the other three photographs; a real portrait asset; the unused `useMedia` and dead header CSS
+(`.hj-desk-nav`, `.hj-mob-menu`), reported and left alone.
+
 ## Session note — 2026-10-09, night: every other layer, and the tree the browser reads
 
 The type system became one scale (ADR 052); this round asked the same question of everything else, front end to
@@ -267,7 +310,8 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
   `songmontofficial.com`, and the owner ruled it need not be reached: the Latin font (the one
   family), the listing crop (3:4) and the header (kept) are decided from the verified language and
   recorded as decisions, not measurements. Open for the owner: photography in the verified
-  direction (pieces worn, linen, soft grounds) to replace the hero image.
+  direction (pieces worn, linen, soft grounds) to replace the hero image (see the 2026-10-10 note: it is recorded as an
+  interim, with its provenance).
 - **Local-only, recorded so it is not rediscovered:** with this container's Chromium (1194, older
   than the one Playwright 1.63 pins), `layout-invariants` "visible focus indicators" reads a 0px
   outline on product-card links at the instant of focus — reduced motion's 0.01ms transitions on
