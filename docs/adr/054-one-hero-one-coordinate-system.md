@@ -188,7 +188,7 @@ What the numbers decided:
   through the sampled corner at 2.625 device pixels per CSS pixel, was read as the backdrop of light type (found at 900px on
   a phone, missed at 390px by which pixels a stride of three landed on); and a focus ring was measured against itself because
   the capture beat the repaint that hid it.
-- **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (the narrowest two) the
+- **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (the three shortest: 320×568, 360×640 and 375×667, an iPhone SE) the
   actions cannot all be above it. The requirement there is the honest one: a focused action is not hidden, its centre is clear
   of the notice (WCAG 2.4.11 asks that it not be entirely hidden), and answering the notice returns the room.
 
@@ -246,6 +246,11 @@ image and no undersized target. It found the page's edges disagreeing with thems
   1024 to 2560 (it failed on all of them before).
 - **Left alone on purpose.** The collection tiles' stagger and the index's offset are an editorial composition, not a
   misalignment, and are the designer's to change; the follow-up band is centred where the others are left-aligned.
+
+The bar's legibility is also measured now over pure white and pure black in both tones (eight cases), so it no longer depends on the
+interim photograph; whether the copy can clear the consent notice is declared per viewport (the three shortest phones cannot)
+and asserted, where it had been derived from the measurement it judged; and the evidence script gained the state the first
+matrix never visited, the headline under the bar.
 
 The four-angle simplification review of the whole branch then removed what the refactors had left behind:
 `data-variant-narrow` (a constant, since the narrow crop is always an overlay), the custom property that toggled the
