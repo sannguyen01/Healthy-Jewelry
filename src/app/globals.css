@@ -162,6 +162,13 @@
     /* The space left under the copy, before the consent notice's own height is added. */
     --hj-hero-pad-b: clamp(32px, 4vw, 64px);
 
+    /* The space between the hero's own lines: the eyebrow to the headline, the headline to the sentence, the sentence
+       to the actions. Tokens so that a phone too short for the copy and the consent notice at once can close them up
+       (the short-phone block under the hero's rules). */
+    --hj-hero-gap-eyebrow: 28px;
+    --hj-hero-gap-title: 24px;
+    --hj-hero-gap-body: 40px;
+
     /* The consent notice's room (its height plus the gap beneath it), estimated, for the moment before it has measured
        itself. A script at the top of <body> reserves this when nobody has answered (CONSENT_PREPAINT_SCRIPT) so the hero
        does not move when the notice arrives after hydration; the notice then replaces it with the real figure. One
@@ -2043,6 +2050,27 @@
     .hj-hero {
       --hj-focal: var(--hj-focal-narrow);
       --hj-zone: var(--hj-zone-narrow);
+    }
+  }
+
+  /* A phone too short for the header, the copy and the consent notice at once. On a first visit the notice is fixed to the
+     bottom of the screen, and the hero used to be at least 720px tall, so on a screen of 667 (an iPhone SE) the hero's
+     bottom, and the copy anchored above it, lay 53px below the fold: the notice covered the end of the copy ("Our story")
+     until it was answered. Closing the gaps between the lines and the clearance under them takes the copy to about 326px,
+     which with the header and the notice fits a 667px screen with room to spare, and the floor goes so the hero is the
+     screen, not more. The copy still grows the hero if it needs more (large text, a longer translation). Two bounds,
+     both measured. Narrow only: a wide card is another composition and keeps its floor. And not below 600px tall: the
+     floor was 720 because the first brief's 640 put the eyebrow on the subject's face on the two narrowest phones, and
+     at 320x568 dropping it did so again (the eyebrow covered 223x13px of the subject; 360x640 and 375x667 are clear). The
+     two phones whose copy alone is taller than the room they have (320x568, 360x640) stay declared in
+     hero-legibility.spec.ts. */
+  @media (max-width: 900px) and (min-height: 600px) and (max-height: 700px) {
+    .hj-hero {
+      --hj-hero-min: 0px;
+      --hj-hero-pad-b: 24px;
+      --hj-hero-gap-eyebrow: 12px;
+      --hj-hero-gap-title: 12px;
+      --hj-hero-gap-body: 20px;
     }
   }
 

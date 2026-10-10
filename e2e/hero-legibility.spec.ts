@@ -46,15 +46,19 @@ import { heroMedia } from '../src/lib/catalog'
  * two compositions used to diverge, so the pair is the regression test for it.
  *
  * `clearsNotice` is declared, not measured: whether the header, the copy and the consent notice can share the screen
- * at scroll 0. They cannot on the three shortest phones (at 375 wide the 64px header, about 375px of copy and the 243px
- * notice need more than the 667px first screen), however the hero is built, because the notice is fixed to the bottom
- * of the viewport and the copy is not. Deriving the expectation from the measurement it judges would make the strict check
- * unfalsifiable, so a hero that stopped lifting its copy would quietly be tested by the weaker one.
+ * at scroll 0. On the two shortest phones they cannot, however the hero is built: the notice is fixed to the bottom of
+ * the viewport and the copy is not, and their copy alone (about 350px with the sentence on two lines) is taller than the
+ * room they have between the header and the notice (about 260 and 310px). At 375×667 they can, and since 2026-10-10 they
+ * do: the hero's floor used to put its bottom, and the copy anchored above it, 53px below that screen's fold, and the gaps
+ * between the lines were fixed; on a screen 600 to 700px tall the floor goes and the gaps close up (globals.css, the
+ * short-phone block), which leaves the copy 24px clear of the notice. Deriving the expectation from the measurement it
+ * judges would make the strict check unfalsifiable, so a hero that stopped lifting its copy would quietly be tested by
+ * the weaker one.
  */
 const VIEWPORTS = [
   { label: '320×568 — smallest phone', width: 320, height: 568, clearsNotice: false },
   { label: '360×640 — small Android', width: 360, height: 640, clearsNotice: false },
-  { label: '375×667 — iPhone SE', width: 375, height: 667, clearsNotice: false },
+  { label: '375×667 — iPhone SE', width: 375, height: 667, clearsNotice: true },
   { label: '390×844 — iPhone', width: 390, height: 844, clearsNotice: true },
   { label: '430×932 — large phone', width: 430, height: 932, clearsNotice: true },
   { label: '768×1024 — tablet portrait', width: 768, height: 1024, clearsNotice: true },

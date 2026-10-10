@@ -188,9 +188,11 @@ What the numbers decided:
   through the sampled corner at 2.625 device pixels per CSS pixel, was read as the backdrop of light type (found at 900px on
   a phone, missed at 390px by which pixels a stride of three landed on); and a focus ring was measured against itself because
   the capture beat the repaint that hid it.
-- **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (the three shortest: 320×568, 360×640 and 375×667, an iPhone SE) the
-  actions cannot all be above it. The requirement there is the honest one: a focused action is not hidden, its centre is clear
-  of the notice (WCAG 2.4.11 asks that it not be entirely hidden), and answering the notice returns the room.
+- **The short-phone notice.** On a phone too short for the header, the copy and the notice at once (the two shortest:
+  320×568 and 360×640) the actions cannot all be above it. The requirement there is the honest one: a focused action is not
+  hidden, its centre is clear of the notice (WCAG 2.4.11 asks that it not be entirely hidden), and answering the notice returns
+  the room. The third short phone, 375×667 (an iPhone SE), was first listed with them, on the claim that no hero construction
+  could clear the notice there. That was wrong, and it is corrected under "After the design review" below.
 
 ## After the independent review
 
@@ -248,7 +250,7 @@ image and no undersized target. It found the page's edges disagreeing with thems
   misalignment, and are the designer's to change; the follow-up band is centred where the others are left-aligned.
 
 The bar's legibility is also measured now over pure white and pure black in both tones (eight cases), so it no longer depends on the
-interim photograph; whether the copy can clear the consent notice is declared per viewport (the three shortest phones cannot)
+interim photograph; whether the copy can clear the consent notice is declared per viewport (the two shortest phones cannot)
 and asserted, where it had been derived from the measurement it judged; and the evidence script gained the state the first
 matrix never visited, the headline under the bar.
 
@@ -287,4 +289,18 @@ Left to the owner, because each is a decision and not a defect: the photographs 
 metals, and the phone crop is a visible upscale; the care band shows the claims gate's neutral fallback as its only emphatic
 text (claims are a named reviewer's, never an agent's); the phone overlay's veil makes the lower half of the first screen
 perceptually dark where the desktop card is alabaster; the first-visit consent notice covers part of the hero's actions on
-the three shortest phones; a badge on every card of the strip carries no signal; and the materials' chips repeat their subtitles.
+the two shortest phones (the notice's own layout or copy would have to change, and consent is outside this change); a badge
+on every card of the strip carries no signal; and the materials' chips repeat their subtitles.
+
+One of the items first left to the owner turned out not to be one, and the earlier claim behind it was wrong.
+
+- **The notice covered "Our story" at 375×667, and the hero could be built so that it did not.** The hero was at least 720px
+  tall, so on a 667px screen its bottom, and the copy anchored 275px above it, lay 53px below the fold: the copy ended at
+  445px while the notice, fixed to the screen's bottom, began at 424px. The earlier text said no construction of the hero could
+  clear it. For this screen one can: on a screen 600 to 700px tall the floor is dropped (the hero is the screen, and still
+  grows if the copy needs more), the gaps between the eyebrow, the headline, the sentence and the actions go from 28, 24
+  and 40px to 12, 12 and 20px (they are tokens now), and the clearance under the copy from 32 to 24px. The copy shrinks by
+  48px, fits above the notice with 24px to spare, and the declaration for that viewport flipped to "clears" (it failed
+  first: "declared to fit above the notice and does not"). The block is bounded below at 600px on a measurement: with it,
+  320×568 put the eyebrow across 223×13px of the subject's face, the failure the floor's own comment recorded when the
+  first brief's 640 did the same on the two narrowest phones. The two phones whose copy alone exceeds the room are unchanged.

@@ -97,7 +97,7 @@ export function Hero({ media, headlineLines }: HeroProps) {
                 puts at the head of the line. */}
             <span
               className="label-eyebrow"
-              style={{ ...step(0), display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '28px' }}
+              style={{ ...step(0), display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: 'var(--hj-hero-gap-eyebrow)' }}
             >
               <span style={{ paddingTop: '4px' }}>
                 <MetalDot metal="titanium" />
@@ -117,7 +117,7 @@ export function Hero({ media, headlineLines }: HeroProps) {
                 color: 'var(--hj-fg)',
                 lineHeight: 'var(--leading-display)',
                 letterSpacing: 'var(--tracking-display)',
-                margin: '0 0 24px',
+                margin: '0 0 var(--hj-hero-gap-title)',
               }}
             >
               {/* The lines are the registry's own breaks, set as blocks and joined by a real space so the
@@ -138,7 +138,7 @@ export function Hero({ media, headlineLines }: HeroProps) {
                 fontWeight: 300,
                 fontSize: 'var(--text-base)',
                 color: 'var(--hj-fg-body)',
-                margin: '0 0 40px',
+                margin: '0 0 var(--hj-hero-gap-body)',
                 lineHeight: 'var(--leading-text)',
                 maxWidth: '400px',
               }}

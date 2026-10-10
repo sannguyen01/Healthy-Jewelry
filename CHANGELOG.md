@@ -27,6 +27,9 @@ user-visible or architecturally significant changes.
   what scrolls under it shows through; held by a unit test on the token and a browser test on the rendered bar), and
   headings, the eyebrow and running text ask the browser not to leave a word alone on a last line (`text-wrap`, measured
   on the rendered words at six widths).
+- **The consent notice no longer covers "Our story" on an iPhone SE** (375×667): on a screen 600 to 700px tall the hero
+  is the screen and not 53px more, and the gaps between its lines close up. The two shorter phones, whose copy alone is
+  taller than the room they have, still lose part of the actions to the notice until it is answered.
 
 ## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
 
