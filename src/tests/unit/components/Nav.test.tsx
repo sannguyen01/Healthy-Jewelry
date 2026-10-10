@@ -202,13 +202,13 @@ describe('Nav — state, tone and the modal', () => {
 
   it('defaults its tone to light when the page does not say', () => {
     withHero()
-    render(<Nav overHero />)
+    render(<Nav overHero headerTone="light" />)
     expect(bar().getAttribute('data-tone')).toBe('light')
   })
 
   it('turns solid when the hero\'s marker has passed the top, and back when it returns', () => {
     withHero()
-    render(<Nav overHero />)
+    render(<Nav overHero headerTone="light" />)
     act(() => callback?.([{ isIntersecting: false, boundingClientRect: { top: -20 } as DOMRectReadOnly, rootBounds: null }]))
     expect(bar().getAttribute('data-state')).toBe('solid')
     act(() => callback?.([{ isIntersecting: true, boundingClientRect: { top: 30 } as DOMRectReadOnly, rootBounds: null }]))
@@ -217,7 +217,7 @@ describe('Nav — state, tone and the modal', () => {
 
   it('is menu-open while the menu is open, and returns to the hero state when it closes', () => {
     withHero()
-    render(<Nav overHero />)
+    render(<Nav overHero headerTone="light" />)
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
     expect(bar().getAttribute('data-state')).toBe('menu-open')
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -226,7 +226,7 @@ describe('Nav — state, tone and the modal', () => {
 
   it('makes main and the footer inert while the menu is open, and restores them when it closes', () => {
     withHero()
-    render(<Nav overHero />)
+    render(<Nav overHero headerTone="light" />)
     const main = document.getElementById('main') as HTMLElement
     const footer = document.querySelector('footer') as HTMLElement
     expect(main.hasAttribute('inert')).toBe(false)
@@ -240,7 +240,7 @@ describe('Nav — state, tone and the modal', () => {
 
   it('does not leave the page inert if the header unmounts with the menu open', () => {
     withHero()
-    const { unmount } = render(<Nav overHero />)
+    const { unmount } = render(<Nav overHero headerTone="light" />)
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
     unmount()
     expect(document.getElementById('main')?.hasAttribute('inert')).toBe(false)
@@ -250,9 +250,25 @@ describe('Nav — state, tone and the modal', () => {
   it('leaves alone a page that was already inert before the menu opened', () => {
     withHero()
     document.getElementById('main')?.setAttribute('inert', '')
-    render(<Nav overHero />)
+    render(<Nav overHero headerTone="light" />)
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(document.getElementById('main')?.hasAttribute('inert')).toBe(true)
+  })
+})
+
+describe('Nav — its props say what the header needs', () => {
+  it('requires a tone of a header that lies over a hero, and refuses one for a header that does not', () => {
+    // Checked by the compiler (`pnpm type-check`): each directive below fails the build if the line beneath it stops
+    // being an error, so a loosening of the props back to two independent optionals is caught there, not by a reader.
+    // @ts-expect-error a header over a hero must say which side of the photograph its type is set against
+    const missing = <Nav overHero />
+    // @ts-expect-error a tone means nothing to a header that is not over a hero
+    const stray = <Nav headerTone="dark" />
+    expect(missing).toBeTruthy()
+    expect(stray).toBeTruthy()
+
+    const fine = [<Nav key="a" />, <Nav key="b" overHero headerTone="dark" />, <Nav key="c" overHero={false} />]
+    expect(fine).toHaveLength(3)
   })
 })

@@ -7,21 +7,36 @@ import { useHeroOverlay } from '@/lib/hooks/useHeroOverlay'
 import { BrandLockup } from '@/components/layout/BrandLockup'
 import { MenuArchive } from '@/components/layout/MenuArchive'
 
-interface NavProps {
-  /**
-   * The page begins with a hero the header lies over. Only the home page does, and it says so: the header's
-   * state is a fact about the page, rendered by the server, not something it infers from a scroll distance.
-   * Every other page is `solid` from its first byte (it was transparent for its first 60px).
-   */
-  overHero?: boolean
-  /**
-   * Which side of the photograph's top edge the header's type is set against: `light` is light type on a darkened
-   * band, `dark` is ink on a light one. The hero's record carries it and a rendered-pixel test proves it.
-   */
-  headerTone?: 'light' | 'dark'
-}
+/**
+ * What the header needs to know, which is a fact about the page and not something it infers from a scroll distance.
+ *
+ * It is a pair that goes together: a header that lies over a hero must say which side of the photograph's top edge its
+ * type is set against, and a header that does not has no use for the answer. As two independent optionals the pair
+ * could be given a tone and no hero (silently ignored) or a hero and no tone (silently `light`). As a union the
+ * compiler refuses both.
+ */
+type NavProps =
+  | {
+      /** Every other page is `solid` from its first byte (it was transparent for its first 60px). */
+      overHero?: false
+      headerTone?: undefined
+    }
+  | {
+      /**
+       * The page begins with a hero the header lies over. Only the home page does, and it says so: the header's
+       * state is rendered by the server.
+       */
+      overHero: true
+      /**
+       * `light` is light type on a darkened band, `dark` is ink on a light one. The hero's record carries it and a
+       * rendered-pixel test proves it.
+       */
+      headerTone: 'light' | 'dark'
+    }
 
-export function Nav({ overHero = false, headerTone = 'light' }: NavProps = {}) {
+export function Nav(props: NavProps = {}) {
+  const overHero = props.overHero === true
+  const headerTone = props.overHero === true ? props.headerTone : undefined
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const overlay = useHeroOverlay(overHero)
@@ -117,7 +132,7 @@ export function Nav({ overHero = false, headerTone = 'light' }: NavProps = {}) {
         ref={headerRef}
         className="hj-header"
         data-state={state}
-        data-tone={overHero ? headerTone : undefined}
+        data-tone={headerTone}
       >
         {/* Left: Menu control */}
         <div className="hj-header-left">

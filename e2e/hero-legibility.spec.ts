@@ -506,13 +506,15 @@ test.describe('Hero — conditions a visitor brings', () => {
       // Sampled every frame from before the page's own script runs: a check made once, after the page
       // settled, would pass a hero that hides its copy for 440ms and then reveals it.
       await page.addInitScript(() => {
-        const w = window as unknown as { __minOpacity: number }
+        const w = window as unknown as { __minOpacity: number; __frames: number }
         w.__minOpacity = 1
+        w.__frames = 0
         const start = performance.now()
         const tick = () => {
           const h1 = document.querySelector('main > section h1')
           const content = h1?.parentElement
           if (content) {
+            w.__frames++
             for (const child of Array.from(content.children)) {
               const o = Number.parseFloat(getComputedStyle(child).opacity)
               if (o < w.__minOpacity) w.__minOpacity = o
@@ -524,7 +526,13 @@ test.describe('Hero — conditions a visitor brings', () => {
       })
       await page.goto('/')
       await page.waitForTimeout(1600)
-      const min = await page.evaluate(() => (window as unknown as { __minOpacity: number }).__minOpacity)
+      const { min, frames } = await page.evaluate(() => {
+        const w = window as unknown as { __minOpacity: number; __frames: number }
+        return { min: w.__minOpacity, frames: w.__frames }
+      })
+      // A sampler that never saw the copy would report "never transparent" for a page that had no copy: the shape of
+      // green that proves nothing. Ninety frames is a second and a half at 60Hz, minus the load.
+      expect(frames, 'frames in which the hero copy existed and was sampled').toBeGreaterThan(20)
       expect(min, 'the lowest opacity any hero copy element had, at any frame').toBe(1)
     })
   })
@@ -625,28 +633,35 @@ test.describe('Hero — conditions a visitor brings', () => {
   test.describe('large text', () => {
     test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
-    test('at 200% text the copy neither overflows nor collides, on the narrowest phone', async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 568 })
-      await page.goto('/')
-      await settleHero(page)
-      await page.evaluate(() => { document.documentElement.style.fontSize = '200%' })
-      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+    // The narrowest phone, where the copy is longest, and the common one, where the hero's min-height and the veil's
+    // fade are what grow or fail to.
+    for (const phone of [
+      { width: 320, height: 568, name: 'the narrowest phone' },
+      { width: 390, height: 844, name: 'a common phone' },
+    ]) {
+      test(`at 200% text the copy neither overflows nor collides, on ${phone.name}`, async ({ page }) => {
+        await page.setViewportSize({ width: phone.width, height: phone.height })
+        await page.goto('/')
+        await settleHero(page)
+        await page.evaluate(() => { document.documentElement.style.fontSize = '200%' })
+        await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
 
-      const boxes = await copyBoxes(page)
-      const bar = await boxOf(header(page), 'header')
-      const heroBox = await boxOf(hero(page), 'hero')
-      const problems: string[] = []
-      for (let i = 0; i < boxes.length; i++) {
-        const { label, box } = boxes[i]
-        if (box.x < -0.5 || box.x + box.width > 320 + 0.5) problems.push(`${label} is cut by the viewport edge`)
-        if (box.y + box.height > heroBox.y + heroBox.height + 0.5) problems.push(`${label} is cut off by the hero's bottom`)
-        if (intersection(box, bar)) problems.push(`${label} is under the header`)
-        for (let j = i + 1; j < boxes.length; j++) {
-          if (intersection(box, boxes[j].box)) problems.push(`${label} overlaps ${boxes[j].label}`)
+        const boxes = await copyBoxes(page)
+        const bar = await boxOf(header(page), 'header')
+        const heroBox = await boxOf(hero(page), 'hero')
+        const problems: string[] = []
+        for (let i = 0; i < boxes.length; i++) {
+          const { label, box } = boxes[i]
+          if (box.x < -0.5 || box.x + box.width > phone.width + 0.5) problems.push(`${label} is cut by the viewport edge`)
+          if (box.y + box.height > heroBox.y + heroBox.height + 0.5) problems.push(`${label} is cut off by the hero's bottom`)
+          if (intersection(box, bar)) problems.push(`${label} is under the header`)
+          for (let j = i + 1; j < boxes.length; j++) {
+            if (intersection(box, boxes[j].box)) problems.push(`${label} overlaps ${boxes[j].label}`)
+          }
         }
-      }
-      expect(problems, `At 200% text:\n  ${problems.join('\n  ')}`).toEqual([])
-    })
+        expect(problems, `At 200% text at ${phone.width}px:\n  ${problems.join('\n  ')}`).toEqual([])
+      })
+    }
   })
 })
 
@@ -670,6 +685,12 @@ test.describe('Hero — with the consent notice up', () => {
       const bar = await boxOf(header(page), 'header')
       const lowest = Math.max(...boxes.map((b) => b.box.y + b.box.height))
       const copyTop = Math.min(...boxes.map((b) => b.box.y))
+      const heroBox = await boxOf(hero(page), 'hero')
+      // However short the phone, the hero grows to hold its copy with the notice up; it never cuts it, and the copy
+      // never rides up under the header. (The rest of this test is about the notice, which can still cover what
+      // the hero has not the height to lift clear of it.)
+      expect(lowest, `the hero is ${Math.round(heroBox.height)}px tall and its copy runs to ${Math.round(lowest - heroBox.y)}px`).toBeLessThanOrEqual(heroBox.y + heroBox.height + 0.5)
+      expect(copyTop, 'the copy begins below the header').toBeGreaterThanOrEqual(bar.y + bar.height - 0.5)
       // Does the hero's copy fit *above* the notice at all? On a 320×568 phone it cannot: the header, the
       // copy and a 260px notice do not share 568px. There the requirement is different, and honest: the
       // actions must be reachable, and a focused one must not be hidden by the notice (WCAG 2.4.11).

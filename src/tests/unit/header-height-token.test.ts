@@ -62,13 +62,36 @@ describe('pages clear the bar through the token', () => {
     expect(pages).toContain('src/app/not-found.tsx')
   })
 
+  /**
+   * Every place a page types the bar's height, or the bar plus a gap, as a pixel literal: a plain value, one inside a
+   * `calc()`, and the scroll offsets that keep an anchor clear of the bar (`scrollMarginTop`, `scrollPaddingTop`).
+   * The first version of this matched only `'64px'`-shaped values on four properties, so `calc(64px + 56px)` and
+   * `scrollMarginTop: '64px'` were both invisible to it.
+   */
+  const headerOffsetLiterals = (text: string): string[] =>
+    [
+      ...text.matchAll(
+        // The literal leads the value (alone, or first in a calc) or is a term added to or taken from one. A literal
+        // inside `clamp(64px, 8vw, 120px)` is a section's own rhythm, not the bar's height.
+        /(?:paddingTop|padding|marginTop|top|scrollMarginTop|scrollPaddingTop):\s*'(?:(?:calc\(\s*)?(?:64|100|104|120)px\b[^']*|calc\([^']*[+-]\s*(?:64|100|104|120)px\b[^']*)'/g
+      ),
+    ].map((m) => m[0])
+
+  it('sees a literal in a calc() and a scroll offset, not only a plain value', () => {
+    expect(headerOffsetLiterals("{ paddingTop: 'calc(64px + 56px)' }")).toHaveLength(1)
+    expect(headerOffsetLiterals("{ scrollMarginTop: '64px' }")).toHaveLength(1)
+    expect(headerOffsetLiterals("{ top: '104px' }")).toHaveLength(1)
+    expect(headerOffsetLiterals("{ paddingTop: 'calc(56px + 64px)' }")).toHaveLength(1)
+    // A section's own rhythm is not the bar: a clamp() that happens to contain 64px is left alone.
+    expect(headerOffsetLiterals("{ padding: 'clamp(64px, 8vw, 120px) clamp(24px, 6vw, 120px)' }")).toHaveLength(0)
+    expect(headerOffsetLiterals("{ paddingTop: 'calc(var(--header-height) + 56px)' }")).toHaveLength(0)
+    expect(headerOffsetLiterals("{ scrollMarginTop: 'var(--header-height)' }")).toHaveLength(0)
+  })
+
   it('no page types the bar\'s height, or the bar plus a gap, as a pixel literal', () => {
     const offenders: string[] = []
     for (const file of pages) {
-      const text = code(read(file))
-      for (const match of text.matchAll(/(paddingTop|padding|marginTop|top):\s*'(?:64|100|104|120)px(?:\s[^']*)?'/g)) {
-        offenders.push(`${relative('.', file)}: ${match[0]}`)
-      }
+      for (const literal of headerOffsetLiterals(code(read(file)))) offenders.push(`${relative('.', file)}: ${literal}`)
     }
     expect(offenders, `header-clearing offsets typed as pixels:\n  ${offenders.join('\n  ')}`).toEqual([])
   })
