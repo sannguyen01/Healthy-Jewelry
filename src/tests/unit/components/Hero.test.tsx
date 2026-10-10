@@ -71,21 +71,20 @@ describe('Hero — one composition (ADR 054)', () => {
     expect(img.getAttribute('alt')).toBe(media.alt)
     expect(img.getAttribute('alt')).not.toBe('')
     expect(container.querySelector('.hj-hero-media')?.getAttribute('aria-hidden')).toBeNull()
+    // One veil, the copy's, in the safe zone's last row beside what it protects. The bar's veil belongs to the bar.
     const veils = Array.from(container.querySelectorAll('.hj-hero-veil'))
-    expect(veils.map((v) => v.getAttribute('data-edge')).sort()).toEqual(['bottom', 'top'])
+    expect(veils.map((v) => v.getAttribute('data-edge'))).toEqual(['bottom'])
     for (const veil of veils) expect(veil.getAttribute('aria-hidden')).toBe('true')
-    // The bottom veil is in the safe zone's last row, beside the copy it protects; the top one is in the media.
     expect(container.querySelector('.hj-hero-safe > .hj-hero-veil[data-edge="bottom"]')).toBeTruthy()
-    expect(container.querySelector('.hj-hero-media > .hj-hero-veil[data-edge="top"]')).toBeTruthy()
   })
 
-  it('carries both variants, the header tone and the record\'s focal points and corners as data', () => {
+  it('carries both variants and the record\'s focal points and corners as data, and leaves the header\'s tone to the header', () => {
     const media = record()
     const { container } = render(<Hero media={media} headlineLines={LINES} />)
     const el = section(container)
     expect(el.getAttribute('data-variant-wide')).toBe(media.desktop.variant)
     expect(el.getAttribute('data-variant-narrow')).toBe(media.mobile.variant)
-    expect(el.getAttribute('data-header-tone')).toBe(media.headerTone)
+    expect(el.hasAttribute('data-header-tone')).toBe(false)
     expect(el.style.getPropertyValue('--hj-focal-wide')).toBe('69% 45%')
     expect(el.style.getPropertyValue('--hj-focal-narrow')).toBe('80% 40%')
     expect(el.style.getPropertyValue('--hj-zone-wide')).toBe('start')

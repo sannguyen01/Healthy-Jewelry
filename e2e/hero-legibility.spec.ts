@@ -331,11 +331,12 @@ for (const viewport of VIEWPORTS) {
       expect(hits, `The copy is on the subject at ${viewport.width}×${viewport.height}:\n  ${hits.join('\n  ')}`).toEqual([])
     })
 
-    test('the hero carries the record\'s variants and header tone', async ({ page }) => {
+    test('the hero carries the record\'s variants, and the header its tone', async ({ page }) => {
       // Both, not the active one: the server cannot know the viewport, and the stylesheet picks by breakpoint.
       await expect(hero(page), 'data-variant-wide').toHaveAttribute('data-variant-wide', media.desktop.variant)
       await expect(hero(page), 'data-variant-narrow').toHaveAttribute('data-variant-narrow', media.mobile.variant)
-      await expect(hero(page), 'data-header-tone').toHaveAttribute('data-header-tone', media.headerTone)
+      // The tone is the bar's: it sets the bar's type and the bar's own veil, so it lives on the bar.
+      await expect(header(page), 'data-tone').toHaveAttribute('data-tone', media.headerTone)
     })
 
     test('a card, where the record asks for one, never outgrows the photograph it sits on', async ({ page }) => {
@@ -369,6 +370,74 @@ for (const viewport of VIEWPORTS) {
     })
   })
 }
+
+// ── The header while the hero scrolls under it ───────────────────────────────
+
+/**
+ * The header is an overlay for as long as any of the hero is under it, not only at the top of the page.
+ *
+ * It was proven legible at scroll 0, where the photograph's sky is behind it. But the state flips to solid only
+ * when the hero is almost entirely above the bar, so for a whole screen of scrolling the transparent bar lay over
+ * whatever the hero holds at that height: on a phone, the hero's own copy and the veil under it. The first run of
+ * the evidence matrix showed it (the "Explore the pieces" label printed through the brand mark at 320×568) and
+ * the sampler would have, had it ever scrolled. So the bar carries its own surface (ADR 054), and this measures the
+ * worst pixel behind each of its controls at the scroll positions where something different is under it.
+ */
+test.describe('Hero — the header while the hero scrolls under it', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  const SCROLLED = [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1280, height: 900 },
+  ]
+
+  for (const viewport of SCROLLED) {
+    test(`${viewport.width}×${viewport.height}: every control clears AA at every depth of the hero`, async ({ page, context }) => {
+      await context.addInitScript(([key]) => {
+        try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
+      }, [CONSENT_KEY])
+      await page.setViewportSize(viewport)
+      await page.goto('/')
+      await settleHero(page)
+
+      const heroBottom = await hero(page).evaluate((el) => el.getBoundingClientRect().bottom + window.scrollY)
+      const depths = [0, 200, Math.max(0, heroBottom - viewport.height / 2), Math.max(0, heroBottom - 200), Math.max(0, heroBottom - 80)]
+      const failures: string[] = []
+
+      for (const depth of depths) {
+        await page.evaluate((y) => window.scrollTo(0, y), depth)
+        await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+        const state = await header(page).getAttribute('data-state')
+        for (const { label, locator, kind } of await headerNodes(page)) {
+          const verdict = await worstContrast(page, `scroll ${Math.round(depth)}px (${state}): ${label}`, locator, kind)
+          if (!verdict.ok) failures.push(describeVerdicts([verdict])[0])
+        }
+      }
+      expect(failures, `Unreadable header at ${viewport.width}×${viewport.height}:\n  ${failures.join('\n  ')}`).toEqual([])
+    })
+  }
+
+  test('with the photograph blocked, mid-hero: the bar\'s own surface carries it', async ({ page, context }) => {
+    await context.addInitScript(([key]) => {
+      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
+    }, [CONSENT_KEY])
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.route('**/_next/image**', (route) => route.abort())
+    await page.goto('/')
+    await expect(hero(page)).toBeVisible()
+    await page.evaluate(async () => { await document.fonts.ready })
+    await page.evaluate(() => window.scrollTo(0, 450))
+    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+    const failures: string[] = []
+    for (const { label, locator, kind } of await headerNodes(page)) {
+      const verdict = await worstContrast(page, `header: ${label}`, locator, kind)
+      if (!verdict.ok) failures.push(describeVerdicts([verdict])[0])
+    }
+    expect(failures, `Unreadable header with no photograph, mid-hero:\n  ${failures.join('\n  ')}`).toEqual([])
+  })
+})
 
 // ── What a visitor can bring with them ───────────────────────────────────────
 

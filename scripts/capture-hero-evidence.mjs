@@ -52,7 +52,7 @@ const VIEWPORTS = [
 
 /** Route keys. The home page is captured in every state; the rest at the top and, once, at the foot. */
 const ROUTES = {
-  home: { path: '/', states: ['top', 'scrolled', 'menu-open'] },
+  home: { path: '/', states: ['top', 'under-bar', 'scrolled', 'menu-open'] },
   contact: { path: '/contact', states: ['top'] },
   shop: { path: '/shop', states: ['top'] },
   collection: { path: '/shop/earrings', states: ['top'] },
@@ -193,6 +193,16 @@ async function main() {
           await page.goto(server.url + route.path, { waitUntil: 'load' })
           await settle(page)
           if (state === 'scrolled') await page.evaluate(() => window.scrollTo(0, window.innerHeight))
+          // The hero's copy under the bar: the depth at which the transparent bar lay over the headline and the
+          // veil beneath it, which a screenshot at the top of the page never shows (ADR 054, reviewer finding 1).
+          if (state === 'under-bar') {
+            await page.evaluate(() => {
+              const h1 = document.querySelector('main > section h1')
+              const bar = document.querySelector('header.hj-header')
+              if (!h1 || !bar) throw new Error('under-bar: no hero headline or no header on this page')
+              window.scrollTo(0, h1.getBoundingClientRect().top + window.scrollY - bar.getBoundingClientRect().height)
+            })
+          }
           if (state === 'footer') await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
           if (state === 'menu-open') {
             await page.locator('.hj-menu-btn').click()

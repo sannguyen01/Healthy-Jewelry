@@ -153,10 +153,13 @@
     /* The space left under the copy, before the consent notice's own height is added. */
     --hj-hero-pad-b: clamp(32px, 4vw, 64px);
 
-    /* How strongly the hero's veils darken (or lighten) the photograph at their strongest edge. A veil is
-       a legibility device, not a palette filter (ADR 054): its strength is set by the lowest contrast
-       measured under the text it protects, by e2e/hero-legibility.spec.ts, and not by eye. */
-    --hj-veil-top: 60%;
+    /* How strongly the veils darken (or lighten) what is behind them at their strongest edge. A veil is a
+       legibility device, not a palette filter (ADR 054): its strength is set by the lowest contrast measured
+       under the text it protects, by e2e/hero-legibility.spec.ts, and not by eye.
+       The first is the header's own (the bar cannot know what scrolls under it, so it must clear AA over black
+       and over white; src/tests/unit/header-veil.test.ts proves it for both tones: 60% cleared the dark tone
+       and not the light). The second is the hero copy's. */
+    --hj-veil-top: 72%;
     --hj-veil-bottom: 72%;
 
     /* The step between one hero line's entrance and the next. */
@@ -740,10 +743,39 @@
     color: var(--ink);
   }
 
-  /* The header's type over a photograph is set against a veil the hero provides (ADR 054): light type on a
-     darkened band for a `light` tone, ink on a light one for `dark`. The tone is the hero record's, and a
-     rendered-pixel test proves the contrast at every width. The ring follows the type, because an ink ring
-     vanishes on a dark band. */
+  /* The bar over the hero carries its own veil (ADR 054). It is an overlay for as long as any of the hero is under
+     it, not only at the top of the page: after the first screen it lies over the hero's copy and the veil beneath
+     it, and a veil the hero provided at its own top edge was gone by then. So the surface is the bar's, drawn at the
+     viewport's top edge wherever the page is scrolled: full strength through the bar's height, fading out below it.
+     Its colour is the type's opposite, ink under light type (`light` tone) and the ground under ink (`dark`), and
+     its strength is the worst case, AA over black and over white (header-veil.test.ts), because the bar does not
+     know what is under it. Gone once the header is solid, which has a ground of its own. */
+  .hj-header {
+    --hj-bar-veil: var(--bg);
+  }
+
+  .hj-header[data-tone="light"] {
+    --hj-bar-veil: var(--ink);
+  }
+
+  .hj-header[data-state="hero-overlay"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: -1;
+    height: calc(var(--header-height) * 3);
+    pointer-events: none;
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--hj-bar-veil) var(--hj-veil-top), transparent) calc(100% / 3),
+      transparent
+    );
+  }
+
+  /* The type follows the tone: light type on a darkened band for a `light` tone, ink on a light one for `dark`.
+     The tone is the hero record's. The ring follows the type, because an ink ring vanishes on a dark band. */
   .hj-header[data-state="hero-overlay"][data-tone="light"] {
     color: var(--on-dark);
   }
@@ -1785,13 +1817,7 @@
        ceiling keeps a tall display from stretching it without end (ADR 021: no floor without a ceiling). */
     min-height: min(max(var(--hj-hero-min), 100vh), var(--hj-hero-max));
     min-height: min(max(var(--hj-hero-min), 100svh), var(--hj-hero-max));
-    /* Header tone: which side of the photograph's top edge the header's type is set against. */
-    --hj-top-veil: var(--bg);
     --hj-bottom-veil: block;
-  }
-
-  .hj-hero[data-header-tone="light"] {
-    --hj-top-veil: var(--ink);
   }
 
   .hj-hero-media {
@@ -1815,27 +1841,12 @@
   }
 
   /* A veil is a legibility device, not a palette filter (ADR 054). Strengths are tokens, set by the rendered-pixel
-     test. The top one holds its full strength through the header's height and fades out below it, so the bar is
-     set against a controlled surface and the photograph below it is left alone. */
+     test. The hero has one, the copy's; the bar's belongs to the bar (.hj-header::before). */
   .hj-hero-veil {
     pointer-events: none;
   }
 
-  .hj-hero-veil[data-edge="top"] {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1;
-    height: calc(var(--header-height) * 3);
-    background-image: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--hj-top-veil) var(--hj-veil-top), transparent) calc(100% / 3),
-      transparent
-    );
-  }
-
-  /* The bottom one lives in the safe zone's last row, the copy's row, and is as tall as the copy plus a fade above
+  /* It lives in the safe zone's last row, the copy's row, and is as tall as the copy plus a fade above
      it: negative margins stretch it to the hero's edges and down through the padding and the consent notice's
      room, so its full strength always covers the copy, whatever size the copy is (large text, a longer line, a
      smaller phone). A veil of fixed height cannot do that: the eyebrow, at the top of the copy, ended up on the

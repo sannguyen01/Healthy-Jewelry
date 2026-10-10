@@ -68,7 +68,6 @@ export function Hero({ media, headlineLines }: HeroProps) {
       className="hj-hero"
       data-variant-wide={desktop.variant}
       data-variant-narrow={mobile.variant}
-      data-header-tone={media.headerTone}
       style={
         {
           '--hj-focal-wide': `${percent(desktop.focal.x)} ${percent(desktop.focal.y)}`,
@@ -78,12 +77,10 @@ export function Hero({ media, headlineLines }: HeroProps) {
         } as CSSProperties
       }
     >
-      {/* The photograph, and the veil that makes the header legible over it. The wrapper is not hidden from
-          assistive technology: the photograph has a literal description in the record. The veil is decoration
-          and is. */}
+      {/* The photograph. The wrapper is not hidden from assistive technology: the photograph has a literal
+          description in the record. The header's veil is the header's own (ADR 054), not drawn here. */}
       <div className="hj-hero-media">
         <HeroPicture media={media} />
-        <div className="hj-hero-veil" data-edge="top" aria-hidden="true" />
       </div>
 
       {/* The safe zone: clear of the header, the page's gutters and the consent notice. It is a grid whose last
