@@ -134,6 +134,32 @@
        other band keeps. */
     --hj-hero-pad-x: var(--space-gutter);
 
+    /* ── Header ──
+       The fixed bar's height, written once (ADR 054). The bar, the menu drawer's top edge, the hero's
+       safe zone and the page offsets all read this; it was typed as 64px in about fifteen places, and as
+       104px and 120px (64 plus a gap) in a dozen more, so a change to one left the rest behind. */
+    --header-height: 64px;
+
+    /* ── Hero composition (ADR 054) ──
+       One image-led composition on every width. The floor is the height below which the first screen
+       stops being a picture; the ceiling is the height above which it stops being a first screen (a
+       floor with no ceiling grows without bound on a tall display, ADR 021). Under 900px the floor
+       lowers, set beside the other breakpoint rules below. */
+    --hj-hero-min: 720px;
+    --hj-hero-max: 1200px;
+
+    /* The space left under the copy, before the consent notice's own height is added. */
+    --hj-hero-pad-b: clamp(32px, 4vw, 64px);
+
+    /* How strongly the hero's veils darken (or lighten) the photograph at their strongest edge. A veil is
+       a legibility device, not a palette filter (ADR 054): its strength is set by the lowest contrast
+       measured under the text it protects, by e2e/hero-legibility.spec.ts, and not by eye. */
+    --hj-veil-top: 60%;
+    --hj-veil-bottom: 72%;
+
+    /* The step between one hero line's entrance and the next. */
+    --stagger: 80ms;
+
     /* ── Product detail tile ── */
     /* The tile is square and bounded above. `min-height` + `aspect-ratio` was not a
        floor with a ratio, it was a contradiction: min-height set the height and the
@@ -212,6 +238,15 @@
        The site is flat (a hairline, not a shadow). The one thing that floats, the consent notice, has
        this: ink at 8%, derived from the token so a palette change moves it. */
     --shadow-float: 0 8px 40px color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+
+  /* The hero's floor under the 900px breakpoint (ADR 054): the one place the phone's first screen differs in
+     height. A breakpoint cannot be a token (a media query cannot read a property), so the value that
+     changes lives here, next to the other tokens it overrides. */
+  @media (max-width: 900px) {
+    :root {
+      --hj-hero-min: 640px;
+    }
   }
 
   /* ── Base Reset ── */

@@ -5,7 +5,7 @@ import { CLAIM_LEXICON, findClaimTerms, type LexiconHit } from '@/lib/catalog/cl
 import { approvedWordingSpans, resolveClaim } from '@/lib/catalog/claims'
 import type { ClaimsRegistry } from '@/lib/catalog/claims-schema'
 import { getAllProducts, getClaimsRegistry } from '@/lib/catalog'
-import { rawClaims, rawCollections, rawProducts } from '@/lib/catalog/manifest'
+import { rawClaims, rawCollections, rawHeroMedia, rawProducts } from '@/lib/catalog/manifest'
 import { filesUnder, jsonStrings, read, sourceStrings, visibleText } from '@/tests/support/renderedStrings'
 import { ProductDetail } from '@/components/product/ProductDetail'
 import { ProductCard } from '@/components/product/ProductCard'
@@ -413,6 +413,15 @@ describe('no content record carries a claim', () => {
     rawCollections.forEach((record, i) => {
       for (const { path, text } of jsonStrings(record)) expectNoClaims(text, `collection[${i}].${path.join('.')}`)
     })
+  })
+
+  /**
+   * The hero record's every string reaches a page or a screen reader: the alt text is read aloud, and
+   * the provenance note is what an editor sees beside the image. JSON is not linted for the banned
+   * vocabulary (ESLint reads source), so this is where "a photograph of rocks" cannot become "stones".
+   */
+  it('the home hero record — its alt text and its provenance note', () => {
+    for (const { path, text } of jsonStrings(rawHeroMedia)) expectNoClaims(text, `hero.${path.join('.')}`)
   })
 
   /**

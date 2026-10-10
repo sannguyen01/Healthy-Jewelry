@@ -1,0 +1,30 @@
+{
+  "id": "home",
+  "alt": "A woman in a green linen shirt smiles out over a sunlit harbour and the sea.",
+  "headerTone": "dark",
+  "desktop": {
+    "src": "/images/lifestyle/hero-banner.jpg",
+    "width": 1376,
+    "height": 768,
+    "focal": { "x": 0.69, "y": 0.45 },
+    "subject": { "x0": 0.62, "y0": 0.04, "x1": 0.84, "y1": 0.36 },
+    "copyZone": "bottom-start",
+    "variant": "card"
+  },
+  "mobile": {
+    "src": "/images/lifestyle/hero-banner.jpg",
+    "width": 1376,
+    "height": 768,
+    "focal": { "x": 0.8, "y": 0.4 },
+    "subject": { "x0": 0.62, "y0": 0.04, "x1": 0.84, "y1": 0.36 },
+    "copyZone": "bottom-start",
+    "variant": "overlay"
+  },
+  "provenance": {
+    "origin": "ai-generated",
+    "source": "the embedded C2PA manifest names a trained algorithmic source (Google); see ADR 054",
+    "rights": { "state": "unreviewed" },
+    "subjectConsent": "not-applicable",
+    "pieces": []
+  }
+}
