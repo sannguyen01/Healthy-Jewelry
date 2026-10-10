@@ -317,7 +317,10 @@ measurements), every control exercised on both formats (71 checks), and `pnpm au
   than the one Playwright 1.63 pins), `layout-invariants` "visible focus indicators" reads a 0px
   outline on product-card links at the instant of focus — reduced motion's 0.01ms transitions on
   elements with no transition of their own. It fails identically on unmodified `main` locally and
-  passes in CI. The brand lockup names its transition, so it is not exposed to it.
+  passes in CI. The brand lockup names its transition, so it is not exposed to it. The probe now
+  re-reads, a frame at a time up to a deadline, until a ring shows (a ring that never shows still
+  fails on the last reading): it was waiting two frames, which made the failure rare (one run in
+  about a hundred) and so easy to leave; 320 of 320 passed afterwards, on both projects.
 
 ## Session note — 2026-10-03
 
