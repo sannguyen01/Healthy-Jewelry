@@ -129,6 +129,28 @@ describe('the shape', () => {
     rejects((r) => { r.mobile.subject = { x0: 0.6, y0: 0.5, x1: 0.8, y1: 0.4 } }, /subject/)
   })
 
+  it('rejects a subject box too small to mean anything, because a tiny box is trivially visible and clear of the copy', () => {
+    // The browser tests hold the crop to "the subject stays in frame and clear of the copy". A box a hundredth of the
+    // image wide is in frame at every width and clear of everything, so it would make both tests pass for any crop.
+    rejects((r) => { r.mobile.subject = { x0: 0.5, y0: 0.2, x1: 0.54, y1: 0.4 } }, /subject/)
+    rejects((r) => { r.desktop.subject = { x0: 0.5, y0: 0.2, x1: 0.7, y1: 0.23 } }, /subject/)
+    accepts((r) => { r.mobile.subject = { x0: 0.5, y0: 0.2, x1: 0.56, y1: 0.26 } })
+  })
+
+  it('rejects a card for the narrow crop, which is always an overlay, and names mobile.variant', () => {
+    // A card is bounded to a fraction of the photograph (ADR 013). At a phone's width that fraction is a column too
+    // narrow to hold a sentence, so the narrow crop is an overlay on a veil, and the schema is where that is decided,
+    // not a stylesheet branch nothing tests. The desktop crop may be either.
+    rejects((r) => { r.mobile.variant = 'card' }, /"mobile",\s*"variant"/)
+    accepts((r) => { r.desktop.variant = 'overlay' })
+    accepts((r) => { r.desktop.variant = 'card' })
+  })
+
+  it('has no stylesheet branch for a narrow card, which the schema forbids', () => {
+    const css = readFileSync(resolve(ROOT, 'src/app/globals.css'), 'utf8')
+    expect(css).not.toMatch(/data-variant-narrow="card"/)
+  })
+
   it('rejects a variant, a copy corner or a header tone that does not exist', () => {
     rejects((r) => { r.desktop.variant = 'banner' }, /variant/)
     rejects((r) => { r.desktop.copyZone = 'top-start' }, /copyZone/)

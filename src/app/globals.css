@@ -122,14 +122,13 @@
        the headline went from 136px to 60px, ADR 051):
          901px 0.467 · 1024px 0.426 · 1440px 0.323 · 2560px 0.182
        So 0.55 is today's 0.467 rounded up with one step of headroom, not a
-       number picked to fit. Enforced as `max-width` on .hj-hero-scrim and
+       number picked to fit. Enforced as `max-width` on .hj-hero-copy and
        asserted in e2e/hero-legibility.spec.ts, which reads this same property
        so the two cannot drift. */
     --hj-hero-card-max-ratio: 0.55;
 
     /* Shared horizontal inset for the hero copy. One definition, two consumers:
-       the card's side margin in the split layout and the band's side padding in
-       the stacked one. It is the page's own gutter (ADR 051, B4): it was a clamp of its
+       the card's side margin and the safe zone's side padding. It is the page's own gutter (ADR 051, B4): it was a clamp of its
        own, a few pixels narrower, so the hero's words stood off the left edge every
        other band keeps. */
     --hj-hero-pad-x: var(--space-gutter);
@@ -2014,46 +2013,21 @@
     }
   }
 
-  /* Under 900px: the narrow crop's focal point and copy corner, and the narrow variant's own look. The wide
-     rules above are the default; these re-declare what differs, so any pairing of variants works. */
+  /* Under 900px: the narrow crop's focal point and copy corner, and its look, which is always the overlay's (the
+     schema allows nothing else for a phone). The wide rules above are the default, whichever variant the wide crop
+     is; these re-declare what differs. */
   @media (max-width: 900px) {
     .hj-hero {
       --hj-focal: var(--hj-focal-narrow);
       --hj-zone: var(--hj-zone-narrow);
     }
 
-    .hj-hero[data-variant-narrow="card"] {
-      --hj-bottom-veil: none;
-    }
-
     .hj-hero[data-variant-narrow="overlay"] {
       --hj-bottom-veil: block;
     }
 
-    .hj-hero[data-variant-narrow="card"] .hj-hero-copy {
-      display: block;
-      padding: clamp(28px, 3.5vw, 48px);
-      background-color: var(--bg);
-      border: 1px solid var(--ash);
-      border-radius: var(--radius-frame);
-    }
-
     .hj-hero[data-variant-narrow="overlay"] .hj-hero-copy {
       display: contents;
-    }
-
-    .hj-hero[data-variant-narrow="card"] .hj-hero-content {
-      width: auto;
-      max-width: none;
-      --hj-fg: var(--ink);
-      --hj-fg-2: var(--ink-2);
-      --hj-fg-body: var(--graphite);
-      --hj-primary-bg: var(--ink);
-      --hj-primary-fg: var(--bg);
-      --hj-primary-hover: var(--graphite);
-      --hj-ghost-edge: var(--outline);
-      --hj-ghost-hover: var(--ink);
-      --hj-ring: var(--ink);
     }
 
     .hj-hero[data-variant-narrow="overlay"] .hj-hero-content {

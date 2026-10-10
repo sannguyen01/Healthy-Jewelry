@@ -61,7 +61,9 @@ const step = (i: number): CSSProperties => ({ '--hj-i': i }) as CSSProperties
  */
 export function Hero({ media, headlineLines }: HeroProps) {
   const { desktop, mobile } = media
-  const hasCard = desktop.variant === 'card' || mobile.variant === 'card'
+  // Only the wide crop can be a card: the schema makes the narrow one an overlay (a card bounded to a fraction of the
+  // photograph is too narrow to read at a phone's width).
+  const hasCard = desktop.variant === 'card'
 
   return (
     <section

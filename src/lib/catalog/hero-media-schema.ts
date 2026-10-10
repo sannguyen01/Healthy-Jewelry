@@ -35,6 +35,14 @@ const productHandle = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'a product handle is a lowercase kebab-case slug')
 
+/**
+ * The least a subject box may span, on each axis, as a fraction of the source. The browser tests hold a crop to
+ * "the subject stays in frame and stays clear of the copy"; a box a hundredth of the image wide is in frame at every
+ * width and clear of everything, so it makes both pass for any crop. Five percent is a face seen from far away, not a
+ * measurement of anything the crop must protect.
+ */
+export const MIN_SUBJECT_SPAN = 0.05
+
 /** A region of the source image, normalised: 0 is its top-left, 1 its bottom-right. */
 export const rectSchema = z
   .object({ x0: unit, y0: unit, x1: unit, y1: unit })
@@ -42,24 +50,41 @@ export const rectSchema = z
   .refine((r) => r.x0 < r.x1 && r.y0 < r.y1, {
     message: 'a subject box must have a positive width and height, with x0 < x1 and y0 < y1',
   })
+  .refine((r) => r.x1 - r.x0 >= MIN_SUBJECT_SPAN && r.y1 - r.y0 >= MIN_SUBJECT_SPAN, {
+    message: `a subject box must span at least ${MIN_SUBJECT_SPAN} of the image on each axis, or it protects nothing`,
+  })
 
 /**
  * One crop. `src` is a local file under `/images/`: the content security policy allows images from
  * this origin only, and `..` is refused so a record cannot name a file outside the folder. JPEG and PNG
  * only, which are the formats `imageSize` can verify against the record's own `width` and `height`.
  */
-export const cropSchema = z
+const cropFields = {
+  src: z
+    .string()
+    .regex(/^\/images\/[A-Za-z0-9_\-./]+\.(?:jpe?g|png)$/, 'src must be a local /images/ file ending .jpg, .jpeg or .png')
+    .refine((src) => !src.split('/').includes('..'), { message: 'src must not contain ".." segments' }),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  focal: z.object({ x: unit, y: unit }).strict(),
+  subject: rectSchema,
+  copyZone: z.enum(['bottom-start', 'bottom-end']),
+}
+
+/** The wide crop: the copy lies on a veil (`overlay`) or in a bounded, opaque card (`card`, ADR 013). */
+export const cropSchema = z.object({ ...cropFields, variant: z.enum(['overlay', 'card']) }).strict()
+
+/**
+ * The narrow crop is always an overlay. A card is bounded to a fraction of the photograph (ADR 013), and at a phone's
+ * width that fraction is a column too narrow to hold a sentence, so a narrow card could be written and not rendered
+ * well. The schema is where that is decided, and the stylesheet has no branch for it.
+ */
+export const mobileCropSchema = z
   .object({
-    src: z
-      .string()
-      .regex(/^\/images\/[A-Za-z0-9_\-./]+\.(?:jpe?g|png)$/, 'src must be a local /images/ file ending .jpg, .jpeg or .png')
-      .refine((src) => !src.split('/').includes('..'), { message: 'src must not contain ".." segments' }),
-    width: z.number().int().positive(),
-    height: z.number().int().positive(),
-    focal: z.object({ x: unit, y: unit }).strict(),
-    subject: rectSchema,
-    copyZone: z.enum(['bottom-start', 'bottom-end']),
-    variant: z.enum(['overlay', 'card']),
+    ...cropFields,
+    variant: z.literal('overlay', {
+      error: 'mobile.variant must be "overlay": a card bounded to a fraction of the photograph is unusable at phone widths',
+    }),
   })
   .strict()
 
@@ -93,7 +118,7 @@ export const heroMediaSchema = z
     alt: z.string().trim().min(1).max(200),
     headerTone: z.enum(['light', 'dark']),
     desktop: cropSchema,
-    mobile: cropSchema,
+    mobile: mobileCropSchema,
     provenance: provenanceSchema,
   })
   .strict()
@@ -124,6 +149,7 @@ export const heroMediaSchema = z
 
 export type Rect = z.infer<typeof rectSchema>
 export type HeroCrop = z.infer<typeof cropSchema>
+export type HeroMobileCrop = z.infer<typeof mobileCropSchema>
 export type HeroMedia = z.infer<typeof heroMediaSchema>
 
 /**
