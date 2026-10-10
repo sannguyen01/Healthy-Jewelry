@@ -3,7 +3,6 @@ import { renderHook } from '@testing-library/react'
 import { useMedia, useIsMobile, useIsTablet } from '@/lib/hooks/useMedia'
 
 // ── useMedia ───────────────────────────────────────────────────────────────
-// (`useScrolled` was here until ADR 054: the header's state now follows the hero's end marker; see hero-overlay.test.ts.)
 
 type MockMQ = {
   matches: boolean

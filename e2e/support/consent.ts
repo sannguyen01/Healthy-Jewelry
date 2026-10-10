@@ -9,7 +9,7 @@ import { CONSENT_ROOM_PROPERTY, CONSENT_STORAGE_KEY } from '../../src/lib/analyt
  * no longer asked, or reads a property nothing writes. (A literal of the key was typed in eight specs.)
  */
 
-export { CONSENT_ROOM_PROPERTY, CONSENT_STORAGE_KEY }
+export { CONSENT_ROOM_PROPERTY }
 
 /**
  * Arrive as a visitor who has already declined, so the notice does not cover the lower part of a phone's hero and

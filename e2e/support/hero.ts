@@ -1,4 +1,5 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from './test'
+import { afterPaint, animationsFinished, settle } from './viewportFit'
 
 /**
  * Where the home page's first screen is, found by structure and by content rather than by the class names of one
@@ -9,6 +10,22 @@ import type { Locator, Page } from '@playwright/test'
 export const hero = (page: Page): Locator => page.locator('main > section').first()
 export const heroPhoto = (page: Page): Locator => hero(page).locator('img').first()
 export const header = (page: Page): Locator => page.locator('header.hj-header')
+
+/** Everything is placed and still: fonts loaded, the photograph decoded, no animation running. */
+export async function settleHero(page: Page): Promise<void> {
+  // The page itself first: it can still be on its streamed fallback with the real page in a hidden segment, where every
+  // box is zero and a measurement passes having measured nothing (ADR 042).
+  await settle(page)
+  await expect(heroPhoto(page)).toBeVisible()
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    const img = document.querySelector<HTMLImageElement>('main > section img')
+    if (img && !img.complete) await new Promise<void>((r) => { img.onload = img.onerror = () => r() })
+    if (img) await img.decode().catch(() => undefined)
+  })
+  await animationsFinished(page)
+  await afterPaint(page)
+}
 
 export type Labelled = { label: string; locator: Locator }
 

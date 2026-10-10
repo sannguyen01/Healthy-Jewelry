@@ -1,9 +1,9 @@
 import { PNG } from 'pngjs'
 import { test, expect, type Locator, type Page } from './support/test'
-import { afterPaint, animationsFinished, intersection, OVERLAP_TOLERANCE_PX, settle, type Box } from './support/viewportFit'
-import { denyConsent } from './support/consent'
-import { copyNodes, header, headerNodes, hero, heroPhoto } from './support/hero'
-import { describeVerdicts, worstContrast, type Verdict } from './support/backdropContrast'
+import { afterPaint, animationsFinished, intersection, OVERLAP_TOLERANCE_PX, type Box } from './support/viewportFit'
+import { consentNotice, denyConsent } from './support/consent'
+import { copyNodes, header, headerNodes, hero, heroPhoto, settleHero } from './support/hero'
+import { describeVerdicts, rgbAt, worstContrast, type Verdict } from './support/backdropContrast'
 import { contrastRatio, worstContrastAgainstPixels, type Rgb } from '../src/lib/utils/contrast'
 import { coverVisibleRect, visibleFraction } from '../src/lib/layout/coverCrop'
 import { heroMedia } from '../src/lib/catalog'
@@ -30,15 +30,16 @@ import { heroMedia } from '../src/lib/catalog'
  *
  * ## How it is located
  *
- * By structure the old composition shares with the new one (`main > section`, the first image, the
- * header, text and role), not by the class names the new one introduces, so a failure on the old page is
- * a *geometric* failure ("the photograph begins 468px down") and not "a selector is missing".
+ * The hero, the bar and the copy are found by structure and by content (`support/hero.ts`: `main > section`, the first
+ * image, the header, text and role), so a failure names what a visitor lost ("the primary action is under the notice")
+ * and not that a selector is missing. The card's own box (`.hj-hero-copy`) is the one class the specs name, because
+ * the card is the thing under test there.
  *
- * ## The old floor, replaced
+ * ## The floor it holds
  *
  * "At least half of the source frame is visible" (ADR 021) cannot hold for a viewport-filling phone hero:
  * a 1376×768 photograph shows 25.8% of its width at 390×844. What must survive the crop is the subject, so
- * that floor is now "the record's subject box is at least 90% visible and clear of the copy".
+ * the floor is "the record's subject box is at least 90% visible and clear of the copy".
  */
 
 /**
@@ -111,26 +112,11 @@ async function unreadable(page: Page, { copy = true, prefix = '' }: { copy?: boo
   return describeVerdicts(verdicts)
 }
 
-/** Everything is placed and still: fonts loaded, the photograph decoded, no animation running. */
-async function settleHero(page: Page): Promise<void> {
-  // The page itself first: it can still be on its streamed fallback with the real page in a hidden segment, where every
-  // box is zero and a measurement passes having measured nothing (ADR 042).
-  await settle(page)
-  await expect(heroPhoto(page)).toBeVisible()
-  await page.evaluate(async () => {
-    await document.fonts.ready
-    const img = document.querySelector<HTMLImageElement>('main > section img')
-    if (img && !img.complete) await new Promise<void>((r) => { img.onload = img.onerror = () => r() })
-    if (img) await img.decode().catch(() => undefined)
-  })
-  await animationsFinished(page)
-  await afterPaint(page)
-}
-
 const px = (value: string): number => Number.parseFloat(value)
 
-async function isNarrow(page: Page): Promise<boolean> {
-  return page.evaluate((q) => matchMedia(q).matches, MOBILE_QUERY)
+/** The crop the browser is using at this width: the record's narrow one under `MOBILE_QUERY`, the wide one above it. */
+async function activeCrop(page: Page) {
+  return (await page.evaluate((q) => matchMedia(q).matches, MOBILE_QUERY)) ? media.mobile : media.desktop
 }
 
 /** The width the visitor's own gutter is, resolved by the browser rather than copied from the stylesheet. */
@@ -143,12 +129,6 @@ async function gutterPx(page: Page): Promise<number> {
     probe.remove()
     return width
   })
-}
-
-async function consentBox(page: Page): Promise<Box | null> {
-  const banner = page.getByRole('dialog', { name: /analytics consent/i })
-  if ((await banner.count()) === 0 || !(await banner.isVisible())) return null
-  return boxOf(banner, 'consent notice')
 }
 
 /**
@@ -267,9 +247,9 @@ for (const viewport of VIEWPORTS) {
     })
 
     test('a card holds all of the copy inside itself', async ({ page }) => {
-      const narrow = await isNarrow(page)
-      // Skipped with its reason, not silently passed: under an overlay there is no card to hold anything.
-      test.skip(narrow || media.desktop.variant !== 'card', `no card at ${viewport.width}px: the copy lies on the photograph's veil`)
+      // Skipped with its reason, not silently passed: under an overlay there is no card to hold anything (and the narrow
+      // crop is always an overlay).
+      test.skip((await activeCrop(page)).variant !== 'card', `no card at ${viewport.width}px: the copy lies on the photograph's veil`)
       const outside = await copyOutsideCard(page)
       expect(outside, `Copy leaves its card at ${viewport.width}px:\n  ${outside.join('\n  ')}`).toEqual([])
     })
@@ -291,8 +271,7 @@ for (const viewport of VIEWPORTS) {
     })
 
     test('the subject stays in frame and clear of the copy, as the record says', async ({ page }) => {
-      const narrow = await isNarrow(page)
-      const crop = narrow ? media.mobile : media.desktop
+      const crop = await activeCrop(page)
       const photo = heroPhoto(page)
       const photoBox = await boxOf(photo, 'hero photograph')
       const style = await photo.evaluate((el) => {
@@ -343,8 +322,7 @@ for (const viewport of VIEWPORTS) {
     })
 
     test('a card, where the record asks for one, never outgrows the photograph it sits on', async ({ page }) => {
-      const narrow = await isNarrow(page)
-      const crop = narrow ? media.mobile : media.desktop
+      const crop = await activeCrop(page)
       // Skipped with its reason, not silently passed: an overlay has no card to bound.
       test.skip(crop.variant !== 'card', `the record asks for an overlay at ${viewport.width}px: there is no card to bound`)
 
@@ -546,10 +524,9 @@ test.describe('Hero — what scrolls under the bar shows through at most 6%', ()
         let widest = 0
         for (let y = EDGE; y < onWhite.height - EDGE; y++) {
           for (let x = EDGE; x < onWhite.width - EDGE; x++) {
-            const i = (onWhite.width * y + x) << 2
-            for (let channel = 0; channel < 3; channel++) {
-              widest = Math.max(widest, Math.abs(onWhite.data[i + channel] - onBlack.data[i + channel]))
-            }
+            const white = rgbAt(onWhite, x, y)
+            const black = rgbAt(onBlack, x, y)
+            widest = Math.max(widest, Math.abs(white.r - black.r), Math.abs(white.g - black.g), Math.abs(white.b - black.b))
           }
         }
         const allowed = Math.ceil(SHOW_THROUGH_MAX * 255) + SLACK_LEVELS
@@ -563,14 +540,14 @@ test.describe('Hero — what scrolls under the bar shows through at most 6%', ()
 })
 
 /**
- * **The bar's veil ends where the bar does.** It used to fade out over two more bar-heights below the bar, to soften its edge.
- * That fade is painted over whatever lies under it, the hero's copy included, so on a short phone, where the copy rests just
- * under the bar, the eyebrow sat inside it and was drawn at about a third of its contrast. The worst-pixel test could not see
- * that: it measures the pixels *behind* a word against the word's own colour, and a veil painted over the word attenuates the
- * word itself. A band that ends with the bar cannot reach anything the copy-below-the-bar check has already kept clear of it,
- * so this asserts the extent of what is drawn, in the browser.
+ * **The bar's veil is the bar's own background, and nothing else is drawn.** It used to fade out over two more bar-heights below
+ * the bar, to soften its edge. That fade is painted over whatever lies under it, the hero's copy included, so on a short phone,
+ * where the copy rests just under the bar, the eyebrow sat inside it and was drawn at about a third of its contrast. The
+ * worst-pixel test could not see that: it measures the pixels *behind* a word against the word's own colour, and a veil painted
+ * over the word attenuates the word itself. A surface that is the bar's own background cannot reach below the bar, so this holds
+ * the two facts that make it so: the background carries the declared strength, and the header draws no pseudo-element beneath it.
  */
-test.describe('Hero — the bar\'s veil ends where the bar does', () => {
+test.describe('Hero — the bar\'s veil is the bar\'s own background', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
   for (const viewport of [
@@ -578,18 +555,24 @@ test.describe('Hero — the bar\'s veil ends where the bar does', () => {
     { width: 390, height: 844 },
     { width: 1280, height: 900 },
   ]) {
-    test(`${viewport.width}×${viewport.height}: the veil is no taller than the bar`, async ({ page, context }) => {
+    test(`${viewport.width}×${viewport.height}: the band is the header's background at the declared strength, with no pseudo-element`, async ({ page, context }) => {
       await denyConsent(context)
       await page.setViewportSize(viewport)
       await page.goto('/')
       await settleHero(page)
-      const { veil, bar, state } = await header(page).evaluate((el) => ({
-        veil: Number.parseFloat(getComputedStyle(el, '::before').height),
-        bar: el.getBoundingClientRect().height,
+      const { background, strength, before, after, state } = await header(page).evaluate((el) => ({
+        background: getComputedStyle(el).backgroundColor,
+        strength: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hj-veil-bar')) / 100,
+        before: getComputedStyle(el, '::before').content,
+        after: getComputedStyle(el, '::after').content,
         state: el.getAttribute('data-state'),
       }))
       expect(state, 'the bar is over the hero').toBe('hero-overlay')
-      expect(veil, `the veil is ${veil}px tall and the bar ${bar}px: the rest is painted over the copy under it`).toBeLessThanOrEqual(bar + 0.5)
+      // `color(srgb r g b / a)` or `rgba(r, g, b, a)`: the alpha is the last number, and a colour with none is opaque.
+      const alpha = /rgba\(|\/\s*[\d.]+\s*\)/.test(background) ? Number(/([\d.]+)\)$/.exec(background)?.[1]) : 1
+      expect(alpha, `the bar's background is ${background}; the declared strength is ${strength}`).toBeCloseTo(strength, 2)
+      expect(['none', 'normal'], 'nothing is drawn before the bar').toContain(before)
+      expect(['none', 'normal'], 'nothing is drawn after the bar').toContain(after)
     })
   }
 })
@@ -648,11 +631,6 @@ test.describe('Hero — conditions a visitor brings', () => {
       await page.goto('/')
       for (const { label, locator } of copyNodes(page)) {
         await expect(locator, `${label} is in the served HTML`).toBeVisible()
-        const opacity = await locator.evaluate((el) => {
-          let o = 1
-          for (let n: Element | null = el; n; n = n.parentElement) o *= Number.parseFloat(getComputedStyle(n).opacity)
-          return o
-        })
         // CSS animations run without script, so the copy may be mid-entrance for a moment; it is never
         // *waiting for* one. Allow it to land.
         await expect.poll(async () =>
@@ -661,7 +639,7 @@ test.describe('Hero — conditions a visitor brings', () => {
             for (let n: Element | null = el; n; n = n.parentElement) o *= Number.parseFloat(getComputedStyle(n).opacity)
             return o
           })
-        , { message: `${label} must reach full opacity with JavaScript off (was ${opacity})` }).toBe(1)
+        , { message: `${label} must reach full opacity with JavaScript off` }).toBe(1)
       }
     })
   })
@@ -774,13 +752,13 @@ test.describe('Hero — with the consent notice up', () => {
     test(`${viewport.label}: the notice never hides the actions, or the visitor can reach them`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await page.goto('/')
-      const notice = page.getByRole('dialog', { name: /analytics consent/i })
+      const notice = consentNotice(page)
       await expect(notice).toBeVisible()
       await settleHero(page)
       // The notice publishes its height and the hero's copy rides above it: give that one frame to land.
       await afterPaint(page)
 
-      const bannerBox = (await consentBox(page)) as Box
+      const bannerBox = await boxOf(notice, 'consent notice')
       const boxes = await copyBoxes(page)
       const bar = await boxOf(header(page), 'header')
       const lowest = Math.max(...boxes.map((b) => b.box.y + b.box.height))
@@ -884,8 +862,7 @@ test.describe('Hero — the focus ring where the copy lies on the photograph', (
     for (let y = Math.max(0, y0); y < Math.min(png.height, y1); y += 2) {
       for (let x = Math.max(0, x0); x < Math.min(png.width, x1); x += 2) {
         if (x >= inner.x0 && x < inner.x1 && y >= inner.y0 && y < inner.y1) continue // the action's own face
-        const i = (png.width * y + x) << 2
-        surround.push({ r: png.data[i], g: png.data[i + 1], b: png.data[i + 2] })
+        surround.push(rgbAt(png, x, y))
       }
     }
     const worst = worstContrastAgainstPixels(ring.color, surround)

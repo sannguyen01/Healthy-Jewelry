@@ -131,6 +131,24 @@ export async function afterPaint(page: Page): Promise<void> {
 }
 
 /**
+ * Walk the page once from top to bottom, as a visitor scrolling would, and come back to the top with it painted. The strip
+ * and the footer reveal on intersection, and a lazy photograph holds no room it has not earned until it is near the screen,
+ * so a geometry probe that reads a part of the page nobody has scrolled to measures a part that is not there yet.
+ */
+export async function walkPage(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    const step = Math.round(window.innerHeight * 0.6)
+    for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+      window.scrollTo(0, y)
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    }
+    window.scrollTo(0, 0)
+  })
+  await afterPaint(page)
+}
+
+/**
  * Every finite animation and transition has finished. A looping one is excluded, because it never will, and the wait
  * is capped so a stuck one is reported as a timeout and not as a hung test. Measuring a moving target is how a
  * button's backdrop gets reported as the page behind where the button used to be.

@@ -13,6 +13,12 @@ import { afterPaint } from './viewportFit'
  * "behind" means.
  */
 
+/** The colour of one device pixel of a decoded screenshot (opaque: the alpha channel is not read). */
+export function rgbAt(png: PNG, x: number, y: number): Rgb {
+  const index = (png.width * y + x) << 2
+  return { r: png.data[index], g: png.data[index + 1], b: png.data[index + 2] }
+}
+
 /** Device pixels trimmed from each edge of a sampled region — see `sampleBackdrop`. */
 const SAMPLE_INSET_PX = 4
 
@@ -74,8 +80,7 @@ export async function sampleBackdrop(page: Page, locator: Locator): Promise<Rgb[
   // Every 3rd pixel in each axis: a contrast failure over a photograph is never a single isolated pixel.
   for (let y = inset; y < png.height - inset; y += 3) {
     for (let x = inset; x < png.width - inset; x += 3) {
-      const index = (png.width * y + x) << 2
-      pixels.push({ r: png.data[index], g: png.data[index + 1], b: png.data[index + 2] })
+      pixels.push(rgbAt(png, x, y))
     }
   }
   return pixels

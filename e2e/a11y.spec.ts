@@ -52,19 +52,6 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-prac
 test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
 /**
- * The hero enters on a CSS stagger, so its children pass through opacity 0 on the way to 1 unless motion is
- * reduced — and the consent notice and the scroll-reveal sections animate too. axe skips fully transparent
- * elements, so that is harmless, but waiting for the animations to finish makes the scan deterministic
- * rather than dependent on when axe happens to run. "No animation is running" resolves on every page; a
- * blanket "nothing is at opacity 0" never does, because plenty of elements are legitimately transparent —
- * hover-only specifications, closed drawers. (This waited for the hero's inline JS `transition` until
- * ADR 054 made the entrance CSS.)
- */
-async function waitForHeroToSettle(page: Page): Promise<void> {
-  await animationsFinished(page)
-}
-
-/**
  * The consent notice is part of what a first-time visitor sees, so the scans run with it up and with it
  * answered. It renders after hydration (the answer lives in localStorage, which the server cannot read), so
  * "is it there?" is asked by waiting for it, not by counting once: counting raced the mount in two of 112 runs
@@ -95,7 +82,10 @@ test.describe('Accessibility — every page, any impact', () => {
       const response = await page.goto(path)
       if (status) expect(response?.status()).toBe(status)
       await expect(page.locator('main#main')).toBeVisible()
-      await waitForHeroToSettle(page)
+      // The hero enters on a CSS stagger and the consent notice and the scroll-reveal sections animate too. axe skips fully
+      // transparent elements, so that is harmless, but "no animation is running" (which resolves on every page, where a
+      // blanket "nothing is at opacity 0" never does) makes the scan deterministic and not dependent on when axe runs.
+      await animationsFinished(page)
 
       await awaitConsentNotice(page)
       expect(await scan(page), `${name}, consent notice showing`).toEqual([])

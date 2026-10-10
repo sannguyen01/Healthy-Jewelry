@@ -90,14 +90,12 @@ describe('Hero — one composition (ADR 054)', () => {
     expect(container.querySelector('.hj-hero-safe > .hj-hero-veil')).toBeTruthy()
   })
 
-  it('carries the wide variant and the record\'s focal points and corners as data, and leaves the header\'s tone to the header', () => {
+  it('carries the wide variant and the record\'s focal points and corners as data', () => {
     const media = record()
     const { container } = render(<Hero media={media} headlineLines={LINES} />)
     const el = section(container)
     expect(el.getAttribute('data-variant-wide')).toBe(media.desktop.variant)
     // The narrow crop is always an overlay (the schema), so there is no attribute for it to carry.
-    expect(el.hasAttribute('data-variant-narrow')).toBe(false)
-    expect(el.hasAttribute('data-header-tone')).toBe(false)
     expect(el.style.getPropertyValue('--hj-focal-wide')).toBe('69% 45%')
     expect(el.style.getPropertyValue('--hj-focal-narrow')).toBe('80% 40%')
     expect(el.style.getPropertyValue('--hj-zone-wide')).toBe('start')

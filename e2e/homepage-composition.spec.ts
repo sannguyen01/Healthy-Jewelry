@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './support/test'
-import { afterPaint } from './support/viewportFit'
+import { afterPaint, walkPage } from './support/viewportFit'
 import { denyConsent } from './support/consent'
 
 /**
@@ -335,18 +335,7 @@ test.describe('Homepage — one container', () => {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/')
       await expect(page.locator('main')).toBeVisible()
-      await page.evaluate(async () => {
-        await document.fonts.ready
-        // The strip and the footer reveal on intersection, and a lazy photograph holds no room it has not earned
-        // until it is near the screen, so the page is walked once from top to bottom, as a visitor would.
-        const step = Math.round(window.innerHeight * 0.6)
-        for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
-          window.scrollTo(0, y)
-          await new Promise((r) => setTimeout(r, 60))
-        }
-        window.scrollTo(0, 0)
-      })
-      await afterPaint(page)
+      await walkPage(page)
 
       const m = await page.evaluate(() => {
         const left = (el: Element | null) => (el ? el.getBoundingClientRect().left : Number.NaN)
@@ -407,6 +396,54 @@ test.describe('Homepage — one container', () => {
  * their top edge, and a block of two or more lines whose last line holds one word is reported. The hero's own headline is left
  * out on purpose: its lines are data (`headlineLines`), broken where the copy says, not where the width does.
  */
+async function lastLineOrphans(page: Page, selector: string): Promise<{ orphans: string[]; measured: number }> {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    // The strip and the footer reveal on intersection, and a lazy photograph holds no room it has not earned until it is
+    // near the screen, so the page is walked once from top to bottom, as a visitor would.
+    const step = Math.round(window.innerHeight * 0.6)
+    for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+      window.scrollTo(0, y)
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    }
+    window.scrollTo(0, 0)
+  })
+  await afterPaint(page)
+  return page.evaluate((blockSelector) => {
+    const found: string[] = []
+    let measured = 0
+    for (const block of document.querySelectorAll(blockSelector)) {
+      const words: { text: string; top: number; height: number }[] = []
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const value = node.nodeValue ?? ''
+        for (const match of value.matchAll(/\S+/g)) {
+          const range = document.createRange()
+          range.setStart(node, match.index ?? 0)
+          range.setEnd(node, (match.index ?? 0) + match[0].length)
+          const rect = range.getBoundingClientRect()
+          if (rect.width > 0) words.push({ text: match[0], top: rect.top, height: rect.height })
+        }
+      }
+      // Under four words a break leaves two and one at best (a three-word name in a narrow column), which `balance` already
+      // chooses well; the check is for sentences and phrases that have somewhere better to break.
+      if (words.length < 4) continue
+      measured++
+      const lines: { top: number; words: string[] }[] = []
+      for (const word of words) {
+        const last = lines[lines.length - 1]
+        if (last && Math.abs(last.top - word.top) < word.height / 2) last.words.push(word.text)
+        else lines.push({ top: word.top, words: [word.text] })
+      }
+      if (lines.length >= 2 && lines[lines.length - 1].words.length === 1) {
+        const label = `${block.tagName.toLowerCase()}${typeof block.className === 'string' && block.className ? `.${block.className.split(/\s+/)[0]}` : ''}`
+        found.push(`${label}: "${lines[lines.length - 1].words[0]}" alone after ${lines.length - 1} line(s) — "${(block.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 50)}"`)
+      }
+    }
+    return { orphans: found, measured }
+  }, selector)
+}
+
 test.describe('Homepage — no word is left alone on a last line', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
@@ -416,54 +453,84 @@ test.describe('Homepage — no word is left alone on a last line', () => {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/')
       await expect(page.locator('main')).toBeVisible()
-      await page.evaluate(async () => {
-        await document.fonts.ready
-        const step = Math.round(window.innerHeight * 0.6)
-        for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
-          window.scrollTo(0, y)
-          await new Promise((r) => setTimeout(r, 60))
-        }
-        window.scrollTo(0, 0)
-      })
-      await afterPaint(page)
-
-      const { orphans, measured } = await page.evaluate(() => {
-        const found: string[] = []
-        let measured = 0
-        const blocks = document.querySelectorAll('main h2, main h3, main p, main li, main figcaption, main .label-eyebrow')
-        for (const block of blocks) {
-          const words: { text: string; top: number; height: number }[] = []
-          const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
-          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-            const value = node.nodeValue ?? ''
-            for (const match of value.matchAll(/\S+/g)) {
-              const range = document.createRange()
-              range.setStart(node, match.index ?? 0)
-              range.setEnd(node, (match.index ?? 0) + match[0].length)
-              const rect = range.getBoundingClientRect()
-              if (rect.width > 0) words.push({ text: match[0], top: rect.top, height: rect.height })
-            }
-          }
-          // Under four words a break leaves two and one at best (a three-word name in a narrow column), which `balance` already
-          // chooses well; the check is for sentences and phrases that have somewhere better to break.
-          if (words.length < 4) continue
-          measured++
-          const lines: { top: number; words: string[] }[] = []
-          for (const word of words) {
-            const last = lines[lines.length - 1]
-            if (last && Math.abs(last.top - word.top) < word.height / 2) last.words.push(word.text)
-            else lines.push({ top: word.top, words: [word.text] })
-          }
-          if (lines.length >= 2 && lines[lines.length - 1].words.length === 1) {
-            const label = `${block.tagName.toLowerCase()}${typeof block.className === 'string' && block.className ? `.${block.className.split(/\s+/)[0]}` : ''}`
-            found.push(`${label}: "${lines[lines.length - 1].words[0]}" alone after ${lines.length - 1} line(s) — "${(block.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 50)}"`)
-          }
-        }
-        return { orphans: found, measured }
-      })
+      const { orphans, measured } = await lastLineOrphans(page, 'main h2, main h3, main p, main li, main figcaption, main .label-eyebrow')
       // A scan that reads nothing finds nothing: the home page has well over a dozen blocks of four words or more.
       expect(measured, `the scan read ${measured} blocks of running text at ${width}px; it should see the page's paragraphs`).toBeGreaterThanOrEqual(10)
       expect(orphans, `Words alone on a last line at ${width}px:\n  ${orphans.join('\n  ')}`).toEqual([])
+    })
+  }
+})
+
+/**
+ * **The same rule, held on every page** — a ratchet, not a clean sheet.
+ *
+ * `text-wrap` is set on the elements, so it reaches every route, and until now only the home page was looked at. Measured
+ * over all fourteen routes at five widths (1030 blocks of four words or more): with the rule overridden away there are 98
+ * words alone on a last line, and as shipped there are 6, of which 2 are running text. The 4 others are the `/stores` heading
+ * "Book a showroom consultation.", which `balance` leaves as three words and one *because that is the more even split*
+ * (a thirteen-letter word is as wide as the three before it); a heading is not running text, and it is not held here.
+ *
+ * The 2 that remain are in the legal pages at the narrowest width, in copy that is counsel's to change, where Chromium's
+ * `pretty` leaves a long final word on its own. They are named below so that they are known and not forgotten. A *new*
+ * stranded word on any page fails. A listed one that no longer occurs does not: it is annotated, because a better engine
+ * (CI runs Playwright's own Chromium, not the one this was written on) or an edited paragraph may fix it, and a guard
+ * that goes red for an improvement is one people learn to delete. Take it off the list when the annotation appears.
+ * Safari draws `pretty` differently and Firefox not at all; this is Chromium's answer.
+ */
+const RUNNING_TEXT = 'main p, main li, main figcaption'
+const EVERY_PAGE = [
+  { path: '/' },
+  { path: '/shop' },
+  { path: '/shop/earrings' },
+  { path: '/products/arc-hoops-titanium' },
+  { path: '/about' },
+  { path: '/materials' },
+  { path: '/search?q=titanium' },
+  { path: '/contact' },
+  { path: '/faq' },
+  { path: '/shipping' },
+  { path: '/terms' },
+  { path: '/privacy' },
+  { path: '/legal' },
+  { path: '/stores' },
+]
+/** Routes whose running text still ends on a lone word, by width: counsel's copy at the narrowest width. */
+const KNOWN_LONE_LAST_WORDS: Record<number, readonly string[]> = {
+  320: ['/privacy', '/terms'],
+  1280: [],
+}
+
+test.describe('Every page — no running text ends on a lone word that is not on the record', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+  test.setTimeout(180_000)
+
+  for (const width of Object.keys(KNOWN_LONE_LAST_WORDS).map(Number)) {
+    test(`at ${width}px`, async ({ page, context }) => {
+      await denyConsent(context)
+      await page.setViewportSize({ width, height: 900 })
+      const routesWithLoneWords: string[] = []
+      const detail: string[] = []
+      let measuredTotal = 0
+      for (const { path } of EVERY_PAGE) {
+        await page.goto(path)
+        await expect(page.locator('main')).toBeVisible()
+        const { orphans, measured } = await lastLineOrphans(page, RUNNING_TEXT)
+        measuredTotal += measured
+        if (orphans.length > 0) {
+          routesWithLoneWords.push(path)
+          detail.push(...orphans.map((o) => `${path}  ${o}`))
+        }
+      }
+      expect(measuredTotal, `the scan read ${measuredTotal} blocks over ${EVERY_PAGE.length} routes at ${width}px`).toBeGreaterThanOrEqual(150)
+      const known = KNOWN_LONE_LAST_WORDS[width]
+      const unrecorded = routesWithLoneWords.filter((path) => !known.includes(path))
+      expect(
+        unrecorded,
+        `Routes whose running text ends on a lone word at ${width}px, and which are not on the record (${JSON.stringify(known)}):\n  ${detail.join('\n  ')}`
+      ).toEqual([])
+      for (const path of known.filter((path) => !routesWithLoneWords.includes(path))) {
+        test.info().annotations.push({ type: 'fixed-lone-last-word', description: `${path} at ${width}px no longer ends on a lone word: take it off KNOWN_LONE_LAST_WORDS` })
+      }
     })
   }
 })

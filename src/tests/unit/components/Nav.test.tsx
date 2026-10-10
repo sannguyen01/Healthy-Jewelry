@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import { Nav } from '@/components/layout/Nav'
 import { SITE_NAME } from '@/config/site'
+import { intersectionEntry, stubIntersectionObserver } from '../../support/intersection'
 
 vi.mock('next/image', () => ({
   // eslint-disable-next-line @next/next/no-img-element
@@ -159,21 +160,10 @@ describe('Nav', () => {
  * only to a Tab key.
  */
 describe('Nav — state, tone and the modal', () => {
-  type Entry = Pick<IntersectionObserverEntry, 'isIntersecting' | 'boundingClientRect' | 'rootBounds'>
-  let callback: ((entries: Entry[]) => void) | undefined
+  let io: ReturnType<typeof stubIntersectionObserver>
 
   beforeEach(() => {
-    callback = undefined
-    vi.stubGlobal(
-      'IntersectionObserver',
-      class {
-        constructor(cb: (entries: Entry[]) => void) {
-          callback = cb
-        }
-        observe() {}
-        disconnect() {}
-      }
-    )
+    io = stubIntersectionObserver()
     document.body.innerHTML = ''
   })
 
@@ -203,9 +193,9 @@ describe('Nav — state, tone and the modal', () => {
   it('turns solid when the hero\'s marker has passed the top, and back when it returns', () => {
     withHero()
     render(<Nav heroTone="light" />)
-    act(() => callback?.([{ isIntersecting: false, boundingClientRect: { top: -20 } as DOMRectReadOnly, rootBounds: null }]))
+    act(() => io.fire(intersectionEntry(false, -20, null)))
     expect(bar().getAttribute('data-state')).toBe('solid')
-    act(() => callback?.([{ isIntersecting: true, boundingClientRect: { top: 30 } as DOMRectReadOnly, rootBounds: null }]))
+    act(() => io.fire(intersectionEntry(true, 30, null)))
     expect(bar().getAttribute('data-state')).toBe('hero-overlay')
   })
 

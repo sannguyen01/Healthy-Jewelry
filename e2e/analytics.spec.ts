@@ -1,7 +1,7 @@
 import { test, expect, type Page } from './support/test'
 import { afterPaint, animationsFinished, intersection } from './support/viewportFit'
 import { consentNotice, CONSENT_ROOM_PROPERTY } from './support/consent'
-import { copyNodes } from './support/hero'
+import { copyNodes, settleHero } from './support/hero'
 
 /**
  * **Nothing is measured until someone says yes.**
@@ -208,6 +208,13 @@ test.describe('Analytics consent', () => {
    * from the footer, which is at the bottom of a scrolled page. So this reopens it from there and compares the number
    * with where the browser put the notice once it has settled.
    */
+  /** Rounded up, so never under-reserved, and never more than a pixel over. */
+  function expectRoomIsTheNoticesDistance({ published, truth, raw }: { published: number; truth: number; raw: string }) {
+    expect(Number.isFinite(published), `${CONSENT_ROOM_PROPERTY} was ${JSON.stringify(raw)}, not a length`).toBe(true)
+    expect(published, `published ${published}px; the notice is ${truth}px from the bottom of the screen`).toBeGreaterThanOrEqual(truth - 0.5)
+    expect(published, `published ${published}px; the notice is ${truth}px from the bottom of the screen`).toBeLessThanOrEqual(truth + 1.5)
+  }
+
   async function roomPublishedVersusWhereTheNoticeIs(page: Page) {
     const banner = consentNotice(page)
     await expect(banner).toBeVisible()
@@ -228,11 +235,7 @@ test.describe('Analytics consent', () => {
   test('the room it publishes is its distance from the bottom of the screen on a first visit', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
-    const { published, truth, raw } = await roomPublishedVersusWhereTheNoticeIs(page)
-    expect(Number.isFinite(published), `${CONSENT_ROOM_PROPERTY} was ${JSON.stringify(raw)}, not a length`).toBe(true)
-    // Rounded up, so never under-reserved, and never more than a pixel over.
-    expect(published).toBeGreaterThanOrEqual(truth - 0.5)
-    expect(published).toBeLessThanOrEqual(truth + 1.5)
+    expectRoomIsTheNoticesDistance(await roomPublishedVersusWhereTheNoticeIs(page))
   })
 
   for (const viewport of [
@@ -247,11 +250,9 @@ test.describe('Analytics consent', () => {
 
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
       await page.getByTestId('measurement-preferences').first().click()
-      const { published, truth, scrollY, raw } = await roomPublishedVersusWhereTheNoticeIs(page)
-      expect(scrollY, 'the page was scrolled when the notice appeared, or this proves nothing').toBeGreaterThan(500)
-      expect(Number.isFinite(published), `${CONSENT_ROOM_PROPERTY} was ${JSON.stringify(raw)}, not a length`).toBe(true)
-      expect(published, `published ${published}px; the notice is ${truth}px from the bottom of the screen`).toBeGreaterThanOrEqual(truth - 0.5)
-      expect(published, `published ${published}px; the notice is ${truth}px from the bottom of the screen`).toBeLessThanOrEqual(truth + 1.5)
+      const measured = await roomPublishedVersusWhereTheNoticeIs(page)
+      expect(measured.scrollY, 'the page was scrolled when the notice appeared, or this proves nothing').toBeGreaterThan(500)
+      expectRoomIsTheNoticesDistance(measured)
     })
   }
 
@@ -309,17 +310,11 @@ test.describe('Analytics consent', () => {
       await page.setViewportSize(viewport)
       await page.goto('/')
       await expect(consentNotice(page)).toBeVisible()
-      await animationsFinished(page)
       // Settled means the things that can still move the page have happened, not that a fixed time has gone by (it was a
       // 1500ms sleep: dead time across six widths and two projects on a fast runner, and a shift later than that unseen on a
-      // slow one). Fonts have swapped in, the photograph has decoded, and two frames have drawn since the notice arrived and
-      // trimmed its estimate to its measured height.
-      await page.evaluate(async () => {
-        await document.fonts.ready
-        const photograph = document.querySelector<HTMLImageElement>('.hj-hero-media img')
-        if (photograph) await photograph.decode().catch(() => undefined)
-      })
-      await afterPaint(page)
+      // slow one). Fonts have swapped in, the photograph has decoded, nothing is animating, and two frames have drawn since
+      // the notice arrived and trimmed its estimate to its measured height.
+      await settleHero(page)
       const { total, shifts, travelled } = await page.evaluate(() => {
         const w = window as unknown as {
           __shifts: Array<{ value: number; at: number; moved: string[] }>

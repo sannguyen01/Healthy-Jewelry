@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { overlayFromEntry, useHeroOverlay } from '@/lib/hooks/useHeroOverlay'
+import { intersectionEntry, stubIntersectionObserver } from '../support/intersection'
 
 /**
  * The header's state follows the hero it sits over, not a distance scrolled (ADR 054).
@@ -35,32 +36,12 @@ describe('overlayFromEntry', () => {
   })
 })
 
-type Entry = Pick<IntersectionObserverEntry, 'isIntersecting' | 'boundingClientRect' | 'rootBounds'>
-const entry = (isIntersecting: boolean, top: number, rootTop: number | null = 0): Entry => ({
-  isIntersecting,
-  boundingClientRect: { top } as DOMRectReadOnly,
-  rootBounds: rootTop === null ? null : ({ top: rootTop } as DOMRectReadOnly),
-})
-
 describe('useHeroOverlay', () => {
-  let callback: ((entries: Entry[]) => void) | undefined
-  const observe = vi.fn()
-  const disconnect = vi.fn()
+  let io: ReturnType<typeof stubIntersectionObserver>
+  const entry = intersectionEntry
 
   beforeEach(() => {
-    callback = undefined
-    observe.mockClear()
-    disconnect.mockClear()
-    vi.stubGlobal(
-      'IntersectionObserver',
-      class {
-        constructor(cb: (entries: Entry[]) => void) {
-          callback = cb
-        }
-        observe = observe
-        disconnect = disconnect
-      }
-    )
+    io = stubIntersectionObserver()
   })
 
   afterEach(() => {
@@ -76,49 +57,49 @@ describe('useHeroOverlay', () => {
     withSentinel()
     const { result } = renderHook(() => useHeroOverlay(false))
     expect(result.current).toBe(false)
-    expect(observe).not.toHaveBeenCalled()
+    expect(io.observe).not.toHaveBeenCalled()
   })
 
   it('starts as an overlay for a page with a hero, so the server\'s first paint and the client\'s agree', () => {
     withSentinel()
     const { result } = renderHook(() => useHeroOverlay(true))
     expect(result.current).toBe(true)
-    expect(observe).toHaveBeenCalledTimes(1)
+    expect(io.observe).toHaveBeenCalledTimes(1)
   })
 
   it('is solid when the page asked for a hero and the marker is not there', () => {
     const { result } = renderHook(() => useHeroOverlay(true))
     expect(result.current).toBe(false)
-    expect(observe).not.toHaveBeenCalled()
+    expect(io.observe).not.toHaveBeenCalled()
   })
 
   it('follows the marker out of the top of the screen and back', () => {
     withSentinel()
     const { result } = renderHook(() => useHeroOverlay(true))
-    act(() => callback?.([entry(false, -50)]))
+    act(() => io.fire(entry(false, -50)))
     expect(result.current).toBe(false)
-    act(() => callback?.([entry(true, 10)]))
+    act(() => io.fire(entry(true, 10)))
     expect(result.current).toBe(true)
   })
 
   it('does not turn solid for a marker below the fold, however long the hero', () => {
     withSentinel()
     const { result } = renderHook(() => useHeroOverlay(true))
-    act(() => callback?.([entry(false, 2400)]))
+    act(() => io.fire(entry(false, 2400)))
     expect(result.current).toBe(true)
   })
 
   it('reads a viewport root as the top of the page when the browser reports none', () => {
     withSentinel()
     const { result } = renderHook(() => useHeroOverlay(true))
-    act(() => callback?.([entry(false, -5, null)]))
+    act(() => io.fire(entry(false, -5, null)))
     expect(result.current).toBe(false)
   })
 
   it('uses the latest entry when several arrive together', () => {
     withSentinel()
     const { result } = renderHook(() => useHeroOverlay(true))
-    act(() => callback?.([entry(false, -100), entry(true, 20)]))
+    act(() => io.fire(entry(false, -100), entry(true, 20)))
     expect(result.current).toBe(true)
   })
 
@@ -126,7 +107,7 @@ describe('useHeroOverlay', () => {
     withSentinel()
     const { unmount } = renderHook(() => useHeroOverlay(true))
     unmount()
-    expect(disconnect).toHaveBeenCalledTimes(1)
+    expect(io.disconnect).toHaveBeenCalledTimes(1)
   })
 
   it('stays an overlay, and does not throw, where IntersectionObserver does not exist', () => {
