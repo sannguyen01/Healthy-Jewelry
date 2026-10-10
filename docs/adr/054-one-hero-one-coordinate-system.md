@@ -259,3 +259,32 @@ bottom-clearance expression typed twice, dead exports, and `Nav`'s two coupled p
 absence means no hero. The header's attribute is `data-bar-tone` and the veil tokens are named for what they protect,
 because `data-tone` already means a dark ground on a band.
 
+## After the design review
+
+A review of the rendered page (heuristics, visual quality, accessibility, motion) found no blocker, and two things in
+this change's own scope that the earlier passes had accepted or not seen.
+
+- **The bar let the hero's copy print across the brand mark.** The bar's veil was set by the arithmetic of legibility
+  alone: strong enough that its own type clears AA over pure black and pure white. That says nothing about what is
+  behind the type, and at the strength it asked for more than a quarter of whatever scrolled under the bar came through, so
+  on a phone the hero's sentence passing under it lay across the lockup, legible type on a band that was not flat. The
+  earlier note called it an accepted trade-off. It is a defect with a cheap fix, and the fix is a second statement about the
+  same token: no more than an eighth of the backdrop may show through (`--hj-veil-bar` is 88%). The unit test holds the token to
+  it, and the browser test holds what was drawn: it puts pure white and then pure black under the bar and compares the two
+  renders pixel by pixel (the most a backdrop can change a pixel is what the veil lets through; the test failed at 71 of 255
+  before and passes now, in both tones, at 390 and 1280, in both projects). The fade below the bar was left at its length: a
+  shorter one drew a band edge across the subject's hair.
+- **Lines ended on one word.** Nothing in the stylesheet asked the browser to care where a line ends, so at 390px the
+  hero's eyebrow broke after "316L" and left "STEEL" alone, and sentences left "specification.", "relationship.", "steel."
+  and "piece." on their own lines (a dozen across six widths). Headings and the eyebrow now ask for `balance`, running text
+  for `pretty`, and the two short ledes (the registry's and the moment's) for `balance`, because `pretty` accepts a long last
+  word as long enough to stand alone. `e2e/homepage-composition.spec.ts` reads the rendered words, groups them into lines
+  and fails on a block of four or more words whose last line is one (a three-word name breaks two and one at best). The
+  hero's headline is left out: its lines are data. These properties are Chromium's and Safari's today and a no-op
+  elsewhere, which is the right way for a refinement to fail; only Chromium was measured.
+
+Left to the owner, because each is a decision and not a defect: the photographs show gold and shell jewellery rather than the three
+metals, and the phone crop is a visible upscale; the care band shows the claims gate's neutral fallback as its only emphatic
+text (claims are a named reviewer's, never an agent's); the phone overlay's veil makes the lower half of the first screen
+perceptually dark where the desktop card is alabaster; the first-visit consent notice covers part of the hero's actions on
+the three shortest phones; a badge on every card of the strip carries no signal; and the materials' chips repeat their subtitles.

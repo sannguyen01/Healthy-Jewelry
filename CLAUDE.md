@@ -173,7 +173,7 @@ in `DESIGN.md`, "Reference: Songmont" — read that before changing a token, a s
   ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)). `hero-overlay` lies over the hero, on `/`
   alone (`<Nav heroTone=… />`), with light type on a darkened band or ink on a light one as the hero
   record's `headerTone` says (the band is the bar's own, `.hj-header::before`, strong enough for any
-  backdrop: `header-veil.test.ts`); `solid` is `--bg` with a hairline, which every other page is from its
+  backdrop and to hide what scrolls under it: `header-veil.test.ts`); `solid` is `--bg` with a hairline, which every other page is from its
   first byte and `/` becomes once the hero's own end marker (`[data-hero-end]`, read by
   `useHeroOverlay`) has passed the top; `menu-open` is the flat bar over the archive, with `main` and
   the footer inert. It read `scrollY > 60` on every route until 2026-10-10, so a page with no hero was

@@ -484,6 +484,72 @@ test.describe('Hero — the bar over the extremes', () => {
   }
 })
 
+/**
+ * **What scrolls under the bar shows through at most 12%**, so the band reads as flat. Legible type on a band that is
+ * visibly not flat is still a defect: with the veil at 72% (the strength AA alone asks for) the hero's sentence passing
+ * under the bar printed through the brand mark on a phone. The measure needs no photograph and no copy: it puts pure white
+ * and then pure black under the bar and compares the two renders pixel by pixel. Whatever the veil lets through is the
+ * most any backdrop can change a pixel, glyph pixels included (they are opaque in both renders, so they differ by nothing).
+ * header-veil.test.ts holds the token to the same figure; this holds what the browser drew.
+ */
+test.describe('Hero — what scrolls under the bar shows through at most 12%', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  const SHOW_THROUGH_MAX = 0.12
+  /** Two levels of slack for the colour mix's rounding. */
+  const SLACK_LEVELS = 2
+
+  for (const width of [390, 1280]) {
+    for (const tone of ['dark', 'light'] as const) {
+      test(`${width}px, ${tone} tone: the bar over white and over black differs by at most ${SHOW_THROUGH_MAX * 100}%`, async ({ page, context }) => {
+        await denyConsent(context)
+        await page.setViewportSize({ width, height: 900 })
+        await page.goto('/')
+        await settleHero(page)
+        await page.evaluate((t) => {
+          document.querySelector('header.hj-header')?.setAttribute('data-bar-tone', t)
+          const layer = document.createElement('div')
+          layer.dataset.hjBackdrop = ''
+          layer.style.cssText = 'position:fixed;inset:0;z-index:80;background:#fff'
+          document.body.append(layer)
+        }, tone)
+
+        const render = async (colour: string) => {
+          await page.evaluate((c) => {
+            ;(document.querySelector('[data-hj-backdrop]') as HTMLElement).style.background = c
+          }, colour)
+          await afterPaint(page)
+          return PNG.sync.read(await header(page).screenshot())
+        }
+        const onWhite = await render('#fff')
+        const onBlack = await render('#000')
+        expect(onWhite.width).toBe(onBlack.width)
+        expect(onWhite.height).toBe(onBlack.height)
+
+        // The outermost device pixels are left out. At a fractional pixel ratio (a Pixel 7's 2.625: 390 CSS pixels are 1023.75
+        // device pixels) the last column is a quarter outside the bar, so it shows the layer beneath and no veil at all; it
+        // differed by 86 between white and black while every pixel inside the bar differed by 31. That is an edge of the
+        // capture, not of the veil.
+        const EDGE = 2
+        let widest = 0
+        for (let y = EDGE; y < onWhite.height - EDGE; y++) {
+          for (let x = EDGE; x < onWhite.width - EDGE; x++) {
+            const i = (onWhite.width * y + x) << 2
+            for (let channel = 0; channel < 3; channel++) {
+              widest = Math.max(widest, Math.abs(onWhite.data[i + channel] - onBlack.data[i + channel]))
+            }
+          }
+        }
+        const allowed = Math.ceil(SHOW_THROUGH_MAX * 255) + SLACK_LEVELS
+        expect(
+          widest,
+          `${tone} tone: the bar changes by up to ${widest}/255 between a white and a black backdrop; ${allowed} allowed`
+        ).toBeLessThanOrEqual(allowed)
+      })
+    }
+  }
+})
+
 // ── What a visitor can bring with them ───────────────────────────────────────
 
 test.describe('Hero — conditions a visitor brings', () => {

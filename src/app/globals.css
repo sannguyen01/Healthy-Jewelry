@@ -173,10 +173,13 @@
     /* How strongly the veils darken (or lighten) what is behind them at their strongest edge. A veil is a
        legibility device, not a palette filter (ADR 054): its strength is set by the lowest contrast measured
        under the text it protects, by e2e/hero-legibility.spec.ts, and not by eye.
-       The first is the header's own (the bar cannot know what scrolls under it, so it must clear AA over black
-       and over white; src/tests/unit/header-veil.test.ts proves it for both tones: 60% cleared the dark tone
-       and not the light). The second is the hero copy's, set against the photograph it lies on. */
-    --hj-veil-bar: 72%;
+       The first is the header's own. The bar cannot know what scrolls under it, so it must clear AA over black
+       and over white (src/tests/unit/header-veil.test.ts proves it for both tones: 60% cleared the dark tone
+       and not the light), and it must hide what is under it: at 72%, the figure AA alone asked for, 28% of the
+       hero's sentence came through and printed across the brand mark on a phone. So no more than 12% may show
+       through (88%), held in the browser by e2e/hero-legibility.spec.ts. The second is the hero copy's, set
+       against the photograph it lies on. */
+    --hj-veil-bar: 88%;
     --hj-veil-copy: 72%;
 
     /* The step between one hero line's entrance and the next. */
@@ -316,6 +319,14 @@
   h1, h2, h3, h4, h5, h6 {
     line-height: var(--leading-display);
     font-weight: inherit;
+    /* Where a line ends is the type's job too. A heading's lines should be of a length (`balance`), and a sentence
+       should not end on one word alone (`pretty`, below). Chromium and Safari today, a no-op elsewhere, which is the
+       right way for a refinement to fail. Measured on the rendered words by e2e/homepage-composition.spec.ts. */
+    text-wrap: balance;
+  }
+
+  p, li, figcaption {
+    text-wrap: pretty;
   }
 
   /* The browser's own defaults ask for 700 and for italic, neither of which the site ships.
@@ -637,6 +648,7 @@
     letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     color: var(--ink-2);
+    text-wrap: balance;
   }
 
   /* ── Horizontal Rule ── */
@@ -782,7 +794,9 @@
      viewport's top edge wherever the page is scrolled: full strength through the bar's height, fading out below it.
      Its colour is the type's opposite, ink under light type (`light` tone) and the ground under ink (`dark`), and
      its strength is the worst case, AA over black and over white (header-veil.test.ts), because the bar does not
-     know what is under it. Gone once the header is solid, which has a ground of its own. */
+     know what is under it, and strong enough that no more than 12% of what scrolls under it shows through, so the
+     band reads as flat (the same test; the browser half is in hero-legibility.spec.ts). Gone once the header is
+     solid, which has a ground of its own. */
   .hj-header[data-bar-tone="light"] {
     --hj-bar-veil: var(--ink);
   }
@@ -1455,6 +1469,10 @@
   .hj-registry-intro .hj-lede {
     max-width: 320px;
     margin: 24px 0 32px;
+    /* A sentence of two lines (the registry's, the moment's) is balanced rather than left to `pretty`, which accepts a
+       long last word ("specification.", "relationship.") as long enough to stand alone. Only the short ledes: balance
+       gives up beyond six lines, and the care band's is longer than that. */
+    text-wrap: balance;
   }
 
   .hj-registry {
@@ -1808,6 +1826,7 @@
 
   .hj-moment-copy .hj-lede {
     max-width: 360px;
+    text-wrap: balance;
   }
 
   .hj-moment-side {

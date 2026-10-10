@@ -23,6 +23,10 @@ user-visible or architecturally significant changes.
   The old "half the frame" floor became a subject floor. The narrow crop is always an overlay.
 - **Found on the way**: the interim photograph carries a trained-algorithmic provenance marker and shows jewellery that is not
   ours; it is recorded and gated, not hidden.
+- **After a design review**: the bar no longer lets the hero's copy print across the brand mark (no more than an eighth of
+  what scrolls under it shows through; held by a unit test on the token and a browser test on the rendered bar), and
+  headings, the eyebrow and running text ask the browser not to leave a word alone on a last line (`text-wrap`, measured
+  on the rendered words at six widths).
 
 ## 2026-10-03 — Incident PR-94: recovery, production admission, and a proven gate
 

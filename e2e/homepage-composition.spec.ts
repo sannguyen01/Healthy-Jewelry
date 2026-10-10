@@ -393,3 +393,73 @@ test.describe('Homepage — one container', () => {
     })
   }
 })
+
+/**
+ * **No block of running text ends on a line of one word** (the type's job as well as the grid's).
+ *
+ * Found by looking at the page, not by a test: at 390px the hero's eyebrow broke after "316L" and left "STEEL" alone, the
+ * strip's heading sentence left "specification." on its own line, a materials description left "steel." and "coating.", and
+ * the care paragraph ended on "piece." — a dozen of them across six widths, because no rule anywhere in the stylesheet asked the
+ * browser to care where a line ends. `text-wrap: balance` (short blocks: headings, the eyebrow) and `pretty` (running text)
+ * ask it to. They are Chromium's and Safari's today and a no-op elsewhere, which is the right way for a refinement to fail.
+ *
+ * Measured from the rendered words, not from the CSS: every word of every block is a range, the ranges are grouped into lines by
+ * their top edge, and a block of two or more lines whose last line holds one word is reported. The hero's own headline is left
+ * out on purpose: its lines are data (`headlineLines`), broken where the copy says, not where the width does.
+ */
+test.describe('Homepage — no word is left alone on a last line', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  for (const width of [320, 360, 390, 768, 1280, 1440]) {
+    test(`at ${width}px`, async ({ page, context }) => {
+      await denyConsent(context)
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/')
+      await expect(page.locator('main')).toBeVisible()
+      await page.evaluate(async () => {
+        await document.fonts.ready
+        const step = Math.round(window.innerHeight * 0.6)
+        for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+          window.scrollTo(0, y)
+          await new Promise((r) => setTimeout(r, 60))
+        }
+        window.scrollTo(0, 0)
+      })
+      await afterPaint(page)
+
+      const orphans = await page.evaluate(() => {
+        const found: string[] = []
+        const blocks = document.querySelectorAll('main h2, main h3, main p, main li, main figcaption, main .label-eyebrow')
+        for (const block of blocks) {
+          const words: { text: string; top: number; height: number }[] = []
+          const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const value = node.nodeValue ?? ''
+            for (const match of value.matchAll(/\S+/g)) {
+              const range = document.createRange()
+              range.setStart(node, match.index ?? 0)
+              range.setEnd(node, (match.index ?? 0) + match[0].length)
+              const rect = range.getBoundingClientRect()
+              if (rect.width > 0) words.push({ text: match[0], top: rect.top, height: rect.height })
+            }
+          }
+          // Under four words a break leaves two and one at best (a three-word name in a narrow column), which `balance` already
+          // chooses well; the check is for sentences and phrases that have somewhere better to break.
+          if (words.length < 4) continue
+          const lines: { top: number; words: string[] }[] = []
+          for (const word of words) {
+            const last = lines[lines.length - 1]
+            if (last && Math.abs(last.top - word.top) < word.height / 2) last.words.push(word.text)
+            else lines.push({ top: word.top, words: [word.text] })
+          }
+          if (lines.length >= 2 && lines[lines.length - 1].words.length === 1) {
+            const label = `${block.tagName.toLowerCase()}${typeof block.className === 'string' && block.className ? `.${block.className.split(/\s+/)[0]}` : ''}`
+            found.push(`${label}: "${lines[lines.length - 1].words[0]}" alone after ${lines.length - 1} line(s) — "${(block.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 50)}"`)
+          }
+        }
+        return found
+      })
+      expect(orphans, `Words alone on a last line at ${width}px:\n  ${orphans.join('\n  ')}`).toEqual([])
+    })
+  }
+})
