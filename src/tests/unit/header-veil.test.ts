@@ -38,8 +38,8 @@ const veilStrength = (): number => {
   return Number.parseFloat(match[1]) / 100
 }
 
-/** How much of what scrolls under the bar may show through it (the browser test holds the rendered bar to the same figure). */
-const SHOW_THROUGH_MAX = 0.06
+/** How much of what scrolls under the bar may show through it: none (the browser test holds the rendered bar to the same figure). */
+const SHOW_THROUGH_MAX = 0
 
 const BLACK: Rgb = { r: 0, g: 0, b: 0 }
 const WHITE: Rgb = { r: 255, g: 255, b: 255 }
@@ -73,18 +73,19 @@ describe('the header\'s veil over the hero', () => {
     expect(contrastRatio(parseHex(token(light.text)), weak)).toBeLessThan(AA_NORMAL_TEXT)
   })
 
-  it('hides what scrolls under it: at most 6% of the backdrop shows through the bar', () => {
+  it('hides what scrolls under it: none of the backdrop shows through the bar', () => {
     // AA is the floor for the bar's own type; it says nothing about what is *behind* the type. At 72% (the first token, set
     // by the AA arithmetic above) 28% of a backdrop came through, so the hero's sentence passing under the bar printed
     // through the brand mark on a phone: legible type on a band that was visibly not flat. At 88% (12%) the sentence was
-    // still faintly there over "MENU" and the logo, on a dark photograph. Hiding a backdrop is its own
-    // requirement, and it is the same arithmetic: what comes through is whatever the veil lets through, 1 - strength,
-    // whatever the backdrop is. e2e/hero-legibility.spec.ts measures the rendered difference between a white and a
-    // black backdrop and holds it to this figure.
+    // still faintly there over "MENU" and the logo, on a dark photograph, and at 94% (6%) it was still there on a phone at
+    // twice the pixel density, a line of light type ghosted across the logo of an otherwise flat bar. What a band that is
+    // meant to hide what is under it lets through is exactly what the veil lets through, 1 - strength, whatever the backdrop
+    // is, so the strength is the whole of it: opaque. e2e/hero-legibility.spec.ts measures the rendered difference between
+    // a white and a black backdrop and holds it to this figure.
     expect(
       1 - veilStrength(),
       `--hj-veil-bar is ${(veilStrength() * 100).toFixed(0)}%, so ${((1 - veilStrength()) * 100).toFixed(0)}% of the page behind the bar shows through`
-    ).toBeLessThanOrEqual(SHOW_THROUGH_MAX + 1e-9) // 1 - 0.94 is 0.06000000000000005 in floating point
+    ).toBeLessThanOrEqual(SHOW_THROUGH_MAX + 1e-9)
   })
 
   it('is the overlay header\'s own background, so it is as tall as the bar and no taller', () => {

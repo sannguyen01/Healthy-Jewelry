@@ -23,8 +23,9 @@ user-visible or architecturally significant changes.
   The old "half the frame" floor became a subject floor. The narrow crop is always an overlay.
 - **Found on the way**: the interim photograph carries a trained-algorithmic provenance marker and shows jewellery that is not
   ours; it is recorded and gated, not hidden.
-- **After a design review**: the bar no longer lets the hero's copy print across the brand mark (no more than 6% of what
-  scrolls under it shows through; held by a unit test on the token and a browser test on the rendered bar), its veil is one
+- **After a design review**: the bar no longer lets the hero's copy print across the brand mark (it hides what
+  scrolls under it entirely, after a translucent band at 94% still ghosted a line of the eyebrow across the logo on a phone;
+  held by a unit test on the token and a browser test on the rendered bar), its veil is one
   flat band as tall as the bar (a fade below it was painted over the copy resting under the bar on the shortest phones), and
   headings, the eyebrow and running text ask the browser not to leave a word alone on a last line (`text-wrap`, measured
   on the rendered words at six widths).

@@ -202,10 +202,11 @@
        and over white (src/tests/unit/header-veil.test.ts proves it for both tones: 60% cleared the dark tone
        and not the light), and it must hide what is under it: at 72%, the figure AA alone asked for, 28% of the
        hero's sentence came through and printed across the brand mark on a phone, and at 88% (12%) it was still
-       faintly there over "MENU" and the logo on a dark photograph. So no more than 6% may show through (94%), held
-       in the browser by e2e/hero-legibility.spec.ts. The second is the hero copy's, set
-       against the photograph it lies on. */
-    --hj-veil-bar: 94%;
+       faintly there over "MENU" and the logo on a dark photograph, and at 94% (6%) it was still there on a phone at twice
+       the pixel density, a line of light type ghosted across the logo of an otherwise flat bar. A band that is meant to
+       hide what is under it lets through exactly 1 - its strength, so it is opaque, held in the browser by
+       e2e/hero-legibility.spec.ts. The second is the hero copy's, set against the photograph it lies on. */
+    --hj-veil-bar: 100%;
     --hj-veil-copy: 72%;
 
     /* The step between one hero line's entrance and the next. */

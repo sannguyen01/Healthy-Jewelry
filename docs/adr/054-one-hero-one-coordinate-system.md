@@ -79,8 +79,8 @@ computes it for both tones), because the bar cannot know what is under it. The r
 pixel behind the bar's own type (MENU, the brand name, SEARCH, CONTACT), its search glyph (3:1) and its focus ring, at
 five depths of the hero at four widths and with the photograph blocked. The **logotype is exempt**: the knot and the name
 as a mark are a logo, which WCAG 1.4.3 and 1.4.11 do not hold to a ratio, and are not measured. What is guaranteed is the
-bar's legibility; the copy that scrolls under the bar is faintly visible through its band, which is the cost of a
-translucent bar and was judged better than an opaque one over a photograph. The header's state is `hero-overlay`, `solid`
+bar's legibility, and the band is opaque, so nothing that scrolls under the bar shows through it (it was translucent at
+first and the copy ghosted across the lockup: see the show-through finding below). The header's state is `hero-overlay`, `solid`
 or `menu-open`, and it is derived from the hero's own sentinel, not from a scroll distance: a page without a hero is
 `solid` from its first byte, and a sentinel below the fold is still overlay. While the menu is open `main` and the footer
 are inert, so the dialog is a true modal.
@@ -280,11 +280,16 @@ this change's own scope that the earlier passes had accepted or not seen.
   behind the type, and at the strength it asked for more than a quarter of whatever scrolled under the bar came through, so
   on a phone the hero's sentence passing under it lay across the lockup, legible type on a band that was not flat. The
   earlier note called it an accepted trade-off. It is a defect with a cheap fix, and the fix is a second statement about the
-  same token: no more than 6% of the backdrop may show through (`--hj-veil-bar` is 94%; the first figure was an eighth, 88%,
-  and the sentence was still faintly there over "MENU" and the logo on a dark photograph). The unit test holds the token to
-  it, and the browser test holds what was drawn: it puts pure white and then pure black under the bar and compares the two
-  renders pixel by pixel (the most a backdrop can change a pixel is what the veil lets through; the test failed at 71 of 255
-  before and passes now, in both tones, at 390 and 1280, in both projects).
+  same token, and the number went down in steps, each one a failing test: an eighth of the backdrop was allowed through
+  (`--hj-veil-bar` 88%) and the sentence was still faintly there over "MENU" and the logo on a dark photograph; no more than
+  6% (94%) and it was still there on a phone at twice the pixel density, in a screenshot of the bar with the hero half
+  scrolled. A band meant to hide what is under it lets through exactly one minus its strength, so the strength is now the
+  whole of it: `--hj-veil-bar` is 100%, and nothing shows through. The unit test holds the token to it, and the browser test
+  holds what was drawn: it puts pure white and then pure black under the bar and compares the two renders pixel by pixel
+  (the most a backdrop can change a pixel is what the veil lets through; the test failed at 71 of 255 at the first strength,
+  and at 15 of 255 at 94%, and passes now, in both tones, at 390 and 1280, in both projects). The cost is that the bar
+  over the hero differs from the solid bar by its hairline alone; the state machine is kept because the type's tone, the
+  focus ring's colour and the inert page behind the menu still follow it, and collapsing it is a separate decision.
 - **The veil's fade was painted over the copy.** The bar's veil faded out over two more bar-heights below the bar, to soften
   its edge. A fade is painted over whatever is under it, and on a short phone (360×640, 320×568) the hero's copy rests just
   under the bar, so the eyebrow sat inside it and was drawn at about a third of its contrast. No pixel test saw it: the

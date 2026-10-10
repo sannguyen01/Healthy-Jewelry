@@ -475,23 +475,23 @@ test.describe('Hero — the bar over the extremes', () => {
 })
 
 /**
- * **What scrolls under the bar shows through at most 6%**, so the band reads as flat. Legible type on a band that is
+ * **What scrolls under the bar does not show through**, so the band reads as flat. Legible type on a band that is
  * visibly not flat is still a defect: with the veil at 72% (the strength AA alone asks for) the hero's sentence passing
- * under the bar printed through the brand mark on a phone. The measure needs no photograph and no copy: it puts pure white
+ * under the bar printed through the brand mark on a phone, and at 94% it was still there at twice the pixel density. The measure needs no photograph and no copy: it puts pure white
  * and then pure black under the bar and compares the two renders pixel by pixel. Whatever the veil lets through is the
  * most any backdrop can change a pixel, glyph pixels included (they are opaque in both renders, so they differ by nothing).
  * header-veil.test.ts holds the token to the same figure; this holds what the browser drew.
  */
-test.describe('Hero — what scrolls under the bar shows through at most 6%', () => {
+test.describe('Hero — what scrolls under the bar does not show through', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
-  const SHOW_THROUGH_MAX = 0.06
+  const SHOW_THROUGH_MAX = 0
   /** Two levels of slack for the colour mix's rounding. */
   const SLACK_LEVELS = 2
 
   for (const width of [390, 1280]) {
     for (const tone of ['dark', 'light'] as const) {
-      test(`${width}px, ${tone} tone: the bar over white and over black differs by at most ${SHOW_THROUGH_MAX * 100}%`, async ({ page, context }) => {
+      test(`${width}px, ${tone} tone: the bar over white and over black is the same (at most ${SHOW_THROUGH_MAX * 100}% apart)`, async ({ page, context }) => {
         await denyConsent(context)
         await page.setViewportSize({ width, height: 900 })
         await page.goto('/')
