@@ -155,6 +155,29 @@ async function consentBox(page: Page): Promise<Box | null> {
   return boxOf(banner, 'consent notice')
 }
 
+/**
+ * Every piece of copy that lies outside the card it should be inside. The card is a shell around the copy with its
+ * own padding, and the copy being inside the *hero* (the safe-area test) is a much weaker statement than the copy
+ * being inside *the card*: text hanging out of its card reads as a fault and loses the surface that makes it legible.
+ */
+async function copyOutsideCard(page: Page): Promise<string[]> {
+  const card = await boxOf(page.locator('.hj-hero-copy'), 'the copy card')
+  const outside: string[] = []
+  for (const { label, box } of await copyBoxes(page)) {
+    const over = {
+      left: card.x - box.x,
+      top: card.y - box.y,
+      right: box.x + box.width - (card.x + card.width),
+      bottom: box.y + box.height - (card.y + card.height),
+    }
+    const worst = Object.entries(over).filter(([, v]) => v > 1)
+    if (worst.length > 0) {
+      outside.push(`${label} leaves the card by ${worst.map(([side, v]) => `${Math.round(v)}px on the ${side}`).join(', ')}`)
+    }
+  }
+  return outside
+}
+
 // ── The matrix ───────────────────────────────────────────────────────────────
 
 for (const viewport of VIEWPORTS) {
@@ -247,6 +270,14 @@ for (const viewport of VIEWPORTS) {
         if (box.y + box.height > heroBox.y + heroBox.height + 0.5) problems.push(`${label} runs past the bottom of the hero`)
       }
       expect(problems, `Hero copy leaves its safe area at ${viewport.width}px:\n  ${problems.join('\n  ')}`).toEqual([])
+    })
+
+    test('a card holds all of the copy inside itself', async ({ page }) => {
+      const narrow = await isNarrow(page)
+      // Skipped with its reason, not silently passed: under an overlay there is no card to hold anything.
+      test.skip(narrow || media.desktop.variant !== 'card', `no card at ${viewport.width}px: the copy lies on the photograph's veil`)
+      const outside = await copyOutsideCard(page)
+      expect(outside, `Copy leaves its card at ${viewport.width}px:\n  ${outside.join('\n  ')}`).toEqual([])
     })
 
     test('the header and the copy clear WCAG AA against the pixels behind them', async ({ page }) => {
@@ -370,6 +401,25 @@ for (const viewport of VIEWPORTS) {
     })
   })
 }
+
+test.describe('Hero — the card containment check can fail', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  test('with the card cut short, the check finds the copy hanging out of it', async ({ page, context }) => {
+    await context.addInitScript(([key]) => {
+      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
+    }, [CONSENT_KEY])
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+    await settleHero(page)
+    test.skip(media.desktop.variant !== 'card', 'the wide crop is an overlay: there is no card to cut short')
+    expect(await copyOutsideCard(page), 'the unmodified card holds its copy').toEqual([])
+    await page.addStyleTag({ content: '.hj-hero-copy { max-height: 80px !important; overflow: visible !important; }' })
+    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+    const outside = await copyOutsideCard(page)
+    expect(outside.length, 'a card 80px tall cannot hold the headline, the sentence and both actions').toBeGreaterThan(0)
+  })
+})
 
 // ── The header while the hero scrolls under it ───────────────────────────────
 
@@ -667,7 +717,7 @@ test.describe('Hero — the focus ring where the copy lies on the photograph', (
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     await settleHero(page)
-    test.skip(media.mobile.variant !== 'overlay', 'the phone crop is a card: its ring sits on an opaque surface')
+    // The phone crop is an overlay by schema (mobile.variant), so the ring here always lies on the photograph's veil.
 
     const action = copyNodes(page).find((n) => n.label === 'primary action')!.locator
     await page.keyboard.press('Tab')
