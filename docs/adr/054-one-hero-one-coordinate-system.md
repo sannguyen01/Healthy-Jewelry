@@ -1,0 +1,126 @@
+# ADR 054 — One hero, one coordinate system
+
+**Date**: 2026-10-10
+**Status**: Accepted. The owner asked for the mobile hero to open the way the Songmont reference does: the photograph
+fills the first viewport, the header and the copy sit inside it, and desktop and phone read as one composition. They
+then ruled on three open questions: the existing photograph is an **interim** held behind an owner gate; the header's
+tone over the photograph is **data, proven by measurement**; and the consent notice **publishes its height** so the
+hero's copy rides above it. It supersedes the stacked-phone clause of [ADR 051](051-three-voices-one-archive.md), amends
+[ADR 013](013-a-protection-that-can-only-grow.md) and [ADR 021](021-a-metric-with-only-one-direction.md), and reads
+[ADR 044](044-decided-from-the-language-not-the-page.md)'s "no filter laid over the photograph" as a rule about
+palette, not about legibility.
+
+## Context
+
+Below 900px the hero was a different object from the one above it. A component-scoped `<style>` of `!important`
+overrides turned it into a column: 104px of clear space, the copy first, the photograph second as a 16:9 band, the card
+made transparent. The first screen of a phone was a page header with a picture under it. Five things owned one box:
+
+| Owner of the geometry | What it did |
+|---|---|
+| Inline styles on the section, card and media | desktop values the phone block then overrode with `!important` |
+| A scoped `<style>` in `Hero.tsx` | the whole phone composition, invisible to the stylesheet's own guards |
+| A JavaScript reveal | set every copy child to `opacity: 0` after hydration; reduced motion zeroed the transition but not the delays |
+| The header | fixed, 64px typed in about fifteen places, state read from `scrollY > 60` on every route |
+| One `object-position` | `right center` kept 25% of the frame at 390px and none of the subject |
+
+Measured while planning this change:
+
+| Finding | Evidence |
+|---|---|
+| A cover crop of the 1376×768 photograph shows 25.8% of its width at 390×844 and 430×932, 31.4% at 320–375, 41.9% at 768×1024 | computed from the file's own dimensions |
+| That crop is scaled 3.3× in device pixels at 390×844 | same |
+| The "at least half the frame" floor of ADR 021 cannot hold for any viewport-filling phone hero | same |
+| All four lifestyle and collection JPEGs carry an embedded C2PA manifest from Google naming a trained-algorithmic source type, and a SynthID marker | byte-level read of each file |
+| The hero shows gold shell and sun necklaces, rings and bangles, not titanium, niobium or 316L pieces | the photograph |
+| Light header text on a 46% top veil over this photograph's sky is about 3.2:1; AA is 4.5:1 | arithmetic on the palette |
+| The overlay header has no veil, and no test measured its legibility over the photograph | `hero-legibility.spec.ts` samples hero copy only |
+| The consent notice is fixed to the bottom and about 230–260px tall on a phone | `ConsentBanner.tsx` |
+| A section with a dark background fails the single-dark-band test | `homepage-composition.spec.ts` |
+
+## Decision
+
+**1. One composition on every width.** The photograph is the hero's geometry: it begins at the top of the page beneath
+the fixed header and fills the first viewport. The copy occupies a safe zone inside it. Below 900px the crop, the
+size and the alignment change; the photograph never moves under a separate panel. The breakpoint stays 900 (already in
+the guarded set), so no width is added to `design-layers`.
+
+**2. Art direction is data.** `src/content/hero/home.json` carries, for a desktop and a phone crop: the source file and
+its dimensions, a focal point, a subject box, the corner the copy sits in, and a variant (`overlay` or `card`). It carries
+the literal alt text, the header tone and the image's provenance. The record is validated through Zod at module load
+like the catalogue and the claims, so a malformed one fails the build, and it is read only through `src/lib/catalog`.
+
+**3. Provenance is a field, and its rules are enforced.** A `photographed` image must name real catalogue pieces and
+every handle must exist. An `ai-generated` image names none, because it cannot depict a real piece. An `approved` rights or
+consent state needs a reviewer and a date. **No agent writes an `approved` state.** The current record says what the bytes
+say: `ai-generated`, rights `unreviewed`. It is an interim; replacing it with photography of the actual pieces is one
+record edit and at most two files, and is an owner gate in `STATE.md`.
+
+**4. The card is a variant, not a doctrine.** `variant: "card"` keeps ADR 013's opaque, bounded card
+(`--hj-hero-card-max-ratio`) for a crop whose photograph has no safe zone for copy; `variant: "overlay"` lays the copy on
+a bottom veil. Desktop keeps the card and the phone takes the overlay for the current photograph. The first screen is one
+composition either way: the photograph, the header over it, the copy inside it.
+
+**5. A veil is a legibility device, not a filter.** ADR 044 forbids a filter that imitates a palette. A gradient whose
+strength is set by the lowest contrast measured under the text it protects does not imitate one, and is allowed. Its
+strength is a token (`--hj-veil-top`, `--hj-veil-bottom`) and is set by the rendered-pixel test, not by eye.
+
+**6. The header's tone is data, and its state comes from the hero.** `headerTone` is `light` (light type on a darkened
+top veil) or `dark` (ink on a light veil of the page ground). The test proves 4.5:1 for text and 3:1 for the icon, the mark
+and the focus ring, at every width, over the rendered photograph and with the photograph blocked. The header's state
+is `hero-overlay`, `solid` or `menu-open`, and it is derived from the hero's own sentinel, not from a scroll distance: a
+page without a hero is `solid` from its first byte, and a sentinel below the fold is still overlay. While the menu is
+open `main` and the footer are inert, so the dialog is a true modal.
+
+**7. One number for the header.** `--header-height` is declared once. The bar, the drawer's top edge, the hero's safe
+zone and the page offsets read it.
+
+**8. The reveal is CSS, and the hero is a server component.** The entrance is an animation on tokens, removed under
+`prefers-reduced-motion` and independent of JavaScript. Copy is never at `opacity: 0` waiting for a script.
+
+**9. The consent notice publishes its height.** While it is showing it writes its measured height to
+`--hj-consent-h`, the hero's bottom padding adds it, and the document's `scroll-padding-bottom` reads it, so a focused
+control is never hidden by it (WCAG 2.4.11). Its copy and its logic are unchanged.
+
+**10. The frame floor becomes a subject floor.** ADR 021's "at least half of the source frame" is replaced by: at every
+width the record's subject box is at least 90% visible after the cover crop, and none of it lies under the copy. It is
+computed from the record by `coverVisibleRect` and checked against the browser's own boxes.
+
+## Consequences
+
+| Guard | What it now holds |
+|---|---|
+| `hero-media.test.ts` | a malformed record, a photographed image with no pieces, an AI-origin image naming pieces, an approval with no reviewer, a source outside `/images/`, or dimensions that disagree with the file all fail |
+| `cover-crop.test.ts` | the crop arithmetic the subject floor stands on |
+| `Hero.test.tsx` | one `h1`, no line break element, the sentinel, the literal alt, the variant, and no inline `opacity: 0` |
+| `hero-overlay.test.ts`, `Nav.test.tsx` | the sentinel predicate, including a sentinel below the fold; the three header states; the modal's inert background |
+| `hero-legibility.spec.ts` | eleven widths, including 900 and 901: first viewport, no overlap, safe area, worst-pixel contrast for the copy and the header (photograph present and blocked), subject visibility, reduced motion, no JavaScript, forced colours, 200% text, a short phone with the notice up |
+| `navigation.spec.ts` | the header's state on `/`, after the hero, on a page without one, and with the menu open |
+| `header-height-token.test.ts` | the bar's height is written once |
+
+What it found on the way:
+
+- The brief's draft set `background: var(--ink)` on the hero section. That is a second dark band to
+  `homepage-composition.spec.ts`; the dark fallback lives on the media wrapper.
+- The focus ring and the primary button are both `--ink`, and vanish on a dark veil. The overlay variant inverts both.
+- A `<picture>` or a `display: contents` parent of the image breaks the aspect check of `layout-invariants.spec.ts`;
+  the picture is a block that fills the media wrapper.
+- Every page's header was transparent for its first 60px, whether or not the page had a hero.
+- The photograph's own provenance was written down nowhere in the repository.
+
+Measured values (veil strengths, focal points, subject box, header tone) are recorded under "Integration" below.
+
+## What this does not do
+
+- **It does not make the photograph real.** The interim is an AI-origin image of gold jewellery. At 390×844 it is a
+  3.3× upscale. Both are known and gated, neither is solved here.
+- **It does not restyle the catalogue or piece pages.** That is the next workstream and inherits this one's grammar.
+- **It does not change consent copy or logic.** It reads the notice's height and nothing else.
+- **It does not touch the platform webhook, its secret or any control row.** The sentinel for the card's bound is
+  preserved by keeping its anchor line verbatim.
+- **It does not claim a measurement it did not take.** The local baseline is a production build in a container; the
+  live deployment is read back by the owner after a merge.
+
+## Integration
+
+Recorded after the rendered-pixel run (see the pull request for the matrix and the receipt).
