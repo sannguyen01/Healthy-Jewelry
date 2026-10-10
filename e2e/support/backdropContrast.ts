@@ -1,12 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { PNG } from 'pngjs'
-import {
-  contrastRatioFromLuminance,
-  parseCssColor,
-  relativeLuminance,
-  requiredContrast,
-  type Rgb,
-} from '../../src/lib/utils/contrast'
+import { requiredContrast, worstContrastAgainstPixels, type Rgb } from '../../src/lib/utils/contrast'
+import { afterPaint } from './viewportFit'
 
 /**
  * **Measures what is actually behind a node: the worst pixel, not an average, and not what the CSS says.**
@@ -30,26 +25,28 @@ const SAMPLE_INSET_PX = 4
  * header's non-text controls are measured with this and not skipped.
  */
 export async function sampleBackdrop(page: Page, locator: Locator): Promise<Rgb[]> {
-  const setGlyphsTransparent = (transparent: boolean) =>
-    locator.evaluate((el, isTransparent) => {
-      const node = el as HTMLElement
-      node.style.color = isTransparent ? 'transparent' : ''
-      node.style.textShadow = isTransparent ? 'none' : ''
-    }, transparent)
-
-  await setGlyphsTransparent(true)
+  // The node's own inline colour and shadow are put back as they were, not cleared: the hero's headline and sentence carry
+  // `color: var(--hj-fg)` inline, and clearing it left the node inheriting whatever the page gave it for the rest of the
+  // test.
+  await locator.evaluate((el) => {
+    const node = el as HTMLElement
+    node.dataset.hjSampled = JSON.stringify([node.style.color, node.style.textShadow])
+    node.style.color = 'transparent'
+    node.style.textShadow = 'none'
+  })
   // The style change must be painted before the capture, or the screenshot samples the glyphs themselves
   // and reports a perfect 1.00:1 "failure" that is really the harness racing the repaint.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      )
-  )
+  await afterPaint(page)
   // An element screenshot, not `page.screenshot({ clip })`: under mobile emulation the two disagree at a
   // fractional device pixel ratio (2.625 on a Pixel 7) and the clip drifts off the element.
   const buffer = await locator.screenshot()
-  await setGlyphsTransparent(false)
+  await locator.evaluate((el) => {
+    const node = el as HTMLElement
+    const [color, textShadow] = JSON.parse(node.dataset.hjSampled ?? '["",""]') as [string, string]
+    node.style.color = color
+    node.style.textShadow = textShadow
+    delete node.dataset.hjSampled
+  })
 
   const png = PNG.sync.read(buffer)
   // Trim the outermost device pixels (an anti-aliased rim of whatever sits just outside) and the control's own
@@ -111,12 +108,9 @@ export async function worstContrast(
     }
   })
   const pixels = await sampleBackdrop(page, locator)
-  const textLuminance = relativeLuminance(parseCssColor(color))
-  let worst = Number.POSITIVE_INFINITY
-  for (const pixel of pixels) {
-    const ratio = contrastRatioFromLuminance(textLuminance, relativeLuminance(pixel))
-    if (ratio < worst) worst = ratio
-  }
+  // The library's own, which throws on an empty sample: a hand-written minimum over no pixels is +Infinity, which clears
+  // every ratio, the shape of green that proves nothing.
+  const worst = worstContrastAgainstPixels(color, pixels)
   const required = kind === 'graphic' ? 3 : requiredContrast(fontSize, fontWeight)
   return { label, color, fontSize, fontWeight, worst, required, ok: worst >= required }
 }

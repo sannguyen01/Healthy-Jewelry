@@ -120,6 +120,33 @@ export async function settle(page: Page): Promise<void> {
 }
 
 /**
+ * Two animation frames: the style change just made has been applied and painted. A computed value read in the frame
+ * it changed can still be the old one when anything on the element transitions, and a screenshot taken in it can
+ * sample the pixels from before the change. Written out in a dozen places before; one place now.
+ */
+export async function afterPaint(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  )
+}
+
+/**
+ * Every finite animation and transition has finished. A looping one is excluded, because it never will, and the wait
+ * is capped so a stuck one is reported as a timeout and not as a hung test. Measuring a moving target is how a
+ * button's backdrop gets reported as the page behind where the button used to be.
+ */
+export async function animationsFinished(page: Page, timeoutMs = 5_000): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      document
+        .getAnimations()
+        .every((animation) => animation.playState !== 'running' || animation.effect?.getComputedTiming().iterations === Infinity),
+    null,
+    { timeout: timeoutMs }
+  )
+}
+
+/**
  * Every interactive control under `rootSelector` — plus the root itself — that
  * reaches past a viewport edge.
  *

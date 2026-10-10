@@ -1,8 +1,10 @@
 import { PNG } from 'pngjs'
 import { test, expect, type Locator, type Page } from './support/test'
-import { intersection, OVERLAP_TOLERANCE_PX, type Box } from './support/viewportFit'
+import { afterPaint, animationsFinished, intersection, OVERLAP_TOLERANCE_PX, settle, type Box } from './support/viewportFit'
+import { denyConsent } from './support/consent'
+import { copyNodes, header, headerNodes, hero, heroPhoto } from './support/hero'
 import { describeVerdicts, worstContrast, type Verdict } from './support/backdropContrast'
-import { contrastRatioFromLuminance, parseCssColor, relativeLuminance } from '../src/lib/utils/contrast'
+import { contrastRatio, worstContrastAgainstPixels, type Rgb } from '../src/lib/utils/contrast'
 import { coverVisibleRect, visibleFraction } from '../src/lib/layout/coverCrop'
 import { heroMedia } from '../src/lib/catalog'
 
@@ -42,67 +44,32 @@ import { heroMedia } from '../src/lib/catalog'
 /**
  * The eleven widths of ADR 054. 900 and 901 are both here on purpose: the breakpoint itself is where the
  * two compositions used to diverge, so the pair is the regression test for it.
+ *
+ * `clearsNotice` is declared, not measured: whether the header, the copy and the consent notice can share the screen
+ * at scroll 0. They cannot on the three shortest phones (at 375 wide the 64px header, about 375px of copy and the 243px
+ * notice need more than the 667px first screen), however the hero is built, because the notice is fixed to the bottom
+ * of the viewport and the copy is not. Deriving the expectation from the measurement it judges would make the strict check
+ * unfalsifiable, so a hero that stopped lifting its copy would quietly be tested by the weaker one.
  */
 const VIEWPORTS = [
-  { label: '320×568 — smallest phone', width: 320, height: 568 },
-  { label: '360×640 — small Android', width: 360, height: 640 },
-  { label: '375×667 — iPhone SE', width: 375, height: 667 },
-  { label: '390×844 — iPhone', width: 390, height: 844 },
-  { label: '430×932 — large phone', width: 430, height: 932 },
-  { label: '768×1024 — tablet portrait', width: 768, height: 1024 },
-  { label: '900×900 — last narrow width', width: 900, height: 900 },
-  { label: '901×900 — first wide width', width: 901, height: 900 },
-  { label: '1024×768 — small laptop', width: 1024, height: 768 },
-  { label: '1280×900 — laptop', width: 1280, height: 900 },
-  { label: '1440×900 — desktop', width: 1440, height: 900 },
+  { label: '320×568 — smallest phone', width: 320, height: 568, clearsNotice: false },
+  { label: '360×640 — small Android', width: 360, height: 640, clearsNotice: false },
+  { label: '375×667 — iPhone SE', width: 375, height: 667, clearsNotice: false },
+  { label: '390×844 — iPhone', width: 390, height: 844, clearsNotice: true },
+  { label: '430×932 — large phone', width: 430, height: 932, clearsNotice: true },
+  { label: '768×1024 — tablet portrait', width: 768, height: 1024, clearsNotice: true },
+  { label: '900×900 — last narrow width', width: 900, height: 900, clearsNotice: true },
+  { label: '901×900 — first wide width', width: 901, height: 900, clearsNotice: true },
+  { label: '1024×768 — small laptop', width: 1024, height: 768, clearsNotice: true },
+  { label: '1280×900 — laptop', width: 1280, height: 900, clearsNotice: true },
+  { label: '1440×900 — desktop', width: 1440, height: 900, clearsNotice: true },
 ]
 
-const CONSENT_KEY = 'hj-analytics-consent'
 const MOBILE_QUERY = '(max-width: 900px)'
 const media = heroMedia()
 
 // ── Locators ─────────────────────────────────────────────────────────────────
-
-const hero = (page: Page): Locator => page.locator('main > section').first()
-const heroPhoto = (page: Page): Locator => hero(page).locator('img').first()
-const header = (page: Page): Locator => page.locator('header.hj-header')
-
-type Labelled = { label: string; locator: Locator }
-
-/** The text the hero's message depends on, found by content so a failure names what a visitor lost. */
-function copyNodes(page: Page): Labelled[] {
-  const h = hero(page)
-  return [
-    { label: 'eyebrow', locator: h.getByText(/grade 23 titanium · niobium · 316l steel/i) },
-    { label: 'headline', locator: h.getByRole('heading', { level: 1 }) },
-    { label: 'body copy', locator: h.getByText(/no stones\. no fillers/i) },
-    // By position, not by label: the labels are pinned by Hero.test.tsx, and a geometry test that fails
-    // because a label changed has reported the label, not the geometry.
-    { label: 'primary action', locator: h.getByRole('link').first() },
-    { label: 'secondary action', locator: h.getByRole('link').nth(1) },
-  ]
-}
-
-/** The header's controls. Visible ones only: below 769px CONTACT leaves the bar, below 360px the name does. */
-async function headerNodes(page: Page): Promise<Array<Labelled & { kind: 'text' | 'graphic' }>> {
-  const bar = header(page)
-  const nodes: Array<Labelled & { kind: 'text' | 'graphic' }> = [
-    { label: 'MENU control', locator: bar.locator('.hj-menu-btn'), kind: 'text' },
-    { label: 'brand name', locator: bar.locator('.hj-lockup-text'), kind: 'text' },
-    { label: 'CONTACT link', locator: bar.getByRole('link', { name: /contact/i }), kind: 'text' },
-  ]
-  const search = bar.getByRole('button', { name: 'Search' })
-  // The same button is a word at 769px and up and a magnifying glass below, and the two are held to
-  // different ratios (WCAG 1.4.3 for text, 1.4.11 for a graphic).
-  const asWord = await search.locator('.hj-desktop-text').isVisible()
-  nodes.push({ label: 'search control', locator: search, kind: asWord ? 'text' : 'graphic' })
-
-  const visible: typeof nodes = []
-  for (const node of nodes) {
-    if (await node.locator.first().isVisible()) visible.push(node)
-  }
-  return visible
-}
+// (the hero, the bar, the copy and the bar's controls are in ./support/hero.ts, shared with the specs that measure them)
 
 async function boxOf(locator: Locator, label: string): Promise<Box> {
   const box = await locator.first().boundingBox({ timeout: 5_000 }).catch(() => null)
@@ -116,8 +83,27 @@ async function copyBoxes(page: Page): Promise<Array<{ label: string; box: Box }>
   return out
 }
 
+/**
+ * What a visitor cannot read right now: the worst pixel behind each of the bar's controls (and, unless asked not to, each
+ * piece of the hero's copy) against its own colour, one line per failure. The same question was a pasted loop in four
+ * tests, each a place for the others to drift from.
+ */
+async function unreadable(page: Page, { copy = true, prefix = '' }: { copy?: boolean; prefix?: string } = {}): Promise<string[]> {
+  const verdicts: Verdict[] = []
+  for (const { label, locator, kind } of await headerNodes(page)) {
+    verdicts.push(await worstContrast(page, `${prefix}header: ${label}`, locator, kind))
+  }
+  if (copy) {
+    for (const { label, locator } of copyNodes(page)) verdicts.push(await worstContrast(page, `${prefix}copy: ${label}`, locator))
+  }
+  return describeVerdicts(verdicts)
+}
+
 /** Everything is placed and still: fonts loaded, the photograph decoded, no animation running. */
 async function settleHero(page: Page): Promise<void> {
+  // The page itself first: it can still be on its streamed fallback with the real page in a hidden segment, where every
+  // box is zero and a measurement passes having measured nothing (ADR 042).
+  await settle(page)
   await expect(heroPhoto(page)).toBeVisible()
   await page.evaluate(async () => {
     await document.fonts.ready
@@ -125,10 +111,8 @@ async function settleHero(page: Page): Promise<void> {
     if (img && !img.complete) await new Promise<void>((r) => { img.onload = img.onerror = () => r() })
     if (img) await img.decode().catch(() => undefined)
   })
-  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
-  await page.evaluate(
-    () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
-  )
+  await animationsFinished(page)
+  await afterPaint(page)
 }
 
 const px = (value: string): number => Number.parseFloat(value)
@@ -191,9 +175,7 @@ for (const viewport of VIEWPORTS) {
     test.beforeEach(async ({ page, context }) => {
       // The consent notice has its own tests below. Here it would cover the lower part of a phone's hero
       // and every measurement would be of the notice.
-      await context.addInitScript(([key]) => {
-        try { localStorage.setItem(key, 'denied') } catch { /* private mode: the notice shows, and the tests say so */ }
-      }, [CONSENT_KEY])
+      await denyConsent(context)
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await page.goto('/')
       await expect(page.locator('main')).toBeVisible()
@@ -281,14 +263,7 @@ for (const viewport of VIEWPORTS) {
     })
 
     test('the header and the copy clear WCAG AA against the pixels behind them', async ({ page }) => {
-      const verdicts: Verdict[] = []
-      for (const { label, locator, kind } of await headerNodes(page)) {
-        verdicts.push(await worstContrast(page, `header: ${label}`, locator, kind))
-      }
-      for (const { label, locator } of copyNodes(page)) {
-        verdicts.push(await worstContrast(page, `copy: ${label}`, locator))
-      }
-      const failures = describeVerdicts(verdicts)
+      const failures = await unreadable(page)
       expect(failures, `Unreadable at ${viewport.width}×${viewport.height}:\n  ${failures.join('\n  ')}`).toEqual([])
     })
 
@@ -297,16 +272,9 @@ for (const viewport of VIEWPORTS) {
       await page.reload()
       await expect(hero(page)).toBeVisible()
       await page.evaluate(async () => { await document.fonts.ready })
-      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+      await animationsFinished(page)
 
-      const verdicts: Verdict[] = []
-      for (const { label, locator, kind } of await headerNodes(page)) {
-        verdicts.push(await worstContrast(page, `header: ${label}`, locator, kind))
-      }
-      for (const { label, locator } of copyNodes(page)) {
-        verdicts.push(await worstContrast(page, `copy: ${label}`, locator))
-      }
-      const failures = describeVerdicts(verdicts)
+      const failures = await unreadable(page)
       expect(failures, `Unreadable with no photograph at ${viewport.width}px:\n  ${failures.join('\n  ')}`).toEqual([])
     })
 
@@ -410,16 +378,14 @@ test.describe('Hero — the card containment check can fail', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
   test('with the card cut short, the check finds the copy hanging out of it', async ({ page, context }) => {
-    await context.addInitScript(([key]) => {
-      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
-    }, [CONSENT_KEY])
+    await denyConsent(context)
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/')
     await settleHero(page)
     test.skip(media.desktop.variant !== 'card', 'the wide crop is an overlay: there is no card to cut short')
     expect(await copyOutsideCard(page), 'the unmodified card holds its copy').toEqual([])
     await page.addStyleTag({ content: '.hj-hero-copy { max-height: 80px !important; overflow: visible !important; }' })
-    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+    await afterPaint(page)
     const outside = await copyOutsideCard(page)
     expect(outside.length, 'a card 80px tall cannot hold the headline, the sentence and both actions').toBeGreaterThan(0)
   })
@@ -449,9 +415,7 @@ test.describe('Hero — the header while the hero scrolls under it', () => {
 
   for (const viewport of SCROLLED) {
     test(`${viewport.width}×${viewport.height}: every control clears AA at every depth of the hero`, async ({ page, context }) => {
-      await context.addInitScript(([key]) => {
-        try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
-      }, [CONSENT_KEY])
+      await denyConsent(context)
       await page.setViewportSize(viewport)
       await page.goto('/')
       await settleHero(page)
@@ -462,44 +426,69 @@ test.describe('Hero — the header while the hero scrolls under it', () => {
 
       for (const depth of depths) {
         await page.evaluate((y) => window.scrollTo(0, y), depth)
-        await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+        await afterPaint(page)
         const state = await header(page).getAttribute('data-state')
-        for (const { label, locator, kind } of await headerNodes(page)) {
-          const verdict = await worstContrast(page, `scroll ${Math.round(depth)}px (${state}): ${label}`, locator, kind)
-          if (!verdict.ok) failures.push(describeVerdicts([verdict])[0])
-        }
+        failures.push(...(await unreadable(page, { copy: false, prefix: `scroll ${Math.round(depth)}px (${state}): ` })))
       }
       expect(failures, `Unreadable header at ${viewport.width}×${viewport.height}:\n  ${failures.join('\n  ')}`).toEqual([])
     })
   }
 
   test('with the photograph blocked, mid-hero: the bar\'s own surface carries it', async ({ page, context }) => {
-    await context.addInitScript(([key]) => {
-      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
-    }, [CONSENT_KEY])
+    await denyConsent(context)
     await page.setViewportSize({ width: 390, height: 844 })
     await page.route('**/_next/image**', (route) => route.abort())
     await page.goto('/')
     await expect(hero(page)).toBeVisible()
     await page.evaluate(async () => { await document.fonts.ready })
     await page.evaluate(() => window.scrollTo(0, 450))
-    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
-    const failures: string[] = []
-    for (const { label, locator, kind } of await headerNodes(page)) {
-      const verdict = await worstContrast(page, `header: ${label}`, locator, kind)
-      if (!verdict.ok) failures.push(describeVerdicts([verdict])[0])
-    }
+    await afterPaint(page)
+    const failures = await unreadable(page, { copy: false })
     expect(failures, `Unreadable header with no photograph, mid-hero:\n  ${failures.join('\n  ')}`).toEqual([])
   })
+})
+
+/**
+ * The bar is legible over *anything*, in either tone, not only over the photograph that happens to be the hero today.
+ * The photograph is an interim and will be replaced, and a check that passes because of what it lies on says nothing about
+ * the next one. So the bar is measured over a layer the test puts under it: pure white and pure black, the two ends a
+ * backdrop can be at, with the bar's tone set each way. This is the rendered form of header-veil.test.ts's arithmetic.
+ */
+test.describe('Hero — the bar over the extremes', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  for (const width of [390, 1280]) {
+    for (const tone of ['dark', 'light'] as const) {
+      for (const backdrop of ['white', 'black'] as const) {
+        test(`${width}px, ${tone} tone, over pure ${backdrop}`, async ({ page, context }) => {
+          await denyConsent(context)
+          await page.setViewportSize({ width, height: 900 })
+          await page.goto('/')
+          await settleHero(page)
+          await page.evaluate(
+            ({ tone: t, backdrop: colour }) => {
+              document.querySelector('header.hj-header')?.setAttribute('data-bar-tone', t)
+              // Between the page and the bar: the bar's own stacking context is above this, the page's content below it.
+              const layer = document.createElement('div')
+              layer.style.cssText = `position:fixed;inset:0;z-index:80;background:${colour}`
+              document.body.append(layer)
+            },
+            { tone, backdrop }
+          )
+          await afterPaint(page)
+          const failures = await unreadable(page, { copy: false, prefix: `${tone} tone over ${backdrop}: ` })
+          expect(failures, `Unreadable bar:\n  ${failures.join('\n  ')}`).toEqual([])
+        })
+      }
+    }
+  }
 })
 
 // ── What a visitor can bring with them ───────────────────────────────────────
 
 test.describe('Hero — conditions a visitor brings', () => {
   test.beforeEach(async ({ context }) => {
-    await context.addInitScript(([key]) => {
-      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
-    }, [CONSENT_KEY])
+    await denyConsent(context)
   })
 
   test.describe('no motion preference', () => {
@@ -610,10 +599,7 @@ test.describe('Hero — conditions a visitor brings', () => {
       const found = await copySurface(page)
       expect(found.surface, 'an opaque ancestor of the headline, inside the section').not.toBeNull()
       expect(found.everyNodeInside, 'the headline, eyebrow, sentence and both actions are all on that surface').toBe(true)
-      const ratio = contrastRatioFromLuminance(
-        relativeLuminance(parseCssColor(found.text)),
-        relativeLuminance(parseCssColor(found.surface!.colour))
-      )
+      const ratio = contrastRatio(found.text, found.surface!.colour)
       expect(ratio, `${found.text} on ${found.surface!.colour} (the system's own pair)`).toBeGreaterThanOrEqual(4.5)
     })
 
@@ -626,7 +612,7 @@ test.describe('Hero — conditions a visitor brings', () => {
       })
       // Two frames: the style change is a change of computed value, and a computed value read in the frame it was
       // made can still be the old one when anything on the element transitions.
-      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+      await afterPaint(page)
       const found = await copySurface(page)
       // The section's own ground is opaque: that is exactly what let the first version of the test pass for ever.
       expect(found.sectionAlpha, 'the section has an opaque ground that is not behind the copy').toBeGreaterThanOrEqual(0.99)
@@ -648,7 +634,7 @@ test.describe('Hero — conditions a visitor brings', () => {
         await page.goto('/')
         await settleHero(page)
         await page.evaluate(() => { document.documentElement.style.fontSize = '200%' })
-        await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+        await afterPaint(page)
 
         const boxes = await copyBoxes(page)
         const bar = await boxOf(header(page), 'header')
@@ -682,7 +668,7 @@ test.describe('Hero — with the consent notice up', () => {
       await expect(notice).toBeVisible()
       await settleHero(page)
       // The notice publishes its height and the hero's copy rides above it: give that one frame to land.
-      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+      await afterPaint(page)
 
       const bannerBox = (await consentBox(page)) as Box
       const boxes = await copyBoxes(page)
@@ -695,13 +681,18 @@ test.describe('Hero — with the consent notice up', () => {
       // the hero has not the height to lift clear of it.)
       expect(lowest, `the hero is ${Math.round(heroBox.height)}px tall and its copy runs to ${Math.round(lowest - heroBox.y)}px`).toBeLessThanOrEqual(heroBox.y + heroBox.height + 0.5)
       expect(copyTop, 'the copy begins below the header').toBeGreaterThanOrEqual(bar.y + bar.height - 0.5)
-      // Does the hero's copy fit *above* the notice at all? On a 320×568 phone it cannot: the header, the
-      // copy and a 260px notice do not share 568px. There the requirement is different, and honest: the
-      // actions must be reachable, and a focused one must not be hidden by the notice (WCAG 2.4.11).
+      // Does the hero's copy fit *above* the notice? Where the viewport says it can (`clearsNotice`), it must, and
+      // nothing may be covered. On the shortest phones it cannot, however the hero is built: the requirement there is
+      // different, and honest: the actions must be reachable, and a focused one must not be hidden by the notice
+      // (WCAG 2.4.11).
       const fits = lowest <= bannerBox.y + 0.5 && copyTop >= bar.y + bar.height - 0.5
-      const covered = boxes.filter(({ box }) => intersection(box, bannerBox))
+      expect(
+        fits,
+        `at ${viewport.width}×${viewport.height} the copy ${viewport.clearsNotice ? 'is declared to fit above the notice and does not' : 'is declared unable to fit above the notice and does: update the declaration'}`
+      ).toBe(viewport.clearsNotice)
 
-      if (fits) {
+      if (viewport.clearsNotice) {
+        const covered = boxes.filter(({ box }) => intersection(box, bannerBox))
         expect(
           covered.map((c) => c.label),
           `the notice covers ${covered.map((c) => c.label).join(', ')} at ${viewport.width}×${viewport.height}, where the copy fits above it`
@@ -715,7 +706,7 @@ test.describe('Hero — with the consent notice up', () => {
       for (const action of ['primary action', 'secondary action']) {
         const target = copyNodes(page).find((n) => n.label === action)!.locator
         await target.focus()
-        await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+        await afterPaint(page)
         const after = await boxOf(target, action)
         const cx = after.x + after.width / 2
         const cy = after.y + after.height / 2
@@ -736,9 +727,7 @@ test.describe('Hero — the focus ring where the copy lies on the photograph', (
   test.use({ contextOptions: { reducedMotion: 'reduce' } })
 
   test('the ring is drawn in a colour that can be seen against what surrounds the action', async ({ page, context }) => {
-    await context.addInitScript(([key]) => {
-      try { localStorage.setItem(key, 'denied') } catch { /* see above */ }
-    }, [CONSENT_KEY])
+    await denyConsent(context)
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     await settleHero(page)
@@ -763,14 +752,13 @@ test.describe('Hero — the focus ring where the copy lies on the photograph', (
     const target = await boxOf(action, 'primary action')
     const heroEl = hero(page)
     const heroBox = await boxOf(heroEl, 'hero')
-    const twoFrames = () => page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
     await page.locator('.hj-hero-copy').evaluate((el) => { (el as HTMLElement).style.visibility = 'hidden' })
     // The repaint must land before the capture, or the screenshot still has the ring in it and the ring is
     // measured against itself (1.00:1).
-    await twoFrames()
+    await afterPaint(page)
     const png = PNG.sync.read(await heroEl.screenshot())
     await page.locator('.hj-hero-copy').evaluate((el) => { (el as HTMLElement).style.visibility = '' })
-    await twoFrames()
+    await afterPaint(page)
 
     const dpr = png.width / heroBox.width
     const reach = ring.width + Math.max(0, ring.offset) + 1
@@ -782,16 +770,15 @@ test.describe('Hero — the focus ring where the copy lies on the photograph', (
       x0: Math.ceil((target.x - heroBox.x) * dpr), x1: Math.floor((target.x + target.width - heroBox.x) * dpr),
       y0: Math.ceil((target.y - heroBox.y) * dpr), y1: Math.floor((target.y + target.height - heroBox.y) * dpr),
     }
-    const ringLuminance = relativeLuminance(parseCssColor(ring.color))
-    let worst = Number.POSITIVE_INFINITY
+    const surround: Rgb[] = []
     for (let y = Math.max(0, y0); y < Math.min(png.height, y1); y += 2) {
       for (let x = Math.max(0, x0); x < Math.min(png.width, x1); x += 2) {
         if (x >= inner.x0 && x < inner.x1 && y >= inner.y0 && y < inner.y1) continue // the action's own face
         const i = (png.width * y + x) << 2
-        const ratio = contrastRatioFromLuminance(ringLuminance, relativeLuminance({ r: png.data[i], g: png.data[i + 1], b: png.data[i + 2] }))
-        if (ratio < worst) worst = ratio
+        surround.push({ r: png.data[i], g: png.data[i + 1], b: png.data[i + 2] })
       }
     }
+    const worst = worstContrastAgainstPixels(ring.color, surround)
     expect(worst, `the focus ring (${ring.color}) is ${worst.toFixed(2)}:1 against what surrounds the action; WCAG 1.4.11 needs 3:1`).toBeGreaterThanOrEqual(3)
   })
 })

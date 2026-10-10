@@ -1,4 +1,7 @@
 import { test, expect, type Page } from './support/test'
+import { afterPaint, animationsFinished, intersection } from './support/viewportFit'
+import { consentNotice, CONSENT_ROOM_PROPERTY } from './support/consent'
+import { copyNodes } from './support/hero'
 
 /**
  * **Nothing is measured until someone says yes.**
@@ -26,12 +29,12 @@ function recordAnalyticsRequests(page: Page): string[] {
 test.describe('Analytics consent', () => {
   test('the banner appears on a first visit', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByRole('dialog', { name: /analytics consent/i })).toBeVisible()
+    await expect(consentNotice(page)).toBeVisible()
   })
 
   test('offers Allow and Decline with equal weight', async ({ page }) => {
     await page.goto('/')
-    const banner = page.getByRole('dialog', { name: /analytics consent/i })
+    const banner = consentNotice(page)
 
     // A "reject" hidden behind a link is a dark pattern whatever the copy says,
     // so both are real buttons.
@@ -56,7 +59,7 @@ test.describe('Analytics consent', () => {
     const hits = recordAnalyticsRequests(page)
 
     await page.goto('/')
-    await page.getByRole('dialog', { name: /analytics consent/i })
+    await consentNotice(page)
       .getByRole('button', { name: /^decline$/i })
       .click()
 
@@ -70,7 +73,7 @@ test.describe('Analytics consent', () => {
     const hits = recordAnalyticsRequests(page)
 
     await page.goto('/')
-    await page.getByRole('dialog', { name: /analytics consent/i })
+    await consentNotice(page)
       .getByRole('button', { name: /^allow$/i })
       .click()
 
@@ -83,14 +86,14 @@ test.describe('Analytics consent', () => {
 
   test('the answer sticks across navigations', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('dialog', { name: /analytics consent/i })
+    await consentNotice(page)
       .getByRole('button', { name: /^decline$/i })
       .click()
 
     await page.goto('/shop')
     // Re-asking someone who already answered is the most common way a consent
     // banner becomes the thing people hate about a site.
-    await expect(page.getByRole('dialog', { name: /analytics consent/i })).toHaveCount(0)
+    await expect(consentNotice(page)).toHaveCount(0)
   })
 
   /**
@@ -105,12 +108,12 @@ test.describe('Analytics consent', () => {
     const hits = recordAnalyticsRequests(page)
 
     await page.goto('/')
-    await page.getByRole('dialog', { name: /analytics consent/i }).getByRole('button', { name: /^allow$/i }).click()
+    await consentNotice(page).getByRole('button', { name: /^allow$/i }).click()
     await page.goto('/products/arc-band-titanium')
     await expect.poll(() => hits.length, { message: 'no analytics after consent' }).toBeGreaterThan(0)
 
     await page.getByTestId('measurement-preferences').first().click()
-    const banner = page.getByRole('dialog', { name: /analytics consent/i })
+    const banner = consentNotice(page)
     await expect(banner).toBeVisible()
     await expect(banner).toContainText(/currently allowed/i)
     await expect(banner.getByRole('button', { name: /^allow$/i })).toHaveAttribute('aria-pressed', 'true')
@@ -148,7 +151,7 @@ test.describe('Analytics consent', () => {
     })
 
     await page.goto('/')
-    await page.getByRole('dialog', { name: /analytics consent/i }).getByRole('button', { name: /^allow$/i }).click()
+    await consentNotice(page).getByRole('button', { name: /^allow$/i }).click()
     // `customer@example.com ring`, percent-encoded as a literal the anchor scan can resolve.
     await page.goto('/search?q=customer%40example.com%20ring')
     await expect.poll(() => bodies.some((b) => b.includes('search_performed'))).toBe(true)
@@ -175,41 +178,23 @@ test.describe('Analytics consent', () => {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/')
 
-      const banner = page.getByRole('dialog', { name: /analytics consent/i })
+      const banner = consentNotice(page)
       await expect(banner).toBeVisible()
       // The hero rides above the notice's height once the notice has published it.
-      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
-      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+      await afterPaint(page)
+      await animationsFinished(page)
       const bannerBox = await banner.boundingBox()
       expect(bannerBox).not.toBeNull()
 
-      const hero = page.locator('main > section').first()
-      const nodes = [
-        hero.getByText(/grade 23 titanium · niobium · 316l steel/i),
-        hero.getByRole('heading', { level: 1 }),
-        hero.getByText(/no stones\. no fillers/i),
-        hero.getByRole('link'),
-      ]
-      let measured = 0
-      for (const node of nodes) {
-        const count = await node.count()
-        for (let i = 0; i < count; i++) {
-          const target = node.nth(i)
-          const box = await target.boundingBox()
-          if (!box) continue
-          measured++
-
-          const overlaps =
-            box.x < bannerBox!.x + bannerBox!.width &&
-            box.x + box.width > bannerBox!.x &&
-            box.y < bannerBox!.y + bannerBox!.height &&
-            box.y + box.height > bannerBox!.y
-
-          expect(overlaps, `consent banner overlaps "${(await target.innerText()).trim()}" at ${width}px`).toBe(false)
-        }
+      // Every piece of the hero's copy, by the same locators the hero's own spec measures with. A node with no box is
+      // a failure, not a skip: a hero with nothing to measure would make the loop vacuous, the shape of green that
+      // proves nothing.
+      for (const { label, locator } of copyNodes(page)) {
+        const box = await locator.first().boundingBox()
+        expect(box, `the hero's ${label} has a box to measure at ${width}px`).not.toBeNull()
+        const hit = intersection(box!, bannerBox!, 0)
+        expect(hit, `the consent banner overlaps the hero's ${label} at ${width}px`).toBeNull()
       }
-      // A hero with nothing to measure would make the loop vacuous — the shape of green that proves nothing.
-      expect(measured).toBeGreaterThanOrEqual(5)
     })
   }
 
@@ -224,23 +209,27 @@ test.describe('Analytics consent', () => {
    * with where the browser put the notice once it has settled.
    */
   async function roomPublishedVersusWhereTheNoticeIs(page: Page) {
-    const banner = page.getByRole('dialog', { name: /analytics consent/i })
+    const banner = consentNotice(page)
     await expect(banner).toBeVisible()
-    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
-    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+    await afterPaint(page)
+    await animationsFinished(page)
     const box = await banner.boundingBox()
     expect(box, 'the notice has a box').not.toBeNull()
-    return page.evaluate((top) => {
-      const raw = document.documentElement.style.getPropertyValue('--hj-consent-h')
-      return { published: Number.parseFloat(raw), truth: window.innerHeight - top, scrollY: window.scrollY, raw }
-    }, box!.y)
+    // The property's name is passed in: the function runs in the page, which has none of this module's imports.
+    return page.evaluate(
+      ({ top, property }) => {
+        const raw = document.documentElement.style.getPropertyValue(property)
+        return { published: Number.parseFloat(raw), truth: window.innerHeight - top, scrollY: window.scrollY, raw }
+      },
+      { top: box!.y, property: CONSENT_ROOM_PROPERTY }
+    )
   }
 
   test('the room it publishes is its distance from the bottom of the screen on a first visit', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     const { published, truth, raw } = await roomPublishedVersusWhereTheNoticeIs(page)
-    expect(Number.isFinite(published), `--hj-consent-h was ${JSON.stringify(raw)}, not a length`).toBe(true)
+    expect(Number.isFinite(published), `${CONSENT_ROOM_PROPERTY} was ${JSON.stringify(raw)}, not a length`).toBe(true)
     // Rounded up, so never under-reserved, and never more than a pixel over.
     expect(published).toBeGreaterThanOrEqual(truth - 0.5)
     expect(published).toBeLessThanOrEqual(truth + 1.5)
@@ -253,14 +242,14 @@ test.describe('Analytics consent', () => {
     test(`the same when the prompt is reopened from the footer of a scrolled page, at ${viewport.width}px`, async ({ page }) => {
       await page.setViewportSize(viewport)
       await page.goto('/')
-      await page.getByRole('dialog', { name: /analytics consent/i }).getByRole('button', { name: /^decline$/i }).click()
-      await expect(page.getByRole('dialog', { name: /analytics consent/i })).toHaveCount(0)
+      await consentNotice(page).getByRole('button', { name: /^decline$/i }).click()
+      await expect(consentNotice(page)).toHaveCount(0)
 
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
       await page.getByTestId('measurement-preferences').first().click()
       const { published, truth, scrollY, raw } = await roomPublishedVersusWhereTheNoticeIs(page)
       expect(scrollY, 'the page was scrolled when the notice appeared, or this proves nothing').toBeGreaterThan(500)
-      expect(Number.isFinite(published), `--hj-consent-h was ${JSON.stringify(raw)}, not a length`).toBe(true)
+      expect(Number.isFinite(published), `${CONSENT_ROOM_PROPERTY} was ${JSON.stringify(raw)}, not a length`).toBe(true)
       expect(published, `published ${published}px; the notice is ${truth}px from the bottom of the screen`).toBeGreaterThanOrEqual(truth - 0.5)
       expect(published, `published ${published}px; the notice is ${truth}px from the bottom of the screen`).toBeLessThanOrEqual(truth + 1.5)
     })
@@ -280,6 +269,8 @@ test.describe('Analytics consent', () => {
     { width: 320, height: 568 },
     { width: 375, height: 667 },
     { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 900, height: 900 },
     { width: 1280, height: 900 },
   ]) {
     test(`a first visit does not shift the page when the notice arrives, at ${viewport.width}×${viewport.height}`, async ({ page }) => {
@@ -316,8 +307,8 @@ test.describe('Analytics consent', () => {
       })
       await page.setViewportSize(viewport)
       await page.goto('/')
-      await expect(page.getByRole('dialog', { name: /analytics consent/i })).toBeVisible()
-      await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+      await expect(consentNotice(page)).toBeVisible()
+      await animationsFinished(page)
       await page.waitForTimeout(1500)
       const { total, shifts, travelled } = await page.evaluate(() => {
         const w = window as unknown as {

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './support/test'
+import { animationsFinished } from './support/viewportFit'
 import AxeBuilder from '@axe-core/playwright'
 
 /**
@@ -60,7 +61,7 @@ test.use({ contextOptions: { reducedMotion: 'reduce' } })
  * ADR 054 made the entrance CSS.)
  */
 async function waitForHeroToSettle(page: Page): Promise<void> {
-  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+  await animationsFinished(page)
 }
 
 /**

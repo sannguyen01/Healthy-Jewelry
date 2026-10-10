@@ -1,4 +1,6 @@
 import { test, expect, type Page } from './support/test'
+import { afterPaint } from './support/viewportFit'
+import { denyConsent } from './support/consent'
 
 /**
  * The homepage as a composition, rather than as a bag of sections.
@@ -329,9 +331,7 @@ test.describe('Homepage — one container', () => {
 
   for (const width of [1024, 1280, 1440, 1680, 1920, 2560]) {
     test(`the hero, the strip and the footer sit on the page's edges at ${width}px`, async ({ page, context }) => {
-      await context.addInitScript(() => {
-        try { localStorage.setItem('hj-analytics-consent', 'denied') } catch { /* private mode: the notice shows */ }
-      })
+      await denyConsent(context)
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/')
       await expect(page.locator('main')).toBeVisible()
@@ -346,7 +346,7 @@ test.describe('Homepage — one container', () => {
         }
         window.scrollTo(0, 0)
       })
-      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+      await afterPaint(page)
 
       const m = await page.evaluate(() => {
         const left = (el: Element | null) => (el ? el.getBoundingClientRect().left : Number.NaN)

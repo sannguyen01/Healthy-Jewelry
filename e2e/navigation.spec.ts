@@ -1,6 +1,7 @@
 import { test, expect, type Locator, type Page } from './support/test'
 import { SITE_NAME } from '../src/config/site'
 import { heroMedia } from '../src/lib/catalog'
+import { denyConsent } from './support/consent'
 
 /**
  * The search control lives in two places depending on width, and these tests run
@@ -188,9 +189,7 @@ test.describe('Header — state follows the hero', () => {
   const hero = (page: Page) => page.locator('main > section').first()
 
   test.beforeEach(async ({ page, context }) => {
-    await context.addInitScript(() => {
-      try { localStorage.setItem('hj-analytics-consent', 'denied') } catch { /* the notice shows; not what is measured here */ }
-    })
+    await denyConsent(context)
     await page.setViewportSize({ width: 390, height: 844 })
   })
 
