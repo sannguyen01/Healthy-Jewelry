@@ -310,3 +310,86 @@ test.describe('Homepage composition', () => {
     ).toBeLessThan(0.5)
   })
 })
+
+/**
+ * **One container, one left edge, one right edge.**
+ *
+ * Every band but three sat on the twelve-column grid whose ceiling is 1296px (`.hj-grid`), so from 1440px up their text
+ * started at the grid's own edge and nowhere else. The hero's copy, the product strip and the footer each had their own:
+ * the hero and the strip's head and first card stood off the *viewport's* gutter (72px at 1920, where the grid's edge is
+ * at 312), and the footer was a narrower container of its own (1200px, so its text began 48px in from every band's at
+ * 1440). The strip also ran its fourth card 56px past its own "View all", ending 16px short of the viewport's edge: a
+ * bleed that looks accidental rather than a scroll that is invited.
+ *
+ * Measured from the page itself: the reference is where the Materials band's text starts, because that band is on the
+ * grid by construction; everything else is held to it.
+ */
+test.describe('Homepage — one container', () => {
+  test.use({ contextOptions: { reducedMotion: 'reduce' } })
+
+  for (const width of [1024, 1280, 1440, 1680, 1920, 2560]) {
+    test(`the hero, the strip and the footer sit on the page's edges at ${width}px`, async ({ page, context }) => {
+      await context.addInitScript(() => {
+        try { localStorage.setItem('hj-analytics-consent', 'denied') } catch { /* private mode: the notice shows */ }
+      })
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/')
+      await expect(page.locator('main')).toBeVisible()
+      await page.evaluate(async () => {
+        await document.fonts.ready
+        // The strip and the footer reveal on intersection, and a lazy photograph holds no room it has not earned
+        // until it is near the screen, so the page is walked once from top to bottom, as a visitor would.
+        const step = Math.round(window.innerHeight * 0.6)
+        for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+          window.scrollTo(0, y)
+          await new Promise((r) => setTimeout(r, 60))
+        }
+        window.scrollTo(0, 0)
+      })
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+
+      const m = await page.evaluate(() => {
+        const left = (el: Element | null) => (el ? el.getBoundingClientRect().left : Number.NaN)
+        const right = (el: Element | null) => (el ? el.getBoundingClientRect().right : Number.NaN)
+        const sections = [...document.querySelectorAll('main > section')]
+        const materials = sections[1]
+        const strip = sections.find((s) => s.classList.contains('hj-band-strip'))
+        const cards = strip ? [...strip.querySelectorAll('.hj-strip-card')] : []
+        const footer = document.querySelector('footer')
+        const bottomRow = footer ? [...footer.querySelectorAll('*')].filter((e) => e.children.length === 0 && /metal, named exactly/i.test(e.textContent ?? '')) : []
+        const heroCopy = document.querySelector('.hj-hero-copy')
+        return {
+          viewport: document.documentElement.clientWidth,
+          referenceLeft: left(materials.querySelector('.label-eyebrow')),
+          heroCopyLeft: left(heroCopy),
+          stripHeadLeft: left(strip?.querySelector('.hj-strip-head h2') ?? null),
+          stripViewAllRight: right(strip?.querySelector('.hj-strip-head a') ?? null),
+          cardLefts: cards.map((c) => left(c)),
+          cardRights: cards.map((c) => right(c)),
+          footerMarkLeft: left(footer?.querySelector('img') ?? null),
+          footerRowRight: right(bottomRow[bottomRow.length - 1] ?? null),
+        }
+      })
+
+      const edge = m.referenceLeft
+      const farEdge = m.viewport - edge
+      expect(Number.isFinite(edge), 'the Materials band has an eyebrow to measure the page edge from').toBe(true)
+      const problems: string[] = []
+      const near = (label: string, got: number, want: number) => {
+        if (!(Math.abs(got - want) <= 1.5)) problems.push(`${label} is at ${got.toFixed(1)}px; the page's edge is ${want.toFixed(1)}px`)
+      }
+      near('the hero copy\'s left', m.heroCopyLeft, edge)
+      near('the strip\'s heading', m.stripHeadLeft, edge)
+      near('the strip\'s "View all" right edge', m.stripViewAllRight, farEdge)
+      near('the strip\'s first card', m.cardLefts[0], edge)
+      // Four cards fill the container exactly, and the fifth is begun, so the row visibly goes on.
+      near('the strip\'s fourth card\'s right edge', m.cardRights[3], farEdge)
+      if (!(m.cardLefts[4] > farEdge && m.cardLefts[4] < m.viewport - 16)) {
+        problems.push(`the fifth card begins at ${m.cardLefts[4]?.toFixed(1)}px: it should peek between ${farEdge.toFixed(0)}px and ${m.viewport - 16}px so the row reads as one that scrolls`)
+      }
+      near('the footer\'s mark', m.footerMarkLeft, edge)
+      near('the footer\'s last line\'s right edge', m.footerRowRight, farEdge)
+      expect(problems, `At ${width}px:\n  ${problems.join('\n  ')}`).toEqual([])
+    })
+  }
+})

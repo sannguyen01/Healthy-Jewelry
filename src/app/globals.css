@@ -127,11 +127,21 @@
        so the two cannot drift. */
     --hj-hero-card-max-ratio: 0.55;
 
-    /* Shared horizontal inset for the hero copy. One definition, two consumers:
-       the card's side margin and the safe zone's side padding. It is the page's own gutter (ADR 051, B4): it was a clamp of its
+    /* The least the hero's copy stands in from the photograph's side edges: the safe zone's side tracks are never
+       narrower than this. It is the page's own gutter (ADR 051, B4): it was a clamp of its
        own, a few pixels narrower, so the hero's words stood off the left edge every
        other band keeps. */
     --hj-hero-pad-x: var(--space-gutter);
+
+    /* ── The page's container (ADR 054) ──
+       The ceiling of the twelve-column grid (the board's 1296px) and the one place it is written. A band's text,
+       the hero's copy, the strip's head and first card and the footer all start at the same edge: the gutter on a
+       narrow screen, and from the point where the viewport outgrows the container, the container's own edge.
+       `--hj-edge` is that edge as a *padding*: its percentage is the width of the full-width block it pads, so it
+       is only for padding on a block that spans the page (the strip's head and row). A grid lays its own edges
+       with the container as a track (.hj-hero-safe, .hj-grid). */
+    --hj-container: 1296px;
+    --hj-edge: max(var(--space-gutter), calc((100% - var(--hj-container)) / 2));
 
     /* ── Header ──
        The fixed bar's height, written once (ADR 054). The bar, the menu drawer's top edge, the hero's
@@ -165,9 +175,9 @@
        under the text it protects, by e2e/hero-legibility.spec.ts, and not by eye.
        The first is the header's own (the bar cannot know what scrolls under it, so it must clear AA over black
        and over white; src/tests/unit/header-veil.test.ts proves it for both tones: 60% cleared the dark tone
-       and not the light). The second is the hero copy's. */
-    --hj-veil-top: 72%;
-    --hj-veil-bottom: 72%;
+       and not the light). The second is the hero copy's, set against the photograph it lies on. */
+    --hj-veil-bar: 72%;
+    --hj-veil-copy: 72%;
 
     /* The step between one hero line's entrance and the next. */
     --stagger: 80ms;
@@ -742,6 +752,8 @@
 
   /* ── Header Redesign ── */
   .hj-header {
+    /* The band's colour over the hero, the type's opposite: the ground under ink type (below, and the light tone's). */
+    --hj-bar-veil: var(--bg);
     position: fixed;
     top: 0;
     left: 0;
@@ -771,11 +783,7 @@
      Its colour is the type's opposite, ink under light type (`light` tone) and the ground under ink (`dark`), and
      its strength is the worst case, AA over black and over white (header-veil.test.ts), because the bar does not
      know what is under it. Gone once the header is solid, which has a ground of its own. */
-  .hj-header {
-    --hj-bar-veil: var(--bg);
-  }
-
-  .hj-header[data-tone="light"] {
+  .hj-header[data-bar-tone="light"] {
     --hj-bar-veil: var(--ink);
   }
 
@@ -790,18 +798,18 @@
     pointer-events: none;
     background-image: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--hj-bar-veil) var(--hj-veil-top), transparent) calc(100% / 3),
+      color-mix(in srgb, var(--hj-bar-veil) var(--hj-veil-bar), transparent) var(--header-height),
       transparent
     );
   }
 
   /* The type follows the tone: light type on a darkened band for a `light` tone, ink on a light one for `dark`.
      The tone is the hero record's. The ring follows the type, because an ink ring vanishes on a dark band. */
-  .hj-header[data-state="hero-overlay"][data-tone="light"] {
+  .hj-header[data-state="hero-overlay"][data-bar-tone="light"] {
     color: var(--on-dark);
   }
 
-  .hj-header[data-state="hero-overlay"][data-tone="light"] :focus-visible {
+  .hj-header[data-state="hero-overlay"][data-bar-tone="light"] :focus-visible {
     outline-color: var(--on-dark);
   }
 
@@ -1032,7 +1040,7 @@
   }
 
   .hj-archive {
-    max-width: 1296px;
+    max-width: var(--hj-container);
     margin: 0 auto;
     padding-bottom: clamp(32px, 4vw, 48px);
     transform: translateY(16px);
@@ -1318,7 +1326,7 @@
      e2e/homepage-composition.spec.ts holds every light-to-light seam to it. The dark band draws none:
      its edge is the change of ground. The last band draws none either, because the footer's own
      hairline is the seam below it. A band is laid on a twelve-column grid whose gap and ceiling are
-     the board's (40px, 1296px), which collapses to one column at the same 900px the hero stacks at. */
+     the board's (40px, --hj-container), which collapses to one column at the same 900px the hero stacks at. */
   .hj-band {
     background-color: var(--bg);
     padding: var(--space-section) var(--space-gutter);
@@ -1347,7 +1355,7 @@
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     column-gap: clamp(24px, 3vw, 40px);
-    max-width: 1296px;
+    max-width: var(--hj-container);
     margin-inline: auto;
   }
 
@@ -1604,25 +1612,43 @@
     padding-bottom: calc(var(--space-section) - 24px);
   }
 
+  /* The head and the row start at the page's edge (--hj-edge), not the viewport's gutter, so they sit on the same
+     line as every band's text on a screen wider than the container. The row still runs to the viewport's right edge
+     on purpose: it is a row that scrolls. Where it is wide enough to be read as a row of four (961px up), a card is
+     a quarter of the container, so four fill it exactly and the fifth is begun at the right edge: the strip ends
+     where the heading's "View all" ends, and the fifth card's start says there is more. Below that a card keeps its
+     own width, with the next one peeking. */
   .hj-strip-head {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 24px;
     margin-bottom: 48px;
-    padding-inline: var(--space-gutter);
+    padding-inline: var(--hj-edge);
   }
 
   .hj-strip-row {
+    --hj-strip-gap: 24px;
     display: flex;
-    gap: 24px;
-    padding: 0 var(--space-gutter) 24px;
+    gap: var(--hj-strip-gap);
+    padding: 0 var(--space-gutter) 24px var(--hj-edge);
   }
 
   .hj-strip-card {
     display: block;
     flex: 0 0 clamp(200px, 68vw, 320px);
     text-decoration: none;
+  }
+
+  @media (min-width: 961px) {
+    .hj-strip-card {
+      /* The row's own width (its percentage) is the container up to 1440px and wider beyond it, so the container's
+         own is the ceiling. */
+      flex-basis: min(
+        calc((100% - var(--hj-strip-gap) * 3) / 4),
+        calc((var(--hj-container) - var(--hj-strip-gap) * 3) / 4)
+      );
+    }
   }
 
   .hj-strip-caption {
@@ -1639,13 +1665,13 @@
       margin-bottom: 32px;
     }
     .hj-strip-row {
-      gap: 16px;
+      --hj-strip-gap: 16px;
     }
   }
 
   /* ── Collections: two photographs and an index ── */
   .hj-coll-head {
-    max-width: 1296px;
+    max-width: var(--hj-container);
     margin: 0 auto 56px;
   }
 
@@ -1819,9 +1845,12 @@
      One composition on every width. The photograph is the hero's geometry and begins under the fixed
      header; the header, the copy and the actions are layered inside it, in zones defined here from
      --header-height, the record's copy corner and the consent notice's published height. Below 900px the
-     crop and the alignment change (a different focal point, perhaps another copy corner, another variant);
-     the photograph never moves under a panel of its own. The art direction is a record
-     (src/content/hero/home.json), delivered here as custom properties on the section. */
+     crop and the alignment change (a different focal point, perhaps another copy corner); the photograph never
+     moves under a panel of its own. The art direction is a record (src/content/hero/home.json), delivered here
+     as custom properties on the section.
+
+     The overlay is the hero's look at every width: light type laid on a veil. The card (ADR 013) is the one
+     exception, and only for a wide crop, so it is declared once, for wide screens, after the overlay it departs from. */
   .hj-hero {
     --hj-focal: var(--hj-focal-wide);
     --hj-zone: var(--hj-zone-wide);
@@ -1830,7 +1859,6 @@
        veils composite on lives on the media wrapper below. */
     position: relative;
     display: grid;
-    grid-template-areas: "hero";
     background-color: var(--bg);
     /* The floor is a height, never a fixed one: copy that needs more room (large text, a long translation)
        makes the hero taller instead of being cut. `svh` is the viewport with the browser's toolbars up, so
@@ -1838,7 +1866,6 @@
        ceiling keeps a tall display from stretching it without end (ADR 021: no floor without a ceiling). */
     min-height: min(max(var(--hj-hero-min), 100vh), var(--hj-hero-max));
     min-height: min(max(var(--hj-hero-min), 100svh), var(--hj-hero-max));
-    --hj-bottom-veil: block;
   }
 
   .hj-hero-media {
@@ -1861,104 +1888,63 @@
     object-position: var(--hj-focal);
   }
 
-  /* A veil is a legibility device, not a palette filter (ADR 054). Strengths are tokens, set by the rendered-pixel
-     test. The hero has one, the copy's; the bar's belongs to the bar (.hj-header::before). */
-  .hj-hero-veil {
-    pointer-events: none;
-  }
-
-  /* It lives in the safe zone's last row, the copy's row, and is as tall as the copy plus a fade above
-     it: negative margins stretch it to the hero's edges and down through the padding and the consent notice's
-     room, so its full strength always covers the copy, whatever size the copy is (large text, a longer line, a
-     smaller phone). A veil of fixed height cannot do that: the eyebrow, at the top of the copy, ended up on the
-     part of it that had already faded. */
-  .hj-hero-veil[data-edge="bottom"] {
-    --hj-veil-fade: 8rem;
-    grid-row: 2;
-    grid-column: 1;
-    align-self: stretch;
-    justify-self: stretch;
-    z-index: -1;
-    display: var(--hj-bottom-veil);
-    margin-top: calc(var(--hj-veil-fade) * -1);
-    margin-right: calc(var(--hj-hero-pad-x) * -1);
-    margin-bottom: calc((max(var(--hj-hero-pad-b), env(safe-area-inset-bottom, 0px)) + var(--hj-consent-h, 0px)) * -1);
-    margin-left: calc(var(--hj-hero-pad-x) * -1);
-    background-image: linear-gradient(
-      to top,
-      color-mix(in srgb, var(--ink) var(--hj-veil-bottom), transparent) calc(100% - var(--hj-veil-fade)),
-      transparent
-    );
-  }
-
-  /* The safe zone: clear of the header and the device's own insets, inside the page's gutters, and above the
-     consent notice while it is up (it publishes its height; 0 once answered). A grid whose last row is the copy;
-     the row above takes whatever height is left, which is what puts the copy at the bottom. */
+  /* The safe zone: clear of the header and the device's own insets, inside the page's container, and above the
+     consent notice while it is up (it publishes its height; 0 once answered). Its columns are the container's:
+     the side tracks take what the container leaves and are never narrower than the gutter, so the copy starts at
+     the same edge as every band below it, at every width, and the veil, which spans all three, reaches the
+     photograph's edges. Its rows are the space above the copy (whatever height is left, which puts the copy at
+     the bottom), the copy, and the clearance under it. */
   .hj-hero-safe {
-    grid-area: hero;
+    --hj-hero-foot: calc(max(var(--hj-hero-pad-b), env(safe-area-inset-bottom, 0px)) + var(--hj-consent-h, 0px));
     position: relative;
     z-index: 2;
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 1fr auto;
+    grid-template-columns: minmax(var(--hj-hero-pad-x), 1fr) minmax(0, var(--hj-container)) minmax(var(--hj-hero-pad-x), 1fr);
+    grid-template-rows: 1fr auto var(--hj-hero-foot);
     padding-top: calc(var(--header-height) + env(safe-area-inset-top, 0px));
-    padding-right: var(--hj-hero-pad-x);
-    padding-bottom: calc(max(var(--hj-hero-pad-b), env(safe-area-inset-bottom, 0px)) + var(--hj-consent-h, 0px));
-    padding-left: var(--hj-hero-pad-x);
+  }
+
+  /* A veil is a legibility device, not a palette filter (ADR 054). Its strength is a token, set by the
+     rendered-pixel test. It lies under the copy and the clearance below it, plus a fade above, so it is as tall as the
+     copy whatever size the copy is (large text, a longer line, a smaller phone): a veil of fixed height cannot do
+     that, and the eyebrow, at the top of the copy, ended up on the part of it that had already faded. The bar's
+     own belongs to the bar (.hj-header::before). */
+  .hj-hero-veil {
+    --hj-veil-fade: 8rem;
+    grid-row: 2 / 4;
+    grid-column: 1 / -1;
+    z-index: -1;
+    margin-top: calc(var(--hj-veil-fade) * -1);
+    pointer-events: none;
+    background-image: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--ink) var(--hj-veil-copy), transparent) calc(100% - var(--hj-veil-fade)),
+      transparent
+    );
   }
 
   .hj-hero-line {
     display: block;
   }
 
-  /* The copy shell is a box only when the active crop is a card (ADR 013, bounded by the inline
-     --hj-hero-card-max-ratio the component sets). Under an overlay it is `display: contents`: no box, so no
-     bound to undo. */
+  /* The copy shell is a box only when the crop is a card (ADR 013, bounded by the inline --hj-hero-card-max-ratio the
+     component sets). Under an overlay it is `display: contents`: no box, so no bound to undo. */
   .hj-hero-copy {
-    grid-row: 2;
-    grid-column: 1;
-    justify-self: var(--hj-zone);
-    box-sizing: border-box;
-    min-width: 0;
-  }
-
-  .hj-hero[data-variant-wide="card"] .hj-hero-copy {
-    padding: clamp(28px, 3.5vw, 48px);
-    background-color: var(--bg);
-    /* A frame, like every card on the site (ADR 051): the hairline and the 6px radius. */
-    border: 1px solid var(--ash);
-    border-radius: var(--radius-frame);
-  }
-
-  .hj-hero[data-variant-wide="overlay"] .hj-hero-copy {
     display: contents;
   }
 
-  /* What the copy and its controls are made of, per variant. The card's are the page's own (ink on the ground);
-     the overlay's are inverted for a veil: light type, a ground-coloured primary button, and a light focus ring,
-     because the ring and the primary are both --ink and vanish on a dark surface (WCAG 1.4.11, 2.4.7). */
+  /* What the copy and its controls are made of. An overlay's are inverted for a veil: light type, a ground-coloured
+     primary button and a light focus ring, because the ring and the primary are both --ink and vanish on a dark
+     surface (WCAG 1.4.11, 2.4.7). Under an overlay the shell has no box and this is the grid item: the copy's row,
+     in the container's column, in the record's corner. */
   .hj-hero-content {
-    /* Under an overlay the shell has no box and this is the grid item: the copy's row, in the record's corner. */
     grid-row: 2;
-    grid-column: 1;
+    grid-column: 2;
     justify-self: var(--hj-zone);
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    --hj-fg: var(--ink);
-    --hj-fg-2: var(--ink-2);
-    --hj-fg-body: var(--graphite);
-    --hj-primary-bg: var(--ink);
-    --hj-primary-fg: var(--bg);
-    --hj-primary-hover: var(--graphite);
-    --hj-ghost-edge: var(--outline);
-    --hj-ghost-hover: var(--ink);
-    --hj-ring: var(--ink);
-  }
-
-  .hj-hero[data-variant-wide="overlay"] .hj-hero-content {
-    width: 100%;
-    max-width: min(100%, 29rem);
+    width: min(100%, 34rem);
     --hj-fg: var(--on-dark);
     --hj-fg-2: var(--on-dark);
     --hj-fg-body: var(--on-dark);
@@ -1968,10 +1954,6 @@
     --hj-ghost-edge: var(--mist);
     --hj-ghost-hover: var(--on-dark);
     --hj-ring: var(--on-dark);
-  }
-
-  .hj-hero[data-variant-wide="card"] {
-    --hj-bottom-veil: none;
   }
 
   .hj-hero-content .label-eyebrow {
@@ -2035,35 +2017,53 @@
     }
   }
 
-  /* Under 900px: the narrow crop's focal point and copy corner, and its look, which is always the overlay's (the
-     schema allows nothing else for a phone). The wide rules above are the default, whichever variant the wide crop
-     is; these re-declare what differs. */
+  /* Under 900px: the narrow crop's focal point and copy corner. Its look is the overlay's already (the schema allows
+     nothing else for a phone, and a card bounded to a fraction of the photograph is a column too narrow for a
+     sentence there), so this re-declares nothing else. */
   @media (max-width: 900px) {
     .hj-hero {
       --hj-focal: var(--hj-focal-narrow);
       --hj-zone: var(--hj-zone-narrow);
     }
+  }
 
-    .hj-hero[data-variant-narrow="overlay"] {
-      --hj-bottom-veil: block;
+  /* From 901px, the one place the look departs from the overlay: a wide overlay is a narrower column than a phone's,
+     and a wide *card* (ADR 013) is the page's own surface, ink on the ground in a hairlined frame, with no veil under
+     it. This is the exact complement of the 900px rule above, so no width belongs to neither. */
+  @media not all and (max-width: 900px) {
+    .hj-hero[data-variant-wide="overlay"] .hj-hero-content {
+      width: min(100%, 29rem);
     }
 
-    .hj-hero[data-variant-narrow="overlay"] .hj-hero-copy {
-      display: contents;
+    .hj-hero[data-variant-wide="card"] .hj-hero-veil {
+      display: none;
     }
 
-    .hj-hero[data-variant-narrow="overlay"] .hj-hero-content {
-      width: 100%;
-      max-width: min(100%, 34rem);
-      --hj-fg: var(--on-dark);
-      --hj-fg-2: var(--on-dark);
-      --hj-fg-body: var(--on-dark);
-      --hj-primary-bg: var(--bg);
-      --hj-primary-fg: var(--ink);
-      --hj-primary-hover: var(--nacre);
-      --hj-ghost-edge: var(--mist);
-      --hj-ghost-hover: var(--on-dark);
-      --hj-ring: var(--on-dark);
+    .hj-hero[data-variant-wide="card"] .hj-hero-copy {
+      display: block;
+      grid-row: 2;
+      grid-column: 2;
+      justify-self: var(--hj-zone);
+      box-sizing: border-box;
+      min-width: 0;
+      padding: clamp(28px, 3.5vw, 48px);
+      background-color: var(--bg);
+      /* A frame, like every card on the site (ADR 051): the hairline and the 6px radius. */
+      border: 1px solid var(--ash);
+      border-radius: var(--radius-frame);
+    }
+
+    .hj-hero[data-variant-wide="card"] .hj-hero-content {
+      width: auto;
+      --hj-fg: var(--ink);
+      --hj-fg-2: var(--ink-2);
+      --hj-fg-body: var(--graphite);
+      --hj-primary-bg: var(--ink);
+      --hj-primary-fg: var(--bg);
+      --hj-primary-hover: var(--graphite);
+      --hj-ghost-edge: var(--outline);
+      --hj-ghost-hover: var(--ink);
+      --hj-ring: var(--ink);
     }
   }
 

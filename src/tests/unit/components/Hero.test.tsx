@@ -85,17 +85,18 @@ describe('Hero — one composition (ADR 054)', () => {
     expect(container.querySelector('.hj-hero-media')?.getAttribute('aria-hidden')).toBeNull()
     // One veil, the copy's, in the safe zone's last row beside what it protects. The bar's veil belongs to the bar.
     const veils = Array.from(container.querySelectorAll('.hj-hero-veil'))
-    expect(veils.map((v) => v.getAttribute('data-edge'))).toEqual(['bottom'])
+    expect(veils).toHaveLength(1)
     for (const veil of veils) expect(veil.getAttribute('aria-hidden')).toBe('true')
-    expect(container.querySelector('.hj-hero-safe > .hj-hero-veil[data-edge="bottom"]')).toBeTruthy()
+    expect(container.querySelector('.hj-hero-safe > .hj-hero-veil')).toBeTruthy()
   })
 
-  it('carries both variants and the record\'s focal points and corners as data, and leaves the header\'s tone to the header', () => {
+  it('carries the wide variant and the record\'s focal points and corners as data, and leaves the header\'s tone to the header', () => {
     const media = record()
     const { container } = render(<Hero media={media} headlineLines={LINES} />)
     const el = section(container)
     expect(el.getAttribute('data-variant-wide')).toBe(media.desktop.variant)
-    expect(el.getAttribute('data-variant-narrow')).toBe(media.mobile.variant)
+    // The narrow crop is always an overlay (the schema), so there is no attribute for it to carry.
+    expect(el.hasAttribute('data-variant-narrow')).toBe(false)
     expect(el.hasAttribute('data-header-tone')).toBe(false)
     expect(el.style.getPropertyValue('--hj-focal-wide')).toBe('69% 45%')
     expect(el.style.getPropertyValue('--hj-focal-narrow')).toBe('80% 40%')

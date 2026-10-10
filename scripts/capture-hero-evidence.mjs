@@ -136,7 +136,7 @@ const loadState = (page) =>
       fontsLoaded: document.fonts.status === 'loaded',
       imagesLoaded: [...document.images].filter(visible).every((i) => i.complete && i.naturalWidth > 0),
       headerState: document.querySelector('.hj-header')?.getAttribute('data-state') ?? null,
-      headerTone: document.querySelector('.hj-header')?.getAttribute('data-tone') ?? null,
+      headerTone: document.querySelector('.hj-header')?.getAttribute('data-bar-tone') ?? null,
       scrollY: Math.round(window.scrollY),
     }
   }, IN_VIEWPORT)

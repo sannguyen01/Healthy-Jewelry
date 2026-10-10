@@ -362,14 +362,6 @@ for (const viewport of VIEWPORTS) {
       expect(hits, `The copy is on the subject at ${viewport.width}×${viewport.height}:\n  ${hits.join('\n  ')}`).toEqual([])
     })
 
-    test('the hero carries the record\'s variants, and the header its tone', async ({ page }) => {
-      // Both, not the active one: the server cannot know the viewport, and the stylesheet picks by breakpoint.
-      await expect(hero(page), 'data-variant-wide').toHaveAttribute('data-variant-wide', media.desktop.variant)
-      await expect(hero(page), 'data-variant-narrow').toHaveAttribute('data-variant-narrow', media.mobile.variant)
-      // The tone is the bar's: it sets the bar's type and the bar's own veil, so it lives on the bar.
-      await expect(header(page), 'data-tone').toHaveAttribute('data-tone', media.headerTone)
-    })
-
     test('a card, where the record asks for one, never outgrows the photograph it sits on', async ({ page }) => {
       const narrow = await isNarrow(page)
       const crop = narrow ? media.mobile : media.desktop
@@ -401,6 +393,18 @@ for (const viewport of VIEWPORTS) {
     })
   })
 }
+
+test.describe('Hero — what the record says reaches the page', () => {
+  // Not in the matrix: these are attributes the server renders, the same at every width, so eleven widths in two
+  // projects would read the same two attributes twenty-two times.
+  test('the hero carries the wide variant, and the header the tone, that the record names', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/')
+    await expect(hero(page), 'data-variant-wide').toHaveAttribute('data-variant-wide', media.desktop.variant)
+    // The tone is the bar's: it sets the bar's type and the bar's own veil, so it lives on the bar.
+    await expect(header(page), 'data-bar-tone').toHaveAttribute('data-bar-tone', media.headerTone)
+  })
+})
 
 test.describe('Hero — the card containment check can fail', () => {
   test.use({ contextOptions: { reducedMotion: 'reduce' } })

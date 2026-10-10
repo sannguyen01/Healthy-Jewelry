@@ -90,17 +90,6 @@ describe('the committed hero record', () => {
       }
     }
   })
-
-  it('keeps the subject inside the frame and the focal point on the image', () => {
-    for (const crop of [heroMedia().desktop, heroMedia().mobile]) {
-      expect(crop.subject.x0).toBeLessThan(crop.subject.x1)
-      expect(crop.subject.y0).toBeLessThan(crop.subject.y1)
-      for (const n of [crop.focal.x, crop.focal.y, crop.subject.x0, crop.subject.y0, crop.subject.x1, crop.subject.y1]) {
-        expect(n).toBeGreaterThanOrEqual(0)
-        expect(n).toBeLessThanOrEqual(1)
-      }
-    }
-  })
 })
 
 describe('the shape', () => {
@@ -144,11 +133,6 @@ describe('the shape', () => {
     rejects((r) => { r.mobile.variant = 'card' }, /"mobile",\s*"variant"/)
     accepts((r) => { r.desktop.variant = 'overlay' })
     accepts((r) => { r.desktop.variant = 'card' })
-  })
-
-  it('has no stylesheet branch for a narrow card, which the schema forbids', () => {
-    const css = readFileSync(resolve(ROOT, 'src/app/globals.css'), 'utf8')
-    expect(css).not.toMatch(/data-variant-narrow="card"/)
   })
 
   it('rejects a variant, a copy corner or a header tone that does not exist', () => {

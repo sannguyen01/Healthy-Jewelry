@@ -33,8 +33,8 @@ const token = (name: string): string => {
 }
 
 const veilStrength = (): number => {
-  const match = css.match(/--hj-veil-top:\s*(\d+(?:\.\d+)?)%/)
-  if (!match) throw new Error('--hj-veil-top is not declared as a percentage in globals.css')
+  const match = css.match(/--hj-veil-bar:\s*(\d+(?:\.\d+)?)%/)
+  if (!match) throw new Error('--hj-veil-bar is not declared as a percentage in globals.css')
   return Number.parseFloat(match[1]) / 100
 }
 
@@ -78,16 +78,15 @@ describe('the header\'s veil over the hero', () => {
     expect(body).toMatch(/position:\s*absolute/)
     expect(body).toMatch(/z-index:\s*-1/)
     expect(body).toMatch(/pointer-events:\s*none/)
-    expect(body).toMatch(/var\(--hj-bar-veil\)\s+var\(--hj-veil-top\)/)
+    expect(body).toMatch(/var\(--hj-bar-veil\)\s+var\(--hj-veil-bar\)/)
   })
 
   it('takes its colour from the header\'s own tone, ground for dark type and ink for light', () => {
     expect(css).toMatch(/\.hj-header \{[^}]*--hj-bar-veil:\s*var\(--bg\)/)
-    expect(css).toMatch(/\.hj-header\[data-tone="light"\] \{[^}]*--hj-bar-veil:\s*var\(--ink\)/)
+    expect(css).toMatch(/\.hj-header\[data-bar-tone="light"\] \{[^}]*--hj-bar-veil:\s*var\(--ink\)/)
   })
 
   it('is no longer drawn by the hero, which has nothing to say about the bar', () => {
-    expect(css).not.toMatch(/\.hj-hero-veil\[data-edge="top"\]/)
     expect(css).not.toMatch(/--hj-top-veil/)
     expect(css).not.toMatch(/data-header-tone/)
   })

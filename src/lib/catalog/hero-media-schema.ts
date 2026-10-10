@@ -41,10 +41,10 @@ const productHandle = z
  * width and clear of everything, so it makes both pass for any crop. Five percent is a face seen from far away, not a
  * measurement of anything the crop must protect.
  */
-export const MIN_SUBJECT_SPAN = 0.05
+const MIN_SUBJECT_SPAN = 0.05
 
 /** A region of the source image, normalised: 0 is its top-left, 1 its bottom-right. */
-export const rectSchema = z
+const rectSchema = z
   .object({ x0: unit, y0: unit, x1: unit, y1: unit })
   .strict()
   .refine((r) => r.x0 < r.x1 && r.y0 < r.y1, {
@@ -72,14 +72,14 @@ const cropFields = {
 }
 
 /** The wide crop: the copy lies on a veil (`overlay`) or in a bounded, opaque card (`card`, ADR 013). */
-export const cropSchema = z.object({ ...cropFields, variant: z.enum(['overlay', 'card']) }).strict()
+const cropSchema = z.object({ ...cropFields, variant: z.enum(['overlay', 'card']) }).strict()
 
 /**
  * The narrow crop is always an overlay. A card is bounded to a fraction of the photograph (ADR 013), and at a phone's
  * width that fraction is a column too narrow to hold a sentence, so a narrow card could be written and not rendered
  * well. The schema is where that is decided, and the stylesheet has no branch for it.
  */
-export const mobileCropSchema = z
+const mobileCropSchema = z
   .object({
     ...cropFields,
     variant: z.literal('overlay', {
@@ -102,7 +102,7 @@ const subjectConsentSchema = z.union([
   z.discriminatedUnion('state', [z.object({ state: z.literal('unreviewed') }).strict(), approval]),
 ])
 
-export const provenanceSchema = z
+const provenanceSchema = z
   .object({
     origin: z.enum(['photographed', 'ai-generated', 'illustrated']),
     source: z.string().trim().min(10),
@@ -147,9 +147,6 @@ export const heroMediaSchema = z
     }
   })
 
-export type Rect = z.infer<typeof rectSchema>
-export type HeroCrop = z.infer<typeof cropSchema>
-export type HeroMobileCrop = z.infer<typeof mobileCropSchema>
 export type HeroMedia = z.infer<typeof heroMediaSchema>
 
 /**

@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react'
  */
 
 /** What the hero renders at its end, a header's height above its bottom edge. */
-export const HERO_END_SELECTOR = '[data-hero-end]'
+const HERO_END_SELECTOR = '[data-hero-end]'
 
 /**
  * Has the hero's end marker *not yet* passed the top of the viewport?
@@ -29,7 +29,7 @@ export function overlayFromEntry(e: { isIntersecting: boolean; top: number; root
 /**
  * `true` while the header should lie over the hero.
  *
- * `enabled` is a fact the page knows and the server renders (`<Nav overHero />` on the home page and nowhere
+ * `enabled` is a fact the page knows and the server renders (`<Nav heroTone=… />` on the home page and nowhere
  * else), so it is the first value: the server's first paint and the client's agree, and there is no flash.
  * A page that asked for a hero and has no marker is solid, which is the safe state: a bar with its own ground
  * is legible over anything. Where `IntersectionObserver` does not exist the header stays an overlay rather
@@ -39,11 +39,7 @@ export function useHeroOverlay(enabled: boolean): boolean {
   const [overlay, setOverlay] = useState(enabled)
 
   useEffect(() => {
-    if (!enabled) {
-      setOverlay(false)
-      return
-    }
-    const marker = document.querySelector(HERO_END_SELECTOR)
+    const marker = enabled ? document.querySelector(HERO_END_SELECTOR) : null
     if (!marker) {
       setOverlay(false)
       return

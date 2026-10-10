@@ -65,7 +65,7 @@ way: the photograph, the header over it, the copy inside it.
 
 **5. A veil is a legibility device, not a filter.** ADR 044 forbids a filter that imitates a palette. A gradient whose
 strength is set by the lowest contrast measured under the text it protects does not imitate one, and is allowed. Its
-strength is a token (`--hj-veil-top`, `--hj-veil-bottom`) and is set by the rendered-pixel test, not by eye.
+strength is a token (`--hj-veil-bar` for the header's, `--hj-veil-copy` for the copy's) and is set by the rendered-pixel test, not by eye. The two are different contracts: the bar's is photograph-independent arithmetic (it cannot know what scrolls under it), the copy's is measured against the photograph it lies on.
 
 **6. The header's tone is data, its veil is its own, and its state comes from the hero.** `headerTone` is `light` (light
 type on a darkened band) or `dark` (ink on a light band of the page ground). The band is drawn by the header itself
@@ -210,8 +210,8 @@ A reviewer with no context read the branch against its contract and found what t
 - **The consent notice moved the page on a first visit.** The reviewer inferred it and it was measured: layout shift 0.39 at
   320×568, 0.36 at 375×667 and 0.23 at 390×844, the copy travelling 221 to 258px, none for a returning visitor. The browser's
   own score was not reported at all on the Pixel 7 emulation for the same movement, so the test also samples the copy's
-  position in every frame. After the pre-paint reservation: at most 0.016 across twelve widths, the copy's travel at most
-  11px. The reviewer's other claim, that the published room is wrong once the page has scrolled, did not reproduce on
+  position in every frame. After the pre-paint reservation: at most 0.016 across twelve widths of a throwaway measurement,
+  the copy's travel at most 11px; the committed test holds six of them, one in each band the estimate is fitted to. The reviewer's other claim, that the published room is wrong once the page has scrolled, did not reproduce on
   either project (reopening the prompt from the footer of a scrolled page publishes the figure the browser's own box
   implies); the tests that showed it stay.
 - **Smaller:** a two-file picture is asked to load at once (`loading` defaults to lazy and `fetchPriority` does not undo
@@ -221,4 +221,36 @@ A reviewer with no context read the branch against its contract and found what t
   the notice do not share 568px); non-hero pages now show the bar's hairline at scroll 0; the interim photograph is a
   3.3× upscale on a phone and is AI-origin. The first is a design trade-off for the owner; the others are the gated
   photography.
+
+## After the geometric review
+
+The homepage was then measured as a page rather than as a hero: every band at thirteen widths from 320 to 1920 (horizontal
+overflow, overlaps between non-nested boxes, clipping, distorted images, undersized targets, each band's left and right
+edge and padding), and looked at band by band, desktop and phone. It found no overflow, no overlap, no clipping, no distorted
+image and no undersized target. It found the page's edges disagreeing with themselves:
+
+- **Three things were not on the page's container.** Every band was on the twelve-column grid, whose ceiling is written
+  `--hj-container`; the hero's copy, the product strip and the footer each had an edge of their own. From 1440px up
+  the hero and the strip's head and first card stood off the viewport's gutter while every band stood off the
+  container's (at 1920px: 72px against 312px), and the footer was a narrower container (1200px, so its text began 48px in
+  from every band's at 1440px).
+- **The strip ended where nothing ended.** Cards of a fixed width ran the fourth 56px past the heading's "View all" and
+  left the fifth off screen, so at the common desktop width the row stopped 16px short of the viewport's edge, which
+  reads as a mistake and not as a row that goes on.
+- **What was done.** The container is one token. The hero's safe zone is laid on the container's grid lines (the
+  copy takes the middle track, the veil spans all three, the clearance under the copy is a row of its own), which also
+  removed the veil's negative margins that mirrored the padding. The strip's head and row pad to `--hj-edge`, and from
+  961px a card is a quarter of the container, so four fill it and the fifth is begun. The footer takes the container.
+  `e2e/homepage-composition.spec.ts` holds the hero's copy, the strip's heading, "View all", first and fourth card and the
+  fifth card's start, and the footer's mark and last line, to the edge the Materials band establishes, at six widths from
+  1024 to 2560 (it failed on all of them before).
+- **Left alone on purpose.** The collection tiles' stagger and the index's offset are an editorial composition, not a
+  misalignment, and are the designer's to change; the follow-up band is centred where the others are left-aligned.
+
+The four-angle simplification review of the whole branch then removed what the refactors had left behind:
+`data-variant-narrow` (a constant, since the narrow crop is always an overlay), the custom property that toggled the
+veil per variant, a second copy of the overlay palette, the veil's `data-edge` attribute, an unused grid-area, a
+bottom-clearance expression typed twice, dead exports, and `Nav`'s two coupled props, which are one: `heroTone`, whose
+absence means no hero. The header's attribute is `data-bar-tone` and the veil tokens are named for what they protect,
+because `data-tone` already means a dark ground on a band.
 

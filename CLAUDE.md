@@ -171,7 +171,7 @@ in `DESIGN.md`, "Reference: Songmont" — read that before changing a token, a s
   replaced is gone
 - Nav: three states, and the state is a fact about the page, not a distance scrolled
   ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)). `hero-overlay` lies over the hero, on `/`
-  alone (`<Nav overHero />`), with light type on a darkened band or ink on a light one as the hero
+  alone (`<Nav heroTone=… />`), with light type on a darkened band or ink on a light one as the hero
   record's `headerTone` says (the band is the bar's own, `.hj-header::before`, strong enough for any
   backdrop: `header-veil.test.ts`); `solid` is `--bg` with a hairline, which every other page is from its
   first byte and `/` becomes once the hero's own end marker (`[data-hero-end]`, read by
@@ -263,7 +263,7 @@ change all three together.
      either; the narrow crop is always an overlay, and the schema refuses a card there.
      Under an overlay `.hj-hero-copy` is `display: contents`, so the card's bound has no box to bound.
    - A veil is a legibility device, not a palette filter: its strength is a token
-     (`--hj-veil-top`, `--hj-veil-bottom`) set by the rendered-pixel test, never by eye. The hero has one
+     (`--hj-veil-bar`, `--hj-veil-copy`) set by the rendered-pixel test, never by eye. The hero has one
      veil, the copy's; the bar's belongs to the bar (below). The page's
      single dark band is still the Care band: the hero section keeps `--bg`, and the dark fallback
      the veils composite on lives on `.hj-hero-media`.
@@ -301,6 +301,13 @@ change all three together.
 
 Every beat is a `.hj-band` (a ground, the section rhythm and a hairline under it) laid on the
 twelve-column `.hj-grid`; the dark band and the last band draw no hairline.
+
+**One container.** `--hj-container` is the one place the grid's ceiling is written. A band's text, the hero's
+copy (the safe zone's grid lines), the strip's head and first card (`--hj-edge`) and the footer all start at the
+same edge, and end at the same one: the gutter on a narrow screen and, once the viewport outgrows the container,
+the container's own. The strip's cards are a quarter of it from the point where it reads as a row of four, so four fill it
+and the fifth is begun. Held by `e2e/homepage-composition.spec.ts` at six widths from 1024 up. The hero, the strip and
+the footer each had an edge of their own until 2026-10-10.
 
 Then the Footer, which is site chrome rather than a beat (it was numbered 8 under "seven beats").
 

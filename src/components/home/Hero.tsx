@@ -56,8 +56,8 @@ const step = (i: number): CSSProperties => ({ '--hj-i': i }) as CSSProperties
  * `opacity: 0` after hydration and back to 1 over 440ms; with JavaScript off, late or blocked, that left the
  * copy where it started. Nothing here waits for a script now.
  *
- * Two attributes carry the variants (`data-variant-wide`, `data-variant-narrow`) rather than one, because the
- * server cannot know the viewport: the stylesheet picks by breakpoint.
+ * One attribute carries the variant (`data-variant-wide`): the server cannot know the viewport, so the stylesheet
+ * applies it from 901px, and below that the look is the overlay's (the narrow crop has no other).
  */
 export function Hero({ media, headlineLines }: HeroProps) {
   const { desktop, mobile } = media
@@ -69,7 +69,6 @@ export function Hero({ media, headlineLines }: HeroProps) {
     <section
       className="hj-hero"
       data-variant-wide={desktop.variant}
-      data-variant-narrow={mobile.variant}
       style={
         {
           '--hj-focal-wide': `${percent(desktop.focal.x)} ${percent(desktop.focal.y)}`,
@@ -85,11 +84,12 @@ export function Hero({ media, headlineLines }: HeroProps) {
         <HeroPicture media={media} />
       </div>
 
-      {/* The safe zone: clear of the header, the page's gutters and the consent notice. It is a grid whose last
-          row is the copy, so the veil that makes the copy legible can share that row and be exactly as tall as
-          the copy plus a fade above it, whatever size the copy is. */}
+      {/* The safe zone: clear of the header and the consent notice, on the page's container. It is a grid whose
+          rows are the space above the copy, the copy and the clearance under it, so the veil that makes the copy
+          legible can span the last two and be exactly as tall as the copy plus a fade above it, whatever size the
+          copy is. */}
       <div className="hj-hero-safe">
-        <div className="hj-hero-veil" data-edge="bottom" aria-hidden="true" />
+        <div className="hj-hero-veil" aria-hidden="true" />
         <div className="hj-hero-copy" style={hasCard ? CARD_BOUND : undefined}>
           <div className="hj-hero-content">
             {/* "Implant-Grade Titanium" until 2026-09-26: a regulatory claim in the first words a visitor

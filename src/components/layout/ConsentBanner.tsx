@@ -82,6 +82,7 @@ export function ConsentBanner() {
       if (consent !== null) root.style.removeProperty(CONSENT_ROOM_PROPERTY)
       return
     }
+    let published = -1
     const publish = () => {
       // `offsetTop`, not `getBoundingClientRect().top`: the notice enters with a `translateY` animation, so its
       // painted top is 24px low until the animation ends, and nothing resizes when it does, so the observer
@@ -90,6 +91,10 @@ export function ConsentBanner() {
       // place in the viewport also once the page has scrolled and the prompt is reopened from the footer
       // (analytics.spec.ts reopens it there and compares the figure with where the browser put the notice).
       const room = Math.max(0, Math.ceil(window.innerHeight - el.offsetTop))
+      // An unchanged figure is not written: the property is inherited by the whole document, so a write restyles it,
+      // and the observer's first callback and a phone's toolbar resizing both arrive with the number already right.
+      if (room === published) return
+      published = room
       root.style.setProperty(CONSENT_ROOM_PROPERTY, `${room}px`)
     }
     publish()
@@ -141,7 +146,6 @@ export function ConsentBanner() {
         */
         position: 'fixed',
         right: 'var(--space-gutter)',
-        left: 'auto',
         bottom: 'clamp(16px, 3vw, 32px)',
         zIndex: 'var(--z-consent)',
         width: 'min(380px, calc(100vw - 2 * var(--space-gutter, 24px)))',

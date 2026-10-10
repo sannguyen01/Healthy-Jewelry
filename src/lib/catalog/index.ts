@@ -41,7 +41,7 @@ import {
   type MaterialHandle,
 } from './schema'
 import { rawClaims, rawCollections, rawHeroMedia, rawProducts } from './manifest'
-import { loadHeroMedia, type HeroCrop, type HeroMedia } from './hero-media-schema'
+import { loadHeroMedia, type HeroMedia } from './hero-media-schema'
 import { CLAIM_IDS, loadClaimsRegistry, type ClaimId, type ClaimsRegistry } from './claims-schema'
 import {
   approvedWordings,
@@ -448,4 +448,4 @@ export function heroMedia(): HeroMedia {
   return heroMediaRecord
 }
 
-export type { CatalogProduct, CatalogCollection, CollectionHandle, ClaimId, ClaimContext, HeroMedia, HeroCrop }
+export type { CatalogProduct, CatalogCollection, CollectionHandle, ClaimId, ClaimContext, HeroMedia }

@@ -201,7 +201,7 @@ test.describe('Header — state follows the hero', () => {
 
   test('it says which tone the hero needs, as the record does', async ({ page }) => {
     await page.goto('/')
-    await expect(bar(page)).toHaveAttribute('data-tone', heroMedia().headerTone)
+    await expect(bar(page)).toHaveAttribute('data-bar-tone', heroMedia().headerTone)
   })
 
   test('it is still an overlay well past the old 60px threshold, while the photograph is under it', async ({ page }) => {
@@ -232,7 +232,7 @@ test.describe('Header — state follows the hero', () => {
   test('a page with no hero is solid from the first paint, not after 60px', async ({ page }) => {
     await page.goto('/about')
     await expect(bar(page)).toHaveAttribute('data-state', 'solid')
-    await expect(bar(page)).not.toHaveAttribute('data-tone', /.+/)
+    await expect(bar(page)).not.toHaveAttribute('data-bar-tone', /.+/)
   })
 
   test('with the menu open it is menu-open, and it returns to the hero state when closed', async ({ page }) => {

@@ -74,7 +74,7 @@ export default function HomePage() {
           called. e2e/metadata.spec.ts reads these two blocks off the served home page. */}
       <JsonLd type="Organization" data={organizationJsonLd()} />
       <JsonLd type="WebSite" data={webSiteJsonLd()} />
-      <Nav overHero headerTone={media.headerTone} />
+      <Nav heroTone={media.headerTone} />
       <main id="main" tabIndex={-1}>
         {/* 1. Hero */}
         <Hero media={media} headlineLines={claimLines('brand-positioning', SITE)} />
