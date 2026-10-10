@@ -78,7 +78,7 @@ export const CONSENT_ROOM_PROPERTY = '--hj-consent-h'
 
 /**
  * A script for the top of `<body>`, run before the first paint: when nobody has answered, reserve the room the
- * notice will take, as an estimate (`--hj-consent-reserve`, by width, in the stylesheet).
+ * notice will take, as an estimate (`--hj-consent-reserve`, in the stylesheet: a formula over the notice's own tokens).
  *
  * Whether to ask is in `localStorage`, which the server cannot read, so the notice only learns it after hydration.
  * A hero that waited for that moved its copy by the notice's whole height a few hundred milliseconds after the page

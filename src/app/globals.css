@@ -171,11 +171,22 @@
 
     /* The consent notice's room (its height plus the gap beneath it), estimated, for the moment before it has measured
        itself. A script at the top of <body> reserves this when nobody has answered (CONSENT_PREPAINT_SCRIPT) so the hero
-       does not move when the notice arrives after hydration; the notice then replaces it with the real figure. One
-       value per band the notice wraps differently in, from the measured room at 320 to 1440px (264 at 320, 243 from 340
-       to 375, 221 to 225 from 390 to 600, 242 at 768, 249 at 900, 254 to 260 above): within about ten pixels of the real
-       one at every width, which e2e/analytics.spec.ts holds to by measuring the copy's travel. */
-    --hj-consent-reserve: 258px;
+       does not move when the notice arrives after hydration; the notice then replaces it with the real figure.
+
+       It is the notice's own arithmetic: its padding above and below, the gap between its sentence and its buttons, its
+       distance from the bottom of the screen, its border (2px), the 44px row of buttons, and the sentence at the lines it
+       wraps to (--hj-consent-lines) times its size and leading. Written that way it follows the notice's tokens, and
+       the compact notice below needs no estimate of its own: it used to be nine fitted pixel values, and the four for the
+       compact notice went stale the moment it changed its padding (a 37px shift on a first visit at 375x667). The lines
+       are the one thing chosen per band, from the measured room at 320 to 1440px (7 at 320, 6 from 340 to 375, 5 from 390
+       up): the bands are the registered 600 and 359 breakpoints, so a half line stands for the two widths that share a
+       band. Within about ten pixels of the real room at every width, which e2e/analytics.spec.ts holds to by measuring
+       the copy's travel. */
+    --hj-consent-lines: 5;
+    --hj-consent-reserve: calc(
+      2 * var(--hj-consent-pad) + var(--hj-consent-gap) + var(--hj-consent-bottom) + 2px + 44px +
+        var(--hj-consent-lines) * var(--text-sm) * var(--leading-text)
+    );
 
     /* The notice's own spacing: its padding, the gap between its sentence and its buttons, and its distance from the
        bottom of the screen. Tokens so that a screen too short to share with the hero's copy can tighten them (the
@@ -280,18 +291,12 @@
     --shadow-float: 0 8px 40px color-mix(in srgb, var(--ink) 8%, transparent);
   }
 
-  /* The consent notice's estimated room, by band (see --hj-consent-reserve). */
-  @media (max-width: 900px) {
-    :root { --hj-consent-reserve: 250px; }
-  }
-  @media (max-width: 768px) {
-    :root { --hj-consent-reserve: 242px; }
-  }
+  /* How many lines the notice's sentence wraps to, by band (see --hj-consent-reserve). */
   @media (max-width: 600px) {
-    :root { --hj-consent-reserve: 232px; }
+    :root { --hj-consent-lines: 5.5; }
   }
   @media (max-width: 359px) {
-    :root { --hj-consent-reserve: 254px; }
+    :root { --hj-consent-lines: 6.5; }
   }
 
   /* The notice on a screen too short to share with the hero's copy (ADR 054). On a 640px phone the header, the copy and the
@@ -303,19 +308,7 @@
       --hj-consent-pad: 12px;
       --hj-consent-gap: 8px;
       --hj-consent-bottom: max(8px, env(safe-area-inset-bottom, 0px));
-      /* Its estimated room, by band, as it is now (measured at 320 to 900px: 238 at 320, 217 at 340 to 360, 195 to 197
-         from 375 to 600, 197 to 200 above): within the 16px the first-visit shift test allows at every width. */
-      --hj-consent-reserve: 200px;
     }
-  }
-  @media (max-width: 768px) and (max-height: 700px) {
-    :root { --hj-consent-reserve: 198px; }
-  }
-  @media (max-width: 600px) and (max-height: 700px) {
-    :root { --hj-consent-reserve: 206px; }
-  }
-  @media (max-width: 359px) and (max-height: 700px) {
-    :root { --hj-consent-reserve: 228px; }
   }
 
   /* ── Base Reset ── */

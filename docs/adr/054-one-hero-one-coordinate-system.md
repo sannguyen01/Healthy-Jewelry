@@ -97,7 +97,7 @@ control is never hidden by it (WCAG 2.4.11). Its copy and its logic are unchange
 `localStorage`, which the server cannot read, so a hero that reserved the room only after the notice had measured itself
 moved its copy by the notice's whole height a few hundred milliseconds after a first visit's first paint. A script at the
 top of `<body>` (`CONSENT_PREPAINT_SCRIPT`, in `consent.ts`, held equal to `readConsent` by `consent-prepaint.test.ts`)
-therefore reserves an estimate (`--hj-consent-reserve`, by width) when nobody has answered, and the notice replaces it with
+therefore reserves an estimate (`--hj-consent-reserve`, the notice's own padding, gap, buttons and sentence worked out as a formula, with the lines the sentence wraps to chosen per band) when nobody has answered, and the notice replaces it with
 its real height or gives it back. It does so on the home page only: the script is in the root layout and so in every
 document, but only `/` lays a hero above the notice, and elsewhere its storage read would sit ahead of the first paint for
 a room nothing uses (those pages get the notice's own figure after hydration, as they did before it existed).

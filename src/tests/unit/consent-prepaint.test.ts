@@ -126,15 +126,36 @@ describe('where it is wired', () => {
     expect(layout.indexOf('suppressHydrationWarning'), 'on the <html> element, before <head>').toBeLessThan(layout.indexOf('<head>'))
   })
 
-  it('has an estimate for every width the notice changes size at, and none below an even pixel', () => {
-    expect(css).toMatch(/--hj-consent-reserve:\s*\d+px;/)
-    const declarations = [...css.matchAll(/--hj-consent-reserve:\s*(\d+)px;/g)].map((m) => Number(m[1]))
-    // The base value and one per band, so the estimate follows the notice's own wrapping and padding.
-    expect(declarations.length).toBeGreaterThanOrEqual(5)
-    for (const px of declarations) {
-      expect(px % 2, `${px}px`).toBe(0)
-      expect(px).toBeGreaterThan(180)
-      expect(px).toBeLessThan(320)
-    }
+  describe('the estimate', () => {
+    // The estimate is the notice's own arithmetic, not a table of measured heights. It used to be nine pixel values, one per
+    // band and again for the compact notice, each fitted by hand; the compact ones went stale the moment the compact notice
+    // changed its padding (a 37px shift on a first visit at 375x667) because nothing tied them to it. Written as a formula
+    // over the notice's tokens it follows them, and only the number of lines its sentence wraps to is chosen per band.
+    const reserve = /--hj-consent-reserve:\s*calc\(([^;]*)\);/.exec(css)?.[1] ?? ''
+    const lines = [...css.matchAll(/--hj-consent-lines:\s*(\d+(?:\.\d+)?);/g)].map((m) => Number(m[1]))
+
+    it('is a formula over the notice\'s own padding, gap, distance from the bottom and text, not a pixel value', () => {
+      expect(reserve, '--hj-consent-reserve is a calc()').not.toBe('')
+      for (const token of ['--hj-consent-pad', '--hj-consent-gap', '--hj-consent-bottom', '--hj-consent-lines', '--text-sm', '--leading-text']) {
+        expect(reserve, `the estimate reads ${token}`).toContain(`var(${token})`)
+      }
+      expect(css, 'no band keeps a fitted pixel value').not.toMatch(/--hj-consent-reserve:\s*\d+px;/)
+    })
+
+    it('chooses how many lines the sentence wraps to per band: more on a narrower screen, within what the notice can wrap to', () => {
+      // The base value and one per band the sentence wraps differently in (the registered 600 and 359 breakpoints).
+      expect(lines.length).toBeGreaterThanOrEqual(3)
+      expect(lines, 'a narrower band never has fewer lines').toEqual([...lines].sort((a, b) => a - b))
+      for (const n of lines) {
+        expect(n).toBeGreaterThanOrEqual(4)
+        expect(n).toBeLessThanOrEqual(8)
+      }
+    })
+
+    it('does not restate the compact notice: the compact tokens change and the formula follows them', () => {
+      const compact = /@media \(max-width: 900px\) and \(max-height: 700px\) \{([\s\S]*?)\n  \}/.exec(css)?.[1] ?? ''
+      expect(compact, 'the compact block exists').toContain('--hj-consent-pad')
+      expect(compact, 'and carries no estimate of its own').not.toContain('--hj-consent-reserve')
+    })
   })
 })
