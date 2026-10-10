@@ -57,8 +57,15 @@ import { heroMedia } from '../src/lib/catalog'
  */
 const VIEWPORTS = [
   { label: '320×568 — smallest phone', width: 320, height: 568, clearsNotice: false },
+  // The short-phone block (globals.css) applies from 600 to 700px tall. Its edges are measured, because a bound chosen from one
+  // failure (568) is the kind that moves: one pixel below it, its two ends, and one pixel above. The widths are ones the matrix
+  // already has, so these are still eleven widths.
+  { label: '360×599 — one pixel under the short-phone block', width: 360, height: 599, clearsNotice: false },
+  { label: '360×600 — the short-phone block\'s lower edge', width: 360, height: 600, clearsNotice: false },
   { label: '360×640 — small Android', width: 360, height: 640, clearsNotice: false },
   { label: '375×667 — iPhone SE', width: 375, height: 667, clearsNotice: true },
+  { label: '390×700 — the short-phone block\'s upper edge', width: 390, height: 700, clearsNotice: true },
+  { label: '390×701 — one pixel over the short-phone block', width: 390, height: 701, clearsNotice: true },
   { label: '390×844 — iPhone', width: 390, height: 844, clearsNotice: true },
   { label: '430×932 — large phone', width: 430, height: 932, clearsNotice: true },
   { label: '768×1024 — tablet portrait', width: 768, height: 1024, clearsNotice: true },

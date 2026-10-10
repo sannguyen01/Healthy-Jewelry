@@ -427,8 +427,9 @@ test.describe('Homepage — no word is left alone on a last line', () => {
       })
       await afterPaint(page)
 
-      const orphans = await page.evaluate(() => {
+      const { orphans, measured } = await page.evaluate(() => {
         const found: string[] = []
+        let measured = 0
         const blocks = document.querySelectorAll('main h2, main h3, main p, main li, main figcaption, main .label-eyebrow')
         for (const block of blocks) {
           const words: { text: string; top: number; height: number }[] = []
@@ -446,6 +447,7 @@ test.describe('Homepage — no word is left alone on a last line', () => {
           // Under four words a break leaves two and one at best (a three-word name in a narrow column), which `balance` already
           // chooses well; the check is for sentences and phrases that have somewhere better to break.
           if (words.length < 4) continue
+          measured++
           const lines: { top: number; words: string[] }[] = []
           for (const word of words) {
             const last = lines[lines.length - 1]
@@ -457,8 +459,10 @@ test.describe('Homepage — no word is left alone on a last line', () => {
             found.push(`${label}: "${lines[lines.length - 1].words[0]}" alone after ${lines.length - 1} line(s) — "${(block.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 50)}"`)
           }
         }
-        return found
+        return { orphans: found, measured }
       })
+      // A scan that reads nothing finds nothing: the home page has well over a dozen blocks of four words or more.
+      expect(measured, `the scan read ${measured} blocks of running text at ${width}px; it should see the page's paragraphs`).toBeGreaterThanOrEqual(10)
       expect(orphans, `Words alone on a last line at ${width}px:\n  ${orphans.join('\n  ')}`).toEqual([])
     })
   }
