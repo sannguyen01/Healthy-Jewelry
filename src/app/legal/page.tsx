@@ -37,7 +37,7 @@ export default function LegalPage() {
         {/* Hero */}
         <section
           style={{
-            paddingTop: '120px',
+            paddingTop: 'calc(var(--header-height) + 56px)',
             paddingBottom: 'clamp(40px, 5vw, 64px)',
             paddingLeft: 'clamp(24px, 6vw, 120px)',
             paddingRight: 'clamp(24px, 6vw, 120px)',

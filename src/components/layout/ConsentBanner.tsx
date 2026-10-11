@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   CONSENT_OPEN_EVENT,
+  CONSENT_ROOM_PROPERTY,
   readConsent,
   writeConsent,
   shouldAskForConsent,
@@ -63,7 +64,51 @@ export function ConsentBanner() {
     if (openRequests > 0) dialog.current?.querySelector('button')?.focus()
   }, [openRequests])
 
-  if (consent === null || (!shouldAskForConsent(consent) && !reopened)) return null
+  const showing = consent !== null && (shouldAskForConsent(consent) || reopened)
+
+  // While the notice is up, tell the page how much of the screen it takes (ADR 054). It is anchored to the
+  // bottom, and the hero's copy sits in the lower part of its first screen, so the hero rides above it by this
+  // much (`--hj-consent-h`) and the document's `scroll-padding-bottom` keeps a focused control clear of it
+  // (WCAG 2.4.11). The room is the notice's own height plus the gap beneath it (its `bottom`), rounded up, so the
+  // room is never under-reserved. Taken back the moment the notice goes.
+  //
+  // Before this runs the page has already reserved an estimate when nobody had answered
+  // (`CONSENT_PREPAINT_SCRIPT`, so the hero does not move when the notice arrives), and this replaces it with the
+  // real figure. Once the stored answer has been read and nobody is being asked, any estimate is given back.
+  useEffect(() => {
+    const root = document.documentElement
+    const el = dialog.current
+    if (!showing || !el) {
+      if (consent !== null) root.style.removeProperty(CONSENT_ROOM_PROPERTY)
+      return
+    }
+    let published = -1
+    const publish = () => {
+      // Height and gap, not a position: `offsetHeight` and the computed `bottom` are layout facts, so neither moves
+      // while the notice's entrance `translateY` plays (reading the painted top published a room 23px short, and the
+      // hero's action sat 21px under the notice at 375×667), and neither depends on how far the page has scrolled or on
+      // what an engine says `offsetTop` of a fixed box is relative to (the CSSOM names the initial containing block, and
+      // only Chromium's answer has been checked). A `bottom` that does not resolve to a length counts as no gap.
+      const gap = Number.parseFloat(window.getComputedStyle(el).bottom)
+      const room = Math.max(0, Math.ceil(el.offsetHeight + (Number.isFinite(gap) ? gap : 0)))
+      // An unchanged figure is not written: the property is inherited by the whole document, so a write restyles it,
+      // and the observer's first callback and a phone's toolbar resizing both arrive with the number already right.
+      if (room === published) return
+      published = room
+      root.style.setProperty(CONSENT_ROOM_PROPERTY, `${room}px`)
+    }
+    publish()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish)
+    observer?.observe(el)
+    window.addEventListener('resize', publish)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', publish)
+      root.style.removeProperty(CONSENT_ROOM_PROPERTY)
+    }
+  }, [showing, consent])
+
+  if (consent === null || !showing) return null
 
   const choose = (next: 'granted' | 'denied') => {
     writeConsent(window.localStorage, next)
@@ -86,32 +131,31 @@ export function ConsentBanner() {
 
           It was a centred 620px bar, and `hero-legibility.spec.ts` caught it
           sitting directly on top of both hero CTAs at 1024px — reporting 1.00:1
-          contrast, because the pixels behind "Shop Collection" were the banner's
+          contrast, because the pixels behind the primary action were the banner's
           own `--bg`. A consent notice covering the two primary calls to action on
           the landing page is a conversion bug caused by a compliance control, and
           it is the failure `analytics.spec.ts` now guards across four widths.
           Guarding one control and not the others is how a class of bug survives
           being fixed.
 
-          Right-hand side because the hero is a split at ≥901px: copy and CTAs
-          left, photograph right. Overlapping part of a photograph is a cost worth
-          paying; overlapping the buttons is not.
+          Right-hand side because the hero's copy sits at the start edge of the
+          photograph (ADR 054): overlapping part of a photograph is a cost worth
+          paying; overlapping the buttons is not. And the hero rides above the
+          notice by the room it publishes (`--hj-consent-h`), so on a phone, where
+          the notice is nearly full width, the copy still clears it.
         */
         position: 'fixed',
         right: 'var(--space-gutter)',
-        // `left` only below the split, where the hero stacks and full width reads
-        // better than a floating card.
-        left: 'auto',
-        bottom: 'clamp(16px, 3vw, 32px)',
+        bottom: 'var(--hj-consent-bottom)',
         zIndex: 'var(--z-consent)',
         width: 'min(380px, calc(100vw - 2 * var(--space-gutter, 24px)))',
         backgroundColor: 'var(--bg)',
         border: '1px solid var(--ash)',
-        padding: 'clamp(18px, 3vw, 24px)',
+        padding: 'var(--hj-consent-pad)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        gap: '14px',
+        gap: 'var(--hj-consent-gap)',
         boxShadow: 'var(--shadow-float)',
         animation: 'hjSlideUp var(--duration-base) var(--ease) both',
       }}

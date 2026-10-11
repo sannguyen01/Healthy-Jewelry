@@ -40,7 +40,8 @@ import {
   type CollectionHandle,
   type MaterialHandle,
 } from './schema'
-import { rawClaims, rawCollections, rawProducts } from './manifest'
+import { rawClaims, rawCollections, rawHeroMedia, rawProducts } from './manifest'
+import { loadHeroMedia, type HeroMedia } from './hero-media-schema'
 import { CLAIM_IDS, loadClaimsRegistry, type ClaimId, type ClaimsRegistry } from './claims-schema'
 import {
   approvedWordings,
@@ -146,6 +147,15 @@ const { products, collections } = loadCatalog(rawProducts, rawCollections)
  * its cross-check needs. Loading it after the products makes both unnecessary.
  */
 const claimsRegistry: ClaimsRegistry = loadClaimsRegistry(rawClaims, {
+  productHandles: products.map((p) => p.handle),
+})
+
+/**
+ * The home hero's art direction (ADR 054), validated here for the same reason as the claims: this is the
+ * one module `next.config.ts` imports, so a malformed record fails the build once, before a page is
+ * generated. It follows the products because a photographed image names catalogue pieces.
+ */
+const heroMediaRecord: HeroMedia = loadHeroMedia(rawHeroMedia, {
   productHandles: products.map((p) => p.handle),
 })
 
@@ -427,4 +437,15 @@ export function materialChips(material: {
   return [...material.properties, ...approvedClaimTexts(asClaimIds(material.claims), materialContext(material.handle))]
 }
 
-export type { CatalogProduct, CatalogCollection, CollectionHandle, ClaimId, ClaimContext }
+// ── Hero media ─────────────────────────────────────────────────────────────
+
+/**
+ * The art direction of the home page's first screen: a crop for a wide screen and one for a narrow
+ * one, the box each subject occupies, the header's tone, the literal alt text and where the image came
+ * from. Server-side; the home page passes what a client component needs as props.
+ */
+export function heroMedia(): HeroMedia {
+  return heroMediaRecord
+}
+
+export type { CatalogProduct, CatalogCollection, CollectionHandle, ClaimId, ClaimContext, HeroMedia }

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import { Nav } from '@/components/layout/Nav'
 import { SITE_NAME } from '@/config/site'
+import { intersectionEntry, stubIntersectionObserver } from '../../support/intersection'
 
 vi.mock('next/image', () => ({
   // eslint-disable-next-line @next/next/no-img-element
@@ -22,10 +23,6 @@ vi.mock('next/link', () => ({
       {children}
     </a>
   ),
-}))
-
-vi.mock('@/lib/hooks/useScrolled', () => ({
-  useScrolled: vi.fn(() => false),
 }))
 
 // jsdom has no app router mounted, so `useRouter()` throws on render.
@@ -154,5 +151,92 @@ describe('Nav', () => {
       fireEvent.click(screen.getByRole('button', { name: /search/i }))
       expect(push).toHaveBeenCalledWith('/search')
     })
+  })
+})
+
+/**
+ * The header's state and tone (ADR 054). The state follows the hero's own end marker; the tone is the record's;
+ * and while the menu is open the page behind it is inert, so the dialog is a modal to a screen reader and not
+ * only to a Tab key.
+ */
+describe('Nav — state, tone and the modal', () => {
+  let io: ReturnType<typeof stubIntersectionObserver>
+
+  beforeEach(() => {
+    io = stubIntersectionObserver()
+    document.body.innerHTML = ''
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    document.body.innerHTML = ''
+  })
+
+  const bar = () => document.querySelector('header.hj-header') as HTMLElement
+  const withHero = () => {
+    document.body.insertAdjacentHTML('beforeend', '<main id="main"><div data-hero-end></div></main><footer></footer>')
+  }
+
+  it('is solid, with no tone, on a page that has no hero', () => {
+    render(<Nav />)
+    expect(bar().getAttribute('data-state')).toBe('solid')
+    expect(bar().hasAttribute('data-bar-tone')).toBe(false)
+  })
+
+  it('overlays the hero from its first paint on a page that asks for one, and carries the record\'s tone', () => {
+    withHero()
+    render(<Nav heroTone="light" />)
+    expect(bar().getAttribute('data-state')).toBe('hero-overlay')
+    expect(bar().getAttribute('data-bar-tone')).toBe('light')
+  })
+
+  it('turns solid when the hero\'s marker has passed the top, and back when it returns', () => {
+    withHero()
+    render(<Nav heroTone="light" />)
+    act(() => io.fire(intersectionEntry(false, -20, null)))
+    expect(bar().getAttribute('data-state')).toBe('solid')
+    act(() => io.fire(intersectionEntry(true, 30, null)))
+    expect(bar().getAttribute('data-state')).toBe('hero-overlay')
+  })
+
+  it('is menu-open while the menu is open, and returns to the hero state when it closes', () => {
+    withHero()
+    render(<Nav heroTone="light" />)
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
+    expect(bar().getAttribute('data-state')).toBe('menu-open')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(bar().getAttribute('data-state')).toBe('hero-overlay')
+  })
+
+  it('makes main and the footer inert while the menu is open, and restores them when it closes', () => {
+    withHero()
+    render(<Nav heroTone="light" />)
+    const main = document.getElementById('main') as HTMLElement
+    const footer = document.querySelector('footer') as HTMLElement
+    expect(main.hasAttribute('inert')).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
+    expect(main.hasAttribute('inert')).toBe(true)
+    expect(footer.hasAttribute('inert')).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(main.hasAttribute('inert')).toBe(false)
+    expect(footer.hasAttribute('inert')).toBe(false)
+  })
+
+  it('does not leave the page inert if the header unmounts with the menu open', () => {
+    withHero()
+    const { unmount } = render(<Nav heroTone="light" />)
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
+    unmount()
+    expect(document.getElementById('main')?.hasAttribute('inert')).toBe(false)
+    expect(document.querySelector('footer')?.hasAttribute('inert')).toBe(false)
+  })
+
+  it('leaves alone a page that was already inert before the menu opened', () => {
+    withHero()
+    document.getElementById('main')?.setAttribute('inert', '')
+    render(<Nav heroTone="light" />)
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.getElementById('main')?.hasAttribute('inert')).toBe(true)
   })
 })

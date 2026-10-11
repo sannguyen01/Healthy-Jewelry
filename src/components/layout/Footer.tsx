@@ -51,7 +51,7 @@ export function Footer() {
     >
       <div
         style={{
-          maxWidth: '1200px',
+          maxWidth: 'var(--hj-container)',
           margin: '0 auto',
         }}
       >

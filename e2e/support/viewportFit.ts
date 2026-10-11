@@ -120,6 +120,51 @@ export async function settle(page: Page): Promise<void> {
 }
 
 /**
+ * Two animation frames: the style change just made has been applied and painted. A computed value read in the frame
+ * it changed can still be the old one when anything on the element transitions, and a screenshot taken in it can
+ * sample the pixels from before the change. Written out in a dozen places before; one place now.
+ */
+export async function afterPaint(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  )
+}
+
+/**
+ * Walk the page once from top to bottom, as a visitor scrolling would, and come back to the top with it painted. The strip
+ * and the footer reveal on intersection, and a lazy photograph holds no room it has not earned until it is near the screen,
+ * so a geometry probe that reads a part of the page nobody has scrolled to measures a part that is not there yet.
+ */
+export async function walkPage(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    const step = Math.round(window.innerHeight * 0.6)
+    for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+      window.scrollTo(0, y)
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    }
+    window.scrollTo(0, 0)
+  })
+  await afterPaint(page)
+}
+
+/**
+ * Every finite animation and transition has finished. A looping one is excluded, because it never will, and the wait
+ * is capped so a stuck one is reported as a timeout and not as a hung test. Measuring a moving target is how a
+ * button's backdrop gets reported as the page behind where the button used to be.
+ */
+export async function animationsFinished(page: Page, timeoutMs = 5_000): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      document
+        .getAnimations()
+        .every((animation) => animation.playState !== 'running' || animation.effect?.getComputedTiming().iterations === Infinity),
+    null,
+    { timeout: timeoutMs }
+  )
+}
+
+/**
  * Every interactive control under `rootSelector` — plus the root itself — that
  * reaches past a viewport edge.
  *
@@ -253,8 +298,8 @@ export interface Segment {
  */
 export const LAYOUT_SEGMENTS: Segment[] = [
   { label: 'mobile nav (<=768px)', lo: 320, hi: 768 },
-  { label: 'desktop nav, full-bleed hero (769-900px)', lo: 769, hi: 900 },
-  { label: 'desktop nav, split hero (>=901px)', lo: 901, hi: 1440 },
+  { label: 'desktop nav, narrow-crop hero (769-900px)', lo: 769, hi: 900 },
+  { label: 'desktop nav, wide-crop hero (>=901px)', lo: 901, hi: 1440 },
 ]
 
 /**

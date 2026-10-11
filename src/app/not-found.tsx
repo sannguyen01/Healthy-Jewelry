@@ -21,8 +21,8 @@ export default function NotFound() {
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          // 64px is the fixed header's height, so the content centres in what is left below it.
-          padding: '64px clamp(20px, 4vw, 64px) 0',
+          // The fixed header's height, so the content centres in what is left below it.
+          padding: 'var(--header-height) clamp(20px, 4vw, 64px) 0',
           gap: '0',
         }}
       >

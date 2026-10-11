@@ -123,15 +123,17 @@ export type ClaimMaterial = (typeof MATERIAL_HANDLES)[number]
  */
 export const CLAIM_WITHDRAWAL_BOUND_SECONDS = 3600
 
-const isoDate = z.iso.date()
+/** The day an approval was given or a record lapses. Exported: the hero record's approval is "exactly as a claim's does" (ADR 054), so the rule is written once. */
+export const isoDate = z.iso.date()
 
 /**
  * A named person. Deliberately not an email or a role: "the materials team" has approved
  * nothing, and an approval is only as good as the individual who can be asked about it.
  */
-const reviewer = z.string().trim().min(3)
+export const reviewer = z.string().trim().min(3)
 
-const productHandle = z
+/** A catalogue handle. Exported with the two above for the hero record, which names the pieces its photograph shows. */
+export const productHandle = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'a product handle is a lowercase kebab-case slug')
 

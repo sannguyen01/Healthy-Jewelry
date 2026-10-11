@@ -3,14 +3,25 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
-import { useScrolled } from '@/lib/hooks/useScrolled'
+import { useHeroOverlay } from '@/lib/hooks/useHeroOverlay'
 import { BrandLockup } from '@/components/layout/BrandLockup'
 import { MenuArchive } from '@/components/layout/MenuArchive'
 
-export function Nav() {
+interface NavProps {
+  /**
+   * The page begins with a hero the header lies over, and this is which side of the photograph's top edge the header's
+   * type is set against: `light` is light type on a darkened band, `dark` is ink on a light one. Only the home page has
+   * a hero, and it says so: the header's state is a fact about the page, rendered by the server, not something it
+   * infers from a scroll distance. Every other page leaves it out and is `solid` from its first byte (it was
+   * transparent for its first 60px). The hero's record carries the tone and a rendered-pixel test proves it.
+   */
+  heroTone?: 'light' | 'dark'
+}
+
+export function Nav({ heroTone }: NavProps) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
-  const scrolled = useScrolled(60)
+  const overlay = useHeroOverlay(heroTone !== undefined)
   const drawerRef = useRef<HTMLDivElement>(null)
   const menuBtnRef = useRef<HTMLButtonElement>(null)
   const headerRef = useRef<HTMLElement>(null)
@@ -22,7 +33,7 @@ export function Nav() {
     menuBtnRef.current?.focus()
   }
 
-  const state = menuOpen ? 'menu-open' : scrolled ? 'solid' : 'hero-overlay'
+  const state = menuOpen ? 'menu-open' : overlay ? 'hero-overlay' : 'solid'
 
   // Focus management. While the drawer is open the Tab cycle is every control in the header
   // (the menu button is the visible close control and lives outside the drawer element) followed
@@ -78,6 +89,14 @@ export function Nav() {
       }
     }
 
+    // A dialog is modal to a screen reader only if what is behind it cannot be reached. `aria-modal` is a hint
+    // some assistive technology ignores and the Tab trap above holds only the keyboard, so the page itself goes
+    // inert while the menu is open. Only what this effect set is restored: a page that was already inert stays so.
+    const inerted = [document.getElementById('main'), document.querySelector('footer')].filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && !el.hasAttribute('inert')
+    )
+    inerted.forEach((el) => el.setAttribute('inert', ''))
+
     document.addEventListener('keydown', handleKeyDown)
     document.body.style.overflow = 'hidden'
 
@@ -85,12 +104,18 @@ export function Nav() {
       window.clearTimeout(focusTimer)
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = ''
+      inerted.forEach((el) => el.removeAttribute('inert'))
     }
   }, [menuOpen])
 
   return (
     <>
-      <header ref={headerRef} className="hj-header" data-state={state}>
+      <header
+        ref={headerRef}
+        className="hj-header"
+        data-state={state}
+        data-bar-tone={heroTone}
+      >
         {/* Left: Menu control */}
         <div className="hj-header-left">
           <button

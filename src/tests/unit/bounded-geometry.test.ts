@@ -107,7 +107,7 @@ const CLASSIFIED: Record<string, { state: 'bounded' | 'intrinsic' | 'unbounded';
   },
   'src/components/home/HorizontalScroll.tsx | aspectRatio | var(--ratio-product)': {
     state: 'intrinsic',
-    why: 'The image box fills a strip card whose own width is `clamp(200px, 68vw, 320px)` (.hj-strip-card). The container caps the deriving axis at 320px, so the 3 / 4 listing crop (ADR 044) cannot grow past 320 x 427.',
+    why: 'The image box fills a strip card whose own width is `clamp(200px, 68vw, 320px)` below 961px and a quarter of the page container (at most 306px) above it (.hj-strip-card). Either way the card caps the deriving axis at 320px, so the 3 / 4 listing crop (ADR 044) cannot grow past 320 x 427.',
   },
   'src/app/globals.css | minHeight | 24px': {
     state: 'intrinsic',

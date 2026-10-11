@@ -221,3 +221,30 @@ describe('the label size is a floor', () => {
     ).toEqual([])
   })
 })
+
+describe('where a line breaks', () => {
+  /**
+   * No rule in the stylesheet asked the browser to care where a line ends, so a heading, the eyebrow or a sentence could leave
+   * one word alone on its last line: "STEEL" under the hero's three metals at 390px, "specification." under a heading
+   * sentence, "piece." at the end of the care paragraph. Two declarations ask: `balance` for short blocks (headings and
+   * the eyebrow, where the lines should be the same length) and `pretty` for running text (where only the last line is at
+   * risk). `e2e/homepage-composition.spec.ts` measures the rendered lines; this holds the asking, so deleting it is not silent.
+   */
+  const block = (selector: RegExp) => {
+    const match = GLOBALS.match(new RegExp(`^\\s*${selector.source}\\s*\\{([^}]*)\\}`, 'm'))
+    if (!match) throw new Error(`no rule for ${selector} in globals.css`)
+    return match[1]
+  }
+
+  it('balances the lines of headings', () => {
+    expect(block(/h1,\s*h2,\s*h3,\s*h4,\s*h5,\s*h6/)).toMatch(/text-wrap:\s*balance/)
+  })
+
+  it('balances the lines of the eyebrow', () => {
+    expect(block(/\.label-eyebrow/)).toMatch(/text-wrap:\s*balance/)
+  })
+
+  it('keeps a lone word off the last line of running text', () => {
+    expect(block(/p,\s*li,\s*figcaption/)).toMatch(/text-wrap:\s*pretty/)
+  })
+})

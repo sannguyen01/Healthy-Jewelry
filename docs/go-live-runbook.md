@@ -183,7 +183,7 @@ configured" from "never arrived."
 Desktop parity is not a safe assumption here. Both mobile-only defects this
 project has shipped — the hero crop that discarded 75% of the frame at 390px,
 and the collection tiles that rendered at `opacity: 0.12` — passed every desktop
-check. That is why `hero-legibility.spec.ts` samples seven widths.
+check. That is why `hero-legibility.spec.ts` samples eleven widths, 900 and 901 among them.
 
 On a real phone, not an emulator: add to bag → open the bag → Checkout, and
 confirm the redirect lands on Shopify's hosted checkout with the right items and

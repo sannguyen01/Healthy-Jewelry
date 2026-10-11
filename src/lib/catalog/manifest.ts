@@ -64,6 +64,13 @@ import collectionRings from '../../content/catalog/collections/rings.json'
 
 import claimsRegistry from '../../content/claims/claims.json'
 
+// ── Hero media ─────────────────────────────────────────────────────────────
+//
+// The art direction of the home page's first screen (ADR 054): which crop at which width, where its
+// subject is, and where the photograph came from. One record, relative import, for the reasons above.
+
+import heroMediaHome from '../../content/hero/home.json'
+
 /** Raw, unvalidated product records. Read them through `@/lib/catalog`, never from here. */
 export const rawProducts: readonly unknown[] = [
   arcBandTitanium,
@@ -96,3 +103,6 @@ export const rawCollections: readonly unknown[] = [
 
 /** The raw, unvalidated claims registry. Read claims through `@/lib/catalog`, never from here. */
 export const rawClaims: unknown = claimsRegistry
+
+/** The raw, unvalidated hero media record. Read it through `@/lib/catalog`, never from here. */
+export const rawHeroMedia: unknown = heroMediaHome

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement } from 'react'
@@ -15,6 +15,7 @@ import {
   analyticsAllowed,
   shouldAskForConsent,
   CONSENT_STORAGE_KEY,
+  CONSENT_ROOM_PROPERTY,
   CONSENT_OPEN_EVENT,
   openConsentPreferences,
   type AnalyticsEvent,
@@ -411,5 +412,161 @@ describe('consent can be withdrawn from the site', () => {
         },
       })
     ).not.toThrow()
+  })
+})
+
+describe('the notice publishes the room it takes (ADR 054)', () => {
+  // The hero's copy rides above a bottom-anchored notice, so the page needs to know how much of the screen the
+  // notice occupies: its own height plus the gap beneath it (its `bottom`). Both are layout facts that do not depend
+  // on where the page is scrolled or on how an engine reports the offset of a fixed box, and neither moves while the
+  // notice's entrance transform plays (measured: reading the painted top published a room 23px short).
+  const PROPERTY = CONSENT_ROOM_PROPERTY
+  const published = () => document.documentElement.style.getPropertyValue(PROPERTY)
+
+  let height = 200
+  let bottom = 44
+  let resizeCallback: (() => void) | undefined
+
+  beforeEach(() => {
+    localStorage.removeItem(CONSENT_STORAGE_KEY)
+    document.documentElement.style.removeProperty(PROPERTY)
+    height = 200
+    bottom = 44
+    resizeCallback = undefined
+    // The painted box is made to lie (24px low, as it is mid-entrance, and nowhere near its layout place), so only the
+    // layout height and the computed `bottom` tell the truth, and the figure cannot come from the rect.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: 999, bottom: 1199, height: 200, left: 0, right: 0, width: 0, x: 0, y: 999, toJSON: () => ({}) }) as DOMRect
+    )
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => height)
+    const computedStyle = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const style = computedStyle(element, pseudo)
+      // jsdom does not resolve `var()`, so the notice's `bottom` (a token) is told to it as the browser would resolve it.
+      if (!(element instanceof HTMLElement) || element.getAttribute('role') !== 'dialog') return style
+      return new Proxy(style, {
+        get: (target, property) => {
+          if (property === 'bottom') return `${bottom}px`
+          const value = Reflect.get(target, property, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+    })
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          resizeCallback = cb
+        }
+        observe() {}
+        disconnect() {}
+      }
+    )
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    cleanup()
+    document.documentElement.style.removeProperty(PROPERTY)
+  })
+
+  it('writes the notice\'s height plus the gap beneath it while it is showing', () => {
+    render(createElement(ConsentBanner))
+    expect(screen.getByRole('dialog', { name: /analytics consent/i })).toBeTruthy()
+    expect(published()).toBe('244px')
+  })
+
+  it('writes nothing while the notice is not showing', () => {
+    writeConsent(localStorage, 'denied')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('')
+  })
+
+  it('takes it back the moment the visitor answers', () => {
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
+    expect(published()).toBe('')
+  })
+
+  it('takes it back when the notice unmounts', () => {
+    const { unmount } = render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+    unmount()
+    expect(published()).toBe('')
+  })
+
+  it('follows the notice when its size changes (a longer line, a rotated phone)', () => {
+    render(createElement(ConsentBanner))
+    height = 300
+    act(() => resizeCallback?.())
+    expect(published()).toBe('344px')
+  })
+
+  it('follows the gap beneath the notice when the window is resized (a rotated phone has a different inset)', () => {
+    render(createElement(ConsentBanner))
+    bottom = 20
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(published()).toBe('220px')
+  })
+
+  it('does not depend on the height of the screen, which a bottom-anchored box does not move with', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 844, configurable: true })
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+    Object.defineProperty(window, 'innerHeight', { value: 520, configurable: true })
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(published()).toBe('244px')
+  })
+
+  it('never publishes less than the room it measured, even from a fractional gap', () => {
+    bottom = 8.4
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('209px')
+  })
+
+  it('publishes the height alone where the gap cannot be read (a stylesheet that does not resolve it)', () => {
+    bottom = Number.NaN
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('200px')
+  })
+
+  it('replaces the estimate the page reserved before first paint with the real figure', () => {
+    // CONSENT_PREPAINT_SCRIPT reserves an estimate (a reference to the token) when nobody has answered; the notice's
+    // own measurement takes its place, so the hero is trimmed to the notice, not left at a guess.
+    document.documentElement.style.setProperty(PROPERTY, 'var(--hj-consent-reserve)')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('244px')
+  })
+
+  it('gives the estimate back when the stored answer says nobody is being asked', () => {
+    // The page reserved a room because it could not tell, the answer turns out to be stored: the room goes, rather
+    // than staying as an empty band above the bottom of the hero for a visitor who will never see a notice.
+    writeConsent(localStorage, 'denied')
+    document.documentElement.style.setProperty(PROPERTY, 'var(--hj-consent-reserve)')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('')
+  })
+
+  it('publishes it when the prompt is reopened from the footer, and takes it back after', () => {
+    writeConsent(localStorage, 'granted')
+    render(createElement(ConsentBanner))
+    expect(published()).toBe('')
+    act(() => openConsentPreferences())
+    expect(published()).toBe('244px')
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }))
+    expect(published()).toBe('')
+  })
+
+  it('does not throw where ResizeObserver does not exist', () => {
+    vi.unstubAllGlobals()
+    vi.stubGlobal('ResizeObserver', undefined)
+    expect(() => render(createElement(ConsentBanner))).not.toThrow()
+    expect(published()).toBe('244px')
   })
 })

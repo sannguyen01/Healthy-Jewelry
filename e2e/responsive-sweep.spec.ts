@@ -1,5 +1,6 @@
 import { test, expect, type Page } from './support/test'
 import { settle } from './support/viewportFit'
+import { denyConsent } from './support/consent'
 
 /**
  * **Every page route, at every width a project stands for, measured rather than looked at.**
@@ -134,13 +135,7 @@ test.describe('Responsive sweep', () => {
   test.beforeEach(async ({ context }) => {
     // The consent banner is fixed over the page by design until answered; its own layout is
     // analytics.spec's subject. Answering it here measures the page beneath.
-    await context.addInitScript(() => {
-      try {
-        localStorage.setItem('hj-analytics-consent', 'denied')
-      } catch {
-        /* storage unavailable: the banner stays, and is fixed, so it is not measured as overflow */
-      }
-    })
+    await denyConsent(context)
   })
 
   for (const { path } of ROUTES) {

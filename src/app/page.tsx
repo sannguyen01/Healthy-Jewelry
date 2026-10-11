@@ -19,6 +19,7 @@ import {
   getBestsellers,
   getNewArrivals,
   getAllCollections,
+  heroMedia,
 } from '@/lib/catalog'
 import { SITE_DEFAULT_TITLE, SITE_NAME } from '@/config/site'
 import { dedupeInOrder } from '@/lib/utils/homepageStrips'
@@ -49,6 +50,9 @@ export default function HomePage() {
   // 2. A few pieces. Four to six reviewed items.
   const [bestsellers, newArrivals] = dedupeInOrder([bestsellersRaw, newArrivalsRaw])
   const curatedPieces = [...bestsellers, ...newArrivals].slice(0, 6)
+  // The hero's art direction (ADR 054). The header takes its tone from the same record the hero takes its
+  // crop from, so the two cannot disagree about what is behind the bar.
+  const media = heroMedia()
 
   // 3. Explore by type. Every collection, from the one list the catalogue keeps; the grid decides
   // which have a photograph to show (ADR 051, B4).
@@ -70,10 +74,10 @@ export default function HomePage() {
           called. e2e/metadata.spec.ts reads these two blocks off the served home page. */}
       <JsonLd type="Organization" data={organizationJsonLd()} />
       <JsonLd type="WebSite" data={webSiteJsonLd()} />
-      <Nav />
+      <Nav heroTone={media.headerTone} />
       <main id="main" tabIndex={-1}>
         {/* 1. Hero */}
-        <Hero headlineLines={claimLines('brand-positioning', SITE)} />
+        <Hero media={media} headlineLines={claimLines('brand-positioning', SITE)} />
 
         {/* 2. The metals */}
         <MaterialsSection />

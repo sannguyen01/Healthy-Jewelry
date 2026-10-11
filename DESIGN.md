@@ -74,7 +74,7 @@ Songmont's site. ([ADR 044](docs/adr/044-decided-from-the-language-not-the-page.
 |---|---|---|---|
 | Latin web font | Decided in ADR 043 as the identity's one family and revised by [ADR 052](docs/adr/052-the-original-pair-on-the-quiet-archive.md): the brand's original pair, Barlow Condensed (display and the name, [ADR 048](docs/adr/048-the-name-keeps-its-own-face.md)) and DM Sans (everything else) | The owner's instruction: a reference for the site is not a template for the brand, and the brand already had a pair | `src/tests/unit/typography-weights.test.ts`, `src/tests/unit/font-files.test.ts`, `e2e/glyph-coverage.spec.ts` |
 | Listing crop | 3:4 portrait (`--ratio-product`) for product cards and the homepage strip, the crop the collection and material tiles already used | One crop through the homepage instead of a square strip between two portrait rows; 8 of the 17 illustrations are taller than wide, and at 3:4 they draw up to 1.33x larger while no piece draws smaller; portrait is the frame of the verified photographic direction, pieces worn | `src/tests/unit/design-consistency.test.ts`, `e2e/layout-invariants.spec.ts` |
-| Header | Kept: centred knot-and-name lockup, two quiet text controls each side, flat fill with a hairline once scrolled, 44px targets | The verified register is restraint — tonal, typographic, nothing laid over content — and the composition already says only that | `src/tests/unit/design-consistency.test.ts`, `e2e/header-fit.spec.ts` |
+| Header | Kept: centred knot-and-name lockup, two quiet text controls each side, flat fill with a hairline once the hero has passed (and from the first byte on a page without one), 44px targets; over the home page's photograph it is set on a veil the hero provides ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)) | The verified register is restraint — tonal, typographic — and the composition already says only that; the one place it lies over content is the photograph, where its legibility is measured | `src/tests/unit/design-consistency.test.ts`, `e2e/header-fit.spec.ts`, `e2e/hero-legibility.spec.ts` |
 
 The product detail tile stays square and bounded ([ADR 017](docs/adr/017-a-box-that-could-not-be-both.md)):
 at 3:4 its cap would make it taller than a laptop window leaves below the header (the figures
@@ -82,7 +82,11 @@ are in ADR 044).
 
 **Photography is content, not a token.** The verified direction — pieces worn with cream, beige and
 tan linen against soft, blurred grounds — describes images this site does not have yet. The hero
-photograph stands until the owner replaces it; no filter is laid over it to imitate a palette.
+photograph stands as an interim until the owner replaces it with photography of the actual pieces
+(its provenance is recorded in `src/content/hero/home.json`, and the replacement is an owner gate in
+`STATE.md`). No filter is laid over it to imitate a palette. A **veil** is not that: a gradient whose
+strength is set by the lowest contrast measured under the text it protects is a legibility device, and
+is allowed ([ADR 054](docs/adr/054-one-hero-one-coordinate-system.md)).
 
 ## Surface and colour
 
@@ -146,8 +150,15 @@ photograph stands until the owner replaces it; no filter is laid over it to imit
 
 ## The header and the footer
 
-- **Flat.** The header has a solid fill and a hairline in its scrolled state — no blur, no
+- **Flat.** The header has a solid fill and a hairline in its solid state — no blur, no
   shadow; the menu drawer likewise. Enforced by `src/tests/unit/design-consistency.test.ts`.
+- **Three states, from the page and not a scroll distance.** Over the hero (`/` alone), solid, and
+  menu-open. The state follows the hero's own end marker, so a page with no hero is solid from its
+  first byte. Enforced by `src/tests/unit/hero-overlay.test.ts`, `src/tests/unit/components/Nav.test.tsx`
+  and `e2e/navigation.spec.ts`.
+- **One number for its height.** `--header-height`, written once; the bar, the menu's top edge, the
+  hero's safe zone and every page's offset read it. Enforced by
+  `src/tests/unit/header-height-token.test.ts`.
 - **The brand lockup is the knot mark and the name, as one link home** (`BrandLockup.tsx`):
   inline in the header, stacked in the footer. The name is always `SITE_NAME`; enforced by
   `src/tests/unit/brand-name.test.ts`.
@@ -186,6 +197,13 @@ photograph stands until the owner replaces it; no filter is laid over it to imit
 - **The product detail tile is square and bounded.** Enforced by `e2e/product-image-fit.spec.ts`
   ([ADR 017](docs/adr/017-a-box-that-could-not-be-both.md)).
 - **No floor without a ceiling** on any box. Enforced by `src/tests/unit/bounded-geometry.test.ts`.
+- **The hero's crop is data, and the subject survives it.** For a wide screen and a narrow one the
+  record holds a focal point and the box the subject occupies; at every width the subject is in
+  frame and clear of the copy, computed from the record and checked against the browser's own
+  boxes. Enforced by `src/tests/unit/hero-media.test.ts`, `src/tests/unit/cover-crop.test.ts` and
+  `e2e/hero-legibility.spec.ts`.
+- **An image says where it came from.** A photographed image names real pieces, an AI-origin one
+  names none, an approval names a person and a date. Enforced by the schema, at build.
 
 ## Rhythm
 
